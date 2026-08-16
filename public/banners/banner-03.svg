@@ -1,0 +1,38 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="left3" x1="275" y1="61" x2="720" y2="758" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8DAB8"/>
+      <stop offset="0.58" stop-color="#6A523B"/>
+      <stop offset="1" stop-color="#111111"/>
+    </linearGradient>
+    <linearGradient id="topRight3" x1="1015" y1="56" x2="1360" y2="370" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#685332"/>
+      <stop offset="0.36" stop-color="#1B1B16"/>
+      <stop offset="1" stop-color="#090909"/>
+    </linearGradient>
+    <linearGradient id="bottomRight3" x1="1002" y1="454" x2="1410" y2="799" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F261F"/>
+      <stop offset="0.38" stop-color="#9C5E3A"/>
+      <stop offset="1" stop-color="#111111"/>
+    </linearGradient>
+    <radialGradient id="flash3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(607 138) rotate(44.6896) scale(490 276)">
+      <stop stop-color="#FFF7E8" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#FFF7E8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" rx="36" fill="#0C0C0E"/>
+  <rect x="0" y="0" width="816" height="900" rx="36" fill="url(#left3)"/>
+  <rect x="816" y="0" width="784" height="410" rx="0 36 0 0" fill="url(#topRight3)"/>
+  <rect x="816" y="410" width="784" height="490" rx="0 0 36 0" fill="url(#bottomRight3)"/>
+  <rect x="0" y="0" width="1600" height="900" rx="36" fill="url(#flash3)"/>
+  <rect x="806" y="0" width="20" height="900" fill="#0C0C0E"/>
+  <rect x="816" y="400" width="784" height="20" fill="#0C0C0E"/>
+  <path d="M437 96C533 92 596 139 659 221L645 382L558 479L436 474L334 355L347 193L437 96Z" fill="#121212" fill-opacity="0.92"/>
+  <path d="M337 512C420 455 504 430 610 443L767 620L716 900H212L176 697L337 512Z" fill="#171717" fill-opacity="0.78"/>
+  <path d="M1110 116C1176 111 1230 132 1277 182L1264 244L1217 236L1171 259L1127 231L1082 245L1064 193L1110 116Z" fill="#736C4E"/>
+  <path d="M1072 174C1126 149 1178 149 1238 173L1268 279L1222 372H1126L1085 299L1072 174Z" fill="#2C241E"/>
+  <path d="M983 446C1047 426 1113 426 1187 452L1267 570L1235 900H950L912 582L983 446Z" fill="#C0A783" fill-opacity="0.26"/>
+  <path d="M1050 497C1129 469 1202 470 1273 495L1354 900H981L1050 497Z" fill="#B9855E" fill-opacity="0.22"/>
+  <path d="M1180 518C1255 506 1331 528 1419 587L1394 690L1280 748L1189 703L1144 602L1180 518Z" fill="#D3B188" fill-opacity="0.56"/>
+  <rect x="0" y="0" width="1600" height="900" rx="36" fill="#090909" fill-opacity="0.08"/>
+</svg>

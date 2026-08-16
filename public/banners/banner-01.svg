@@ -1,0 +1,41 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg1" x1="141" y1="92" x2="1364" y2="812" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6F7C73"/>
+      <stop offset="0.42" stop-color="#B0A998"/>
+      <stop offset="1" stop-color="#1A1815"/>
+    </linearGradient>
+    <linearGradient id="figure1" x1="987" y1="114" x2="1239" y2="766" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10100F"/>
+      <stop offset="0.48" stop-color="#312A24"/>
+      <stop offset="1" stop-color="#090909"/>
+    </linearGradient>
+    <linearGradient id="sleeve1" x1="638" y1="288" x2="923" y2="680" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1EDE1"/>
+      <stop offset="0.53" stop-color="#B0A898"/>
+      <stop offset="1" stop-color="#555048"/>
+    </linearGradient>
+    <radialGradient id="light1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(551 113) rotate(46.11) scale(712 476)">
+      <stop stop-color="#F4F0E4" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#F4F0E4" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur1" x="692" y="44" width="764" height="816" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" rx="36" fill="url(#bg1)"/>
+  <rect width="1600" height="900" rx="36" fill="url(#light1)"/>
+  <rect width="1600" height="900" rx="36" fill="#090909" fill-opacity="0.08"/>
+  <path d="M0 0H520L314 900H0V0Z" fill="#0A0A0A" fill-opacity="0.28"/>
+  <path d="M631 300C731 214 832 182 958 184L867 471L710 621L574 443L631 300Z" fill="url(#sleeve1)" fill-opacity="0.96"/>
+  <path d="M862 88C998 76 1109 103 1224 211L1124 277L1001 235L900 278L835 179L862 88Z" fill="#EEE5D7" fill-opacity="0.72"/>
+  <g filter="url(#blur1)">
+    <path d="M1034 118C1154 116 1263 151 1367 240L1319 746C1226 789 1102 793 991 734L905 403C899 286 936 186 1034 118Z" fill="url(#figure1)"/>
+  </g>
+  <path d="M1038 130C1154 122 1251 159 1343 234L1310 724C1234 762 1130 770 1038 734L966 410C962 298 979 191 1038 130Z" fill="url(#figure1)"/>
+  <path d="M1124 178C1171 199 1200 233 1222 276L1180 482L1124 561L1074 486L1043 279C1058 228 1081 194 1124 178Z" fill="#1F1B18"/>
+  <path d="M967 415C1032 439 1086 485 1131 556L1093 862H790L740 716L782 560L967 415Z" fill="#F2ECDD" fill-opacity="0.82"/>
+  <path d="M1339 356C1412 363 1475 394 1532 454V900H1207L1172 642L1242 441L1339 356Z" fill="#EFE5D8" fill-opacity="0.74"/>
+  <circle cx="1136" cy="455" r="112" fill="#0A0A0A" fill-opacity="0.26"/>
+  <path d="M0 758C151 720 271 720 406 758V900H0V758Z" fill="#0A0A0A" fill-opacity="0.16"/>
+</svg>

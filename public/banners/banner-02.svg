@@ -1,0 +1,35 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="271" y1="109" x2="1416" y2="823" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86A6B0"/>
+      <stop offset="0.42" stop-color="#CED4D1"/>
+      <stop offset="1" stop-color="#5F5F5E"/>
+    </linearGradient>
+    <linearGradient id="hoodie2" x1="896" y1="277" x2="1232" y2="813" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBFCFC"/>
+      <stop offset="0.43" stop-color="#C9CCC7"/>
+      <stop offset="1" stop-color="#6B706E"/>
+    </linearGradient>
+    <linearGradient id="face2" x1="1009" y1="170" x2="1142" y2="449" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9C6B7"/>
+      <stop offset="0.54" stop-color="#8B6F5D"/>
+      <stop offset="1" stop-color="#43352C"/>
+    </linearGradient>
+    <radialGradient id="glow2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(661 161) rotate(39.3418) scale(779 412)">
+      <stop stop-color="#E9F8FF" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#E9F8FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" rx="36" fill="url(#bg2)"/>
+  <rect width="1600" height="900" rx="36" fill="url(#glow2)"/>
+  <path d="M0 0H542L412 900H0V0Z" fill="#0A0A0A" fill-opacity="0.2"/>
+  <path d="M820 736C1017 677 1207 674 1448 736V900H820V736Z" fill="#16181B" fill-opacity="0.72"/>
+  <path d="M1111 129C1187 145 1244 198 1280 295L1207 338L1074 330L995 281L1034 180L1111 129Z" fill="#0E1014"/>
+  <ellipse cx="1091" cy="263" rx="170" ry="167" fill="#111417"/>
+  <path d="M1049 216C1099 175 1148 175 1203 213L1222 332L1170 441H1051L1000 333L1049 216Z" fill="url(#face2)"/>
+  <path d="M936 468C1008 406 1096 378 1204 391L1333 607L1284 900H856L791 646L936 468Z" fill="url(#hoodie2)"/>
+  <path d="M1078 103C1151 101 1210 129 1263 183L1250 248L1181 212L1091 204L1019 231L995 174C1031 128 1078 105 1078 103Z" fill="#090A0D"/>
+  <path d="M854 542L970 614L1085 573L1194 618L1308 543L1350 631L1285 900H856L796 633L854 542Z" fill="#9FA39E" fill-opacity="0.28"/>
+  <circle cx="1170" cy="365" r="18" fill="#1C1410"/>
+  <rect x="0" y="0" width="1600" height="900" rx="36" fill="#090909" fill-opacity="0.07"/>
+</svg>
