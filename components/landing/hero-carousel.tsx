@@ -105,6 +105,16 @@ const emptyCreateAccountForm: CreateAccountForm = {
   confirmPassword: "",
 };
 
+function getDashboardPathForRole(role: string) {
+  const normalizedRole = role.trim().toLowerCase();
+
+  if (normalizedRole === "artist") {
+    return "/dashboard/artist";
+  }
+
+  return "/dashboard";
+}
+
 export function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
@@ -128,6 +138,11 @@ export function HeroCarousel() {
     useState<CreateAccountForm>(emptyCreateAccountForm);
 
   const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch("/dashboard");
+    router.prefetch("/dashboard/artist");
+  }, [router]);
 
   const advanceSlide = useEffectEvent(() => {
     setActiveIndex((current) => (current + 1) % heroSlides.length);
@@ -225,13 +240,7 @@ export function HeroCarousel() {
         });
         setIsSignInOpen(false);
 
-        if (currentUser.role === "USER") {
-          router.push("/dashboard");
-        } else {
-          setAuthMessage(
-            `Xin chao ${currentUser.fullName}, ban da dang nhap thanh cong.`
-          );
-        }
+        router.push(getDashboardPathForRole(currentUser.role));
       } catch (error) {
         setSignInError(
           error instanceof Error ? error.message : "Dang nhap that bai"
@@ -270,13 +279,7 @@ export function HeroCarousel() {
         setShowCreateFields(false);
         setIsCreateAccountOpen(false);
 
-        if (currentUser.role === "USER") {
-          router.push("/dashboard");
-        } else {
-          setAuthMessage(
-            `Tai khoan da duoc tao thanh cong cho ${currentUser.fullName}.`
-          );
-        }
+        router.push(getDashboardPathForRole(currentUser.role));
       } catch (error) {
         setCreateAccountError(
           error instanceof Error ? error.message : "Tao tai khoan that bai"
@@ -352,12 +355,12 @@ export function HeroCarousel() {
     <section className="space-y-4">
       <div className="relative overflow-hidden rounded-[2.25rem] border border-white/8 bg-[#090909] shadow-[0_35px_110px_rgba(0,0,0,0.42)]">
         <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-8 sm:py-7">
-          <div className="flex items-center gap-3 text-white">
+          <Link href="/" className="flex items-center gap-3 text-white">
             <LogoMark />
             <span className="text-xs font-semibold uppercase tracking-[0.32em] sm:text-sm">
               Moodify
             </span>
-          </div>
+          </Link>
 
           <div className="hidden items-center gap-3 md:flex">
             {authUser ? (

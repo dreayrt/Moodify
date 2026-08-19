@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
@@ -200,7 +201,7 @@ function WaveformPreview({ active }: { active: boolean }) {
 function SectionHeader({
   eyebrow,
   title,
-  seeAllHref = "#",
+  seeAllHref = "/",
 }: {
   eyebrow: string;
   title: string;
@@ -216,12 +217,12 @@ function SectionHeader({
           {title}
         </h2>
       </div>
-      <a
+      <Link
         href={seeAllHref}
         className="font-manrope text-[11px] tracking-[0.18em] text-white/55 hover:text-white transition-colors uppercase"
       >
         See all
-      </a>
+      </Link>
     </div>
   );
 }
@@ -669,12 +670,13 @@ export default function LumenHero() {
       <div className="relative z-10 w-full min-h-screen flex flex-col">
         {/* Top bar */}
         <header className="flex items-center gap-[16px] px-5 md:px-[35px] pt-5 md:pt-[27px]">
-          <span
+          <Link
+            href="/"
             className="font-graphik text-white text-[18px] md:text-[21px] leading-[21px] whitespace-nowrap anim-fade-up tracking-[-0.02em]"
             style={{ animationDelay: "200ms" }}
           >
             Moodify
-          </span>
+          </Link>
 
           <div
             className="hidden md:flex items-center gap-[10px] ml-[18px] px-[14px] py-[9px] rounded-full border border-white/10 bg-white/5 backdrop-blur-md w-[280px] anim-fade-up"
@@ -704,27 +706,27 @@ export default function LumenHero() {
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6 lg:gap-10 mt-10 md:mt-14 px-5 md:px-[35px] pb-[140px]">
           {/* Left rail (lg+) — Spotify-style nav */}
           <nav className="hidden lg:flex flex-col gap-2 anim-fade-up" style={{ animationDelay: "400ms" }}>
-            <a
-              href="#"
+            <Link
+              href="/"
               className="flex items-center gap-3 px-3 py-2 rounded-[8px] bg-white/[0.08] text-white"
             >
               <Home className="w-[16px] h-[16px]" strokeWidth={1.6} />
               <span className="font-manrope text-[13px]">Home</span>
-            </a>
-            <a
-              href="#"
+            </Link>
+            <button
+              type="button"
               className="flex items-center gap-3 px-3 py-2 rounded-[8px] text-white/65 hover:text-white hover:bg-white/5 transition-colors"
             >
               <Search className="w-[16px] h-[16px]" strokeWidth={1.6} />
               <span className="font-manrope text-[13px]">Search</span>
-            </a>
-            <a
-              href="#"
+            </button>
+            <button
+              type="button"
               className="flex items-center gap-3 px-3 py-2 rounded-[8px] text-white/65 hover:text-white hover:bg-white/5 transition-colors"
             >
               <Library className="w-[16px] h-[16px]" strokeWidth={1.6} />
               <span className="font-manrope text-[13px]">Your Library</span>
-            </a>
+            </button>
 
             <div className="mt-6">
               <p className="font-manrope text-[10px] tracking-[0.32em] text-white/35 mb-2 px-3">
