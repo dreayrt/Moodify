@@ -243,3 +243,143 @@ a {
     transition: none !important;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────
+   LŪMEN // ÍNDEX — hero animations & font classes
+   ────────────────────────────────────────────────────────────── */
+
+.font-graphik {
+  font-family: "Graphik LCG Regular Regular", "Graphik LCG", sans-serif;
+}
+
+.font-manrope {
+  font-family: "Manrope", sans-serif;
+}
+
+@keyframes lumenFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lumenFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lumenSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes lumenSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes lumenScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lumenGridRevealV {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes lumenGridRevealH {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@layer utilities {
+  .anim-fade-up {
+    opacity: 0;
+    animation: lumenFadeUp 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .anim-fade-in {
+    opacity: 0;
+    animation: lumenFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .anim-slide-left {
+    opacity: 0;
+    animation: lumenSlideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .anim-slide-right {
+    opacity: 0;
+    animation: lumenSlideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .anim-scale-in {
+    opacity: 0;
+    animation: lumenScaleIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .anim-grid-v {
+    opacity: 0;
+    transform-origin: top;
+    animation: lumenGridRevealV 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .anim-grid-h {
+    opacity: 0;
+    transform-origin: left;
+    animation: lumenGridRevealH 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up,
+  .anim-fade-in,
+  .anim-slide-left,
+  .anim-slide-right,
+  .anim-scale-in,
+  .anim-grid-v,
+  .anim-grid-h {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

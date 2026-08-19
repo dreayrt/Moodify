@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useEffectEvent,
@@ -126,6 +127,8 @@ export function HeroCarousel() {
   const [createAccountForm, setCreateAccountForm] =
     useState<CreateAccountForm>(emptyCreateAccountForm);
 
+  const router = useRouter();
+
   const advanceSlide = useEffectEvent(() => {
     setActiveIndex((current) => (current + 1) % heroSlides.length);
   });
@@ -221,9 +224,14 @@ export function HeroCarousel() {
           password: "",
         });
         setIsSignInOpen(false);
-        setAuthMessage(
-          `Xin chao ${currentUser.fullName}, ban da dang nhap thanh cong.`
-        );
+
+        if (currentUser.role === "USER") {
+          router.push("/dashboard");
+        } else {
+          setAuthMessage(
+            `Xin chao ${currentUser.fullName}, ban da dang nhap thanh cong.`
+          );
+        }
       } catch (error) {
         setSignInError(
           error instanceof Error ? error.message : "Dang nhap that bai"
@@ -261,9 +269,14 @@ export function HeroCarousel() {
         setCreateAccountForm(emptyCreateAccountForm);
         setShowCreateFields(false);
         setIsCreateAccountOpen(false);
-        setAuthMessage(
-          `Tai khoan da duoc tao thanh cong cho ${currentUser.fullName}.`
-        );
+
+        if (currentUser.role === "USER") {
+          router.push("/dashboard");
+        } else {
+          setAuthMessage(
+            `Tai khoan da duoc tao thanh cong cho ${currentUser.fullName}.`
+          );
+        }
       } catch (error) {
         setCreateAccountError(
           error instanceof Error ? error.message : "Tao tai khoan that bai"
