@@ -12,6 +12,7 @@ import {
   type FormEvent,
 } from "react";
 
+import { LogoMark } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
   getCurrentUser,
@@ -22,7 +23,7 @@ import {
   register as registerRequest,
   saveAuthSession,
   type UserProfileResponse,
-} from "@/lib/auth-client";
+} from "@/lib/auth/auth-client";
 
 type HeroSlide = {
   id: number;
@@ -62,7 +63,8 @@ const heroSlides: HeroSlide[] = [
     secondaryCta: "See releases",
     artist: "NOVA / Mirage Set",
     role: "Late-night electronic feature",
-    image: "/banners/banner-01.svg",
+    image:
+      "/banners/1788243993529_6080836390862480121_6080836390862480121_ff76fd5c30fba28265f20f5da3e41163.jpg",
     artPrompt:
       "Editorial music campaign banner, moody spotlight, dark olive and warm beige tones, premium streaming landing page, cinematic fashion photography energy, left side clean for headline, no text",
   },
@@ -76,7 +78,8 @@ const heroSlides: HeroSlide[] = [
     secondaryCta: "Artist Pro",
     artist: "AERA / Signal Bloom",
     role: "Independent artist spotlight",
-    image: "/banners/banner-02.svg",
+    image:
+      "/banners/1788243993610_6080836390862480121_6080836390862480121_35ed9330e0f93c011d4d07484a0ad23e.jpg",
     artPrompt:
       "Independent artist hero banner, cool blue sky, oversized silhouette, contemporary music platform, premium minimalist composition, crisp editorial lighting, left side empty for typography, no text",
   },
@@ -90,7 +93,8 @@ const heroSlides: HeroSlide[] = [
     secondaryCta: "Browse scenes",
     artist: "Collective / Aftertone",
     role: "Community discovery campaign",
-    image: "/banners/banner-03.svg",
+    image:
+      "/banners/1788243993708_6080836390862480121_6080836390862480121_2513202b00af128641e7f146c8a3d192.jpg",
     artPrompt:
       "Music culture collage banner with multiple panels, underground artists, warm flash photography, black background, luxury streaming platform, dramatic contrast, composition leaves room for text on left, no text",
   },
@@ -105,14 +109,18 @@ const emptyCreateAccountForm: CreateAccountForm = {
   confirmPassword: "",
 };
 
+const HOME_ROUTE = "/dashboard";
+const USER_DASHBOARD_ROUTE = "/dashboard/user";
+const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
+
 function getDashboardPathForRole(role: string) {
   const normalizedRole = role.trim().toLowerCase();
 
   if (normalizedRole === "artist") {
-    return "/dashboard/artist";
+    return ARTIST_DASHBOARD_ROUTE;
   }
 
-  return "/dashboard";
+  return USER_DASHBOARD_ROUTE;
 }
 
 export function HeroCarousel() {
@@ -124,7 +132,7 @@ export function HeroCarousel() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [createAccountError, setCreateAccountError] = useState<string | null>(
-    null
+    null,
   );
   const [isSubmittingSignIn, setIsSubmittingSignIn] = useState(false);
   const [isSubmittingCreateAccount, setIsSubmittingCreateAccount] =
@@ -134,14 +142,15 @@ export function HeroCarousel() {
     username: "",
     password: "",
   });
-  const [createAccountForm, setCreateAccountForm] =
-    useState<CreateAccountForm>(emptyCreateAccountForm);
+  const [createAccountForm, setCreateAccountForm] = useState<CreateAccountForm>(
+    emptyCreateAccountForm,
+  );
 
   const router = useRouter();
 
   useEffect(() => {
-    router.prefetch("/dashboard");
-    router.prefetch("/dashboard/artist");
+    router.prefetch(USER_DASHBOARD_ROUTE);
+    router.prefetch(ARTIST_DASHBOARD_ROUTE);
   }, [router]);
 
   const advanceSlide = useEffectEvent(() => {
@@ -243,7 +252,7 @@ export function HeroCarousel() {
         router.push(getDashboardPathForRole(currentUser.role));
       } catch (error) {
         setSignInError(
-          error instanceof Error ? error.message : "Dang nhap that bai"
+          error instanceof Error ? error.message : "Dang nhap that bai",
         );
       } finally {
         setIsSubmittingSignIn(false);
@@ -282,7 +291,7 @@ export function HeroCarousel() {
         router.push(getDashboardPathForRole(currentUser.role));
       } catch (error) {
         setCreateAccountError(
-          error instanceof Error ? error.message : "Tao tai khoan that bai"
+          error instanceof Error ? error.message : "Tao tai khoan that bai",
         );
       } finally {
         setIsSubmittingCreateAccount(false);
@@ -321,19 +330,18 @@ export function HeroCarousel() {
   const handleLogout = () => {
     const submitLogout = async () => {
       const session = getStoredAuthSession();
+
+      if (session) {
+        try {
+          await logoutRequest(session.refreshToken);
+        } catch {
+          // Stateless backend may already consider the client logged out.
+        }
+      }
+
       clearAuthSession();
       setAuthUser(null);
-      setAuthMessage("Ban da dang xuat.");
-
-      if (!session) {
-        return;
-      }
-
-      try {
-        await logoutRequest(session.refreshToken);
-      } catch {
-        // Stateless backend may already consider the client logged out.
-      }
+      setAuthMessage("Bạn đã đăng xuất.");
     };
 
     void submitLogout();
@@ -355,7 +363,10 @@ export function HeroCarousel() {
     <section className="space-y-4">
       <div className="relative overflow-hidden rounded-[2.25rem] border border-white/8 bg-[#090909] shadow-[0_35px_110px_rgba(0,0,0,0.42)]">
         <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-8 sm:py-7">
-          <Link href="/" className="flex items-center gap-3 text-white">
+          <Link
+            href={HOME_ROUTE}
+            className="flex items-center gap-3 text-white"
+          >
             <LogoMark />
             <span className="text-xs font-semibold uppercase tracking-[0.32em] sm:text-sm">
               Moodify
@@ -479,35 +490,6 @@ export function HeroCarousel() {
         </div>
       </div>
 
-      <div className="rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-[var(--text-secondary)]">
-        <span className="font-semibold text-white">
-          Banner prompts included:
-        </span>{" "}
-        each hero slide contains an <code>artPrompt</code> field so you can swap
-        the SVG placeholders with AI-generated campaign images later.
-      </div>
-
-      <div className="rounded-[1.25rem] border border-white/8 bg-white/[0.03] px-5 py-4 text-sm text-[var(--text-secondary)]">
-        {isHydratingSession ? (
-          <span className="text-white/70">Dang kiem tra phien dang nhap...</span>
-        ) : authUser ? (
-          <span className="text-white/80">
-            Da ket noi backend auth. User hien tai:{" "}
-            <strong className="font-semibold text-white">
-              {authUser.username}
-            </strong>
-          </span>
-        ) : (
-          <span className="text-white/60">
-            Chua dang nhap. Frontend da san sang goi API backend JWT.
-          </span>
-        )}
-
-        {authMessage ? (
-          <p className="mt-2 text-sm text-[#a8f0c9]">{authMessage}</p>
-        ) : null}
-      </div>
-
       {isSignInOpen ? (
         <SignInModal
           credentials={credentials}
@@ -622,7 +604,9 @@ function SignInModal({
                   id={accountId}
                   name="username"
                   onChange={onChange}
-                  placeholder={"Nh\u1eadp email ho\u1eb7c t\u00ean t\u00e0i kho\u1ea3n"}
+                  placeholder={
+                    "Nh\u1eadp email ho\u1eb7c t\u00ean t\u00e0i kho\u1ea3n"
+                  }
                   type="text"
                   value={credentials.username}
                 />
@@ -693,10 +677,16 @@ function SignInModal({
           </div>
 
           <div className="modal-item flex flex-wrap items-center justify-between gap-3 px-1 text-sm text-white/64 [animation-delay:0.28s]">
-            <Link href="/" className="modal-link transition hover:text-white">
+            <Link
+              href={HOME_ROUTE}
+              className="modal-link transition hover:text-white"
+            >
               {"\u0110\u0103ng k\u00fd t\u00e0i kho\u1ea3n"}
             </Link>
-            <Link href="/" className="modal-link transition hover:text-white">
+            <Link
+              href={HOME_ROUTE}
+              className="modal-link transition hover:text-white"
+            >
               {"Qu\u00ean m\u1eadt kh\u1ea9u"}
             </Link>
           </div>
@@ -748,7 +738,9 @@ function CreateAccountModal({
               Join Moodify
             </h2>
             <p className="mt-3 max-w-[420px] text-sm leading-6 text-white/64 sm:text-[15px]">
-              {"B\u1eaft \u0111\u1ea7u v\u1edbi Google ho\u1eb7c Facebook. N\u1ebfu mu\u1ed1n t\u1ef1 nh\u1eadp th\u00f4ng tin, b\u1ea1n c\u00f3 th\u1ec3 b\u1eadt bi\u1ec3u m\u1eabu \u0111\u0103ng k\u00fd \u1edf ph\u00eda d\u01b0\u1edbi."}
+              {
+                "B\u1eaft \u0111\u1ea7u v\u1edbi Google ho\u1eb7c Facebook. N\u1ebfu mu\u1ed1n t\u1ef1 nh\u1eadp th\u00f4ng tin, b\u1ea1n c\u00f3 th\u1ec3 b\u1eadt bi\u1ec3u m\u1eabu \u0111\u0103ng k\u00fd \u1edf ph\u00eda d\u01b0\u1edbi."
+              }
             </p>
           </div>
 
@@ -770,7 +762,9 @@ function CreateAccountModal({
                   {"\u0110\u0103ng k\u00fd nhanh"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-white/56">
-                  {"S\u1eed d\u1ee5ng t\u00e0i kho\u1ea3n m\u1ea1ng x\u00e3 h\u1ed9i \u0111\u1ec3 b\u1eaft \u0111\u1ea7u nhanh h\u01a1n."}
+                  {
+                    "S\u1eed d\u1ee5ng t\u00e0i kho\u1ea3n m\u1ea1ng x\u00e3 h\u1ed9i \u0111\u1ec3 b\u1eaft \u0111\u1ea7u nhanh h\u01a1n."
+                  }
                 </p>
               </div>
 
@@ -802,10 +796,14 @@ function CreateAccountModal({
               >
                 <div className="min-w-0">
                   <p className="text-base font-semibold text-white">
-                    {"Bi\u1ec3u m\u1eabu \u0111\u0103ng k\u00fd th\u1ee7 c\u00f4ng"}
+                    {
+                      "Bi\u1ec3u m\u1eabu \u0111\u0103ng k\u00fd th\u1ee7 c\u00f4ng"
+                    }
                   </p>
                   <p className="mt-1 text-sm leading-6 text-white/56">
-                    {"\u0110i\u1ec1n \u0111\u1ea7y \u0111\u1ee7 th\u00f4ng tin t\u00e0i kho\u1ea3n n\u1ebfu b\u1ea1n mu\u1ed1n t\u1ea1o t\u00e0i kho\u1ea3n theo c\u00e1ch th\u1ee7 c\u00f4ng."}
+                    {
+                      "\u0110i\u1ec1n \u0111\u1ea7y \u0111\u1ee7 th\u00f4ng tin t\u00e0i kho\u1ea3n n\u1ebfu b\u1ea1n mu\u1ed1n t\u1ea1o t\u00e0i kho\u1ea3n theo c\u00e1ch th\u1ee7 c\u00f4ng."
+                    }
                   </p>
                 </div>
                 <span
@@ -827,7 +825,10 @@ function CreateAccountModal({
                 }`}
               >
                 <div className="overflow-hidden">
-                  <form className="space-y-4 pt-1 sm:space-y-5" onSubmit={onSubmit}>
+                  <form
+                    className="space-y-4 pt-1 sm:space-y-5"
+                    onSubmit={onSubmit}
+                  >
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div className="space-y-2 lg:col-span-2">
                         <label
@@ -859,7 +860,9 @@ function CreateAccountModal({
                           id={usernameId}
                           name="username"
                           onChange={onChange}
-                          placeholder={"Nh\u1eadp t\u00ean \u0111\u0103ng nh\u1eadp"}
+                          placeholder={
+                            "Nh\u1eadp t\u00ean \u0111\u0103ng nh\u1eadp"
+                          }
                           type="text"
                           value={form.username}
                         />
@@ -877,7 +880,9 @@ function CreateAccountModal({
                           id={phoneId}
                           name="phone"
                           onChange={onChange}
-                          placeholder={"Nh\u1eadp s\u1ed1 \u0111i\u1ec7n tho\u1ea1i"}
+                          placeholder={
+                            "Nh\u1eadp s\u1ed1 \u0111i\u1ec7n tho\u1ea1i"
+                          }
                           type="tel"
                           value={form.phone}
                         />
@@ -961,17 +966,6 @@ function CreateAccountModal({
         </div>
       </div>
     </div>
-  );
-}
-
-function LogoMark() {
-  return (
-    <svg aria-hidden="true" className="h-8 w-8" fill="none" viewBox="0 0 32 32">
-      <path
-        d="M4 18.2a2 2 0 012-2h1v8H6a2 2 0 01-2-2v-4zm4-4.3a2 2 0 012-2h1v12H10a2 2 0 01-2-2V13.9zm4-3.2a2 2 0 012-2h1v15.2h-1a2 2 0 01-2-2V10.7zm4-3.2a2 2 0 012-2h1v18.4h-1a2 2 0 01-2-2V7.5zm4 2.4a8 8 0 010 16H8.8v-3.4H20a4.6 4.6 0 000-9.2h-1.2V9.9H20z"
-        fill="currentColor"
-      />
-    </svg>
   );
 }
 

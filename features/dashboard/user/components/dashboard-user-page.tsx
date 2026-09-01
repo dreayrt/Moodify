@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Heart,
   Home,
   Library,
   ListMusic,
+  LogOut,
   MoreHorizontal,
   Pause,
   Play,
@@ -18,8 +20,14 @@ import {
   SkipForward,
   Volume2,
 } from "lucide-react";
-import { getCurrentUser, getValidAccessToken, type UserProfileResponse } from "@/lib/auth-client";
-
+import {
+  clearAuthSession,
+  getCurrentUser,
+  getStoredAuthSession,
+  getValidAccessToken,
+  logout,
+  type UserProfileResponse,
+} from "@/lib/auth/auth-client";
 
 const VIDEO_SRC =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_115057_94c3699b-0fd1-4124-bcf3-3626bb8c1f77.mp4";
@@ -139,26 +147,23 @@ const BUTTERFLY_SVG = (size: number, hue: number) => (
 
 /* ── Sub-components ───────────────────────────────────────────── */
 
-function ButterflySwarm({ count = 8, className = "" }: { count?: number; className?: string }) {
-  const butterflies = useMemo(() => {
-    const seeded = (i: number, salt: number) => {
-      const x = Math.sin(i * 9301 + salt * 49297) * 233280;
-      return x - Math.floor(x);
-    };
-    return Array.from({ length: count }, (_, i) => ({
-      id: i,
-      startX: 42 + seeded(i, 1) * 24,
-      startY: 16 + seeded(i, 2) * 56,
-      size: 8 + seeded(i, 3) * 6,
-      hue: 195 + seeded(i, 4) * 35,
-      duration: 9000 + seeded(i, 5) * 5000,
-      delay: seeded(i, 6) * 3500,
-    }));
-  }, [count]);
+const BUTTERFLIES_DATA = [
+  { id: 0, startX: 48, startY: 28, size: 10, hue: 200, duration: 11000, delay: 0 },
+  { id: 1, startX: 55, startY: 42, size: 12, hue: 215, duration: 13000, delay: 1200 },
+  { id: 2, startX: 44, startY: 58, size: 9,  hue: 195, duration: 10000, delay: 2400 },
+  { id: 3, startX: 62, startY: 35, size: 14, hue: 220, duration: 12500, delay: 800 },
+  { id: 4, startX: 50, startY: 65, size: 11, hue: 205, duration: 14000, delay: 3100 },
+  { id: 5, startX: 58, startY: 22, size: 8,  hue: 210, duration: 9500,  delay: 1800 },
+  { id: 6, startX: 46, startY: 50, size: 13, hue: 225, duration: 11500, delay: 2700 },
+];
 
+const HOME_ROUTE = "/dashboard";
+const USER_DASHBOARD_ROUTE = "/dashboard/user";
+
+function ButterflySwarm({ className = "" }: { count?: number; className?: string }) {
   return (
     <div className={`absolute inset-0 pointer-events-none overflow-hidden ${className}`}>
-      {butterflies.map((b) => (
+      {BUTTERFLIES_DATA.map((b) => (
         <div
           key={b.id}
           className="absolute"
@@ -175,19 +180,20 @@ function ButterflySwarm({ count = 8, className = "" }: { count?: number; classNa
   );
 }
 
+const WAVEFORM_BAR_HEIGHTS = [
+  45, 78, 62, 89, 54, 95, 42, 68, 85, 92, 58, 74, 88, 65, 48, 82,
+  70, 96, 52, 64, 86, 78, 90, 60, 72, 84, 55, 94, 68, 76, 88, 50,
+];
+
 function WaveformPreview({ active }: { active: boolean }) {
-  const bars = useMemo(
-    () => Array.from({ length: 32 }, (_, i) => 0.3 + ((Math.sin(i * 127.1) * 43758.5453) % 1 + 1) % 1 * 0.7),
-    []
-  );
   return (
     <div className="flex items-center gap-[2px] h-[24px] w-full">
-      {bars.map((h, i) => (
+      {WAVEFORM_BAR_HEIGHTS.map((h, i) => (
         <span
           key={i}
           className="block w-[2px] rounded-full"
           style={{
-            height: `${h * 100}%`,
+            height: `${h}%`,
             background: active ? "#AFDDFF" : "rgba(255,255,255,0.35)",
             transformOrigin: "bottom",
             animation: active ? `waveBar ${600 + i * 30}ms ease-in-out ${i * 40}ms infinite` : "none",
@@ -201,7 +207,7 @@ function WaveformPreview({ active }: { active: boolean }) {
 function SectionHeader({
   eyebrow,
   title,
-  seeAllHref = "/",
+  seeAllHref = USER_DASHBOARD_ROUTE,
 }: {
   eyebrow: string;
   title: string;
@@ -450,6 +456,10 @@ function VibeDropdown({
 /* ── Account pill ─────────────────────────────────────────────── */
 
 function AccountPill({ user, loading }: { user: UserProfileResponse | null; loading: boolean }) {
+  const router = useRouter();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const displayName = user?.fullName || user?.username || "Guest";
   const initials = useMemo(() => {
     const source = (user?.fullName || user?.username || "G").trim();
@@ -464,30 +474,136 @@ function AccountPill({ user, loading }: { user: UserProfileResponse | null; load
     return source.split(/\s+/)[0] || "friend";
   }, [user]);
 
+  useEffect(() => {
+    const closeMenu = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
+  const handleLogout = async (e?: React.MouseEvent) => {
+    console.log("[AccountPill] 🟡 handleLogout triggered. Event:", e?.type);
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (loggingOut) {
+      console.log("[AccountPill] ⏳ Already logging out, ignoring duplicate click.");
+      return;
+    }
+
+    setLoggingOut(true);
+
+    try {
+      const session = getStoredAuthSession();
+      console.log("[AccountPill] 🔑 Stored auth session found:", session ? {
+        hasAccessToken: !!session.accessToken,
+        hasRefreshToken: !!session.refreshToken,
+      } : "No session in localStorage");
+
+      if (session?.refreshToken) {
+        console.log("[AccountPill] 🚀 Calling logout(session.refreshToken)...");
+        await logout(session.refreshToken);
+        console.log("[AccountPill] ✅ Backend logout call completed successfully.");
+      } else {
+        console.warn("[AccountPill] ⚠️ No refreshToken available, skipping backend revoke.");
+      }
+    } catch (err) {
+      console.error("[AccountPill] ❌ Logout API error:", err);
+    } finally {
+      console.log("[AccountPill] 🧹 Clearing local auth session and redirecting to /...");
+      clearAuthSession();
+      setOpen(false);
+      setLoggingOut(false);
+      router.push(HOME_ROUTE);
+    }
+  };
+
   return (
-    <div
-      className="anim-slide-right flex items-center gap-[10px] px-[12px] py-[6px] rounded-full border border-white/12 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-colors"
-      style={{ animationDelay: "600ms" }}
-    >
-      {user?.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={user.avatarUrl}
-          alt={displayName}
-          className="w-[26px] h-[26px] rounded-full object-cover"
-          referrerPolicy="no-referrer"
+    <div ref={menuRef} className="relative z-50 anim-slide-right" style={{ animationDelay: "600ms" }}>
+      <button
+        type="button"
+        onClick={() => {
+          console.log("[AccountPill] 👤 User avatar pill clicked. Toggling open from:", open, "to:", !open);
+          setOpen((isOpen) => !isOpen);
+        }}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-[10px] px-[12px] py-[6px] rounded-full border border-white/12 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-colors cursor-pointer"
+      >
+        {user?.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.avatarUrl}
+            alt={displayName}
+            className="w-[26px] h-[26px] rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div
+            className="w-[26px] h-[26px] rounded-full grid place-items-center text-[11px] font-semibold text-black"
+            style={{ background: "linear-gradient(135deg,#AFDDFF,#dbeeff)" }}
+          >
+            {loading ? "…" : initials}
+          </div>
+        )}
+        <span className="font-manrope text-white text-[12px] tracking-wide">
+          {loading ? "Hi, …" : `Hi, ${firstName}`}
+        </span>
+        <ChevronDown
+          className={`w-[14px] h-[14px] text-white/60 transition-transform ${open ? "rotate-180" : ""}`}
+          strokeWidth={1.6}
         />
-      ) : (
+      </button>
+
+      {open && (
         <div
-          className="w-[26px] h-[26px] rounded-full grid place-items-center text-[11px] font-semibold text-black"
-          style={{ background: "linear-gradient(135deg,#AFDDFF,#dbeeff)" }}
+          role="menu"
+          onMouseDown={(e) => {
+            console.log("[AccountPill] 🖱️ onMouseDown inside dropdown menu (stopped propagation)");
+            e.stopPropagation();
+          }}
+          className="absolute right-0 mt-2 w-[172px] rounded-[14px] border border-white/12 bg-black/90 p-2 shadow-2xl backdrop-blur-xl z-50"
+          style={{ animation: "lumenFadeIn 180ms cubic-bezier(0.16,1,0.3,1) both" }}
         >
-          {loading ? "…" : initials}
+          <p className="px-3 py-2 font-manrope text-[11px] text-white/45 truncate">
+            {displayName}
+          </p>
+          <div className="h-px bg-white/10 my-1" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              console.log("[AccountPill] 🔴 'Đăng xuất' button onClick fired!");
+              void handleLogout(e);
+            }}
+            onMouseDown={(e) => {
+              console.log("[AccountPill] 🔴 'Đăng xuất' button onMouseDown fired!");
+              e.stopPropagation();
+              void handleLogout(e);
+            }}
+            disabled={loggingOut}
+            className="w-full flex items-center gap-2 rounded-[10px] px-3 py-2.5 font-manrope text-left text-[12px] text-red-300 hover:bg-red-400/10 disabled:cursor-wait disabled:opacity-60 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" strokeWidth={1.7} />
+            {loggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
+          </button>
         </div>
       )}
-      <span className="font-manrope text-white text-[12px] tracking-wide">
-        {loading ? "Hi, …" : `Hi, ${firstName}`}
-      </span>
     </div>
   );
 }
@@ -600,6 +716,7 @@ function MiniPlayer({
 /* ── Main component ───────────────────────────────────────────── */
 
 export default function LumenHero() {
+  const router = useRouter();
   const [activeVibe, setActiveVibe] = useState<string>("edm");
   const [vibeMenuOpen, setVibeMenuOpen] = useState(false);
   const [playing, setPlaying] = useState(true);
@@ -617,6 +734,7 @@ export default function LumenHero() {
           if (!cancelled) {
             setUser(null);
             setUserLoading(false);
+            router.replace(HOME_ROUTE);
           }
           return;
         }
@@ -626,16 +744,18 @@ export default function LumenHero() {
           setUserLoading(false);
         }
       } catch {
+        clearAuthSession();
         if (!cancelled) {
           setUser(null);
           setUserLoading(false);
+          router.replace(HOME_ROUTE);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const active = VIBES.find((v) => v.id === activeVibe) ?? VIBES[0];
   const tracks = TRACKS_BY_VIBE[activeVibe] ?? TRACKS_BY_VIBE.edm;
@@ -669,9 +789,9 @@ export default function LumenHero() {
       {/* Layout shell */}
       <div className="relative z-10 w-full min-h-screen flex flex-col">
         {/* Top bar */}
-        <header className="flex items-center gap-[16px] px-5 md:px-[35px] pt-5 md:pt-[27px]">
+        <header className="relative z-40 flex items-center gap-[16px] px-5 md:px-[35px] pt-5 md:pt-[27px]">
           <Link
-            href="/"
+            href={HOME_ROUTE}
             className="font-graphik text-white text-[18px] md:text-[21px] leading-[21px] whitespace-nowrap anim-fade-up tracking-[-0.02em]"
             style={{ animationDelay: "200ms" }}
           >
@@ -684,6 +804,8 @@ export default function LumenHero() {
           >
             <Search className="w-[14px] h-[14px] text-white/55" strokeWidth={1.6} />
             <input
+              id="search-input"
+              name="search"
               aria-label="Search"
               placeholder="Search artists, tracks, playlists…"
               className="bg-transparent outline-none text-white text-[12px] leading-[14px] flex-1 placeholder:text-white/40"
@@ -707,7 +829,7 @@ export default function LumenHero() {
           {/* Left rail (lg+) — Spotify-style nav */}
           <nav className="hidden lg:flex flex-col gap-2 anim-fade-up" style={{ animationDelay: "400ms" }}>
             <Link
-              href="/"
+              href={HOME_ROUTE}
               className="flex items-center gap-3 px-3 py-2 rounded-[8px] bg-white/[0.08] text-white"
             >
               <Home className="w-[16px] h-[16px]" strokeWidth={1.6} />

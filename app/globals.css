@@ -8,9 +8,10 @@
   --text-primary: #f4f2ed;
   --text-secondary: rgba(244, 242, 237, 0.72);
   --text-muted: rgba(244, 242, 237, 0.5);
-  --font-sans-stack: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-  --font-display-stack: "Arial Black", "Impact", "Helvetica Neue Condensed",
+  --font-sans-stack: var(--font-manrope), "Segoe UI", "Helvetica Neue",
     sans-serif;
+  --font-display-stack: var(--font-space-grotesk), "Avenir Next",
+    "Helvetica Neue", sans-serif;
 }
 
 @theme inline {
@@ -249,11 +250,11 @@ a {
    ────────────────────────────────────────────────────────────── */
 
 .font-graphik {
-  font-family: "Graphik LCG Regular Regular", "Graphik LCG", sans-serif;
+  font-family: var(--font-display-stack);
 }
 
 .font-manrope {
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-sans-stack);
 }
 
 @keyframes lumenFadeUp {

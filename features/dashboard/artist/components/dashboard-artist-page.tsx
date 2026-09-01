@@ -14,6 +14,7 @@ import {
   Download,
   Flame,
   Heart,
+  LogOut,
   MessageSquare,
   Music2,
   Radio,
@@ -25,9 +26,11 @@ import {
 import {
   clearAuthSession,
   getCurrentUser,
+  getStoredAuthSession,
   getValidAccessToken,
+  logout,
   type UserProfileResponse,
-} from "@/lib/auth-client";
+} from "@/lib/auth/auth-client";
 
 type TabKey = "tracks" | "distribution" | "vinyl" | "comments" | "benefits";
 
@@ -132,6 +135,9 @@ const TAB_LABELS: Array<{ key: TabKey; label: string }> = [
   { key: "comments", label: "Comments" },
   { key: "benefits", label: "Benefits" },
 ];
+
+const HOME_ROUTE = "/dashboard";
+const USER_DASHBOARD_ROUTE = "/dashboard/user";
 
 function StatCard({ item, delay }: { item: Stat; delay: number }) {
   const Icon = item.icon;
@@ -525,10 +531,27 @@ export default function ArtistDashboardPage() {
     "checking"
   );
   const [currentUser, setCurrentUser] = useState<UserProfileResponse | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+
+    try {
+      const session = getStoredAuthSession();
+      await logout(session?.refreshToken);
+    } catch (err) {
+      console.warn("Logout error (proceeding with local cleanup):", err);
+    } finally {
+      clearAuthSession();
+      setLoggingOut(false);
+      router.push(HOME_ROUTE);
+    }
+  };
 
   useEffect(() => {
-    router.prefetch("/");
-    router.prefetch("/dashboard");
+    router.prefetch(HOME_ROUTE);
+    router.prefetch(USER_DASHBOARD_ROUTE);
   }, [router]);
 
   useEffect(() => {
@@ -540,7 +563,7 @@ export default function ArtistDashboardPage() {
         if (!token) {
           if (!cancelled) {
             setAuthState("denied");
-            router.replace("/");
+            router.replace(HOME_ROUTE);
           }
           return;
         }
@@ -554,7 +577,7 @@ export default function ArtistDashboardPage() {
 
         if (normalizedRole !== "artist") {
           setAuthState("denied");
-          router.replace("/dashboard");
+          router.replace(USER_DASHBOARD_ROUTE);
           return;
         }
 
@@ -564,7 +587,7 @@ export default function ArtistDashboardPage() {
         clearAuthSession();
         if (!cancelled) {
           setAuthState("denied");
-          router.replace("/");
+          router.replace(HOME_ROUTE);
         }
       }
     };
@@ -667,6 +690,16 @@ export default function ArtistDashboardPage() {
                 </p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 text-[13px] text-red-300 backdrop-blur-md transition hover:bg-red-500/10 hover:border-red-500/20 disabled:opacity-50"
+              title="Đăng xuất"
+            >
+              <LogOut className="h-4 w-4" strokeWidth={1.7} />
+              <span className="hidden sm:inline">{loggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</span>
+            </button>
           </div>
         </header>
 

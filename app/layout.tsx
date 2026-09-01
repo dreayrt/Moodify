@@ -1,6 +1,17 @@
 import type { Metadata } from "next";
+import { Manrope, Space_Grotesk } from "next/font/google";
 
 import "./globals.css";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+});
 
 export const metadata: Metadata = {
   title: "Moodify",
@@ -14,17 +25,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <head>
-        <link
-          href="https://db.onlinewebfonts.com/c/ca3d10781128664daddf89bf2e2d1305?family=Graphik+LCG+Regular+Regular"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>{children}</body>
+      <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
+        {children}
+      </body>
     </html>
   );
 }

@@ -40,6 +40,8 @@ const STORAGE_KEY = "moodify.auth.session";
 
 type RequestOptions = {
   body?: unknown;
+  keepalive?: boolean;
+  method?: "GET" | "POST";
   token?: string;
 };
 
@@ -119,9 +121,21 @@ export async function refresh(refreshToken: string) {
   });
 }
 
-export async function logout(refreshToken: string) {
+export async function logout(refreshToken?: string) {
+  const session = getStoredAuthSession();
+  const token = session?.accessToken;
+  const tokenToRevoke = refreshToken ?? session?.refreshToken;
+
+  console.log("[AuthClient] 🚀 Calling logout API:", {
+    token: token ? `${token.slice(0, 15)}...` : null,
+    refreshToken: tokenToRevoke ? `${tokenToRevoke.slice(0, 15)}...` : null,
+  });
+
   return requestJson<void>("/api/auth/logout", {
-    body: { refreshToken },
+    keepalive: true,
+    method: "POST",
+    token,
+    body: tokenToRevoke ? { refreshToken: tokenToRevoke } : undefined,
   });
 }
 
@@ -159,10 +173,20 @@ export async function getValidAccessToken(): Promise<string | null> {
 
 async function requestJson<T>(
   path: string,
-  { body, token }: RequestOptions = {},
+  { body, keepalive, method, token }: RequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: body ? "POST" : "GET",
+  const fullUrl = `${API_BASE_URL}${path}`;
+  const requestMethod = method ?? (body ? "POST" : "GET");
+
+  console.log(`[RequestJson] 📡 Sending ${requestMethod} ${fullUrl}`, {
+    hasToken: !!token,
+    hasBody: !!body,
+    body,
+  });
+
+  const response = await fetch(fullUrl, {
+    keepalive,
+    method: requestMethod,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -170,24 +194,45 @@ async function requestJson<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  console.log(`[RequestJson] 📥 Response status:`, response.status, response.statusText);
+
   if (!response.ok) {
-    throw new Error(await extractErrorMessage(response));
+    const errorMsg = await extractErrorMessage(response);
+    console.error(`[RequestJson] ❌ Request failed (${response.status}):`, errorMsg);
+    throw new Error(errorMsg);
   }
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 async function extractErrorMessage(response: Response) {
   try {
-    const payload = (await response.json()) as {
-      message?: string;
-      error?: string;
-    };
-    return payload.message || payload.error || "Request failed";
+    const text = await response.text();
+    if (!text) {
+      return `Request failed with status ${response.status}`;
+    }
+    try {
+      const payload = JSON.parse(text) as {
+        message?: string;
+        error?: string;
+      };
+      return payload.message || payload.error || text;
+    } catch {
+      return text;
+    }
   } catch {
     return `Request failed with status ${response.status}`;
   }

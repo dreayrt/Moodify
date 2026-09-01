@@ -1,5 +1,5 @@
-import LumenHero from "@/components/dashboard/user/page";
+import HomePage from "@/features/home/components/home-page";
 
-export default function DashboardPage() {
-  return <LumenHero />;
+export default function MarketingPage() {
+  return <HomePage />;
 }
