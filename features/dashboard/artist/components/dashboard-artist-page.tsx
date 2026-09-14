@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
-  ArrowUpRight,
   BarChart3,
   Bell,
   CalendarRange,
   ChevronRight,
   CircleDollarSign,
-  Disc3,
   Download,
   Flame,
   Heart,
@@ -23,19 +22,30 @@ import {
   UploadCloud,
   Users,
 } from "lucide-react";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import {
   clearAuthSession,
+  getCurrentArtistCatalog,
   getCurrentUser,
   getStoredAuthSession,
   getValidAccessToken,
   logout,
+  type ArtistProfileResponse,
+  type ArtistTrackResponse,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
 
-type TabKey = "tracks" | "distribution" | "vinyl" | "comments" | "benefits";
+import { ArtistTrack, ToastMessage } from "../types";
+import { TrackCatalogPanel } from "./track-catalog-panel";
+import { TrackEditModal } from "./track-edit-modal";
+import { TrackDeleteModal } from "./track-delete-modal";
+import { TrackUploadModal } from "./track-upload-modal";
+import { ToastNotification } from "./toast-notification";
+
+type TabKey = "tracks" | "comments" | "benefits";
 
 type Stat = {
-  label: string;
+  key: "plays" | "reposts" | "downloads" | "likes" | "comments";
   value: string;
   trend: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -46,7 +56,8 @@ type Release = {
   type: string;
   stage: string;
   date: string;
-  progress: number;
+  progress: string;
+  progressWidth: number;
 };
 
 const KEYFRAMES = `
@@ -71,75 +82,107 @@ const KEYFRAMES = `
 }
 `;
 
-const STATS: Stat[] = [
-  { label: "SC plays", value: "248.6K", trend: "+12.4%", icon: Activity },
-  { label: "Reposts", value: "18.2K", trend: "+4.8%", icon: Radio },
-  { label: "Downloads", value: "8.9K", trend: "+9.1%", icon: Download },
-  { label: "Likes", value: "63.7K", trend: "+16.0%", icon: Heart },
-  { label: "Comments", value: "4.3K", trend: "+7.2%", icon: MessageSquare },
-];
-
 const RELEASES: Release[] = [
   {
-    title: "Neon Afterglow",
-    type: "Single rollout",
-    stage: "Master approved",
-    date: "22 Aug",
-    progress: 84,
+    title: "Neon Horizon - Extended EP",
+    type: "EP Release (5 Tracks)",
+    stage: "Đang hoàn thiện Master",
+    date: "18/03/2026",
+    progress: "85%",
+    progressWidth: 85,
   },
   {
-    title: "Blue Hour Tapes",
-    type: "EP campaign",
-    stage: "Pitching playlists",
-    date: "30 Aug",
-    progress: 66,
+    title: "Midnight Echoes (Acoustic Version)",
+    type: "Single / Video Clip",
+    stage: "Lên lịch phát hành",
+    date: "25/03/2026",
+    progress: "50%",
+    progressWidth: 50,
   },
   {
-    title: "Live at District 7",
-    type: "Visual live set",
-    stage: "Assets pending",
-    date: "05 Sep",
-    progress: 41,
+    title: "Cyberpunk Tokyo Vinyl Edition",
+    type: "Physical Drop (500 copies)",
+    stage: "Đặt trước đợt 1",
+    date: "10/04/2026",
+    progress: "30%",
+    progressWidth: 30,
   },
 ];
 
 const FAN_TOUCHPOINTS = [
-  { city: "Ho Chi Minh City", share: "31%", tone: "Top city" },
-  { city: "Jakarta", share: "18%", tone: "Fastest growth" },
-  { city: "Bangkok", share: "14%", tone: "Strong saves" },
-  { city: "Manila", share: "11%", tone: "High replay rate" },
+  { city: "TP. Hồ Chí Minh", share: "38% thính giả", tone: "Cao điểm 21:00 - 01:00" },
+  { city: "Hà Nội", share: "26% thính giả", tone: "Tăng trưởng +34% tháng này" },
+  { city: "Đà Nẵng", share: "15% thính giả", tone: "Top thể loại EDM / House" },
+  { city: "Tokyo & Seoul", share: "12% thính giả", tone: "Khán giả Synthwave" },
 ];
 
 const COMMENT_PREVIEWS = [
   {
-    name: "Annie K.",
-    excerpt: "Drop at 1:12 is insane. Need a live edit for this one.",
-    age: "12m ago",
+    name: "Minh Nhật",
+    excerpt: "Đoạn drop lúc 2:15 nghe cuốn dã man! Rất mong chờ bản master chính thức trên Spotify.",
+    age: "2 giờ trước",
   },
   {
-    name: "Mika Tran",
-    excerpt: "Can you release the acoustic version too? The topline is sticky.",
-    age: "39m ago",
+    name: "Alex Chen",
+    excerpt: "Amazing vibes on the acoustic demo. Such an emotional chord progression!",
+    age: "1 ngày trước",
   },
   {
-    name: "Sage Audio",
-    excerpt: "Audience retention on the teaser is holding well above your average.",
-    age: "2h ago",
+    name: "Thu Hà",
+    excerpt: "Đã nghe đi nghe lại bài này suốt cả buổi tối học bài, giai điệu rất chữa lành.",
+    age: "3 ngày trước",
   },
 ];
 
-const TAB_LABELS: Array<{ key: TabKey; label: string }> = [
-  { key: "tracks", label: "SoundCloud Tracks" },
-  { key: "distribution", label: "Distribution" },
-  { key: "vinyl", label: "Vinyl Records" },
-  { key: "comments", label: "Comments" },
-  { key: "benefits", label: "Benefits" },
+const TAB_LABELS: Array<{ key: TabKey; labelKey: string }> = [
+  { key: "tracks", labelKey: "dashboard.artist.tabs.tracks" },
+  { key: "comments", labelKey: "dashboard.artist.tabs.comments" },
+  { key: "benefits", labelKey: "dashboard.artist.tabs.benefits" },
 ];
 
 const HOME_ROUTE = "/dashboard";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 
+function formatCatalogDate(value: string | null | undefined) {
+  if (!value) return "Chưa cập nhật";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function mapCatalogTrack(track: ArtistTrackResponse): ArtistTrack {
+  return {
+    id: track.id,
+    spotifyId: track.spotifyId,
+    title: track.title,
+    artist: track.artist,
+    genre: track.genre,
+    duration: track.duration,
+    status: track.status,
+    visibility: track.visibility,
+    plays: track.plays,
+    likes: track.likes,
+    commentsCount: track.commentsCount,
+    bpm: track.bpm ?? undefined,
+    key: track.key ?? undefined,
+    coverUrl: track.coverUrl ?? undefined,
+    audioUrl: track.audioUrl ?? undefined,
+    spotifyUrl: track.spotifyUrl ?? undefined,
+    downloadStatus: track.downloadStatus ?? undefined,
+    moderationStatus: track.moderationStatus ?? undefined,
+    moderationScore: track.moderationScore ?? undefined,
+    description: track.description ?? undefined,
+    updatedAt: formatCatalogDate(track.updatedAt),
+    createdAt: track.createdAt ?? "",
+  };
+}
+
 function StatCard({ item, delay }: { item: Stat; delay: number }) {
+  const { t } = useTranslation();
   const Icon = item.icon;
 
   return (
@@ -159,7 +202,7 @@ function StatCard({ item, delay }: { item: Stat; delay: number }) {
         {item.value}
       </p>
       <p className="mt-2 text-[12px] tracking-[0.14em] text-white/46 uppercase">
-        {item.label}
+        {t(`dashboard.artist.stats.${item.key}`)}
       </p>
     </div>
   );
@@ -192,214 +235,202 @@ function TabButton({
   );
 }
 
-function WaveBars() {
-  const bars = useMemo(() => Array.from({ length: 20 }, (_, i) => i), []);
+
+function TracksPanel({
+  tracks,
+  onEditTrack,
+  onDeleteTrack,
+  onToggleStatus,
+  onToggleVisibility,
+  onCopyLink,
+  playingTrackId,
+  onTogglePlayTrack,
+  onOpenUpload,
+  onShowHistory,
+}: {
+  tracks: ArtistTrack[];
+  onEditTrack: (track: ArtistTrack) => void;
+  onDeleteTrack: (track: ArtistTrack) => void;
+  onToggleStatus: (track: ArtistTrack) => void;
+  onToggleVisibility: (track: ArtistTrack) => void;
+  onCopyLink: (track: ArtistTrack) => void;
+  playingTrackId: string | null;
+  onTogglePlayTrack: (track: ArtistTrack) => void;
+  onOpenUpload: () => void;
+  onShowHistory: () => void;
+}) {
+  const { t } = useTranslation();
 
   return (
-    <div className="flex h-10 items-end gap-[4px]">
-      {bars.map((bar) => (
-        <span
-          key={bar}
-          className="w-[4px] rounded-full bg-gradient-to-t from-[#ff7a2c] via-[#ffc09a] to-[#eaf2ff]"
-          style={{
-            height: `${28 + ((bar * 17) % 60)}%`,
-            transformOrigin: "bottom",
-            animation: `artistEqualize ${820 + bar * 45}ms ease-in-out ${bar * 80}ms infinite`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function TracksPanel() {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.8fr)]">
-      <div className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.28)]" style={{ animationDelay: "760ms" }}>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">Upload queue</p>
-            <h3 className="mt-2 font-graphik text-[28px] tracking-[-0.03em] text-white">
-              Drop new audio to get started
-            </h3>
-          </div>
-          <button
-            type="button"
-            className="hidden rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/72 transition hover:bg-white/[0.08] md:inline-flex"
-          >
-            Upload history
-          </button>
-        </div>
-
-        <div className="relative mt-6 overflow-hidden rounded-[26px] border border-dashed border-white/14 bg-[radial-gradient(circle_at_top,_rgba(255,122,44,0.14),_transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 md:p-9">
-          <div className="absolute inset-0 opacity-60">
-            <div className="absolute left-[10%] top-5 h-32 w-32 rounded-full bg-[#ff7a2c]/10 blur-3xl" />
-            <div className="absolute bottom-0 right-[10%] h-28 w-28 rounded-full bg-[#8fb4ff]/10 blur-3xl" />
-          </div>
-          <div className="relative flex flex-col items-center text-center">
-            <div className="grid h-16 w-16 place-items-center rounded-[18px] border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-              <UploadCloud className="h-8 w-8 text-white" strokeWidth={1.7} />
-            </div>
-            <p className="mt-5 text-[24px] font-graphik tracking-[-0.03em] text-white">
-              Drag and drop audio files here
-            </p>
-            <p className="mt-2 max-w-xl text-[14px] leading-6 text-white/58">
-              Keep it simple for first-time visitors: upload, set release date, and track performance without leaving the dashboard.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button
-                type="button"
-                className="group relative overflow-hidden rounded-full bg-white px-5 py-3 text-[13px] font-medium text-black transition hover:-translate-y-0.5"
-              >
-                <span className="relative z-10">Choose files</span>
-                <span
-                  className="absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{
-                    background:
-                      "linear-gradient(115deg, transparent 0%, rgba(255,122,44,0.08) 35%, rgba(255,255,255,0.85) 50%, rgba(255,122,44,0.08) 65%, transparent 100%)",
-                    animation: "artistSheen 820ms ease",
-                  }}
-                />
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-[13px] text-white/74 transition hover:bg-white/[0.08]"
-              >
-                Import from archive
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.22)]" style={{ animationDelay: "860ms" }}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">Release pulse</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
-              Upcoming campaigns
-            </h3>
-          </div>
-          <CalendarRange className="h-5 w-5 text-white/42" strokeWidth={1.7} />
-        </div>
-
-        <div className="mt-5 space-y-4">
-          {RELEASES.map((release) => (
-            <div
-              key={release.title}
-              className="rounded-[22px] border border-white/8 bg-black/20 p-4 transition hover:border-white/14 hover:bg-white/[0.05]"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[15px] text-white">{release.title}</p>
-                  <p className="mt-1 text-[12px] text-white/48">{release.type}</p>
-                </div>
-                <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/64">
-                  {release.date}
-                </span>
-              </div>
-              <div className="mt-4 flex items-center justify-between gap-3 text-[12px] text-white/58">
-                <span>{release.stage}</span>
-                <span>{release.progress}%</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
-                <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb37a_56%,#dce9ff_100%)]"
-                  style={{ width: `${release.progress}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DistributionPanel() {
-  return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      {[
-        { label: "Spotify", value: "142.8K streams", delta: "+18% MoM" },
-        { label: "Apple Music", value: "76.4K plays", delta: "+9% MoM" },
-        { label: "YouTube", value: "58.1K views", delta: "+22% MoM" },
-        { label: "TikTok", value: "12.9K creates", delta: "+31% MoM" },
-      ].map((item, index) => (
+    <div className="space-y-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.8fr)]">
         <div
-          key={item.label}
-          className="anim-fade-up rounded-[26px] border border-white/8 bg-white/[0.04] p-6"
-          style={{ animationDelay: `${760 + index * 70}ms` }}
+          className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.28)]"
+          style={{ animationDelay: "760ms" }}
         >
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] text-white/64">{item.label}</p>
-            <ArrowUpRight className="h-4 w-4 text-[#ffb488]" strokeWidth={1.8} />
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
+                {t("dashboard.artist.upload.queue")}
+              </p>
+              <h3 className="mt-2 font-graphik text-[28px] tracking-[-0.03em] text-white">
+                {t("dashboard.artist.upload.title")}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={onShowHistory}
+              className="hidden rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/72 transition hover:bg-white/[0.08] hover:text-white md:inline-flex"
+            >
+              {t("dashboard.artist.upload.history")}
+            </button>
           </div>
-          <p className="mt-5 font-graphik text-[30px] tracking-[-0.03em] text-white">{item.value}</p>
-          <p className="mt-2 text-[12px] tracking-[0.18em] text-[#9ec5ff] uppercase">{item.delta}</p>
+
+          <div
+            onClick={onOpenUpload}
+            className="relative mt-6 overflow-hidden rounded-[26px] border border-dashed border-white/14 bg-[radial-gradient(circle_at_top,_rgba(255,122,44,0.14),_transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 md:p-9 cursor-pointer group transition-all hover:border-[#ff7a2c]/50 hover:bg-white/[0.03]"
+          >
+            <div className="absolute inset-0 opacity-60">
+              <div className="absolute left-[10%] top-5 h-32 w-32 rounded-full bg-[#ff7a2c]/10 blur-3xl" />
+              <div className="absolute bottom-0 right-[10%] h-28 w-28 rounded-full bg-[#8fb4ff]/10 blur-3xl" />
+            </div>
+            <div className="relative flex flex-col items-center text-center">
+              <div className="grid h-16 w-16 place-items-center rounded-[18px] border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] group-hover:scale-110 transition-transform">
+                <UploadCloud className="h-8 w-8 text-white" strokeWidth={1.7} />
+              </div>
+              <p className="mt-5 text-[24px] font-graphik tracking-[-0.03em] text-white group-hover:text-[#ffb488] transition-colors">
+                {t("dashboard.artist.upload.dropTitle")}
+              </p>
+              <p className="mt-2 max-w-xl text-[14px] leading-6 text-white/58">
+                Tải lên bản phối mới nhất (WAV, FLAC, MP3 320kbps) để phân phối trực tiếp tới người nghe trên Moodify.
+              </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenUpload();
+                  }}
+                  className="group/btn relative overflow-hidden rounded-full bg-white px-5 py-3 text-[13px] font-medium text-black transition hover:-translate-y-0.5"
+                >
+                  <span className="relative z-10">{t("dashboard.artist.upload.choose")}</span>
+                  <span
+                    className="absolute inset-0 opacity-0 transition-opacity group-hover/btn:opacity-100"
+                    style={{
+                      background:
+                        "linear-gradient(115deg, transparent 0%, rgba(255,122,44,0.08) 35%, rgba(255,255,255,0.85) 50%, rgba(255,122,44,0.08) 65%, transparent 100%)",
+                      animation: "artistSheen 820ms ease",
+                    }}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenUpload();
+                  }}
+                  className="rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-[13px] text-white/74 transition hover:bg-white/[0.08]"
+                >
+                  {t("dashboard.artist.upload.import")}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      ))}
+
+        <div
+          className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
+          style={{ animationDelay: "860ms" }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">
+                {t("dashboard.artist.release.eyebrow")}
+              </p>
+              <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
+                {t("dashboard.artist.release.title")}
+              </h3>
+            </div>
+            <CalendarRange className="h-5 w-5 text-white/42" strokeWidth={1.7} />
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {RELEASES.map((release, index) => (
+              <div
+                key={`release-${index}`}
+                className="rounded-[22px] border border-white/8 bg-black/20 p-4 transition hover:border-white/14 hover:bg-white/[0.05]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[15px] text-white">{release.title}</p>
+                    <p className="mt-1 text-[12px] text-white/48">{release.type}</p>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/64">
+                    {release.date}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 text-[12px] text-white/58">
+                  <span>{release.stage}</span>
+                  <span>{release.progress}</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb37a_56%,#dce9ff_100%)]"
+                    style={{ width: `${release.progressWidth}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Interactive Track Catalog Panel */}
+      <TrackCatalogPanel
+        tracks={tracks}
+        onEditTrack={onEditTrack}
+        onDeleteTrack={onDeleteTrack}
+        onToggleStatus={onToggleStatus}
+        onToggleVisibility={onToggleVisibility}
+        onCopyLink={onCopyLink}
+        playingTrackId={playingTrackId}
+        onTogglePlayTrack={onTogglePlayTrack}
+        onOpenUpload={onOpenUpload}
+      />
     </div>
   );
 }
 
-function VinylPanel() {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-      <div className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-6" style={{ animationDelay: "760ms" }}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">Collector drop</p>
-            <h3 className="mt-2 font-graphik text-[26px] tracking-[-0.03em] text-white">
-              Limited pressing in motion
-            </h3>
-          </div>
-          <Disc3 className="h-5 w-5 text-white/44" strokeWidth={1.7} />
-        </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {[
-            ["Pressing run", "500 units"],
-            ["Reserved", "312 pre-orders"],
-            ["Margin", "$4.9K est."],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-              <p className="text-[12px] tracking-[0.18em] text-white/42 uppercase">{label}</p>
-              <p className="mt-4 font-graphik text-[24px] tracking-[-0.03em] text-white">{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-6" style={{ animationDelay: "860ms" }}>
-        <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">Audio signature</p>
-        <div className="mt-4 flex min-h-[180px] items-center justify-center rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_top,_rgba(158,197,255,0.12),_transparent_40%),rgba(255,255,255,0.02)]">
-          <WaveBars />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function CommentsPanel() {
+  const { t } = useTranslation();
+
   return (
-    <div className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-6" style={{ animationDelay: "760ms" }}>
+    <div
+      className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-6"
+      style={{ animationDelay: "760ms" }}
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">Community inbox</p>
+          <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
+            {t("dashboard.artist.commentsPanel.eyebrow")}
+          </p>
           <h3 className="mt-2 font-graphik text-[26px] tracking-[-0.03em] text-white">
-            Fresh audience feedback
+            {t("dashboard.artist.commentsPanel.title")}
           </h3>
         </div>
         <button
           type="button"
           className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/72 transition hover:bg-white/[0.08]"
         >
-          Moderate
+          {t("dashboard.artist.commentsPanel.moderate")}
         </button>
       </div>
       <div className="mt-6 space-y-4">
         {COMMENT_PREVIEWS.map((comment) => (
           <div key={comment.name} className="rounded-[22px] border border-white/8 bg-black/20 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[14px] text-white">{comment.name}</p>
+              <p className="text-[14px] text-white font-medium">{comment.name}</p>
               <p className="text-[11px] text-white/44">{comment.age}</p>
             </div>
             <p className="mt-3 text-[14px] leading-6 text-white/62">{comment.excerpt}</p>
@@ -414,12 +445,21 @@ function BenefitsPanel() {
   return (
     <div className="grid gap-5 md:grid-cols-3">
       {[
-        { title: "Insights Pro", body: "Unlock cohort retention, save rates, and skip segments." },
-        { title: "Fan messaging", body: "Send lightweight drop alerts to your top listeners." },
-        { title: "Early merch", body: "Bundle unreleased edits with exclusive merch windows." },
+        {
+          title: "Doanh thu trực tiếp 85%",
+          body: "Nhận tiền bản quyền trực tiếp từ người nghe với tỉ lệ chi trả cao nhất thị trường.",
+        },
+        {
+          title: "Xác thực nghệ sĩ chính thức",
+          body: "Huy hiệu tick xanh độc quyền và trang profile nghệ sĩ tùy biến giao diện.",
+        },
+        {
+          title: "Công cụ phân tích Real-time",
+          body: "Theo dõi nhân khẩu học người nghe, bản đồ lượt phát và xu hướng tương tác 24/7.",
+        },
       ].map((item, index) => (
         <div
-          key={item.title}
+          key={`benefit-${index}`}
           className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-6"
           style={{ animationDelay: `${760 + index * 80}ms` }}
         >
@@ -433,14 +473,21 @@ function BenefitsPanel() {
 }
 
 function RightRail() {
+  const { t } = useTranslation();
+
   return (
     <div className="grid gap-5">
-      <div className="anim-fade-up overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]" style={{ animationDelay: "900ms" }}>
+      <div
+        className="anim-fade-up overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
+        style={{ animationDelay: "900ms" }}
+      >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">Audience pulse</p>
+            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">
+              {t("dashboard.artist.audience.eyebrow")}
+            </p>
             <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
-              Fans are leaning in
+              {t("dashboard.artist.audience.title")}
             </h3>
           </div>
           <Users className="h-5 w-5 text-white/40" strokeWidth={1.7} />
@@ -452,35 +499,43 @@ function RightRail() {
             style={{ animation: "artistPulse 4s ease-in-out infinite" }}
           />
           <p className="text-[42px] font-graphik leading-none tracking-[-0.04em] text-white">
-            78%
+            18.4K
           </p>
           <p className="mt-2 max-w-[220px] text-[13px] leading-6 text-white/58">
-            Save-to-listen ratio is outperforming your last release cycle across the first 48 hours.
+            Người nghe hoạt động hàng tháng (Monthly Listeners)
           </p>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
-            <div className="h-full w-[78%] rounded-full bg-[linear-gradient(90deg,#8fb4ff_0%,#dce9ff_100%)]" />
+            <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#8fb4ff_0%,#dce9ff_100%)]" />
           </div>
         </div>
 
         <div className="mt-5 space-y-3">
-          {FAN_TOUCHPOINTS.map((point) => (
-            <div key={point.city} className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-black/20 px-4 py-3">
+          {FAN_TOUCHPOINTS.map((point, index) => (
+            <div
+              key={`fan-touchpoint-${index}`}
+              className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-black/20 px-4 py-3"
+            >
               <div>
                 <p className="text-[13px] text-white">{point.city}</p>
                 <p className="mt-1 text-[11px] text-white/42">{point.tone}</p>
               </div>
-              <p className="text-[13px] text-[#ffb488]">{point.share}</p>
+              <p className="text-[13px] text-[#ffb488] font-medium">{point.share}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]" style={{ animationDelay: "980ms" }}>
+      <div
+        className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
+        style={{ animationDelay: "980ms" }}
+      >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">Studio actions</p>
+            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
+              {t("dashboard.artist.actions.eyebrow")}
+            </p>
             <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
-              Next best moves
+              {t("dashboard.artist.actions.title")}
             </h3>
           </div>
           <ChevronRight className="h-5 w-5 text-white/40" strokeWidth={1.7} />
@@ -489,29 +544,29 @@ function RightRail() {
           {[
             {
               icon: Bell,
-              title: "Schedule teaser reminder",
-              copy: "Best send window in your top market: tonight at 8:30 PM.",
+              title: "Hoàn thiện bản quyền tác giả",
+              copy: "Đăng ký ISRC code cho single Midnight Echoes trước ngày phát hành.",
             },
             {
               icon: CircleDollarSign,
-              title: "Turn on artist monetization",
-              copy: "Earnings panel is ready once your next release goes live.",
+              title: "Doanh thu phát sinh tuần này",
+              copy: "+$842.50 đã sẵn sàng rút về tài khoản ngân hàng liên kết.",
             },
             {
               icon: Flame,
-              title: "Boost top-performing snippet",
-              copy: "The chorus cut is trending above average completion.",
+              title: "Tăng tốc quảng bá Single mới",
+              copy: "Gửi bản nghe thử tới 12 Playlist Curators hàng đầu trên hệ thống.",
             },
-          ].map((task) => {
+          ].map((task, index) => {
             const Icon = task.icon;
             return (
-              <div key={task.title} className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+              <div key={`studio-action-${index}`} className="rounded-[20px] border border-white/8 bg-black/20 p-4 hover:bg-white/[0.04] transition">
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.05]">
                     <Icon className="h-[17px] w-[17px] text-white/72" strokeWidth={1.7} />
                   </div>
                   <div>
-                    <p className="text-[14px] text-white">{task.title}</p>
+                    <p className="text-[14px] text-white font-medium">{task.title}</p>
                     <p className="mt-1 text-[12px] leading-5 text-white/52">{task.copy}</p>
                   </div>
                 </div>
@@ -525,13 +580,157 @@ function RightRail() {
 }
 
 export default function ArtistDashboardPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("tracks");
   const [authState, setAuthState] = useState<"checking" | "allowed" | "denied">(
     "checking"
   );
   const [currentUser, setCurrentUser] = useState<UserProfileResponse | null>(null);
+  const [artistProfile, setArtistProfile] = useState<ArtistProfileResponse | null>(null);
+  const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Tracks State & Modals
+  const [tracks, setTracks] = useState<ArtistTrack[]>([]);
+  const [editingTrack, setEditingTrack] = useState<ArtistTrack | null>(null);
+  const [deletingTrack, setDeletingTrack] = useState<ArtistTrack | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const toastCounterRef = useRef(0);
+
+  const addToast = (message: string, type: ToastMessage["type"] = "success") => {
+    toastCounterRef.current += 1;
+    const newToast: ToastMessage = {
+      id: `toast-${toastCounterRef.current}`,
+      type,
+      message,
+    };
+    setToasts((prev) => [...prev, newToast]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Actions
+  const handleEditTrack = (track: ArtistTrack) => {
+    setEditingTrack(track);
+  };
+
+  const handleSaveEditedTrack = (updatedTrack: ArtistTrack) => {
+    const nextTracks = tracks.map((t) => (t.id === updatedTrack.id ? updatedTrack : t));
+    setTracks(nextTracks);
+    setEditingTrack(null);
+    addToast(
+      t("dashboard.artist.trackCatalog.toast.saved", { title: updatedTrack.title }),
+      "success"
+    );
+  };
+
+  const handleDeleteTrack = (track: ArtistTrack) => {
+    setDeletingTrack(track);
+  };
+
+  const handleConfirmDeleteTrack = (trackId: string) => {
+    const target = tracks.find((t) => t.id === trackId);
+    const nextTracks = tracks.filter((t) => t.id !== trackId);
+    setTracks(nextTracks);
+    setDeletingTrack(null);
+    if (playingTrackId === trackId) {
+      setPlayingTrackId(null);
+    }
+    addToast(
+      t("dashboard.artist.trackCatalog.toast.deleted", {
+        title: target?.title || "bài hát",
+      }),
+      "success"
+    );
+  };
+
+  const handleUploadSuccess = (newTrack: ArtistTrack) => {
+    const nextTracks = [newTrack, ...tracks];
+    setTracks(nextTracks);
+    addToast(
+      t("dashboard.artist.trackCatalog.toast.uploaded", { title: newTrack.title }),
+      "success"
+    );
+  };
+
+  const handleToggleStatus = (track: ArtistTrack) => {
+    const nextStatus = track.status === "published" ? "draft" : "published";
+    const statusLabel =
+      nextStatus === "published"
+        ? t("dashboard.artist.trackCatalog.filters.published")
+        : t("dashboard.artist.trackCatalog.filters.draft");
+
+    const updatedTrack: ArtistTrack = {
+      ...track,
+      status: nextStatus,
+      updatedAt: "Vừa xong",
+    };
+    const nextTracks = tracks.map((t) => (t.id === track.id ? updatedTrack : t));
+    setTracks(nextTracks);
+    addToast(
+      t("dashboard.artist.trackCatalog.toast.statusUpdated", {
+        title: track.title,
+        status: statusLabel,
+      }),
+      "info"
+    );
+  };
+
+  const handleToggleVisibility = (track: ArtistTrack) => {
+    const nextVis = track.visibility === "public" ? "private" : "public";
+    const visLabel =
+      nextVis === "public"
+        ? t("dashboard.artist.trackCatalog.visibilities.public")
+        : t("dashboard.artist.trackCatalog.visibilities.private");
+
+    const updatedTrack: ArtistTrack = {
+      ...track,
+      visibility: nextVis,
+      updatedAt: "Vừa xong",
+    };
+    const nextTracks = tracks.map((t) => (t.id === track.id ? updatedTrack : t));
+    setTracks(nextTracks);
+    addToast(
+      t("dashboard.artist.trackCatalog.toast.visibilityUpdated", {
+        title: track.title,
+        visibility: visLabel,
+      }),
+      "info"
+    );
+  };
+
+  const handleCopyLink = (track: ArtistTrack) => {
+    if (typeof window !== "undefined") {
+      const shareUrl = `${window.location.origin}/track/${track.id}`;
+      navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => {
+          addToast(t("dashboard.artist.trackCatalog.toast.linkCopied"), "success");
+        })
+        .catch(() => {
+          addToast("Đã sao chép liên kết bài hát", "success");
+        });
+    }
+  };
+
+  const handleTogglePlayTrack = (track: ArtistTrack) => {
+    if (playingTrackId === track.id) {
+      setPlayingTrackId(null);
+    } else {
+      setPlayingTrackId(track.id);
+      addToast(`Đang phát nghe thử: "${track.title}"`, "info");
+    }
+  };
+
+  const handleShowHistory = () => {
+    addToast(`Lịch sử: Đã đồng bộ ${tracks.length} bài hát trong thư viện studio.`, "info");
+  };
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -583,6 +782,29 @@ export default function ArtistDashboardPage() {
 
         setCurrentUser(profile);
         setAuthState("allowed");
+        setCatalogState("loading");
+        setCatalogError(null);
+
+        try {
+          const catalog = await getCurrentArtistCatalog(token);
+          if (cancelled) {
+            return;
+          }
+          setArtistProfile(catalog.artist);
+          setTracks(catalog.tracks.map(mapCatalogTrack));
+          setCatalogState("ready");
+        } catch (catalogErr) {
+          if (cancelled) {
+            return;
+          }
+          setTracks([]);
+          setCatalogState("error");
+          setCatalogError(
+            catalogErr instanceof Error
+              ? catalogErr.message
+              : "Không thể tải dữ liệu bài hát từ MongoDB"
+          );
+        }
       } catch {
         clearAuthSession();
         if (!cancelled) {
@@ -599,38 +821,75 @@ export default function ArtistDashboardPage() {
     };
   }, [router]);
 
-  const activePanel = useMemo(() => {
+  // Dynamic calculated stats from tracks
+  const statsList: Stat[] = useMemo(() => {
+    const totalPlays = tracks.reduce((sum, tr) => sum + tr.plays, 0);
+    const totalLikes = tracks.reduce((sum, tr) => sum + tr.likes, 0);
+    const totalComments = tracks.reduce((sum, tr) => sum + tr.commentsCount, 0);
+
+    const formatNum = (num: number) => {
+      if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+      return num.toString();
+    };
+    const downloadedTracks = tracks.filter((tr) => tr.downloadStatus === "completed").length;
+
+    return [
+      { key: "plays", value: formatNum(totalPlays), trend: "MongoDB", icon: Activity },
+      { key: "reposts", value: "0", trend: "Chưa có", icon: Radio },
+      { key: "downloads", value: formatNum(downloadedTracks), trend: "MongoDB", icon: Download },
+      { key: "likes", value: formatNum(totalLikes), trend: "Chưa có", icon: Heart },
+      { key: "comments", value: totalComments.toString(), trend: "Chưa có", icon: MessageSquare },
+    ];
+  }, [tracks]);
+
+  const artistDisplayName =
+    artistProfile?.name ||
+    currentUser?.fullName ||
+    currentUser?.username ||
+    t("common.artistFallback");
+  const artistImageUrl = artistProfile?.imageUrl || currentUser?.avatarUrl;
+
+  const renderActivePanel = () => {
     switch (activeTab) {
-      case "distribution":
-        return <DistributionPanel />;
-      case "vinyl":
-        return <VinylPanel />;
       case "comments":
         return <CommentsPanel />;
       case "benefits":
         return <BenefitsPanel />;
       case "tracks":
       default:
-        return <TracksPanel />;
+        return (
+          <TracksPanel
+            tracks={tracks}
+            onEditTrack={handleEditTrack}
+            onDeleteTrack={handleDeleteTrack}
+            onToggleStatus={handleToggleStatus}
+            onToggleVisibility={handleToggleVisibility}
+            onCopyLink={handleCopyLink}
+            playingTrackId={playingTrackId}
+            onTogglePlayTrack={handleTogglePlayTrack}
+            onOpenUpload={() => setIsUploadModalOpen(true)}
+            onShowHistory={handleShowHistory}
+          />
+        );
     }
-  }, [activeTab]);
+  };
 
   if (authState !== "allowed") {
     return (
       <section className="flex min-h-screen items-center justify-center bg-[#08090d] px-6 text-[#f4f2ed]">
         <div className="w-full max-w-[460px] rounded-[28px] border border-white/8 bg-white/[0.04] p-7 text-center shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
           <p className="text-[11px] tracking-[0.28em] text-[#ffb488] uppercase">
-            Artist Access
+            {t("dashboard.artist.access.eyebrow")}
           </p>
           <h1 className="mt-3 font-graphik text-[30px] tracking-[-0.04em] text-white">
             {authState === "checking"
-              ? "Checking your account..."
-              : "This page is only for artist accounts."}
+              ? t("dashboard.artist.access.checkingTitle")
+              : t("dashboard.artist.access.deniedTitle")}
           </h1>
           <p className="mt-3 text-[14px] leading-6 text-white/58">
             {authState === "checking"
-              ? "We are verifying your session and role before opening the artist studio."
-              : "You will be redirected to the appropriate page based on your current session."}
+              ? t("dashboard.artist.access.checkingCopy")
+              : t("dashboard.artist.access.deniedCopy")}
           </p>
         </div>
       </section>
@@ -654,11 +913,12 @@ export default function ArtistDashboardPage() {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col px-4 pb-10 pt-5 sm:px-6 lg:px-10">
+        {/* Header */}
         <header className="flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="anim-fade-up">
-            <p className="text-[11px] tracking-[0.28em] text-white/44 uppercase">Moodify for Artists</p>
+            <p className="text-[11px] tracking-[0.28em] text-white/44 uppercase">{t("dashboard.artist.header.eyebrow")}</p>
             <h1 className="mt-2 font-graphik text-[34px] tracking-[-0.04em] text-white sm:text-[40px]">
-              Artist dashboard
+              {t("dashboard.artist.header.title")}
             </h1>
           </div>
 
@@ -666,15 +926,23 @@ export default function ArtistDashboardPage() {
             <label className="flex min-h-[54px] flex-1 items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 backdrop-blur-md transition focus-within:border-white/20 focus-within:bg-white/[0.06]">
               <Search className="h-4 w-4 text-white/44" strokeWidth={1.7} />
               <input
-                aria-label="Search dashboard"
-                placeholder="Search tracks, campaigns, fans..."
+                aria-label={t("dashboard.artist.header.searchLabel")}
+                placeholder={t("dashboard.artist.header.searchPlaceholder")}
                 className="w-full bg-transparent text-[14px] text-white outline-none placeholder:text-white/36"
               />
             </label>
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-md">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-[linear-gradient(135deg,#ff8b4d,#ffd1b5)] text-black">
+              <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#ff8b4d,#ffd1b5)] text-black font-semibold">
+                {artistImageUrl && (
+                  <img
+                    src={artistImageUrl}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
                 {(() => {
-                  const source = (currentUser?.fullName || currentUser?.username || "Artist").trim();
+                  if (artistImageUrl) return null;
+                  const source = artistDisplayName.trim();
                   const parts = source.split(/\s+/).filter(Boolean);
                   if (parts.length === 0) return "AR";
                   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
@@ -682,61 +950,76 @@ export default function ArtistDashboardPage() {
                 })()}
               </div>
               <div>
-                <p className="text-[13px] text-white">
-                  {currentUser?.fullName || currentUser?.username || "Artist"}
+                <p className="text-[13px] text-white font-medium">
+                  {artistDisplayName}
                 </p>
                 <p className="mt-0.5 text-[11px] tracking-[0.16em] text-white/42 uppercase">
-                  Artist studio
+                  {t("dashboard.artist.header.studio")}
                 </p>
               </div>
             </div>
+            <LanguageSwitcher />
             <button
               type="button"
               onClick={handleLogout}
               disabled={loggingOut}
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 text-[13px] text-red-300 backdrop-blur-md transition hover:bg-red-500/10 hover:border-red-500/20 disabled:opacity-50"
-              title="Đăng xuất"
+              title={t("common.logout")}
             >
               <LogOut className="h-4 w-4" strokeWidth={1.7} />
-              <span className="hidden sm:inline">{loggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</span>
+              <span className="hidden sm:inline">{loggingOut ? t("common.loggingOut") : t("common.logout")}</span>
             </button>
           </div>
         </header>
 
-        <div className="anim-fade-up mt-6 flex flex-col gap-4 rounded-[28px] border border-white/8 bg-white/[0.04] px-5 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:flex-row md:items-center md:justify-between" style={{ animationDelay: "180ms" }}>
+        {/* Upload quota & upgrade banner */}
+        <div
+          className="anim-fade-up mt-6 flex flex-col gap-4 rounded-[28px] border border-white/8 bg-white/[0.04] px-5 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:flex-row md:items-center md:justify-between"
+          style={{ animationDelay: "180ms" }}
+        >
           <div className="flex items-center gap-4">
             <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-white/10 bg-white/[0.05]">
-              <UploadCloud className="h-6 w-6 text-white" strokeWidth={1.7} />
+              <UploadCloud className="h-6 w-6 text-[#ffb488]" strokeWidth={1.7} />
             </div>
             <div>
-              <p className="text-[15px] text-white">62% of monthly upload space used</p>
-              <div className="mt-2 h-2 w-[220px] max-w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[62%] rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb488_60%,#dce9ff_100%)]" />
+              <p className="text-[15px] text-white font-medium">
+                Dung lượng phòng thu: <strong className="text-[#ffb488]">{tracks.length * 15} MB</strong> / 2.0 GB ({tracks.length} bài hát)
+              </p>
+              <div className="mt-2 h-2 w-[240px] max-w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb488_60%,#dce9ff_100%)] transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.max(12, (tracks.length / 20) * 100))}%` }}
+                />
               </div>
             </div>
           </div>
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-[13px] text-white transition hover:bg-white/[0.08]"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-[13px] text-white hover:bg-white/[0.08] hover:border-white/20 transition"
           >
-            Get unlimited uploads
+            + Tải lên bài hát mới
           </button>
         </div>
 
+        {/* Main Studio Hub */}
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_340px]">
           <div className="grid gap-6">
-            <div className="anim-fade-up overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(135deg,rgba(18,19,22,0.96)_0%,rgba(12,13,18,0.9)_58%,rgba(13,17,28,0.94)_100%)] px-5 py-6 shadow-[0_30px_90px_rgba(0,0,0,0.28)] md:px-7 md:py-7" style={{ animationDelay: "260ms" }}>
+            <div
+              className="anim-fade-up overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(135deg,rgba(18,19,22,0.96)_0%,rgba(12,13,18,0.9)_58%,rgba(13,17,28,0.94)_100%)] px-5 py-6 shadow-[0_30px_90px_rgba(0,0,0,0.28)] md:px-7 md:py-7"
+              style={{ animationDelay: "260ms" }}
+            >
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
                 <div>
-                  <p className="text-[11px] tracking-[0.28em] text-[#ffb488] uppercase">Artist Studio</p>
+                  <p className="text-[11px] tracking-[0.28em] text-[#ffb488] uppercase">{t("dashboard.artist.studio.eyebrow")}</p>
                   <div className="mt-4 flex flex-wrap items-end gap-3">
                     <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
-                      Build momentum
+                      {artistDisplayName}
                     </h2>
-                    <p className="pb-1 text-[14px] text-white/52">All-time stats update daily.</p>
+                    <p className="pb-1 text-[14px] text-white/52">Studio Verified</p>
                   </div>
                   <p className="mt-4 max-w-[640px] text-[15px] leading-7 text-white/60">
-                    A clean command center for releases, audience signals, and artist growth. Motion is present, but calm enough to keep the page feeling premium.
+                    Chào mừng bạn quay lại phòng thu âm thanh kỹ thuật số. Quản lý các bản phát hành, theo dõi tương tác của người hâm mộ và tối ưu hóa từng bài nhạc của bạn.
                   </p>
                 </div>
 
@@ -759,31 +1042,32 @@ export default function ArtistDashboardPage() {
                 </div>
               </div>
 
+              {/* Dynamic Stats Grid */}
               <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                {STATS.map((item, index) => (
-                  <StatCard key={item.label} item={item} delay={340 + index * 70} />
+                {statsList.map((item, index) => (
+                  <StatCard key={item.key} item={item} delay={340 + index * 70} />
                 ))}
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {[
-                  { icon: BarChart3, label: "Insights", copy: "Deep listener trends" },
-                  { icon: CircleDollarSign, label: "Earnings", copy: "Revenue + payouts" },
-                  { icon: Users, label: "Fans", copy: "Audience growth and saves" },
-                  { icon: Sparkles, label: "Benefits", copy: "Perks for artist accounts" },
+                  { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nghệ sĩ thịnh hành" },
+                  { icon: CircleDollarSign, label: t("dashboard.artist.studio.earnings"), copy: "$1,420.80 tháng này" },
+                  { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 fans theo dõi mới" },
+                  { icon: Sparkles, label: t("dashboard.artist.studio.benefits"), copy: "Đặc quyền phân phối cấp 2" },
                 ].map((item, index) => {
                   const Icon = item.icon;
                   return (
                     <div
                       key={item.label}
-                      className="anim-fade-up flex items-center gap-4 rounded-[22px] border border-white/8 bg-black/20 p-4"
+                      className="anim-fade-up flex items-center gap-4 rounded-[22px] border border-white/8 bg-black/20 p-4 hover:bg-white/[0.04] transition"
                       style={{ animationDelay: `${620 + index * 80}ms` }}
                     >
                       <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-white/10 bg-white/[0.04]">
-                        <Icon className="h-5 w-5 text-white/74" strokeWidth={1.7} />
+                        <Icon className="h-5 w-5 text-[#ffb488]" strokeWidth={1.7} />
                       </div>
                       <div>
-                        <p className="text-[14px] text-white">{item.label}</p>
+                        <p className="text-[14px] text-white font-medium">{item.label}</p>
                         <p className="mt-1 text-[12px] text-white/44">{item.copy}</p>
                       </div>
                     </div>
@@ -792,48 +1076,86 @@ export default function ArtistDashboardPage() {
               </div>
             </div>
 
-            <div className="anim-fade-up rounded-[30px] border border-white/8 bg-white/[0.03] px-5 py-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:px-6" style={{ animationDelay: "520ms" }}>
+            {/* Tabs Section */}
+            <div
+              className="anim-fade-up rounded-[30px] border border-white/8 bg-white/[0.03] px-5 py-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:px-6"
+              style={{ animationDelay: "520ms" }}
+            >
               <div className="flex flex-wrap items-end gap-x-8 gap-y-4 border-b border-white/8">
                 {TAB_LABELS.map((tab) => (
                   <TabButton
                     key={tab.key}
                     active={tab.key === activeTab}
-                    label={tab.label}
+                    label={t(tab.labelKey)}
                     onClick={() => setActiveTab(tab.key)}
                   />
                 ))}
               </div>
-              <div className="mt-5">{activePanel}</div>
+              {catalogState === "loading" && (
+                <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20 px-5 py-4 text-[13px] text-white/58">
+                  Đang tải bài hát thật từ MongoDB...
+                </div>
+              )}
+              {catalogState === "error" && (
+                <div className="mt-5 rounded-[22px] border border-red-400/20 bg-red-500/10 px-5 py-4 text-[13px] text-red-100">
+                  Không thể tải catalog nghệ sĩ: {catalogError}
+                </div>
+              )}
+              <div className="mt-5">{renderActivePanel()}</div>
             </div>
           </div>
 
           <RightRail />
         </div>
 
+        {/* Footer Notes */}
         <div className="anim-fade-up mt-6 grid gap-5 lg:grid-cols-3" style={{ animationDelay: "1080ms" }}>
           <div className="rounded-[28px] border border-white/8 bg-white/[0.04] p-5">
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">Track energy</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Chorus retention is peaking</h3>
+            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">{t("dashboard.artist.notes.trackEnergy")}</p>
+            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Năng lượng âm thanh</h3>
             <p className="mt-3 text-[14px] leading-6 text-white/58">
-              Listeners are replaying the central hook and staying longer through the second drop than they did last cycle.
+              Chỉ số dynamic range và loudness trung bình đạt chuẩn LUFS -14 phù hợp cho các nền tảng streaming quốc tế.
             </p>
           </div>
           <div className="rounded-[28px] border border-white/8 bg-white/[0.04] p-5">
-            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">A&R radar</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Playlist fit looks healthy</h3>
+            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">{t("dashboard.artist.notes.arRadar")}</p>
+            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">A&R Radar & Hợp tác</h3>
             <p className="mt-3 text-[14px] leading-6 text-white/58">
-              Warm electronic and alt-pop buckets are the strongest lanes based on skip rate, saves, and regional replay patterns.
+              3 hãng thu âm Indie đang theo dõi hồ sơ của bạn với 4 bài hát EDM demo được quan tâm nhất.
             </p>
           </div>
           <div className="rounded-[28px] border border-white/8 bg-white/[0.04] p-5">
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">Brand note</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Visual style stays understated</h3>
+            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">{t("dashboard.artist.notes.brandNote")}</p>
+            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Bảo hộ thương hiệu</h3>
             <p className="mt-3 text-[14px] leading-6 text-white/58">
-              Soft gradients, glass panels, and restrained motion keep the screen attractive without feeling noisy or over-designed.
+              Toàn bộ bài hát tải lên Moodify được đăng ký mã fingerprint nhận diện tác quyền tự động.
             </p>
           </div>
         </div>
       </div>
+
+      {/* Modals & Toasts */}
+      <TrackEditModal
+        isOpen={Boolean(editingTrack)}
+        track={editingTrack}
+        onClose={() => setEditingTrack(null)}
+        onSave={handleSaveEditedTrack}
+      />
+
+      <TrackDeleteModal
+        isOpen={Boolean(deletingTrack)}
+        track={deletingTrack}
+        onClose={() => setDeletingTrack(null)}
+        onConfirm={handleConfirmDeleteTrack}
+      />
+
+      <TrackUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadSuccess={handleUploadSuccess}
+      />
+
+      <ToastNotification toasts={toasts} onDismiss={dismissToast} />
     </section>
   );
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 
+import { I18nProvider } from "@/components/i18n/i18n-provider";
+
 import "./globals.css";
 
 const manrope = Manrope({
@@ -26,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
-        {children}
+        <I18nProvider>{children}</I18nProvider>
       </body>
     </html>
   );

@@ -20,9 +20,74 @@ export type UserProfileResponse = {
   username: string;
   avatarUrl: string | null;
   role: string;
+  artistSpotifyId: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ArtistProfileResponse = {
+  id: string;
+  spotifyId: string;
+  name: string;
+  imageUrl: string | null;
+  followers: number | null;
+  popularity: number | null;
+  genres: string[] | null;
+  genresRaw: string[] | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type ArtistTrackResponse = {
+  id: string;
+  spotifyId: string;
+  title: string;
+  artist: string;
+  genre: string;
+  duration: string;
+  status: "draft" | "published" | "scheduled";
+  visibility: "public" | "private" | "unlisted";
+  plays: number;
+  likes: number;
+  commentsCount: number;
+  bpm: number | null;
+  key: string | null;
+  coverUrl: string | null;
+  audioUrl: string | null;
+  spotifyUrl: string | null;
+  downloadStatus: string | null;
+  moderationStatus: string | null;
+  moderationScore: number | null;
+  description: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type ArtistAlbumResponse = {
+  id: string;
+  spotifyId: string;
+  name: string;
+  artistName: string;
+  artistSpotifyId: string;
+  imageUrl: string | null;
+  releaseDate: string | null;
+  totalTracks: number | null;
+  downloadedTracksCount: number | null;
+  fullyDownloaded: boolean | null;
+  trackIds: string[] | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type ArtistCatalogResponse = {
+  artist: ArtistProfileResponse;
+  tracks: ArtistTrackResponse[];
+  albums: ArtistAlbumResponse[];
+  page: number;
+  size: number;
+  totalTracks: number;
+  totalTrackPages: number;
 };
 
 export type StoredAuthSession = {
@@ -109,6 +174,8 @@ export async function register(payload: {
   password: string;
   confirmPassword: string;
   role?: string;
+  avatarUrl?: string;
+  stageName?: string;
 }) {
   return requestJson<AuthResponse>("/api/auth/register", {
     body: payload,
@@ -139,10 +206,51 @@ export async function logout(refreshToken?: string) {
   });
 }
 
+export async function uploadAvatar(
+  accessToken: string,
+  file: File,
+): Promise<UserProfileResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const fullUrl = `${API_BASE_URL}/api/auth/avatar`;
+  const response = await fetch(fullUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorMsg = await extractErrorMessage(response);
+    throw new Error(errorMsg);
+  }
+
+  return (await response.json()) as UserProfileResponse;
+}
+
 export async function getCurrentUser(accessToken: string) {
   return requestJson<UserProfileResponse>("/api/auth/me", {
     token: accessToken,
   });
+}
+
+export async function getCurrentArtistCatalog(
+  accessToken: string,
+  params: { page?: number; size?: number; query?: string } = {},
+) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("page", String(params.page ?? 0));
+  searchParams.set("size", String(params.size ?? 50));
+  if (params.query?.trim()) {
+    searchParams.set("query", params.query.trim());
+  }
+
+  return requestJson<ArtistCatalogResponse>(
+    `/api/artists/me/catalog?${searchParams.toString()}`,
+    { token: accessToken },
+  );
 }
 
 export async function getValidAccessToken(): Promise<string | null> {
