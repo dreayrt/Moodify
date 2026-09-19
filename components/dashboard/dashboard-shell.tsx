@@ -17,6 +17,9 @@ import {
 import {
   getCurrentUser,
   getValidAccessToken,
+  clearAuthSession,
+  getStoredAuthSession,
+  logout,
   type UserProfileResponse,
 } from "@/lib/auth-client";
 import { fetchUserPlaylists, type Playlist } from "@/lib/api-client";
@@ -139,10 +142,20 @@ function MascotAccountTrigger({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    router.push("/");
+  const handleLogout = async () => {
+    try {
+      const session = getStoredAuthSession();
+      if (session?.refreshToken) {
+        await logout(session.refreshToken);
+      }
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      clearAuthSession();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      router.push("/");
+    }
   };
 
   const displayName = user?.fullName || user?.username || "Người dùng Moodify";
@@ -221,10 +234,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  if (pathname?.startsWith("/dashboard/artist") || pathname?.startsWith("/dashboard/moderator")) {
-    return <>{children}</>;
-  }
 
   const currentVibe = searchParams.get("vibe") || "all";
   const activeVibeObj = VIBES.find((v) => v.id === currentVibe) ?? VIBES[0];

@@ -44,10 +44,6 @@ export function GlobalPlayerBar() {
 
   const [liked, setLiked] = useState(false);
 
-  if (pathname?.startsWith("/dashboard/artist") || pathname?.startsWith("/dashboard/moderator")) {
-    return null;
-  }
-
   // Check liked status when track changes
   React.useEffect(() => {
     if (!currentTrack?.spotifyId) return;
