@@ -1,5 +1,8 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { HeroCarousel } from "@/components/landing/hero-carousel";
 
 const playlists = [
@@ -32,6 +35,22 @@ const footerLinks = [
 ];
 
 export default function Home() {
+  const { user, loading, router } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--page-bg)] flex items-center justify-center">
+        <div className="text-white/60">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)]">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-5 pb-14 pt-6 sm:px-8 lg:gap-14 lg:px-10">
