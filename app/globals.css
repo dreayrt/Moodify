@@ -12,6 +12,19 @@
     sans-serif;
   --font-display-stack: var(--font-space-grotesk), "Avenir Next",
     "Helvetica Neue", sans-serif;
+
+  /* Moodify Brand Design System Tokens */
+  --moodify-primary: #7A5CFF;
+  --moodify-primary-rgb: 122, 92, 255;
+  --moodify-accent: #F557B6;
+  --moodify-accent-rgb: 245, 87, 182;
+  --moodify-soft: #EED9FF;
+  --moodify-dark: #0D1224;
+  --moodify-surface: #161B2E;
+  --moodify-light: #F6F7FB;
+  --moodify-gray: #A7AABC;
+  --moodify-gradient-primary: linear-gradient(135deg, #7A5CFF 0%, #F557B6 100%);
+  --moodify-gradient-glow: radial-gradient(circle, rgba(122, 92, 255, 0.35) 0%, rgba(13, 18, 36, 0) 70%);
 }
 
 @theme inline {

@@ -1,0 +1,21 @@
+{
+  "name": "Moodify - Music for a Brighter You",
+  "short_name": "Moodify",
+  "description": "Personalized music and soundscapes that adapt to your mood for a brighter tomorrow.",
+  "icons": [
+    {
+      "src": "android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0D1224",
+  "background_color": "#0D1224",
+  "display": "standalone",
+  "start_url": "/"
+}

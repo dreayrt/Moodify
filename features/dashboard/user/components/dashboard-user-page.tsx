@@ -28,6 +28,7 @@ import {
   logout,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
+import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 
 const VIDEO_SRC =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_115057_94c3699b-0fd1-4124-bcf3-3626bb8c1f77.mp4";
@@ -792,10 +793,15 @@ export default function LumenHero() {
         <header className="relative z-40 flex items-center gap-[16px] px-5 md:px-[35px] pt-5 md:pt-[27px]">
           <Link
             href={HOME_ROUTE}
-            className="font-graphik text-white text-[18px] md:text-[21px] leading-[21px] whitespace-nowrap anim-fade-up tracking-[-0.02em]"
+            className="group flex items-center transition-transform duration-200 hover:scale-[1.02] anim-fade-up"
             style={{ animationDelay: "200ms" }}
+            title="Moodify Home"
           >
-            Moodify
+            <BrandLogo
+              variant="horizontal"
+              className="h-[26px] md:h-[30px] w-auto drop-shadow-[0_2px_14px_rgba(122,92,255,0.45)]"
+              priority
+            />
           </Link>
 
           <div

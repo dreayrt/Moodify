@@ -13,7 +13,7 @@ import {
   type FormEvent,
 } from "react";
 
-import { LogoMark } from "@/components/shared/logo-mark";
+import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
   getCurrentUser,
@@ -151,12 +151,17 @@ const emptyCreateAccountForm: CreateAccountForm = {
 const HOME_ROUTE = "/dashboard";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
+const ADMIN_DASHBOARD_ROUTE = "/dashboard/admin";
 
 function getDashboardPathForRole(role: string) {
   const normalizedRole = role.trim().toLowerCase();
 
   if (normalizedRole === "artist") {
     return ARTIST_DASHBOARD_ROUTE;
+  }
+
+  if (normalizedRole === "admin") {
+    return ADMIN_DASHBOARD_ROUTE;
   }
 
   return USER_DASHBOARD_ROUTE;
@@ -197,6 +202,7 @@ export function HeroCarousel() {
   useEffect(() => {
     router.prefetch(USER_DASHBOARD_ROUTE);
     router.prefetch(ARTIST_DASHBOARD_ROUTE);
+    router.prefetch(ADMIN_DASHBOARD_ROUTE);
   }, [router]);
 
   const advanceSlide = useEffectEvent(() => {
@@ -229,10 +235,13 @@ export function HeroCarousel() {
         if (!isCancelled) {
           setAuthUser(user);
         }
-      } catch {
+      } catch (err) {
         if (!isCancelled) {
-          clearAuthSession();
-          setAuthUser(null);
+          const errMsg = err instanceof Error ? err.message : String(err);
+          if (errMsg.includes("401") || errMsg.toLowerCase().includes("unauthorized")) {
+            clearAuthSession();
+            setAuthUser(null);
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -513,15 +522,14 @@ export function HeroCarousel() {
         <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-8 sm:py-7">
           <Link
             aria-label="Moodify Home"
-            className="group flex items-center gap-3"
+            className="group flex items-center transition-transform duration-200 hover:scale-[1.03]"
             href={HOME_ROUTE}
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/10 backdrop-blur-md transition duration-300 group-hover:scale-105 group-hover:border-white/20">
-              <LogoMark />
-            </span>
-            <span className="font-display text-xl font-bold uppercase tracking-[0.24em] text-white">
-              Moodify
-            </span>
+            <BrandLogo
+              variant="horizontal"
+              className="h-9 sm:h-10 w-auto drop-shadow-[0_4px_20px_rgba(122,92,255,0.45)]"
+              priority
+            />
           </Link>
 
           <div className="flex items-center gap-3">

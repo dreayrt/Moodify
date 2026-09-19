@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { LogoMark } from "@/components/shared/logo-mark";
+import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import { HeroCarousel } from "@/features/home/components/hero-carousel";
 
 const HOME_ROUTE = "/dashboard";
@@ -182,11 +182,8 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="flex items-center gap-3 text-white/80">
-              <LogoMark />
-              <span className="text-sm font-semibold uppercase tracking-[0.32em]">
-                Moodify
-              </span>
+            <div className="flex items-center gap-3">
+              <BrandLogo variant="horizontal" className="h-7 w-auto opacity-75 hover:opacity-100 transition duration-200" />
             </div>
           </div>
         </footer>

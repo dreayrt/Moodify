@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
@@ -23,6 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { LogoMark } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
   getCurrentArtistCatalog,
@@ -599,6 +601,7 @@ export default function ArtistDashboardPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const artistAudioRef = useRef<HTMLAudioElement | null>(null);
   const toastCounterRef = useRef(0);
 
   const addToast = (message: string, type: ToastMessage["type"] = "success") => {
@@ -721,9 +724,25 @@ export default function ArtistDashboardPage() {
 
   const handleTogglePlayTrack = (track: ArtistTrack) => {
     if (playingTrackId === track.id) {
+      artistAudioRef.current?.pause();
       setPlayingTrackId(null);
     } else {
       setPlayingTrackId(track.id);
+      if (artistAudioRef.current) {
+        artistAudioRef.current.crossOrigin = "anonymous";
+        const url = track.audioUrl?.trim() || "https://musiccollector.kandes.io.vn/data/audio/xesi-hoaprox/3b2kCFZhX9GYnQ58qL1cAM_vo-tinh.mp3";
+        let streamUrl = url;
+        if (url.includes("data/audio/")) {
+          streamUrl = `https://musiccollector.kandes.io.vn/${url.slice(url.indexOf("data/audio/"))}`;
+        } else if (url.includes("mixkit.co") || !url.startsWith("http")) {
+          streamUrl = "https://musiccollector.kandes.io.vn/data/audio/xesi-hoaprox/3b2kCFZhX9GYnQ58qL1cAM_vo-tinh.mp3";
+        }
+        artistAudioRef.current.src = streamUrl;
+        artistAudioRef.current.load();
+        artistAudioRef.current.play().catch((err) => {
+          console.warn("Artist audio play error:", err);
+        });
+      }
       addToast(`Đang phát nghe thử: "${track.title}"`, "info");
     }
   };
@@ -802,7 +821,7 @@ export default function ArtistDashboardPage() {
           setCatalogError(
             catalogErr instanceof Error
               ? catalogErr.message
-              : "Không thể tải dữ liệu bài hát từ MongoDB"
+              : "Không thể tải dữ liệu bài hát từ máy chủ"
           );
         }
       } catch {
@@ -834,9 +853,9 @@ export default function ArtistDashboardPage() {
     const downloadedTracks = tracks.filter((tr) => tr.downloadStatus === "completed").length;
 
     return [
-      { key: "plays", value: formatNum(totalPlays), trend: "MongoDB", icon: Activity },
+      { key: "plays", value: formatNum(totalPlays), trend: "Thời gian thực", icon: Activity },
       { key: "reposts", value: "0", trend: "Chưa có", icon: Radio },
-      { key: "downloads", value: formatNum(downloadedTracks), trend: "MongoDB", icon: Download },
+      { key: "downloads", value: formatNum(downloadedTracks), trend: "Trực tuyến", icon: Download },
       { key: "likes", value: formatNum(totalLikes), trend: "Chưa có", icon: Heart },
       { key: "comments", value: totalComments.toString(), trend: "Chưa có", icon: MessageSquare },
     ];
@@ -878,6 +897,9 @@ export default function ArtistDashboardPage() {
     return (
       <section className="flex min-h-screen items-center justify-center bg-[#08090d] px-6 text-[#f4f2ed]">
         <div className="w-full max-w-[460px] rounded-[28px] border border-white/8 bg-white/[0.04] p-7 text-center shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] p-2 shadow-[0_0_24px_rgba(122,92,255,0.35)]">
+            <LogoMark variant="icon" className="h-full w-full object-contain" />
+          </div>
           <p className="text-[11px] tracking-[0.28em] text-[#ffb488] uppercase">
             {t("dashboard.artist.access.eyebrow")}
           </p>
@@ -899,6 +921,7 @@ export default function ArtistDashboardPage() {
   return (
     <section className="relative min-h-screen overflow-hidden bg-[#08090d] text-[#f4f2ed]">
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
+      <audio ref={artistAudioRef} onEnded={() => setPlayingTrackId(null)} className="hidden" />
 
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,122,44,0.12),_transparent_28%),radial-gradient(circle_at_80%_22%,_rgba(143,180,255,0.1),_transparent_20%),linear-gradient(180deg,#0a0b10_0%,#08090d_100%)]" />
@@ -915,11 +938,20 @@ export default function ArtistDashboardPage() {
       <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col px-4 pb-10 pt-5 sm:px-6 lg:px-10">
         {/* Header */}
         <header className="flex flex-col gap-4 lg:flex-row lg:items-center">
-          <div className="anim-fade-up">
-            <p className="text-[11px] tracking-[0.28em] text-white/44 uppercase">{t("dashboard.artist.header.eyebrow")}</p>
-            <h1 className="mt-2 font-graphik text-[34px] tracking-[-0.04em] text-white sm:text-[40px]">
-              {t("dashboard.artist.header.title")}
-            </h1>
+          <div className="anim-fade-up flex items-center gap-3.5">
+            <Link
+              href={HOME_ROUTE}
+              className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] p-2 backdrop-blur-md transition hover:scale-105 hover:border-[#7A5CFF]/60 hover:shadow-[0_0_20px_rgba(122,92,255,0.35)]"
+              title="Về trang chủ Moodify"
+            >
+              <LogoMark variant="icon" className="h-full w-full object-contain" />
+            </Link>
+            <div>
+              <p className="text-[11px] tracking-[0.28em] text-white/44 uppercase">{t("dashboard.artist.header.eyebrow")}</p>
+              <h1 className="mt-1 font-graphik text-[32px] tracking-[-0.04em] text-white sm:text-[38px]">
+                {t("dashboard.artist.header.title")}
+              </h1>
+            </div>
           </div>
 
           <div className="anim-slide-right flex flex-1 flex-col gap-3 lg:ml-auto lg:max-w-[620px] lg:flex-row" style={{ animationDelay: "120ms" }}>
@@ -1093,7 +1125,7 @@ export default function ArtistDashboardPage() {
               </div>
               {catalogState === "loading" && (
                 <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20 px-5 py-4 text-[13px] text-white/58">
-                  Đang tải bài hát thật từ MongoDB...
+                  Đang tải danh sách bài hát...
                 </div>
               )}
               {catalogState === "error" && (
