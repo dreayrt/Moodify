@@ -130,6 +130,21 @@ export function getStoredAuthSession(): StoredAuthSession | null {
     ) {
       return null;
     }
+
+    // Auto synchronize cookies if not present yet
+    if (typeof document !== "undefined" && !document.cookie.includes("moodify_token=")) {
+      const userRaw = window.localStorage.getItem(USER_STORAGE_KEY);
+      let role = "USER";
+      if (userRaw) {
+        try {
+          const userObj = JSON.parse(userRaw);
+          if (userObj.role) role = userObj.role;
+        } catch {}
+      }
+      document.cookie = "moodify_token=" + encodeURIComponent(parsed.accessToken) + "; path=/; max-age=86400; SameSite=Lax";
+      document.cookie = "moodify_role=" + encodeURIComponent(role) + "; path=/; max-age=86400; SameSite=Lax";
+    }
+
     return parsed;
   } catch {
     return null;
@@ -161,6 +176,11 @@ export function saveAuthSession(auth: AuthResponse) {
       status: auth.status,
     }),
   );
+
+  // Synchronize token and role with cookies for Next.js Middleware route protection
+  const maxAge = auth.expiresIn || 86400;
+  document.cookie = "moodify_token=" + encodeURIComponent(auth.accessToken) + "; path=/; max-age=" + maxAge + "; SameSite=Lax";
+  document.cookie = "moodify_role=" + encodeURIComponent(auth.role) + "; path=/; max-age=" + maxAge + "; SameSite=Lax";
 }
 
 export function clearAuthSession() {
@@ -170,6 +190,10 @@ export function clearAuthSession() {
 
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
+
+  // Clear cookies for Next.js Middleware
+  document.cookie = "moodify_token=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "moodify_role=; path=/; max-age=0; SameSite=Lax";
 }
 
 
