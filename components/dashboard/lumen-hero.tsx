@@ -6,11 +6,12 @@ import {
   Play,
   Mic2,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
 import { fetchTracks, type Track as ApiTrack } from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
 import RealtimeLyrics from "./realtime-lyrics";
-import TrackActionMenu from "./track-action-menu";
+import TrackActionMenu, { TrackInlineActions } from "./track-action-menu";
 
 // Map UI vibe ids → real genre strings stored in MongoDB
 // 147 Vietnamese tracks catalog
@@ -226,98 +227,135 @@ function TrackRow({
   playing: boolean;
   onClick: () => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <div
-      onClick={onClick}
-      className="group w-full grid grid-cols-[24px_44px_1fr_auto_32px] items-center gap-3 px-3 py-2 rounded-[8px] hover:bg-white/[0.06] transition-colors text-left cursor-pointer"
-      style={{
-        animation: `lumenFadeIn 500ms cubic-bezier(0.16,1,0.3,1) both`,
-        animationDelay: `${900 + index * 60}ms`,
-      }}
+      className={`w-full flex flex-col rounded-xl transition-all duration-300 ${
+        isExpanded
+          ? "bg-white/[0.04] border border-cyan-500/25 shadow-[0_8px_30px_rgba(0,0,0,0.6)] my-1"
+          : "border border-transparent hover:bg-white/[0.03]"
+      }`}
     >
-      {/* Index / equalizer / play on hover */}
-      <div className="relative w-6 h-6 flex items-center justify-center">
-        <span
-          className={`font-manrope text-[12px] ${
-            active ? "text-[#AFDDFF]" : "text-white/45 group-hover:opacity-0"
-          }`}
-        >
-          {active && playing ? (
-            <span className="flex items-end gap-[2px] h-[14px]">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="block w-[2px] rounded-sm bg-[#AFDDFF]"
-                  style={{
-                    height: "100%",
-                    transformOrigin: "bottom",
-                    animation: `equalize 800ms ease-in-out ${i * 120}ms infinite`,
-                  }}
-                />
-              ))}
-            </span>
-          ) : (
-            String(index + 1).padStart(2, "0")
-          )}
-        </span>
-        <Play
-          className="absolute w-[14px] h-[14px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
-          fill="currentColor"
-        />
-      </div>
-
-      {/* Cover */}
+      {/* Top Track Row */}
       <div
-        className="w-[44px] h-[44px] rounded-[6px] shrink-0 shadow-[0_4px_14px_rgba(0,0,0,0.45)]"
-        style={{ background: track.cover }}
-      />
-
-      {/* Title / artist */}
-      <div className="min-w-0">
-        <p
-          className={`font-manrope text-[14px] leading-[18px] truncate ${
-            active ? "text-[#AFDDFF]" : "text-white"
-          }`}
-        >
-          {track.title}
-        </p>
-        <p className="font-manrope text-white/55 text-[12px] leading-[15px] truncate mt-[2px]">
-          {track.artist}
-        </p>
-      </div>
-
-      {/* Duration & Status */}
-      <div className="flex items-center gap-2 text-right justify-end">
-        {!track.raw?.localPath && (
-          <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-manrope font-medium text-amber-300/80 bg-amber-400/10 border border-amber-400/20">
-            Sắp ra mắt
-          </span>
-        )}
-        <span className="font-manrope text-white/45 text-[12px] tracking-wide">
-          {track.duration}
-        </span>
-      </div>
-
-      {/* 3-Dots Action Menu */}
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
+        onClick={onClick}
+        className="group w-full grid grid-cols-[24px_44px_1fr_auto_32px] items-center gap-3 px-3 py-2 rounded-xl text-left cursor-pointer transition-colors"
+        style={{
+          animation: `lumenFadeIn 500ms cubic-bezier(0.16,1,0.3,1) both`,
+          animationDelay: `${900 + index * 60}ms`,
         }}
-        className="flex items-center justify-end"
       >
-        <TrackActionMenu
-          track={
-            track.raw || {
-              spotifyId: track.spotifyId,
-              name: track.title,
-              artistName: track.artist,
-              cover: track.cover,
-              imageUrl: track.cover,
-            }
-          }
-          onShowLyrics={onClick}
+        {/* Index / equalizer / play on hover */}
+        <div className="relative w-6 h-6 flex items-center justify-center">
+          <span
+            className={`font-manrope text-[12px] ${
+              active ? "text-[#AFDDFF]" : "text-white/45 group-hover:opacity-0"
+            }`}
+          >
+            {active && playing ? (
+              <span className="flex items-end gap-[2px] h-[14px]">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="block w-[2px] rounded-sm bg-[#AFDDFF]"
+                    style={{
+                      height: "100%",
+                      transformOrigin: "bottom",
+                      animation: `equalize 800ms ease-in-out ${i * 120}ms infinite`,
+                    }}
+                  />
+                ))}
+              </span>
+            ) : (
+              String(index + 1).padStart(2, "0")
+            )}
+          </span>
+          <Play
+            className="absolute w-[14px] h-[14px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            fill="currentColor"
+          />
+        </div>
+
+        {/* Cover */}
+        <div
+          className="w-[44px] h-[44px] rounded-[6px] shrink-0 shadow-[0_4px_14px_rgba(0,0,0,0.45)]"
+          style={{ background: track.cover }}
         />
+
+        {/* Title / artist */}
+        <div className="min-w-0">
+          <p
+            className={`font-manrope text-[14px] leading-[18px] truncate ${
+              active ? "text-[#AFDDFF]" : "text-white"
+            }`}
+          >
+            {track.title}
+          </p>
+          <p className="font-manrope text-white/55 text-[12px] leading-[15px] truncate mt-[2px]">
+            {track.artist}
+          </p>
+        </div>
+
+        {/* Duration & Status */}
+        <div className="flex items-center gap-2 text-right justify-end">
+          {!track.raw?.localPath && (
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-manrope font-medium text-amber-300/80 bg-amber-400/10 border border-amber-400/20">
+              Sắp ra mắt
+            </span>
+          )}
+          <span className="font-manrope text-white/45 text-[12px] tracking-wide">
+            {track.duration}
+          </span>
+        </div>
+
+        {/* Dropdown Chevron Action Trigger */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          className="flex items-center justify-end"
+        >
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`p-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+              isExpanded
+                ? "text-cyan-300 bg-cyan-500/25 rotate-180 scale-110 shadow-[0_0_12px_rgba(56,189,248,0.45)] border border-cyan-400/40"
+                : "text-white/40 hover:text-white hover:bg-white/10 hover:scale-105 active:scale-95"
+            }`}
+            title={isExpanded ? "Đóng tùy chọn" : "Mở rộng tùy chọn bài hát"}
+            aria-label="Tùy chọn bài hát"
+          >
+            <ChevronDown
+              className="w-4 h-4 pointer-events-none transition-transform duration-300"
+              strokeWidth={2}
+            />
+          </button>
+        </div>
       </div>
+
+      {/* Inline Expanded Action Drawer (Pushes subsequent rows down!) */}
+      {isExpanded && (
+        <div
+          className="w-full px-2.5 pb-2.5 pt-1 animate-in fade-in slide-in-from-top-2 duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <TrackInlineActions
+            track={
+              track.raw || {
+                spotifyId: track.spotifyId,
+                name: track.title,
+                artistName: track.artist,
+                cover: track.cover,
+                imageUrl: track.cover,
+              }
+            }
+            onShowLyrics={onClick}
+            onClose={() => setIsExpanded(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
