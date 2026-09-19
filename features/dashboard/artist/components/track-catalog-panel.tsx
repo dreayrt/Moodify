@@ -20,6 +20,7 @@ import {
   Copy,
   Radio,
   Music,
+  Plus,
 } from "lucide-react";
 import {
   ArtistTrack,
@@ -296,6 +297,16 @@ export function TrackCatalogPanel({
               </div>
             )}
           </div>
+
+          {/* Upload Track Button */}
+          <button
+            type="button"
+            onClick={onOpenUpload}
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e58] px-5 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(255,122,44,0.25)] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] transition cursor-pointer"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.2} />
+            <span>{t("dashboard.artist.trackCatalog.uploadTrack", "Tải lên bài hát mới")}</span>
+          </button>
         </div>
       </div>
 
@@ -344,7 +355,7 @@ export function TrackCatalogPanel({
       </div>
 
       {/* Tracks Table / Catalog List */}
-      <div className="mt-5 overflow-hidden rounded-[22px] border border-white/8 bg-black/20">
+      <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20">
         {/* Table Header */}
         <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(120px,0.7fr)_minmax(120px,0.7fr)_minmax(130px,0.8fr)_110px] gap-4 border-b border-white/8 bg-white/[0.03] px-5 py-3.5 text-[11px] tracking-[0.16em] text-white/42 uppercase md:grid">
           <span>{t("dashboard.artist.trackCatalog.columns.track")}</span>
@@ -380,7 +391,7 @@ export function TrackCatalogPanel({
         ) : (
           /* Table Rows */
           <div className="divide-y divide-white/8">
-            {filteredTracks.map((track) => {
+            {filteredTracks.map((track, trackIndex) => {
               const isPlaying = playingTrackId === track.id;
               const isMenuOpen = activeMenuTrackId === track.id;
 
@@ -402,8 +413,20 @@ export function TrackCatalogPanel({
                     >
                       {track.coverUrl && (
                         <img
-                          src={track.coverUrl}
+                          src={
+                            track.coverUrl.startsWith("http") ||
+                            track.coverUrl.startsWith("blob:") ||
+                            track.coverUrl.startsWith("data:")
+                              ? track.coverUrl
+                              : `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"}${
+                                  track.coverUrl.startsWith("/") ? "" : "/"
+                                }${track.coverUrl}`
+                          }
                           alt=""
+                          onError={(e) => {
+                            // Ẩn ảnh bị hỏng để hiện gradient và ký tự viết tắt đẹp mắt
+                            e.currentTarget.style.display = "none";
+                          }}
                           className="absolute inset-0 h-full w-full object-cover"
                         />
                       )}
@@ -428,14 +451,17 @@ export function TrackCatalogPanel({
                         {track.title}
                       </p>
                       <div className="mt-1 flex items-center gap-2 text-[12px] text-white/48">
-                        <span>{track.genre}</span>
-                        <span>•</span>
-                        <span>{track.duration}</span>
-                        {track.key && (
+                        <span className="truncate">{track.genre}</span>
+                        {track.duration && (
                           <>
                             <span>•</span>
-                            <span className="text-[11px] text-white/36">{track.key}</span>
+                            <span>{track.duration}</span>
                           </>
+                        )}
+                        {track.explicit && (
+                          <span className="inline-grid h-3.5 w-3.5 place-items-center rounded bg-white/15 text-[8px] font-bold text-white">
+                            E
+                          </span>
                         )}
                       </div>
                     </div>
@@ -444,8 +470,8 @@ export function TrackCatalogPanel({
                   {/* Column 2: Status */}
                   <div>
                     {track.status === "published" ? (
-                      <span className="inline-flex items-center gap-2 text-[12px] text-white/75 font-normal">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span className="inline-flex items-center gap-2 text-[12px] text-emerald-400 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         {t("dashboard.artist.trackCatalog.filters.published")}
                       </span>
                     ) : (
@@ -532,7 +558,13 @@ export function TrackCatalogPanel({
 
                       {/* Dropdown Popover */}
                       {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-2xl border border-white/12 bg-[#171821] p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.7)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                        <div
+                          className={`absolute right-0 z-50 w-56 rounded-2xl border border-white/12 bg-[#171821] p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${
+                            filteredTracks.length <= 2 || trackIndex >= filteredTracks.length - 2
+                              ? "bottom-full mb-2"
+                              : "top-full mt-2"
+                          }`}
+                        >
                           {/* Play Preview */}
                           <button
                             type="button"

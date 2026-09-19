@@ -16,20 +16,29 @@ import {
   LogOut,
   MessageSquare,
   Music2,
+  Pause,
+  Play,
   Radio,
+  Rewind,
   Search,
+  SkipBack,
+  SkipForward,
   Sparkles,
+  Square,
+  FastForward,
   UploadCloud,
   Users,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import {
   clearAuthSession,
+  deleteArtistTrack,
   getCurrentArtistCatalog,
   getCurrentUser,
   getStoredAuthSession,
   getValidAccessToken,
   logout,
+  updateArtistTrack,
   type ArtistProfileResponse,
   type ArtistTrackResponse,
   type UserProfileResponse,
@@ -47,7 +56,6 @@ type TabKey = "tracks" | "comments" | "benefits";
 type Stat = {
   key: "plays" | "reposts" | "downloads" | "likes" | "comments";
   value: string;
-  trend: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 };
 
@@ -79,6 +87,11 @@ const KEYFRAMES = `
 @keyframes artistEqualize {
   0%, 100% { transform: scaleY(0.28); opacity: 0.55; }
   50% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes artistDiscSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 `;
 
@@ -154,6 +167,42 @@ function formatCatalogDate(value: string | null | undefined) {
   }).format(parsed);
 }
 
+function resolveMediaUrl(rawUrl: string | null | undefined) {
+  if (!rawUrl) return undefined;
+  if (
+    rawUrl.startsWith("http://") ||
+    rawUrl.startsWith("https://") ||
+    rawUrl.startsWith("blob:") ||
+    rawUrl.startsWith("data:")
+  ) {
+    return rawUrl;
+  }
+
+  const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+  return `${baseUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+}
+
+function parseDurationLabel(value: string | undefined) {
+  if (!value) return 0;
+  const parts = value.split(":").map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return 0;
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return 0;
+}
+
+function formatPlaybackTime(value: number) {
+  if (!Number.isFinite(value) || value < 0) return "0:00";
+  const totalSeconds = Math.floor(value);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 function mapCatalogTrack(track: ArtistTrackResponse): ArtistTrack {
   return {
     id: track.id,
@@ -161,24 +210,168 @@ function mapCatalogTrack(track: ArtistTrackResponse): ArtistTrack {
     title: track.title,
     artist: track.artist,
     genre: track.genre,
+    albumName: track.albumName ?? undefined,
+    featuredArtists: track.featuredArtists ?? undefined,
     duration: track.duration,
     status: track.status,
     visibility: track.visibility,
     plays: track.plays,
     likes: track.likes,
     commentsCount: track.commentsCount,
-    bpm: track.bpm ?? undefined,
-    key: track.key ?? undefined,
-    coverUrl: track.coverUrl ?? undefined,
-    audioUrl: track.audioUrl ?? undefined,
+    coverUrl: resolveMediaUrl(track.coverUrl) ?? undefined,
+    coverGradient: "linear-gradient(135deg, #ff7a2c, #7a5cff)",
+    audioUrl: resolveMediaUrl(track.audioUrl) ?? undefined,
     spotifyUrl: track.spotifyUrl ?? undefined,
     downloadStatus: track.downloadStatus ?? undefined,
     moderationStatus: track.moderationStatus ?? undefined,
     moderationScore: track.moderationScore ?? undefined,
     description: track.description ?? undefined,
+    explicit: track.explicit,
     updatedAt: formatCatalogDate(track.updatedAt),
     createdAt: track.createdAt ?? "",
   };
+}
+
+function PreviewPlayer({
+  track,
+  isPlaying,
+  currentTime,
+  duration,
+  onPlayPause,
+  onStop,
+  onSeekBy,
+  onPreviousTrack,
+  onNextTrack,
+}: {
+  track: ArtistTrack;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  onPlayPause: () => void;
+  onStop: () => void;
+  onSeekBy: (seconds: number) => void;
+  onPreviousTrack: () => void;
+  onNextTrack: () => void;
+}) {
+  const coverUrl = resolveMediaUrl(track.coverUrl);
+  const fallbackDuration = parseDurationLabel(track.duration);
+  const resolvedDuration = duration || fallbackDuration;
+  const progress =
+    resolvedDuration > 0 ? Math.min(100, Math.max(0, (currentTime / resolvedDuration) * 100)) : 0;
+
+  return (
+    <div className="fixed bottom-5 left-1/2 z-40 w-[calc(100%-32px)] max-w-[620px] -translate-x-1/2 rounded-[28px] border border-white/12 bg-[#14151b]/94 p-3 text-white shadow-[0_28px_90px_rgba(0,0,0,0.58)] backdrop-blur-2xl sm:bottom-6 sm:p-4">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <div
+          className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-[linear-gradient(135deg,#ff7a2c,#7a5cff)] shadow-[0_12px_35px_rgba(0,0,0,0.32)]"
+          style={{
+            animation: isPlaying ? "artistDiscSpin 4s linear infinite" : undefined,
+            background: track.coverGradient || "linear-gradient(135deg,#ff7a2c,#7a5cff)",
+          }}
+        >
+          {coverUrl && (
+            <img
+              src={coverUrl}
+              alt=""
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+              }}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+          <div className="absolute inset-[24px] rounded-full border border-white/25 bg-black/70" />
+          <span className="relative text-[10px] font-bold text-white">
+            {track.title.slice(0, 2).toUpperCase()}
+          </span>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-semibold text-white">{track.title}</p>
+              <p className="mt-0.5 truncate text-[12px] text-white/50">
+                {track.artist} • {track.genre}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onStop}
+              aria-label="Dừng nghe thử"
+              title="Dừng nghe thử"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/58 transition hover:bg-white/[0.1] hover:text-white"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 text-[11px] text-white/44">
+            <span className="w-9 tabular-nums">{formatPlaybackTime(currentTime)}</span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb488_68%,#dce9ff_100%)] transition-[width]"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="w-9 text-right tabular-nums">
+              {formatPlaybackTime(resolvedDuration)}
+            </span>
+          </div>
+
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={onPreviousTrack}
+              aria-label="Bài trước"
+              title="Bài trước"
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.1] hover:text-white"
+            >
+              <SkipBack className="h-4 w-4 fill-current" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onSeekBy(-5)}
+              aria-label="Lùi 5 giây"
+              title="Lùi 5 giây"
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.1] hover:text-white"
+            >
+              <Rewind className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onPlayPause}
+              aria-label={isPlaying ? "Tạm dừng" : "Phát"}
+              title={isPlaying ? "Tạm dừng" : "Phát"}
+              className="grid h-11 w-11 place-items-center rounded-full bg-white text-black shadow-[0_10px_30px_rgba(255,255,255,0.18)] transition hover:scale-105 active:scale-95"
+            >
+              {isPlaying ? (
+                <Pause className="h-5 w-5 fill-current" />
+              ) : (
+                <Play className="ml-0.5 h-5 w-5 fill-current" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSeekBy(5)}
+              aria-label="Tới 5 giây"
+              title="Tới 5 giây"
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.1] hover:text-white"
+            >
+              <FastForward className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onNextTrack}
+              aria-label="Bài tiếp theo"
+              title="Bài tiếp theo"
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.1] hover:text-white"
+            >
+              <SkipForward className="h-4 w-4 fill-current" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function StatCard({ item, delay }: { item: Stat; delay: number }) {
@@ -194,9 +387,6 @@ function StatCard({ item, delay }: { item: Stat; delay: number }) {
         <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.05]">
           <Icon className="h-[18px] w-[18px] text-white/72" strokeWidth={1.7} />
         </div>
-        <span className="rounded-full border border-[#ff8b4d]/25 bg-[#ff8b4d]/10 px-2.5 py-1 text-[10px] tracking-[0.18em] text-[#ffb488]">
-          {item.trend}
-        </span>
       </div>
       <p className="mt-5 font-graphik text-[28px] leading-none tracking-[-0.03em] text-white">
         {item.value}
@@ -599,7 +789,14 @@ export default function ArtistDashboardPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [previewTrackId, setPreviewTrackId] = useState<string | null>(null);
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const [previewDuration, setPreviewDuration] = useState(0);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [savingTrackId, setSavingTrackId] = useState<string | null>(null);
+  const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const toastCounterRef = useRef(0);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   const addToast = (message: string, type: ToastMessage["type"] = "success") => {
     toastCounterRef.current += 1;
@@ -615,39 +812,161 @@ export default function ArtistDashboardPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const startPreviewTrack = (track: ArtistTrack, resetPosition = true) => {
+    const audio = audioPlayerRef.current;
+    const resolvedUrl = resolveMediaUrl(track.audioUrl);
+
+    setPreviewTrackId(track.id);
+    setPlayingTrackId(track.id);
+
+    if (!audio || !resolvedUrl) {
+      setIsPreviewPlaying(false);
+      addToast("Bài hát này chưa có file audio để nghe thử", "warning");
+      return;
+    }
+
+    if (audio.src !== resolvedUrl) {
+      audio.src = resolvedUrl;
+      if (resetPosition) {
+        audio.currentTime = 0;
+      }
+    } else if (resetPosition && audio.ended) {
+      audio.currentTime = 0;
+    }
+
+    void audio.play().then(() => {
+      setIsPreviewPlaying(true);
+    }).catch((err) => {
+      console.warn("Audio preview playback failed:", err);
+      setIsPreviewPlaying(false);
+      addToast("Không thể phát nghe thử bài hát này", "error");
+    });
+  };
+
+  const pausePreviewTrack = () => {
+    audioPlayerRef.current?.pause();
+    setPlayingTrackId(null);
+    setIsPreviewPlaying(false);
+  };
+
+  const stopPreviewTrack = () => {
+    const audio = audioPlayerRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setPreviewTrackId(null);
+    setPlayingTrackId(null);
+    setPreviewCurrentTime(0);
+    setPreviewDuration(0);
+    setIsPreviewPlaying(false);
+  };
+
+  const seekPreviewBy = (seconds: number) => {
+    const audio = audioPlayerRef.current;
+    if (!audio) return;
+    const fallbackDuration = parseDurationLabel(
+      tracks.find((track) => track.id === previewTrackId)?.duration
+    );
+    const maxTime = Number.isFinite(audio.duration) ? audio.duration : fallbackDuration;
+    const nextTime = Math.min(Math.max(audio.currentTime + seconds, 0), maxTime || Number.MAX_SAFE_INTEGER);
+    audio.currentTime = nextTime;
+    setPreviewCurrentTime(nextTime);
+  };
+
+  const playAdjacentPreviewTrack = (direction: -1 | 1) => {
+    if (tracks.length === 0) return;
+    const currentIndex = tracks.findIndex((track) => track.id === previewTrackId);
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = (safeIndex + direction + tracks.length) % tracks.length;
+    startPreviewTrack(tracks[nextIndex]);
+  };
+
+  const togglePreviewPlayback = () => {
+    const previewTrack = tracks.find((track) => track.id === previewTrackId);
+    if (!previewTrack) return;
+
+    if (isPreviewPlaying) {
+      pausePreviewTrack();
+      return;
+    }
+
+    startPreviewTrack(previewTrack, false);
+  };
+
   // Actions
   const handleEditTrack = (track: ArtistTrack) => {
     setEditingTrack(track);
   };
 
-  const handleSaveEditedTrack = (updatedTrack: ArtistTrack) => {
-    const nextTracks = tracks.map((t) => (t.id === updatedTrack.id ? updatedTrack : t));
-    setTracks(nextTracks);
-    setEditingTrack(null);
-    addToast(
-      t("dashboard.artist.trackCatalog.toast.saved", { title: updatedTrack.title }),
-      "success"
-    );
+  const persistTrackUpdate = async (updatedTrack: ArtistTrack) => {
+    setSavingTrackId(updatedTrack.id);
+    try {
+      const savedTrack = await updateArtistTrack(updatedTrack.id, {
+        title: updatedTrack.title,
+        genre: updatedTrack.genre,
+        featuredArtists: updatedTrack.featuredArtists,
+        albumName: updatedTrack.albumName,
+        status: updatedTrack.status,
+        visibility: updatedTrack.visibility,
+        explicit: updatedTrack.explicit,
+        lyricsPlain: updatedTrack.lyricsPlain,
+        description: updatedTrack.description,
+      });
+      const mappedTrack = mapCatalogTrack(savedTrack);
+      setTracks((currentTracks) =>
+        currentTracks.map((track) => (track.id === mappedTrack.id ? mappedTrack : track))
+      );
+      return mappedTrack;
+    } finally {
+      setSavingTrackId(null);
+    }
+  };
+
+  const handleSaveEditedTrack = async (updatedTrack: ArtistTrack) => {
+    try {
+      const savedTrack = await persistTrackUpdate(updatedTrack);
+      setEditingTrack(null);
+      addToast(
+        t("dashboard.artist.trackCatalog.toast.saved", { title: savedTrack.title }),
+        "success"
+      );
+    } catch (err) {
+      addToast(
+        err instanceof Error ? err.message : "Không thể lưu thay đổi bài hát xuống database",
+        "error"
+      );
+    }
   };
 
   const handleDeleteTrack = (track: ArtistTrack) => {
     setDeletingTrack(track);
   };
 
-  const handleConfirmDeleteTrack = (trackId: string) => {
+  const handleConfirmDeleteTrack = async (trackId: string) => {
     const target = tracks.find((t) => t.id === trackId);
-    const nextTracks = tracks.filter((t) => t.id !== trackId);
-    setTracks(nextTracks);
-    setDeletingTrack(null);
-    if (playingTrackId === trackId) {
-      setPlayingTrackId(null);
+    setDeletingTrackId(trackId);
+    try {
+      await deleteArtistTrack(trackId);
+      setTracks((currentTracks) => currentTracks.filter((t) => t.id !== trackId));
+      setDeletingTrack(null);
+      if (playingTrackId === trackId || previewTrackId === trackId) {
+        stopPreviewTrack();
+      }
+      addToast(
+        t("dashboard.artist.trackCatalog.toast.deleted", {
+          title: target?.title || "bài hát",
+        }),
+        "success"
+      );
+    } catch (err) {
+      addToast(
+        err instanceof Error ? err.message : "Không thể xóa bài hát khỏi database",
+        "error"
+      );
+    } finally {
+      setDeletingTrackId(null);
     }
-    addToast(
-      t("dashboard.artist.trackCatalog.toast.deleted", {
-        title: target?.title || "bài hát",
-      }),
-      "success"
-    );
   };
 
   const handleUploadSuccess = (newTrack: ArtistTrack) => {
@@ -659,7 +978,8 @@ export default function ArtistDashboardPage() {
     );
   };
 
-  const handleToggleStatus = (track: ArtistTrack) => {
+  const handleToggleStatus = async (track: ArtistTrack) => {
+    if (savingTrackId === track.id) return;
     const nextStatus = track.status === "published" ? "draft" : "published";
     const statusLabel =
       nextStatus === "published"
@@ -671,18 +991,25 @@ export default function ArtistDashboardPage() {
       status: nextStatus,
       updatedAt: "Vừa xong",
     };
-    const nextTracks = tracks.map((t) => (t.id === track.id ? updatedTrack : t));
-    setTracks(nextTracks);
-    addToast(
-      t("dashboard.artist.trackCatalog.toast.statusUpdated", {
-        title: track.title,
-        status: statusLabel,
-      }),
-      "info"
-    );
+    try {
+      const savedTrack = await persistTrackUpdate(updatedTrack);
+      addToast(
+        t("dashboard.artist.trackCatalog.toast.statusUpdated", {
+          title: savedTrack.title,
+          status: statusLabel,
+        }),
+        "info"
+      );
+    } catch (err) {
+      addToast(
+        err instanceof Error ? err.message : "Không thể cập nhật trạng thái bài hát",
+        "error"
+      );
+    }
   };
 
-  const handleToggleVisibility = (track: ArtistTrack) => {
+  const handleToggleVisibility = async (track: ArtistTrack) => {
+    if (savingTrackId === track.id) return;
     const nextVis = track.visibility === "public" ? "private" : "public";
     const visLabel =
       nextVis === "public"
@@ -694,15 +1021,21 @@ export default function ArtistDashboardPage() {
       visibility: nextVis,
       updatedAt: "Vừa xong",
     };
-    const nextTracks = tracks.map((t) => (t.id === track.id ? updatedTrack : t));
-    setTracks(nextTracks);
-    addToast(
-      t("dashboard.artist.trackCatalog.toast.visibilityUpdated", {
-        title: track.title,
-        visibility: visLabel,
-      }),
-      "info"
-    );
+    try {
+      const savedTrack = await persistTrackUpdate(updatedTrack);
+      addToast(
+        t("dashboard.artist.trackCatalog.toast.visibilityUpdated", {
+          title: savedTrack.title,
+          visibility: visLabel,
+        }),
+        "info"
+      );
+    } catch (err) {
+      addToast(
+        err instanceof Error ? err.message : "Không thể cập nhật quyền hiển thị bài hát",
+        "error"
+      );
+    }
   };
 
   const handleCopyLink = (track: ArtistTrack) => {
@@ -720,12 +1053,12 @@ export default function ArtistDashboardPage() {
   };
 
   const handleTogglePlayTrack = (track: ArtistTrack) => {
-    if (playingTrackId === track.id) {
-      setPlayingTrackId(null);
-    } else {
-      setPlayingTrackId(track.id);
-      addToast(`Đang phát nghe thử: "${track.title}"`, "info");
+    if (previewTrackId === track.id && isPreviewPlaying) {
+      pausePreviewTrack();
+      return;
     }
+
+    startPreviewTrack(track, previewTrackId !== track.id);
   };
 
   const handleShowHistory = () => {
@@ -802,7 +1135,7 @@ export default function ArtistDashboardPage() {
           setCatalogError(
             catalogErr instanceof Error
               ? catalogErr.message
-              : "Không thể tải dữ liệu bài hát từ MongoDB"
+              : "Không thể tải dữ liệu bài hát"
           );
         }
       } catch {
@@ -834,11 +1167,11 @@ export default function ArtistDashboardPage() {
     const downloadedTracks = tracks.filter((tr) => tr.downloadStatus === "completed").length;
 
     return [
-      { key: "plays", value: formatNum(totalPlays), trend: "MongoDB", icon: Activity },
-      { key: "reposts", value: "0", trend: "Chưa có", icon: Radio },
-      { key: "downloads", value: formatNum(downloadedTracks), trend: "MongoDB", icon: Download },
-      { key: "likes", value: formatNum(totalLikes), trend: "Chưa có", icon: Heart },
-      { key: "comments", value: totalComments.toString(), trend: "Chưa có", icon: MessageSquare },
+      { key: "plays", value: formatNum(totalPlays), icon: Activity },
+      { key: "reposts", value: "0", icon: Radio },
+      { key: "downloads", value: formatNum(downloadedTracks), icon: Download },
+      { key: "likes", value: formatNum(totalLikes), icon: Heart },
+      { key: "comments", value: totalComments.toString(), icon: MessageSquare },
     ];
   }, [tracks]);
 
@@ -848,6 +1181,7 @@ export default function ArtistDashboardPage() {
     currentUser?.username ||
     t("common.artistFallback");
   const artistImageUrl = artistProfile?.imageUrl || currentUser?.avatarUrl;
+  const previewTrack = tracks.find((track) => track.id === previewTrackId) ?? null;
 
   const renderActivePanel = () => {
     switch (activeTab) {
@@ -972,36 +1306,6 @@ export default function ArtistDashboardPage() {
           </div>
         </header>
 
-        {/* Upload quota & upgrade banner */}
-        <div
-          className="anim-fade-up mt-6 flex flex-col gap-4 rounded-[28px] border border-white/8 bg-white/[0.04] px-5 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:flex-row md:items-center md:justify-between"
-          style={{ animationDelay: "180ms" }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-white/10 bg-white/[0.05]">
-              <UploadCloud className="h-6 w-6 text-[#ffb488]" strokeWidth={1.7} />
-            </div>
-            <div>
-              <p className="text-[15px] text-white font-medium">
-                Dung lượng phòng thu: <strong className="text-[#ffb488]">{tracks.length * 15} MB</strong> / 2.0 GB ({tracks.length} bài hát)
-              </p>
-              <div className="mt-2 h-2 w-[240px] max-w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb488_60%,#dce9ff_100%)] transition-all duration-500"
-                  style={{ width: `${Math.min(100, Math.max(12, (tracks.length / 20) * 100))}%` }}
-                />
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-[13px] text-white hover:bg-white/[0.08] hover:border-white/20 transition"
-          >
-            + Tải lên bài hát mới
-          </button>
-        </div>
-
         {/* Main Studio Hub */}
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_340px]">
           <div className="grid gap-6">
@@ -1093,7 +1397,7 @@ export default function ArtistDashboardPage() {
               </div>
               {catalogState === "loading" && (
                 <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20 px-5 py-4 text-[13px] text-white/58">
-                  Đang tải bài hát thật từ MongoDB...
+                  Đang tải danh mục bài hát...
                 </div>
               )}
               {catalogState === "error" && (
@@ -1109,29 +1413,7 @@ export default function ArtistDashboardPage() {
         </div>
 
         {/* Footer Notes */}
-        <div className="anim-fade-up mt-6 grid gap-5 lg:grid-cols-3" style={{ animationDelay: "1080ms" }}>
-          <div className="rounded-[28px] border border-white/8 bg-white/[0.04] p-5">
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">{t("dashboard.artist.notes.trackEnergy")}</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Năng lượng âm thanh</h3>
-            <p className="mt-3 text-[14px] leading-6 text-white/58">
-              Chỉ số dynamic range và loudness trung bình đạt chuẩn LUFS -14 phù hợp cho các nền tảng streaming quốc tế.
-            </p>
-          </div>
-          <div className="rounded-[28px] border border-white/8 bg-white/[0.04] p-5">
-            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">{t("dashboard.artist.notes.arRadar")}</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">A&R Radar & Hợp tác</h3>
-            <p className="mt-3 text-[14px] leading-6 text-white/58">
-              3 hãng thu âm Indie đang theo dõi hồ sơ của bạn với 4 bài hát EDM demo được quan tâm nhất.
-            </p>
-          </div>
-          <div className="rounded-[28px] border border-white/8 bg-white/[0.04] p-5">
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">{t("dashboard.artist.notes.brandNote")}</p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">Bảo hộ thương hiệu</h3>
-            <p className="mt-3 text-[14px] leading-6 text-white/58">
-              Toàn bộ bài hát tải lên Moodify được đăng ký mã fingerprint nhận diện tác quyền tự động.
-            </p>
-          </div>
-        </div>
+    
       </div>
 
       {/* Modals & Toasts */}
@@ -1140,6 +1422,7 @@ export default function ArtistDashboardPage() {
         track={editingTrack}
         onClose={() => setEditingTrack(null)}
         onSave={handleSaveEditedTrack}
+        isSaving={savingTrackId === editingTrack?.id}
       />
 
       <TrackDeleteModal
@@ -1147,6 +1430,7 @@ export default function ArtistDashboardPage() {
         track={deletingTrack}
         onClose={() => setDeletingTrack(null)}
         onConfirm={handleConfirmDeleteTrack}
+        isDeleting={deletingTrackId === deletingTrack?.id}
       />
 
       <TrackUploadModal
@@ -1156,6 +1440,44 @@ export default function ArtistDashboardPage() {
       />
 
       <ToastNotification toasts={toasts} onDismiss={dismissToast} />
+
+      {previewTrack && (
+        <PreviewPlayer
+          track={previewTrack}
+          isPlaying={isPreviewPlaying}
+          currentTime={previewCurrentTime}
+          duration={previewDuration}
+          onPlayPause={togglePreviewPlayback}
+          onStop={stopPreviewTrack}
+          onSeekBy={seekPreviewBy}
+          onPreviousTrack={() => playAdjacentPreviewTrack(-1)}
+          onNextTrack={() => playAdjacentPreviewTrack(1)}
+        />
+      )}
+
+      {/* Hidden Audio Player for Studio Preview */}
+      <audio
+        ref={audioPlayerRef}
+        onLoadedMetadata={(event) => {
+          const nextDuration = event.currentTarget.duration;
+          setPreviewDuration(Number.isFinite(nextDuration) ? nextDuration : 0);
+        }}
+        onTimeUpdate={(event) => {
+          setPreviewCurrentTime(event.currentTarget.currentTime);
+        }}
+        onPlay={() => setIsPreviewPlaying(true)}
+        onPause={() => setIsPreviewPlaying(false)}
+        onEnded={() => {
+          setPlayingTrackId(null);
+          setIsPreviewPlaying(false);
+          setPreviewCurrentTime(audioPlayerRef.current?.duration || 0);
+        }}
+        onError={() => {
+          setPlayingTrackId(null);
+          setIsPreviewPlaying(false);
+        }}
+        className="hidden"
+      />
     </section>
   );
 }

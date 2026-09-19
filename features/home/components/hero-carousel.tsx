@@ -151,12 +151,17 @@ const emptyCreateAccountForm: CreateAccountForm = {
 const HOME_ROUTE = "/dashboard";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
+const MODERATOR_DASHBOARD_ROUTE = "/dashboard/moderator";
 
 function getDashboardPathForRole(role: string) {
   const normalizedRole = role.trim().toLowerCase();
 
   if (normalizedRole === "artist") {
     return ARTIST_DASHBOARD_ROUTE;
+  }
+
+  if (normalizedRole === "moderator") {
+    return MODERATOR_DASHBOARD_ROUTE;
   }
 
   return USER_DASHBOARD_ROUTE;
@@ -197,10 +202,23 @@ export function HeroCarousel() {
   useEffect(() => {
     router.prefetch(USER_DASHBOARD_ROUTE);
     router.prefetch(ARTIST_DASHBOARD_ROUTE);
+    router.prefetch(MODERATOR_DASHBOARD_ROUTE);
   }, [router]);
 
-  const advanceSlide = useEffectEvent(() => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const prevSlide = () => {
+    setActiveIndex((current) => (current - 1 + heroSlides.length) % heroSlides.length);
+  };
+
+  const nextSlide = () => {
     setActiveIndex((current) => (current + 1) % heroSlides.length);
+  };
+
+  const advanceSlide = useEffectEvent(() => {
+    if (!isHovered) {
+      setActiveIndex((current) => (current + 1) % heroSlides.length);
+    }
   });
 
   useEffect(() => {
@@ -509,17 +527,22 @@ export function HeroCarousel() {
 
   return (
     <section className="space-y-4">
-      <div className="relative overflow-hidden rounded-[2.25rem] border border-white/8 bg-[#090909] shadow-[0_35px_110px_rgba(0,0,0,0.42)]">
-        <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-8 sm:py-7">
+      <div
+        className="group relative w-full aspect-[2/1] sm:aspect-[2.4/1] lg:aspect-[3.03/1] min-h-[300px] sm:min-h-[360px] lg:min-h-[420px] overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] border border-white/10 bg-[#090909] shadow-[0_25px_80px_rgba(0,0,0,0.55)]"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Navigation Header overlay with subtle top shadow */}
+        <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-5 py-5 sm:px-8 sm:py-6 bg-gradient-to-b from-black/60 via-black/20 to-transparent">
           <Link
             aria-label="Moodify Home"
-            className="group flex items-center gap-3"
+            className="group/logo flex items-center gap-3"
             href={HOME_ROUTE}
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/10 backdrop-blur-md transition duration-300 group-hover:scale-105 group-hover:border-white/20">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/14 bg-white/10 backdrop-blur-md transition duration-300 group-hover/logo:scale-105 group-hover/logo:border-white/25">
               <LogoMark />
             </span>
-            <span className="font-display text-xl font-bold uppercase tracking-[0.24em] text-white">
+            <span className="font-display text-xl font-bold uppercase tracking-[0.24em] text-white drop-shadow-md">
               Moodify
             </span>
           </Link>
@@ -565,106 +588,79 @@ export function HeroCarousel() {
         </header>
 
         {authMessage ? (
-          <div className="absolute inset-x-6 top-24 z-20 flex justify-center">
-            <p className="rounded-full border border-white/14 bg-black/60 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur-md">
+          <div className="absolute inset-x-6 top-20 z-30 flex justify-center">
+            <p className="rounded-full border border-white/14 bg-black/70 px-4 py-2 text-xs font-medium text-white/90 backdrop-blur-md shadow-lg">
               {authMessage}
             </p>
           </div>
         ) : null}
 
-        <div className="relative h-[680px] w-full sm:h-[720px] lg:h-[760px]">
-          {heroSlides.map((slide, index) => {
-            const isActive = index === activeIndex;
+        {/* Clean Banner Carousel without overlay text/gradients */}
+        {heroSlides.map((slide, index) => {
+          const isActive = index === activeIndex;
 
-            return (
-              <article
-                aria-hidden={!isActive}
-                className={`absolute inset-0 transition-opacity duration-1000 ease-out ${
-                  isActive
-                    ? "pointer-events-auto opacity-100"
-                    : "pointer-events-none opacity-0"
-                }`}
-                key={slide.id}
-              >
-                <Image
-                  alt={slide.artPrompt}
-                  className={`scale-105 object-cover transition-transform duration-1000 ease-out ${
-                    isActive ? "scale-100" : "scale-105"
-                  }`}
-                  fill
-                  priority={index === 0}
-                  quality={88}
-                  sizes="100vw"
-                  src={slide.image}
-                />
+          return (
+            <article
+              aria-hidden={!isActive}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                isActive
+                  ? "pointer-events-auto opacity-100"
+                  : "pointer-events-none opacity-0"
+              }`}
+              key={slide.id}
+            >
+              <Image
+                alt={slide.title.replace("\n", " ")}
+                className="object-cover object-center"
+                fill
+                priority={index === 0}
+                quality={95}
+                sizes="(max-width: 768px) 100vw, 1280px"
+                src={slide.image}
+              />
+            </article>
+          );
+        })}
 
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,0,0,0.15),rgba(0,0,0,0.85)_75%)]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#090909] via-[#090909]/45 to-transparent" />
-                <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-[#090909]/92 via-[#090909]/65 to-transparent lg:w-2/3" />
+        {/* Previous Button */}
+        <button
+          aria-label="Banner trước"
+          className="absolute left-3 sm:left-5 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:border-white/40 opacity-0 group-hover:opacity-100 sm:opacity-60 sm:hover:opacity-100 focus:opacity-100 cursor-pointer shadow-lg"
+          onClick={prevSlide}
+          type="button"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
 
-                <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-14 lg:pb-24">
-                  <div className="max-w-2xl space-y-4 sm:space-y-6">
-                    <p className="text-xs font-semibold uppercase tracking-[0.34em] text-white/60">
-                      {slide.eyebrow}
-                    </p>
+        {/* Next Button */}
+        <button
+          aria-label="Banner tiếp theo"
+          className="absolute right-3 sm:right-5 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:border-white/40 opacity-0 group-hover:opacity-100 sm:opacity-60 sm:hover:opacity-100 focus:opacity-100 cursor-pointer shadow-lg"
+          onClick={nextSlide}
+          type="button"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
 
-                    <h1 className="font-display text-4xl font-extrabold uppercase leading-[0.92] tracking-tight text-white sm:text-6xl lg:text-7xl">
-                      {slide.title.split("\n").map((line, lineIndex) => (
-                        <span className="block" key={lineIndex}>
-                          {line}
-                        </span>
-                      ))}
-                    </h1>
-
-                    <p className="max-w-xl text-sm leading-relaxed text-white/72 sm:text-base lg:text-lg">
-                      {slide.description}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-3 pt-2 sm:gap-4">
-                      <button
-                        className="inline-flex h-12 items-center justify-center rounded-full bg-white px-6 text-xs font-semibold uppercase tracking-[0.2em] text-[#0d0d11] transition duration-300 hover:scale-105 hover:bg-white/90"
-                        onClick={openCreateAccount}
-                        type="button"
-                      >
-                        {slide.primaryCta}
-                      </button>
-                      <button
-                        className="inline-flex h-12 items-center justify-center rounded-full border border-white/18 bg-white/10 px-6 text-xs font-semibold uppercase tracking-[0.2em] text-white backdrop-blur-md transition duration-300 hover:border-white/32 hover:bg-white/18"
-                        onClick={openSignIn}
-                        type="button"
-                      >
-                        {slide.secondaryCta}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-4 text-xs font-medium uppercase tracking-[0.2em] text-white/50 sm:mt-12 sm:pt-6">
-                    <div>
-                      <span className="text-white/80">{slide.artist}</span>
-                      <span className="mx-2 text-white/30">•</span>
-                      <span>{slide.role}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {heroSlides.map((_, dotIndex) => (
-                        <button
-                          aria-label={`Chuyển đến slide ${dotIndex + 1}`}
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            dotIndex === activeIndex
-                              ? "w-8 bg-white"
-                              : "w-2 bg-white/30 hover:bg-white/50"
-                          }`}
-                          key={dotIndex}
-                          onClick={() => setActiveIndex(dotIndex)}
-                          type="button"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+        {/* Dot Pagination Indicator */}
+        <div className="absolute bottom-3 sm:bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/14 bg-black/50 px-3.5 py-1.5 backdrop-blur-md shadow-md">
+          {heroSlides.map((_, dotIndex) => (
+            <button
+              aria-label={`Chuyển đến banner ${dotIndex + 1}`}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                dotIndex === activeIndex
+                  ? "w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+                  : "w-2 bg-white/40 hover:bg-white/70"
+              }`}
+              key={dotIndex}
+              onClick={() => setActiveIndex(dotIndex)}
+              type="button"
+            />
+          ))}
         </div>
       </div>
 

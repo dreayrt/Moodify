@@ -45,14 +45,14 @@ export type ArtistTrackResponse = {
   title: string;
   artist: string;
   genre: string;
+  albumName: string | null;
+  featuredArtists: string | null;
   duration: string;
   status: "draft" | "published" | "scheduled";
   visibility: "public" | "private" | "unlisted";
   plays: number;
   likes: number;
   commentsCount: number;
-  bpm: number | null;
-  key: string | null;
   coverUrl: string | null;
   audioUrl: string | null;
   spotifyUrl: string | null;
@@ -60,6 +60,7 @@ export type ArtistTrackResponse = {
   moderationStatus: string | null;
   moderationScore: number | null;
   description: string | null;
+  explicit: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -102,11 +103,12 @@ const API_BASE_URL =
   "http://localhost:8080";
 
 const STORAGE_KEY = "moodify.auth.session";
+const USER_STORAGE_KEY = "moodify.auth.user";
 
 type RequestOptions = {
   body?: unknown;
   keepalive?: boolean;
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   token?: string;
 };
 
@@ -148,6 +150,17 @@ export function saveAuthSession(auth: AuthResponse) {
   };
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  window.localStorage.setItem(
+    USER_STORAGE_KEY,
+    JSON.stringify({
+      id: auth.userId,
+      fullName: auth.fullName,
+      email: auth.email,
+      username: auth.username,
+      role: auth.role,
+      status: auth.status,
+    }),
+  );
 }
 
 export function clearAuthSession() {
@@ -156,6 +169,7 @@ export function clearAuthSession() {
   }
 
   window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem(USER_STORAGE_KEY);
 }
 
 
@@ -176,6 +190,7 @@ export async function register(payload: {
   role?: string;
   avatarUrl?: string;
   stageName?: string;
+  genres?: string[];
 }) {
   return requestJson<AuthResponse>("/api/auth/register", {
     body: payload,
@@ -229,6 +244,114 @@ export async function uploadAvatar(
 
   return (await response.json()) as UserProfileResponse;
 }
+
+export async function uploadArtistTrack(
+  formData: FormData,
+  token?: string
+): Promise<ArtistTrackResponse> {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên làm việc đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+  }
+  const fullUrl = `${API_BASE_URL}/api/artists/me/tracks`;
+  const response = await fetch(fullUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${validToken}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Phiên đăng nhập đã hết hạn hoặc tài khoản không có quyền Nghệ sĩ (ARTIST). Vui lòng đăng xuất và đăng nhập lại.");
+    }
+    const errorMsg = await extractErrorMessage(response);
+    throw new Error(errorMsg);
+  }
+
+  return (await response.json()) as ArtistTrackResponse;
+}
+
+export async function updateArtistTrack(
+  trackId: string,
+  payload: {
+    title: string;
+    genre: string;
+    featuredArtists?: string;
+    albumName?: string;
+    status: "draft" | "published" | "scheduled";
+    visibility: "public" | "private" | "unlisted";
+    explicit?: boolean;
+    lyricsPlain?: string;
+    description?: string;
+  },
+  token?: string,
+): Promise<ArtistTrackResponse> {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+  }
+
+  return requestJson<ArtistTrackResponse>(`/api/artists/me/tracks/${encodeURIComponent(trackId)}`, {
+    method: "PATCH",
+    token: validToken,
+    body: payload,
+  });
+}
+
+export async function deleteArtistTrack(trackId: string, token?: string): Promise<void> {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+  }
+
+  return requestJson<void>(`/api/artists/me/tracks/${encodeURIComponent(trackId)}`, {
+    method: "DELETE",
+    token: validToken,
+  });
+}
+
+export async function getModeratorQueue(token?: string) {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên đăng nhập kiểm duyệt đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  return requestJson<Record<string, unknown>[]>("/api/moderator/queue", {
+    token: validToken,
+  });
+}
+
+export async function getModeratorHistory(token?: string) {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên đăng nhập kiểm duyệt đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  return requestJson<Record<string, unknown>[]>("/api/moderator/history", {
+    token: validToken,
+  });
+}
+
+export async function submitModeratorDecision(
+  payload: {
+    trackId: string;
+    actionType: "approve" | "reject" | "needs_revision";
+    rejectionReason?: string;
+    internalNote?: string;
+    explicitTag?: boolean;
+  },
+  token?: string
+) {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên đăng nhập kiểm duyệt đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  return requestJson<{ message: string }>("/api/moderator/decision", {
+    token: validToken,
+    body: payload,
+  });
+}
+
 
 export async function getCurrentUser(accessToken: string) {
   return requestJson<UserProfileResponse>("/api/auth/me", {
@@ -306,7 +429,7 @@ async function requestJson<T>(
 
   if (!response.ok) {
     const errorMsg = await extractErrorMessage(response);
-    console.error(`[RequestJson] ❌ Request failed (${response.status}):`, errorMsg);
+    console.warn(`[RequestJson] Request failed (${response.status}):`, errorMsg);
     throw new Error(errorMsg);
   }
 

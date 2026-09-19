@@ -20,13 +20,40 @@ export type ArtistTrack = {
   coverGradient?: string;
   coverUrl?: string;
   audioUrl?: string;
+  featuredArtists?: string;
+  albumName?: string;
+  explicit?: boolean;
+  lyricsPlain?: string;
   spotifyId?: string;
   spotifyUrl?: string;
   downloadStatus?: string;
   moderationStatus?: string;
   moderationScore?: number;
   description?: string;
+  license?: SongLicense;
 };
+
+export type LicenseType =
+  | "DIGITAL_STREAMING"
+  | "MASTER_LICENSE"
+  | "DIRECT_LICENSE"
+  | "STREAMING_PENDING";
+
+export type LicenseStatus = "ACTIVE" | "PENDING" | "EXPIRED" | "REVOKED";
+
+export interface SongLicense {
+  id?: string;
+  trackId?: string;
+  distributorId?: number | null;
+  distributionContractId?: number | null;
+  licenseType: LicenseType;
+  copyrightOwner: string;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+  status: LicenseStatus;
+  documentUrl?: string | null;
+  documentName?: string | null;
+}
 
 export type TrackFilterStatus = "all" | "draft" | "published";
 
