@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronDown,
   Disc,
+  Settings,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -21,6 +22,8 @@ import {
 import { fetchUserPlaylists, type Playlist } from "@/lib/api-client";
 import CreatePlaylistModal from "./create-playlist-modal";
 import MoodifyMascot from "./moodify-mascot";
+import UserSettingsModal from "./user-settings-modal";
+import { useCurrentMascot } from "@/lib/mascots";
 
 const VIDEO_SRC =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_115057_94c3699b-0fd1-4124-bcf3-3626bb8c1f77.mp4";
@@ -112,16 +115,19 @@ function ButterflySwarm({ count = 7, className = "" }: { count?: number; classNa
   );
 }
 
-function AccountPill({
+function MascotAccountTrigger({
   user,
   loading,
+  onOpenSettings,
 }: {
   user: UserProfileResponse | null;
   loading: boolean;
+  onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
+  const { mascot } = useCurrentMascot();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -139,81 +145,72 @@ function AccountPill({
     router.push("/");
   };
 
-  const displayName = user?.fullName || user?.username || "Guest";
-  const initials = useMemo(() => {
-    const source = (user?.fullName || user?.username || "G").trim();
-    const parts = source.split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "G";
-    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }, [user]);
-
-  const firstName = useMemo(() => {
-    const source = (user?.fullName || user?.username || "friend").trim();
-    return source.split(/\s+/)[0] || "friend";
-  }, [user]);
+  const displayName = user?.fullName || user?.username || "Người dùng Moodify";
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        type="button"
+      {/* Interactive Mascot as the sole Account Trigger */}
+      <MoodifyMascot
+        size={74}
         onClick={() => setOpen(!open)}
-        className="anim-slide-right flex items-center gap-[10px] px-[12px] py-[6px] rounded-full border border-white/12 bg-white/5 backdrop-blur-md hover:bg-white/10 transition-colors active:scale-95 cursor-pointer"
-      >
-        {user?.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt={displayName}
-            className="w-[26px] h-[26px] rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div
-            className="w-[26px] h-[26px] rounded-full grid place-items-center text-[11px] font-semibold text-black"
-            style={{ background: "linear-gradient(135deg,#AFDDFF,#dbeeff)" }}
-          >
-            {loading ? "…" : initials}
-          </div>
-        )}
-        <span className="font-manrope text-white text-[12px] tracking-wide">
-          {loading ? "Hi, …" : `Hi, ${firstName}`}
-        </span>
-        <ChevronDown
-          className={`w-[12px] h-[12px] text-white/50 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+        className="cursor-pointer hover:scale-105 transition-transform"
+      />
 
+      {/* Account Dropdown Menu */}
       {open && (
-        <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/12 bg-slate-950/95 backdrop-blur-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
-          {user && (
-            <div className="p-3 border-b border-white/10 mb-1">
-              <p className="text-xs font-bold text-white truncate">
-                {displayName}
-              </p>
-              <p className="text-[11px] text-white/50 truncate">
-                {user.email}
-              </p>
+        <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          {/* User profile & mascot card */}
+          <div className="p-3 border-b border-white/10 mb-1 rounded-xl bg-white/[0.03]">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl shrink-0">{mascot.icon}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-white truncate">
+                  {loading ? "Đang tải..." : displayName}
+                </p>
+                <p className="text-[11px] text-white/50 truncate">
+                  {user?.email || "Chưa có email"}
+                </p>
+              </div>
             </div>
-          )}
+            <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10.5px]">
+              <span className="text-white/40">Linh vật:</span>
+              <span className="font-semibold text-cyan-300">{mascot.name}</span>
+            </div>
+          </div>
 
+          {/* Option: Settings */}
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onOpenSettings();
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors text-left cursor-pointer group"
+          >
+            <Settings className="w-4 h-4 text-cyan-400 group-hover:rotate-45 transition-transform duration-300" />
+            <span>Cài đặt</span>
+          </button>
+
+          {/* Library & Playlists */}
           <Link
             href="/dashboard/library"
             onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <Disc className="w-4 h-4 text-cyan-400" />
+            <Disc className="w-4 h-4 text-purple-400" />
             <span>Thư viện & Playlist</span>
           </Link>
 
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Đăng xuất</span>
-          </button>
+          {/* Logout */}
+          <div className="pt-1 border-t border-white/10 mt-1">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/15 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Đăng xuất</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -232,6 +229,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const [userLoading, setUserLoading] = useState(true);
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const refreshPlaylists = async () => {
     try {
@@ -372,8 +370,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            <MoodifyMascot size={68} />
-            <AccountPill user={user} loading={userLoading} />
+            <MascotAccountTrigger
+              user={user}
+              loading={userLoading}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
           </div>
         </header>
 
@@ -528,11 +529,19 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Global Create Playlist Modal (accessible from sidebar + button anywhere) */}
+      {/* Global Create Playlist Modal */}
       <CreatePlaylistModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreated={handlePlaylistCreated}
+      />
+
+      {/* User Settings & Mascot Switcher Modal */}
+      <UserSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        user={user}
+        onProfileUpdated={(updated) => setUser(updated)}
       />
     </div>
   );

@@ -752,18 +752,74 @@ function LumenHeroContent() {
             <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-[640px] overflow-y-auto pr-2 scrollbar-thin">
-            {tracks.map((t, i) => (
-              <TrackRow
-                key={`${activeVibe}-${t.spotifyId || i}`}
-                track={t}
-                index={i}
-                active={currentTrack?.spotifyId ? currentTrack.spotifyId === t.spotifyId : i === activeTrackIdx}
-                playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
-                onClick={() => handlePlayTrack(t, i)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Desktop (md+): 2 independent vertical columns so expanding a track only pushes down its own column */}
+            <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start max-h-[640px] overflow-y-auto pr-2 scrollbar-thin">
+              {/* Left Column: 01, 03, 05, 07... */}
+              <div className="flex flex-col gap-1 min-w-0">
+                {tracks
+                  .map((t, i) => ({ track: t, originalIndex: i }))
+                  .filter((_, i) => i % 2 === 0)
+                  .map(({ track, originalIndex }) => (
+                    <TrackRow
+                      key={`${activeVibe}-${track.spotifyId || originalIndex}`}
+                      track={track}
+                      index={originalIndex}
+                      active={
+                        currentTrack?.spotifyId
+                          ? currentTrack.spotifyId === track.spotifyId
+                          : originalIndex === activeTrackIdx
+                      }
+                      playing={
+                        currentTrack?.spotifyId === track.spotifyId && isPlaying
+                      }
+                      onClick={() => handlePlayTrack(track, originalIndex)}
+                    />
+                  ))}
+              </div>
+
+              {/* Right Column: 02, 04, 06, 08... */}
+              <div className="flex flex-col gap-1 min-w-0">
+                {tracks
+                  .map((t, i) => ({ track: t, originalIndex: i }))
+                  .filter((_, i) => i % 2 !== 0)
+                  .map(({ track, originalIndex }) => (
+                    <TrackRow
+                      key={`${activeVibe}-${track.spotifyId || originalIndex}`}
+                      track={track}
+                      index={originalIndex}
+                      active={
+                        currentTrack?.spotifyId
+                          ? currentTrack.spotifyId === track.spotifyId
+                          : originalIndex === activeTrackIdx
+                      }
+                      playing={
+                        currentTrack?.spotifyId === track.spotifyId && isPlaying
+                      }
+                      onClick={() => handlePlayTrack(track, originalIndex)}
+                    />
+                  ))}
+              </div>
+            </div>
+
+            {/* Mobile (<md): 1 single sequential column */}
+            <div className="flex md:hidden flex-col gap-1 max-h-[640px] overflow-y-auto pr-2 scrollbar-thin">
+              {tracks.map((t, i) => (
+                <TrackRow
+                  key={`${activeVibe}-${t.spotifyId || i}`}
+                  track={t}
+                  index={i}
+                  active={
+                    currentTrack?.spotifyId
+                      ? currentTrack.spotifyId === t.spotifyId
+                      : i === activeTrackIdx
+                  }
+                  playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
+                  onClick={() => handlePlayTrack(t, i)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -789,7 +845,41 @@ function LumenHeroContent() {
       {/* Hottest in genre */}
       <div>
         <SectionHeader eyebrow="TRENDING IN" title={`${active.label}`} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+        <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start">
+          <div className="flex flex-col gap-1 min-w-0">
+            {[...tracks]
+              .slice(0, 4)
+              .map((t, i) => ({ track: t, originalIndex: i }))
+              .filter((_, i) => i % 2 === 0)
+              .map(({ track, originalIndex }) => (
+                <TrackRow
+                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
+                  track={track}
+                  index={originalIndex}
+                  active={currentTrack?.spotifyId === track.spotifyId}
+                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
+                  onClick={() => handlePlayTrack(track)}
+                />
+              ))}
+          </div>
+          <div className="flex flex-col gap-1 min-w-0">
+            {[...tracks]
+              .slice(0, 4)
+              .map((t, i) => ({ track: t, originalIndex: i }))
+              .filter((_, i) => i % 2 !== 0)
+              .map(({ track, originalIndex }) => (
+                <TrackRow
+                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
+                  track={track}
+                  index={originalIndex}
+                  active={currentTrack?.spotifyId === track.spotifyId}
+                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
+                  onClick={() => handlePlayTrack(track)}
+                />
+              ))}
+          </div>
+        </div>
+        <div className="flex md:hidden flex-col gap-1">
           {[...tracks].slice(0, 4).map((t, i) => (
             <TrackRow
               key={`more-${activeVibe}-${t.spotifyId || i}`}
