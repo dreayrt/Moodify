@@ -277,7 +277,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -297,7 +297,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
@@ -308,7 +308,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
@@ -319,7 +319,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
@@ -330,7 +330,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: scaleY(1);
+    transform: none;
   }
 }
 
@@ -341,7 +341,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: scaleX(1);
+    transform: none;
   }
 }
 

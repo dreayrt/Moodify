@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { ReviewAction, ReviewRequest } from "../types";
 import { resolveAudioStreamUrl } from "./shared/admin-audio-player-dock";
+import { ModalPortal } from "./shared/modal-portal";
 
 type ModerationTabProps = {
   reviews: ReviewRequest[];
@@ -101,7 +102,7 @@ export function ModerationTab({
   };
 
   return (
-    <div className="space-y-8 anim-fade-up">
+    <div className="space-y-8 anim-fade-in">
       {/* Hidden Audio Player for Preview */}
       <audio
         ref={audioRef}
@@ -357,8 +358,9 @@ export function ModerationTab({
 
       {/* ================= MODAL: RETURN FOR EDIT ================= */}
       {isReturnModalOpen && selectedReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-white/12 bg-[#121316] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.8)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-sm anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#121316] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.8)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-4">
               <h3 className="font-graphik text-[18px] font-semibold text-white">Yêu Cầu Nghệ Sĩ Bổ Sung / Chỉnh Sửa</h3>
               <button
@@ -406,12 +408,14 @@ export function ModerationTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL: REJECT ================= */}
       {isRejectModalOpen && selectedReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-white/12 bg-[#121316] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.8)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-sm anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#121316] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.8)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-4">
               <h3 className="font-graphik text-[18px] font-semibold text-rose-400">Từ Chối Phát Hành Bài Hát</h3>
               <button
@@ -459,7 +463,8 @@ export function ModerationTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import { CatalogTrack } from "../types";
 import { AudioFeaturesRadar } from "./shared/audio-features-radar";
 import { WaveformVisualizer } from "./shared/waveform-visualizer";
 import { AdminPagination } from "./shared/admin-pagination";
+import { ModalPortal } from "./shared/modal-portal";
 
 type CatalogManagementTabProps = {
   tracks: CatalogTrack[];
@@ -106,7 +107,7 @@ export function CatalogManagementTab({
   };
 
   return (
-    <div className="space-y-6 anim-fade-up">
+    <div className="space-y-6 anim-fade-in">
       {/* Studio Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -537,8 +538,9 @@ export function CatalogManagementTab({
 
       {/* ================= MODAL 1: AUDIO FEATURES RADAR INSPECTION ================= */}
       {selectedTrackForRadar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-white/14 bg-[#0a0c12] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/14 bg-[#0a0c12] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <div>
                 <h3 className="font-graphik text-[17px] font-semibold text-white">
@@ -592,12 +594,14 @@ export function CatalogManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL 2: TAKEDOWN TRACK ================= */}
       {selectedTrackForTakedown && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-rose-500/30 bg-[#0d090a] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-rose-500/30 bg-[#0d090a] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <h3 className="font-graphik text-[17px] font-semibold text-rose-400">
                 Cưỡng Chế Gỡ Bỏ Bài Hát (Takedown)
@@ -650,12 +654,14 @@ export function CatalogManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL 2.5: RESTORE TRACK ================= */}
       {selectedTrackForRestore && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-emerald-500/30 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-emerald-500/30 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <div className="flex items-center gap-2 text-emerald-400">
                 <RefreshCw className="h-5 w-5" />
@@ -718,12 +724,14 @@ export function CatalogManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL 3: CHANGE VIBE ================= */}
       {selectedTrackForVibe && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-sm rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <h3 className="font-graphik text-[17px] font-semibold text-white">Gán Lại Vibe Cảm Xúc</h3>
               <button
@@ -758,7 +766,8 @@ export function CatalogManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
     </div>
   );
 }

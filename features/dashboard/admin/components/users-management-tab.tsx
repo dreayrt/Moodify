@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { AdminUser, AdminUserRole, AdminUserStatus, UserDevice } from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
+import { ModalPortal } from "./shared/modal-portal";
 
 type UsersManagementTabProps = {
   users: AdminUser[];
@@ -232,7 +233,7 @@ export function UsersManagementTab({
     : [];
 
   return (
-    <div className="space-y-6 anim-fade-up">
+    <div className="space-y-6 anim-fade-in">
       {/* Studio Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -542,8 +543,9 @@ export function UsersManagementTab({
 
       {/* ================= MODAL: USER PROFILE DETAIL DRAWER ================= */}
       {inspectingUser && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/80 backdrop-blur-sm anim-fade-in">
-          <div className="w-full max-w-md bg-[#0c0e14] border-l border-white/10 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex justify-end bg-black/80 backdrop-blur-sm anim-fade-in">
+            <div className="w-full max-w-md bg-[#0c0e14] border-l border-white/10 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
             <div>
               <div className="flex items-center justify-between border-b border-white/8 pb-4">
                 <h3 className="font-graphik text-[18px] font-bold text-white">Hồ Sơ Định Danh IAM</h3>
@@ -732,12 +734,14 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL: BAN USER ================= */}
       {selectedUserForBan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-rose-500/30 bg-[#0d090a] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-rose-500/30 bg-[#0d090a] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <h3 className="font-graphik text-[17px] font-semibold text-rose-400">Khóa Quyền Truy Cập Tài Khoản</h3>
               <button
@@ -807,12 +811,14 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL: CHANGE ROLE ================= */}
       {selectedUserForRole && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <h3 className="font-graphik text-[17px] font-semibold text-white">Bổ Nhiệm & Đổi Vai Trò (IAM)</h3>
               <button
@@ -895,12 +901,14 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL: CONNECTED DEVICES ================= */}
       {selectedUserForDevices && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
               <h3 className="font-graphik text-[17px] font-semibold text-white">Thiết Bị Nghe Ngoại Tuyến</h3>
               <button
@@ -959,12 +967,14 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* ================= MODAL: RESET PASSWORD ================= */}
       {selectedUserForResetPassword && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-[#0d0c10] p-6 shadow-2xl space-y-4">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-amber-500/30 bg-[#0d0c10] p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-amber-400">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-500/10 border border-amber-500/20">
                 <Key className="h-5 w-5" />
@@ -1003,11 +1013,13 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
       {/* ================= MODAL: CREATE NEW USER ================= */}
       {isCreateUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 anim-fade-in">
-          <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-5">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#ff7a2c]/15 text-[#ff7a2c]">
@@ -1131,12 +1143,14 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* CONFIRMATION MODAL: DELETE USER */}
       {selectedUserForDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 anim-fade-up">
-          <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-[#0c1017] p-6 shadow-2xl">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-rose-500/30 bg-[#0c1017] p-6 shadow-2xl">
             <div className="flex items-center gap-3 text-rose-400 mb-4">
               <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <Trash2 className="h-6 w-6 text-rose-500" />
@@ -1181,7 +1195,8 @@ export function UsersManagementTab({
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
+    )}
     </div>
   );
 }
