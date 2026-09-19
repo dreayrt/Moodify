@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0D1224</color>
+    <color name="moodify_primary">#7A5CFF</color>
+    <color name="moodify_accent">#F557B6</color>
+</resources>

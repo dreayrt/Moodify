@@ -7,7 +7,7 @@ import { DEFAULT_LANGUAGE, resources, SUPPORTED_LANGUAGES, type SupportedLanguag
 
 const STORAGE_KEY = "moodify-language";
 
-function getInitialLanguage(): SupportedLanguage {
+export function getUserPreferredLanguage(): SupportedLanguage {
   if (typeof window === "undefined") {
     return DEFAULT_LANGUAGE;
   }
@@ -28,7 +28,7 @@ function getInitialLanguage(): SupportedLanguage {
 if (!i18n.isInitialized) {
   void i18n.use(initReactI18next).init({
     resources,
-    lng: getInitialLanguage(),
+    lng: DEFAULT_LANGUAGE,
     fallbackLng: DEFAULT_LANGUAGE,
     interpolation: {
       escapeValue: false,

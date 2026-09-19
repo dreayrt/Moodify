@@ -13,7 +13,7 @@ import {
   type FormEvent,
 } from "react";
 
-import { LogoMark } from "@/components/shared/logo-mark";
+import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
   getCurrentUser,
@@ -152,6 +152,7 @@ const HOME_ROUTE = "/";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
 const MODERATOR_DASHBOARD_ROUTE = "/dashboard/moderator";
+const ADMIN_DASHBOARD_ROUTE = "/dashboard/admin";
 
 function getDashboardPathForRole(role: string) {
   const normalizedRole = role.trim().toLowerCase();
@@ -162,6 +163,10 @@ function getDashboardPathForRole(role: string) {
 
   if (normalizedRole === "moderator") {
     return MODERATOR_DASHBOARD_ROUTE;
+  }
+
+  if (normalizedRole === "admin") {
+    return ADMIN_DASHBOARD_ROUTE;
   }
 
   return USER_DASHBOARD_ROUTE;
@@ -203,6 +208,7 @@ export function HeroCarousel() {
     router.prefetch(USER_DASHBOARD_ROUTE);
     router.prefetch(ARTIST_DASHBOARD_ROUTE);
     router.prefetch(MODERATOR_DASHBOARD_ROUTE);
+    router.prefetch(ADMIN_DASHBOARD_ROUTE);
   }, [router]);
 
   const [isHovered, setIsHovered] = useState(false);
@@ -247,10 +253,13 @@ export function HeroCarousel() {
         if (!isCancelled) {
           setAuthUser(user);
         }
-      } catch {
+      } catch (err) {
         if (!isCancelled) {
-          clearAuthSession();
-          setAuthUser(null);
+          const errMsg = err instanceof Error ? err.message : String(err);
+          if (errMsg.includes("401") || errMsg.toLowerCase().includes("unauthorized")) {
+            clearAuthSession();
+            setAuthUser(null);
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -536,15 +545,14 @@ export function HeroCarousel() {
         <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-5 py-5 sm:px-8 sm:py-6 bg-gradient-to-b from-black/60 via-black/20 to-transparent">
           <Link
             aria-label="Moodify Home"
-            className="group/logo flex items-center gap-3"
+            className="group flex items-center transition-transform duration-200 hover:scale-[1.03]"
             href={HOME_ROUTE}
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/14 bg-white/10 backdrop-blur-md transition duration-300 group-hover/logo:scale-105 group-hover/logo:border-white/25">
-              <LogoMark />
-            </span>
-            <span className="font-display text-xl font-bold uppercase tracking-[0.24em] text-white drop-shadow-md">
-              Moodify
-            </span>
+            <BrandLogo
+              variant="horizontal"
+              className="h-9 sm:h-10 w-auto drop-shadow-[0_4px_20px_rgba(122,92,255,0.45)]"
+              priority
+            />
           </Link>
 
           <div className="flex items-center gap-3">

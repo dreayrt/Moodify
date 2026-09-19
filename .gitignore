@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,32 +10,65 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing & coverage
 /coverage
+*.lcov
 
-# next.js
+# Next.js build outputs
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Debug & Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Environment files & Secrets (CRITICAL: Do not commit local envs)
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
 .env*
+!.env.example
+*.key
+*.pem
+*.id_rsa
 
-# vercel
+# Vercel & Turbopack
 .vercel
+.turbo
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Editor & IDE configurations
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Backup and temporary files
+*.bak
+*.old
+*.orig
+*.swp
+*~
+*.tmp
+
+# Raw AI design drafts (exclude 25MB+ unserved raw drafts to keep repository lightweight)
+/public/Brand/raw_source_images/

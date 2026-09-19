@@ -453,7 +453,11 @@ async function requestJson<T>(
 
   if (!response.ok) {
     const errorMsg = await extractErrorMessage(response);
-    console.warn(`[RequestJson] Request failed (${response.status}):`, errorMsg);
+    if (response.status >= 500) {
+      console.error(`[RequestJson] ❌ Server error (${response.status}):`, errorMsg);
+    } else {
+      console.warn(`[RequestJson] ⚠️ Client error (${response.status}):`, errorMsg);
+    }
     throw new Error(errorMsg);
   }
 
@@ -477,18 +481,27 @@ async function extractErrorMessage(response: Response) {
   try {
     const text = await response.text();
     if (!text) {
-      return `Request failed with status ${response.status}`;
+      if (response.status === 401) {
+        return "Tài khoản hoặc mật khẩu không chính xác.";
+      }
+      if (response.status === 403) {
+        return "Tài khoản không có quyền truy cập hoặc đã bị vô hiệu hóa.";
+      }
+      return `Yêu cầu thất bại với mã trạng thái ${response.status}`;
     }
     try {
       const payload = JSON.parse(text) as {
         message?: string;
         error?: string;
       };
+      if (response.status === 401) {
+        return payload.message || "Tài khoản hoặc mật khẩu không chính xác.";
+      }
       return payload.message || payload.error || text;
     } catch {
       return text;
     }
   } catch {
-    return `Request failed with status ${response.status}`;
+    return `Yêu cầu thất bại với mã trạng thái ${response.status}`;
   }
 }
