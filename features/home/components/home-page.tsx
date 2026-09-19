@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LogoMark } from "@/components/shared/logo-mark";
 import { HeroCarousel } from "@/features/home/components/hero-carousel";
 
-const HOME_ROUTE = "/dashboard";
+const HOME_ROUTE = "/";
 
 const playlists = [
   {

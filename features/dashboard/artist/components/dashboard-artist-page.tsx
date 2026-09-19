@@ -153,7 +153,7 @@ const TAB_LABELS: Array<{ key: TabKey; labelKey: string }> = [
   { key: "benefits", labelKey: "dashboard.artist.tabs.benefits" },
 ];
 
-const HOME_ROUTE = "/dashboard";
+const HOME_ROUTE = "/";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 
 function formatCatalogDate(value: string | null | undefined) {
@@ -1076,6 +1076,8 @@ export default function ArtistDashboardPage() {
       console.warn("Logout error (proceeding with local cleanup):", err);
     } finally {
       clearAuthSession();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
       setLoggingOut(false);
       router.push(HOME_ROUTE);
     }

@@ -148,7 +148,7 @@ const emptyCreateAccountForm: CreateAccountForm = {
   role: "USER",
 };
 
-const HOME_ROUTE = "/dashboard";
+const HOME_ROUTE = "/";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
 const MODERATOR_DASHBOARD_ROUTE = "/dashboard/moderator";

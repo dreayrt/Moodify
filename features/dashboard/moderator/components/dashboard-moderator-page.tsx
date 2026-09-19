@@ -21,10 +21,13 @@ import {
   ViolationCategory,
 } from "../types";
 import {
+  clearAuthSession,
   getCurrentUser,
   getModeratorHistory,
   getModeratorQueue,
+  getStoredAuthSession,
   getValidAccessToken,
+  logout,
   submitModeratorDecision,
 } from "@/lib/auth/auth-client";
 
@@ -435,11 +438,21 @@ export default function DashboardModeratorPage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     addToast("Đang đăng xuất khỏi hệ thống kiểm duyệt...", "info");
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 500);
+    try {
+      const session = getStoredAuthSession();
+      if (session?.refreshToken) {
+        await logout(session.refreshToken);
+      }
+    } catch (err) {
+      console.warn("Logout error:", err);
+    } finally {
+      clearAuthSession();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      router.push("/");
+    }
   };
 
   const handleRefresh = async () => {

@@ -4,7 +4,14 @@ import { Home, Search, Library, LogOut, Plus, Music } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { getCurrentUser, type UserProfileResponse } from "@/lib/auth-client";
+import {
+  getCurrentUser,
+  getValidAccessToken,
+  clearAuthSession,
+  getStoredAuthSession,
+  logout,
+  type UserProfileResponse,
+} from "@/lib/auth-client";
 import { fetchUserPlaylists, type Playlist } from "@/lib/api-client";
 import CreatePlaylistModal from "./create-playlist-modal";
 
@@ -39,10 +46,20 @@ export function Sidebar() {
     loadData();
   }, [pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    router.push("/");
+  const handleLogout = async () => {
+    try {
+      const session = getStoredAuthSession();
+      if (session?.refreshToken) {
+        await logout(session.refreshToken);
+      }
+    } catch (err) {
+      console.warn("Logout error:", err);
+    } finally {
+      clearAuthSession();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      router.push("/");
+    }
   };
 
   const handlePlaylistCreated = (newPlaylist: Playlist) => {
