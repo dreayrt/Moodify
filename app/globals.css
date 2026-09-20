@@ -8,10 +8,11 @@
   --text-primary: #f4f2ed;
   --text-secondary: rgba(244, 242, 237, 0.72);
   --text-muted: rgba(244, 242, 237, 0.5);
-  --font-sans-stack: var(--font-manrope), "Segoe UI", "Helvetica Neue",
-    sans-serif;
-  --font-display-stack: var(--font-space-grotesk), "Avenir Next",
-    "Helvetica Neue", sans-serif;
+  /* Centralized Typography Tokens */
+  --font-display: var(--font-sora), var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-body: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-sans-stack: var(--font-body);
+  --font-display-stack: var(--font-display);
 
   /* Moodify Brand Design System Tokens */
   --moodify-primary: #7A5CFF;
@@ -30,8 +31,61 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans-stack);
-  --font-display: var(--font-display-stack);
+  --font-sans: var(--font-body);
+  --font-body: var(--font-body);
+  --font-display: var(--font-display);
+  --font-sora: var(--font-display);
+  --font-manrope: var(--font-body);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    font-family: var(--font-body);
+    letter-spacing: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 650;
+    letter-spacing: -0.018em;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+
+  button,
+  input,
+  optgroup,
+  select,
+  textarea {
+    font-family: var(--font-body);
+  }
+
+  table,
+  th,
+  td {
+    font-family: var(--font-body);
+  }
 }
 
 * {
@@ -48,7 +102,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans-stack);
+  font-family: var(--font-body);
   min-height: 100vh;
   text-rendering: optimizeLegibility;
 }
@@ -238,6 +292,38 @@ a {
     opacity: 1;
     transform: scaleX(1);
   }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 124, 56, 0.35);
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -262,12 +348,24 @@ a {
    LŪMEN // ÍNDEX — hero animations & font classes
    ────────────────────────────────────────────────────────────── */
 
+/* Typography utilities & Aliases */
+.font-display,
+.font-sora,
 .font-graphik {
-  font-family: var(--font-display-stack);
+  font-family: var(--font-display);
 }
 
-.font-manrope {
-  font-family: var(--font-sans-stack);
+.font-sans,
+.font-manrope,
+.font-body {
+  font-family: var(--font-body);
+}
+
+.stat-number,
+.font-statistic {
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 @keyframes lumenFadeUp {

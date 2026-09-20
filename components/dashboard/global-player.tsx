@@ -137,7 +137,7 @@ export function GlobalPlayerBar() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <h4 className="font-medium text-slate-100 text-sm md:text-base leading-snug truncate">
+            <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
               {currentTrack.name}
             </h4>
             <p className="text-xs text-slate-400 leading-tight truncate mt-0.5">

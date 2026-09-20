@@ -1,5 +1,6 @@
-// API Base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+// API Base URL - Luôn đảm bảo có tiền tố /api
+const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
 import { getValidAccessToken } from './auth-client';
 
@@ -94,7 +95,15 @@ export async function fetchTracks(options?: {
   if (options?.query) params.set('query', options.query);
   if (options?.genre) params.set('genre', options.genre);
 
-  const response = await fetch(`${API_BASE}/tracks?${params.toString()}`);
+  const headers: HeadersInit = {};
+  try {
+    const token = await getValidAccessToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {}
+
+  const response = await fetch(`${API_BASE}/tracks?${params.toString()}`, { headers });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch tracks: ${response.status}`);

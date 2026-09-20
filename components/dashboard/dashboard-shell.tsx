@@ -452,7 +452,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             {/* Playlists & Moods Box */}
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-3.5 shadow-2xl space-y-4">
               <div>
-                <p className="font-manrope text-[10px] tracking-[0.25em] text-white/40 uppercase font-bold px-1 mb-2">
+                <p className="font-manrope text-[10px] tracking-[0.06em] text-white/50 uppercase font-semibold px-1 mb-2">
                   TÂM TRẠNG & THỂ LOẠI
                 </p>
                 <div className="space-y-1">
@@ -499,7 +499,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               {/* User Custom Playlists Section */}
               <div className="pt-3 border-t border-white/10">
                 <div className="flex items-center justify-between px-1 mb-2">
-                  <p className="font-manrope text-[10px] tracking-[0.25em] text-white/40 uppercase font-bold">
+                  <p className="font-manrope text-[10px] tracking-[0.06em] text-white/50 uppercase font-semibold">
                     DANH SÁCH PHÁT
                   </p>
                   <button

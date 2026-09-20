@@ -335,7 +335,7 @@ export function MonetizationTab({
 
                     {/* Price Tag */}
                     <div className="mt-2.5 flex items-baseline gap-1.5">
-                      <span className="font-mono text-2xl font-black text-[#ff7a2c]">
+                      <span className="font-display text-2xl font-bold text-[#ff7a2c] tracking-tight">
                         {formatVND(pkg.price)}
                       </span>
                       <span className="text-xs text-white/50 font-mono">

@@ -215,6 +215,7 @@ export async function register(payload: {
   avatarUrl?: string;
   stageName?: string;
   genres?: string[];
+  genresRaw?: string[];
 }) {
   return requestJson<AuthResponse>("/api/auth/register", {
     body: payload,

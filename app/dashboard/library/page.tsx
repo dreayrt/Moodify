@@ -358,7 +358,7 @@ function LibraryContent() {
                     <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold uppercase tracking-wider">
                       Danh sách phát
                     </span>
-                    <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight break-words">
+                    <h1 className="text-3xl md:text-5xl font-bold font-display text-white tracking-tight break-words">
                       {selectedPlaylist.name}
                     </h1>
                     {selectedPlaylist.description && (
@@ -644,7 +644,7 @@ function LibraryContent() {
                 <span className="text-[11px] font-semibold text-pink-400 uppercase tracking-wider">
                   Bộ sưu tập
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                <h2 className="text-2xl sm:text-3xl font-bold font-display text-white tracking-tight">
                   Bài hát đã thích
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-400 mt-1">

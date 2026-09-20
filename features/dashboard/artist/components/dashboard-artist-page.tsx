@@ -390,10 +390,10 @@ function StatCard({ item, delay }: { item: Stat; delay: number }) {
           <Icon className="h-[18px] w-[18px] text-white/72" strokeWidth={1.7} />
         </div>
       </div>
-      <p className="mt-5 font-graphik text-[28px] leading-none tracking-[-0.03em] text-white">
+      <p className="mt-5 font-graphik text-[28px] font-semibold leading-none tracking-[-0.025em] text-white">
         {item.value}
       </p>
-      <p className="mt-2 text-[12px] tracking-[0.14em] text-white/46 uppercase">
+      <p className="mt-2 text-[12px] font-medium tracking-[0.06em] text-white/46 uppercase">
         {t(`dashboard.artist.stats.${item.key}`)}
       </p>
     </div>
@@ -462,10 +462,10 @@ function TracksPanel({
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
+              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
                 {t("dashboard.artist.upload.queue")}
               </p>
-              <h3 className="mt-2 font-graphik text-[28px] tracking-[-0.03em] text-white">
+              <h3 className="mt-2 font-graphik text-[28px] font-semibold tracking-[-0.02em] text-white">
                 {t("dashboard.artist.upload.title")}
               </h3>
             </div>
@@ -536,10 +536,10 @@ function TracksPanel({
         >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">
+              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
                 {t("dashboard.artist.release.eyebrow")}
               </p>
-              <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
+              <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
                 {t("dashboard.artist.release.title")}
               </h3>
             </div>
@@ -604,10 +604,10 @@ function CommentsPanel() {
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
+          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
             {t("dashboard.artist.commentsPanel.eyebrow")}
           </p>
-          <h3 className="mt-2 font-graphik text-[26px] tracking-[-0.03em] text-white">
+          <h3 className="mt-2 font-graphik text-[26px] font-semibold tracking-[-0.02em] text-white">
             {t("dashboard.artist.commentsPanel.title")}
           </h3>
         </div>
@@ -675,10 +675,10 @@ function RightRail() {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#9ec5ff] uppercase">
-              {t("dashboard.artist.audience.eyebrow")}
+            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
+              {t("dashboard.artist.analytics.kpi")}
             </p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
+            <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
               {t("dashboard.artist.audience.title")}
             </h3>
           </div>
@@ -723,10 +723,10 @@ function RightRail() {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
-              {t("dashboard.artist.actions.eyebrow")}
+            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
+              {t("dashboard.artist.analytics.eyebrow")}
             </p>
-            <h3 className="mt-2 font-graphik text-[24px] tracking-[-0.03em] text-white">
+            <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
               {t("dashboard.artist.actions.title")}
             </h3>
           </div>
@@ -1216,11 +1216,14 @@ export default function ArtistDashboardPage() {
     return (
       <section className="flex min-h-screen items-center justify-center bg-[#08090d] px-6 text-[#f4f2ed]">
         <div className="w-full max-w-[460px] rounded-[28px] border border-white/8 bg-white/[0.04] p-7 text-center shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] p-2 shadow-[0_0_24px_rgba(122,92,255,0.35)]">
-            <LogoMark variant="icon" className="h-full w-full object-contain" />
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] p-2.5 shadow-[0_0_24px_rgba(122,92,255,0.35)]">
+            <LogoMark variant="gradient" className="h-full w-full" />
           </div>
-          <p className="text-[11px] tracking-[0.28em] text-[#ffb488] uppercase">
-            {t("dashboard.artist.access.eyebrow")}
+          <div className="mb-3 flex items-center justify-center">
+            <span className="font-graphik text-[20px] font-bold tracking-tight text-white">Moodify</span>
+          </div>
+          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
+            {t("dashboard.artist.hero.badge")}
           </p>
           <h1 className="mt-3 font-graphik text-[30px] tracking-[-0.04em] text-white">
             {authState === "checking"
@@ -1255,18 +1258,25 @@ export default function ArtistDashboardPage() {
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col px-4 pb-10 pt-5 sm:px-6 lg:px-10">
         {/* Header */}
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-center">
-          <div className="anim-fade-up flex items-center gap-3.5">
+        <header className="flex flex-col gap-4 border-b border-white/[0.06] pb-4 lg:flex-row lg:items-center">
+          <div className="anim-fade-up flex flex-wrap items-center gap-4 sm:gap-5">
             <Link
               href={HOME_ROUTE}
-              className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] p-2 backdrop-blur-md transition hover:scale-105 hover:border-[#7A5CFF]/60 hover:shadow-[0_0_20px_rgba(122,92,255,0.35)]"
+              className="group flex items-center gap-3 transition-transform duration-200 hover:scale-[1.02]"
               title="Về trang chủ Moodify"
             >
-              <LogoMark variant="icon" className="h-full w-full object-contain" />
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/[0.06] p-1.5 shadow-[0_0_15px_rgba(122,92,255,0.25)] backdrop-blur-md transition-all duration-300 group-hover:border-[#7A5CFF]/60 group-hover:shadow-[0_0_22px_rgba(122,92,255,0.4)]">
+                <LogoMark variant="gradient" className="h-full w-full" />
+              </div>
+              <span className="font-graphik text-[22px] font-bold tracking-tight text-white transition-colors group-hover:text-white/90">
+                Moodify
+              </span>
             </Link>
+
+            <div className="hidden h-7 w-[1px] bg-white/10 md:block" />
+
             <div>
-              <p className="text-[11px] tracking-[0.28em] text-white/44 uppercase">{t("dashboard.artist.header.eyebrow")}</p>
-              <h1 className="mt-1 font-graphik text-[32px] tracking-[-0.04em] text-white sm:text-[38px]">
+              <h1 className="font-graphik text-[20px] font-bold tracking-[-0.03em] text-white sm:text-[24px]">
                 {t("dashboard.artist.header.title")}
               </h1>
             </div>
@@ -1331,7 +1341,7 @@ export default function ArtistDashboardPage() {
             >
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
                 <div>
-                  <p className="text-[11px] tracking-[0.28em] text-[#ffb488] uppercase">{t("dashboard.artist.studio.eyebrow")}</p>
+                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">{t("dashboard.artist.studio.eyebrow")}</p>
                   <div className="mt-4 flex flex-wrap items-end gap-3">
                     <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
                       {artistDisplayName}

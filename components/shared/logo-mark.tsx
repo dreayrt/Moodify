@@ -62,12 +62,12 @@ export function LogoMark({
   const imageAlt = alt ?? asset.defaultAlt;
 
   return (
-    <picture className="inline-flex shrink-0 items-center justify-center">
+    <picture className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${className}`}>
       <source srcSet={asset.webp} type="image/webp" />
       <img
         src={asset.png}
         alt={imageAlt}
-        className={`object-contain select-none pointer-events-none ${className}`}
+        className="h-full w-full object-contain select-none pointer-events-none"
         loading={priority ? "eager" : "lazy"}
         decoding="async"
       />

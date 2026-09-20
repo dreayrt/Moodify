@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
-import { Manrope, Space_Grotesk } from "next/font/google";
+import { Manrope, Sora } from "next/font/google";
 
 import { I18nProvider } from "@/components/i18n/i18n-provider";
 
 import "./globals.css";
 
 const manrope = Manrope({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
   variable: "--font-manrope",
+  display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
+const sora = Sora({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-sora",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -92,7 +94,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${manrope.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
+      <body className={`${manrope.variable} ${sora.variable}`} suppressHydrationWarning>
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>

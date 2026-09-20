@@ -52,10 +52,12 @@ import {
   createAdminPackage,
   updateAdminPackageDetails,
   deleteAdminPackage,
+  toggleAdminPackageStatus,
   resetAdminUserPassword,
   createAdminUser,
   deleteAdminUser,
   updateAdminUserProfile,
+  revokeAdminDevice,
 } from "@/lib/api/admin-client";
 
 import {
@@ -410,12 +412,18 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleRevokeDevice = (deviceId: number) => {
-    setDevices((prev) =>
-      prev.map((d) => (d.id === deviceId ? { ...d, status: "REVOKED" } : d))
-    );
-    recordAudit("REVOKE_DEVICE", `DEV-ID-${deviceId}`, "Thu hồi quyền nghe offline của thiết bị", "SECURITY", "warning");
-    addToast("Đã thu hồi quyền thiết bị offline thành công.", "info");
+  const handleRevokeDevice = async (deviceId: number) => {
+    try {
+      await revokeAdminDevice(deviceId);
+      setDevices((prev) =>
+        prev.map((d) => (d.id === deviceId ? { ...d, status: "REVOKED" } : d))
+      );
+      recordAudit("REVOKE_DEVICE", `DEV-ID-${deviceId}`, "Thu hồi quyền nghe offline của thiết bị", "SECURITY", "warning");
+      addToast("Đã thu hồi quyền thiết bị offline thành công.", "info");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi thu hồi thiết bị: ${msg}`, "error");
+    }
   };
 
   // 2. Catalog Actions
@@ -456,16 +464,27 @@ export default function AdminDashboardPage() {
     addToast(`Đã chuyển Vibe bài hát sang "${newVibe}".`, "success");
   };
 
-  // 3. Monetization Actions
-  const handleTogglePackageStatus = (packageId: number) => {
-    setPackages((prev) =>
-      prev.map((p) =>
-        p.id === packageId
-          ? { ...p, status: p.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }
-          : p
-      )
-    );
-    addToast("Đã thay đổi trạng thái kích hoạt gói dịch vụ.", "info");
+  const handleTogglePackageStatus = async (packageId: number) => {
+    try {
+      await toggleAdminPackageStatus(packageId);
+      const realPackages = await fetchAdminPackages();
+      if (Array.isArray(realPackages) && realPackages.length > 0) {
+        setPackages(realPackages);
+      } else {
+        setPackages((prev) =>
+          prev.map((p) =>
+            p.id === packageId
+              ? { ...p, status: p.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }
+              : p
+          )
+        );
+      }
+      recordAudit("TOGGLE_PACKAGE", `PKG-00${packageId}`, "Bật/Tắt trạng thái hoạt động của gói cước", "BILLING", "info");
+      addToast("Đã thay đổi trạng thái kích hoạt gói dịch vụ thành công.", "success");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi đổi trạng thái gói cước: ${msg}`, "error");
+    }
   };
 
   const handleUpdatePackagePrice = async (packageId: number, newPrice: number) => {
@@ -499,70 +518,50 @@ export default function AdminDashboardPage() {
   };
 
   const handleCreatePackage = async (data: Partial<ServicePackage>) => {
-    const tempId = Date.now();
-    const newPkg: ServicePackage = {
-      id: tempId,
-      name: data.name || "Gói Cước Mới",
-      price: Number(data.price) || 0,
-      durationDays: Number(data.durationDays) || 30,
-      displayOrder: Number(data.displayOrder) || packages.length + 1,
-      status: (data.status as "ACTIVE" | "INACTIVE") || "ACTIVE",
-      description: data.description || "",
-      subscribersCount: 0,
-    };
-    // 1. Optimistic UI update: instantly appear on screen!
-    setPackages((prev) => [...prev, newPkg]);
-    recordAudit("CREATE_PACKAGE", newPkg.name, `Tạo gói cước mới với giá ${newPkg.price.toLocaleString()} đ`, "BILLING", "info");
-    addToast(`Đã tạo gói cước "${newPkg.name}" thành công.`, "success");
-
-    // 2. Background sync to backend
     try {
       await createAdminPackage(data);
       const realPackages = await fetchAdminPackages();
       if (Array.isArray(realPackages) && realPackages.length > 0) {
         setPackages(realPackages);
       }
+      recordAudit("CREATE_PACKAGE", data.name || "Gói Cước Mới", `Tạo gói cước mới với giá ${Number(data.price || 0).toLocaleString()} đ`, "BILLING", "info");
+      addToast(`Đã tạo gói cước "${data.name || "mới"}" thành công vào cơ sở dữ liệu.`, "success");
     } catch (err: unknown) {
-      console.warn("Background sync error on package creation:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi tạo gói cước: ${msg}`, "error");
     }
   };
 
   const handleUpdatePackageDetails = async (packageId: number, data: Partial<ServicePackage>) => {
-    // 1. Optimistic UI update: instantly update locally!
-    setPackages((prev) =>
-      prev.map((p) => (p.id === packageId ? { ...p, ...data } : p))
-    );
-    recordAudit("UPDATE_PACKAGE", `PKG-00${packageId}`, `Cập nhật toàn diện thông tin và quyền lợi gói cước`, "BILLING", "info");
-    addToast("Đã cập nhật chi tiết gói cước thành công.", "success");
-
-    // 2. Background sync to backend
     try {
       await updateAdminPackageDetails(packageId, data);
       const realPackages = await fetchAdminPackages();
       if (Array.isArray(realPackages) && realPackages.length > 0) {
         setPackages(realPackages);
       }
+      recordAudit("UPDATE_PACKAGE", `PKG-00${packageId}`, `Cập nhật toàn diện thông tin và quyền lợi gói cước`, "BILLING", "info");
+      addToast("Đã cập nhật chi tiết gói cước thành công vào cơ sở dữ liệu.", "success");
     } catch (err: unknown) {
-      console.warn("Background sync error on package update:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi cập nhật gói cước: ${msg}`, "error");
     }
   };
 
   const handleDeletePackage = async (packageId: number) => {
     const target = packages.find((p) => p.id === packageId);
-    // 1. Optimistic UI update: instantly remove locally!
-    setPackages((prev) => prev.filter((p) => p.id !== packageId));
-    recordAudit("DELETE_PACKAGE", target?.name || `PKG-00${packageId}`, "Xóa / vô hiệu hóa gói cước khỏi hệ thống", "BILLING", "warning");
-    addToast(`Đã xóa / gỡ gói cước "${target?.name || packageId}" thành công.`, "info");
-
-    // 2. Background sync to backend
     try {
       await deleteAdminPackage(packageId);
       const realPackages = await fetchAdminPackages();
       if (Array.isArray(realPackages)) {
         setPackages(realPackages.filter((p) => p.id !== packageId));
+      } else {
+        setPackages((prev) => prev.filter((p) => p.id !== packageId));
       }
+      recordAudit("DELETE_PACKAGE", target?.name || `PKG-00${packageId}`, "Xóa / vô hiệu hóa gói cước khỏi hệ thống", "BILLING", "warning");
+      addToast(`Đã xóa gói cước "${target?.name || packageId}" thành công khỏi cơ sở dữ liệu.`, "info");
     } catch (err: unknown) {
-      console.warn("Background sync error on package delete:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi xóa gói cước: ${msg}`, "error");
     }
   };
 
@@ -575,55 +574,35 @@ export default function AdminDashboardPage() {
     status: AdminUserStatus;
     password?: string;
   }) => {
-    const tempId = Date.now();
-    const newUser: AdminUser = {
-      id: tempId,
-      username: data.username,
-      fullName: data.fullName,
-      email: data.email,
-      phone: data.phone || "0900000000",
-      role: data.role,
-      status: data.status,
-      avatarUrl: null,
-      artistSpotifyId: null,
-      staffCode: null,
-      devicesCount: 0,
-      createdAt: new Intl.DateTimeFormat("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }).format(new Date()),
-      lastLoginAt: "Chưa đăng nhập",
-    };
-    setUsers((prev) => [newUser, ...prev]);
-    recordAudit("CREATE_USER", `@${newUser.username}`, `Tạo người dùng mới với vai trò ${newUser.role}`, "IAM", "info");
-    addToast(`Đã tạo người dùng "${newUser.fullName}" thành công.`, "success");
-
     try {
       await createAdminUser(data);
       const realUsers = await fetchAdminUsers();
       if (Array.isArray(realUsers) && realUsers.length > 0) {
         setUsers(realUsers);
       }
+      recordAudit("CREATE_USER", `@${data.username}`, `Tạo người dùng mới với vai trò ${data.role}`, "IAM", "info");
+      addToast(`Đã tạo người dùng "${data.fullName}" thành công vào cơ sở dữ liệu.`, "success");
     } catch (err: unknown) {
-      console.warn("Background sync error on user creation:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi tạo người dùng: ${msg}`, "error");
     }
   };
 
   const handleDeleteUser = async (userId: number) => {
     const target = users.find((u) => u.id === userId);
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    recordAudit("DELETE_USER", `@${target?.username || userId}`, "Xóa tài khoản người dùng khỏi hệ thống", "IAM", "warning");
-    addToast(`Đã xóa người dùng "${target?.fullName || target?.username}" thành công.`, "info");
-
     try {
       await deleteAdminUser(userId);
       const realUsers = await fetchAdminUsers();
       if (Array.isArray(realUsers)) {
         setUsers(realUsers.filter((u) => u.id !== userId));
+      } else {
+        setUsers((prev) => prev.filter((u) => u.id !== userId));
       }
+      recordAudit("DELETE_USER", `@${target?.username || userId}`, "Xóa tài khoản người dùng khỏi hệ thống", "IAM", "warning");
+      addToast(`Đã xóa người dùng "${target?.fullName || target?.username}" thành công.`, "info");
     } catch (err: unknown) {
-      console.warn("Background sync error on user deletion:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi xóa người dùng: ${msg}`, "error");
     }
   };
 
@@ -631,16 +610,21 @@ export default function AdminDashboardPage() {
     userId: number,
     data: { fullName?: string; email?: string; phone?: string }
   ) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, ...data } : u))
-    );
-    recordAudit("UPDATE_USER_PROFILE", `User #${userId}`, "Cập nhật thông tin hồ sơ người dùng", "IAM", "info");
-    addToast("Đã cập nhật thông tin người dùng thành công.", "success");
-
     try {
       await updateAdminUserProfile(userId, data);
+      const realUsers = await fetchAdminUsers();
+      if (Array.isArray(realUsers) && realUsers.length > 0) {
+        setUsers(realUsers);
+      } else {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, ...data } : u))
+        );
+      }
+      recordAudit("UPDATE_USER_PROFILE", `User #${userId}`, "Cập nhật thông tin hồ sơ người dùng", "IAM", "info");
+      addToast("Đã cập nhật thông tin người dùng thành công vào cơ sở dữ liệu.", "success");
     } catch (err: unknown) {
-      console.warn("Background sync error on user profile update:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi cập nhật thông tin người dùng: ${msg}`, "error");
     }
   };
 

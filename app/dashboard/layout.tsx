@@ -13,7 +13,8 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const isStudioRoute =
     pathname?.startsWith("/dashboard/artist") ||
-    pathname?.startsWith("/dashboard/moderator");
+    pathname?.startsWith("/dashboard/moderator") ||
+    pathname?.startsWith("/dashboard/admin");
 
   if (isStudioRoute) {
     return <>{children}</>;

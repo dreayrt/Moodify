@@ -16,11 +16,11 @@ import TrackActionMenu, { TrackInlineActions } from "./track-action-menu";
 // Map UI vibe ids → real genre strings stored in MongoDB
 // 147 Vietnamese tracks catalog
 const VIBE_TO_GENRES: Record<string, string[]> = {
-  all:    ["v-pop", "vpop", "vietnamese", "pop", "indie", "hiphop", "edm"],
-  pop:    ["v-pop", "vpop", "pop"],
-  hiphop: ["hiphop", "hip-hop", "rap"],
-  indie:  ["indie", "indie pop"],
-  edm:    ["edm", "remix", "dance"],
+  all:    ["all", "pop", "Pop", "other", "v-pop", "vpop", "vietnamese", "indie", "hiphop", "edm"],
+  pop:    ["pop", "Pop", "v-pop", "vpop"],
+  hiphop: ["hiphop", "hip-hop", "rap", "other"],
+  indie:  ["indie", "indie pop", "other"],
+  edm:    ["edm", "remix", "dance", "other"],
 };
 
 const VIDEO_SRC =
@@ -194,17 +194,17 @@ function SectionHeader({
     <div className="flex items-end justify-between mb-4">
       <div>
         {eyebrow && (
-          <p className="font-manrope text-[10px] tracking-[0.32em] text-[#AFDDFF]/80 mb-2">
+          <p className="font-manrope text-[10px] tracking-[0.06em] text-[#AFDDFF]/80 mb-2 uppercase font-semibold">
             {eyebrow}
           </p>
         )}
-        <h2 className="font-graphik text-white text-[20px] md:text-[22px] leading-[1.1] tracking-[-0.01em]">
+        <h2 className="font-display font-semibold text-white text-[20px] md:text-[24px] leading-[1.2] tracking-[-0.015em]">
           {title}
         </h2>
       </div>
       <a
         href={seeAllHref}
-        className="font-manrope text-[11px] tracking-[0.18em] text-white/55 hover:text-white transition-colors uppercase"
+        className="font-manrope text-[11px] tracking-[0.06em] text-white/55 hover:text-white transition-colors uppercase font-medium"
       >
         See all
       </a>
@@ -286,7 +286,7 @@ function TrackRow({
         {/* Title / artist */}
         <div className="min-w-0">
           <p
-            className={`font-manrope text-[14px] leading-[18px] truncate ${
+            className={`font-manrope text-[14px] font-semibold leading-[18px] truncate ${
               active ? "text-[#AFDDFF]" : "text-white"
             }`}
           >
@@ -679,7 +679,7 @@ function LumenHeroContent() {
               </button>
             </div>
 
-            <p className="font-manrope text-[11px] tracking-[0.25em] text-[#AFDDFF]/70 hidden sm:block uppercase">
+            <p className="font-manrope text-[11px] tracking-[0.06em] text-[#AFDDFF]/70 hidden sm:block uppercase font-medium">
               {viewMode === "lyrics" ? "Spotify / SoundCloud Style Lyrics" : "Moodify Catalog"}
             </p>
           </div>
@@ -709,10 +709,10 @@ function LumenHeroContent() {
           </div>
         ) : (
           <div className="flex flex-col gap-4 anim-fade-up" style={{ animationDelay: "400ms" }}>
-            <p className="font-manrope text-[11px] tracking-[0.32em] text-[#AFDDFF]/80">
+            <p className="font-manrope text-[11px] tracking-[0.06em] text-[#AFDDFF]/80 uppercase font-medium">
               TOP GENRE · {String(VIBES.indexOf(active) + 1).padStart(2, "0")}/05 · NOW PLAYING
             </p>
-            <h1 className="font-graphik text-white font-normal leading-[1.05] text-[36px] sm:text-[48px] md:text-[58px]">
+            <h1 className="font-display text-white font-bold leading-[1.1] text-[36px] sm:text-[48px] md:text-[56px] tracking-[-0.025em]">
               Your world,
               <br />
               <span

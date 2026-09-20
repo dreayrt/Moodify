@@ -143,7 +143,7 @@ export function SystemSettingsTab({ auditLogs, onSaveSettings }: SystemSettingsT
               <span className="text-[11px] font-mono text-zinc-400 block mb-2">Trạng thái Core Services</span>
               <div className="flex items-center justify-between p-3 rounded-lg bg-black/40 border border-white/5 text-xs">
                 <span className="flex items-center gap-2 text-zinc-300">
-                  <Server className="h-4 w-4 text-emerald-400" /> Spring Boot Core API: <code>localhost:8088</code>
+                  <Server className="h-4 w-4 text-emerald-400" /> Spring Boot Core API: <code>localhost:8080</code>
                 </span>
                 <span className="font-mono text-[10px] text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30">
                   ONLINE

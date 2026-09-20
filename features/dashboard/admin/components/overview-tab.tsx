@@ -151,7 +151,7 @@ export function OverviewTab({
               Doanh Thu Gói Cước (ACID)
             </p>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="font-mono text-2xl font-black text-white tracking-tight">
+              <span className="font-display text-2xl font-bold text-white tracking-tight">
                 {formatCurrency(totalRevenue)}
               </span>
             </div>

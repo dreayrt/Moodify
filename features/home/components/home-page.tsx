@@ -65,7 +65,7 @@ export default function Home() {
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
               Listen Anywhere
             </p>
-            <h2 className="font-display max-w-md text-4xl font-black uppercase leading-[0.92] sm:text-5xl">
+            <h2 className="font-display max-w-md text-4xl font-bold uppercase tracking-[-0.02em] leading-[1.05] sm:text-5xl">
               Never Stop Listening
             </h2>
             <div className="mt-8 grid gap-6 md:grid-cols-[180px_1fr] md:items-center">
@@ -113,7 +113,7 @@ export default function Home() {
                 <p className="mb-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
                   For Creators
                 </p>
-                <h2 className="font-display text-4xl font-black uppercase leading-[0.92] sm:text-5xl">
+                <h2 className="font-display text-4xl font-bold uppercase tracking-[-0.02em] leading-[1.05] sm:text-5xl">
                   Calling All Creators
                 </h2>
                 <p className="mt-5 max-w-md text-base leading-7 text-[var(--text-secondary)]">
@@ -134,7 +134,7 @@ export default function Home() {
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
                 Trending Now
               </p>
-              <h2 className="font-display mt-2 text-3xl font-black uppercase sm:text-4xl">
+              <h2 className="font-display mt-2 text-3xl font-bold uppercase tracking-[-0.02em] sm:text-4xl">
                 Hear What&apos;s Next
               </h2>
             </div>

@@ -195,11 +195,11 @@ export default function SearchPage() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-cyan-400">
+            <span className="text-xs font-semibold uppercase tracking-[0.06em] text-cyan-400">
               Khám Phá & Tìm Kiếm
             </span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-slate-100 tracking-tight mb-6">
+          <h1 className="font-display text-3xl md:text-5xl font-bold text-slate-100 tracking-[-0.025em] mb-6">
             Tìm kiếm bài hát
           </h1>
 

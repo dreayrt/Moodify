@@ -8,11 +8,12 @@ import {
   ReviewRequest,
   ServicePackage,
   SongLicense,
+  UserDevice,
 } from "../../features/dashboard/admin/types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8088";
+  "http://localhost:8080";
 
 async function adminRequest<T>(
   path: string,
@@ -163,6 +164,21 @@ export async function deleteAdminUser(
   return adminRequest<{ success: boolean; message: string }>(
     `/api/admin/users/${userId}`,
     { method: "DELETE" }
+  );
+}
+
+export async function fetchAdminUserDevices(
+  userId: number
+): Promise<UserDevice[]> {
+  return adminRequest<UserDevice[]>(`/api/admin/users/${userId}/devices`);
+}
+
+export async function revokeAdminDevice(
+  deviceId: number
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/devices/${deviceId}/revoke`,
+    { method: "PATCH" }
   );
 }
 
