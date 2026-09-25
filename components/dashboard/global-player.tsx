@@ -226,10 +226,13 @@ export function GlobalPlayerBar() {
                 className={`hidden sm:flex items-center justify-center p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-40 relative group ${
                   isShuffle
                     ? isVipButtonsActive
-                      ? "text-amber-300 hover:text-amber-200"
+                      ? ""
                       : "text-purple-400 hover:text-purple-300"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
+                style={{
+                  color: isShuffle && isVipButtonsActive ? currentVipTheme.accent : undefined,
+                }}
                 title={isShuffle ? "Phát ngẫu nhiên: BẬT (Bấm để tắt)" : "Phát ngẫu nhiên: TẮT (Bấm để bật)"}
                 aria-label="Shuffle"
               >
@@ -292,9 +295,14 @@ export function GlobalPlayerBar() {
                 onClick={toggleRepeat}
                 className={`hidden sm:flex items-center justify-center p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-40 relative group ${
                   repeatMode !== "off"
-                    ? "text-purple-400 hover:text-purple-300"
+                    ? isVipButtonsActive
+                      ? ""
+                      : "text-purple-400 hover:text-purple-300"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
+                style={{
+                  color: repeatMode !== "off" && isVipButtonsActive ? currentVipTheme.accent : undefined,
+                }}
                 title={
                   repeatMode === "off"
                     ? "Lặp lại: TẮT (Bấm để lặp toàn bộ danh sách)"
@@ -327,14 +335,26 @@ export function GlobalPlayerBar() {
                 <button
                   type="button"
                   onClick={() => setIsSpeedMenuOpen(!isSpeedMenuOpen)}
-                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1 ${
+                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1 group ${
                     playbackRate !== 1
-                      ? "text-cyan-300 bg-cyan-500/20 border-cyan-400/40 shadow-[0_0_10px_rgba(56,189,248,0.3)]"
-                      : "text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/10"
+                      ? isVipButtonsActive
+                        ? "shadow-sm"
+                        : "text-purple-300 bg-purple-500/20 border-purple-400/40 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                      : "text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border-white/10"
                   }`}
+                  style={
+                    playbackRate !== 1 && isVipButtonsActive
+                      ? {
+                          color: currentVipTheme.accent,
+                          borderColor: `${currentVipTheme.accent}50`,
+                          backgroundColor: `${currentVipTheme.accent}20`,
+                          boxShadow: `0 0 10px ${currentVipTheme.accent}30`,
+                        }
+                      : undefined
+                  }
                   title="Tốc độ phát âm thanh"
                 >
-                  <Gauge className="w-3 h-3 text-cyan-400" />
+                  <Gauge className="w-3 h-3 text-current transition-colors" />
                   <span>{playbackRate}x</span>
                 </button>
 
