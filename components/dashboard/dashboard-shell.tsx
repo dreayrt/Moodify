@@ -72,13 +72,13 @@ const KEYFRAMES = `
 }
 @keyframes rgbBorderFlow {
   0% {
-    background-position: 0% 0%;
+    background-position: 0% 50%;
   }
   50% {
-    background-position: 100% 100%;
+    background-position: 100% 50%;
   }
   100% {
-    background-position: 0% 0%;
+    background-position: 0% 50%;
   }
 }
 @keyframes rgbBackgroundShift {
@@ -94,78 +94,62 @@ const KEYFRAMES = `
 }
 @keyframes rgbAuraGlow {
   0%, 100% {
-    box-shadow: 0 0 32px -1px rgba(255, 0, 110, 0.65), 0 16px 45px rgba(0, 0, 0, 0.9);
+    box-shadow: 0 0 16px -2px rgba(236, 72, 153, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
   }
-  20% {
-    box-shadow: 0 0 32px -1px rgba(121, 40, 202, 0.65), 0 16px 45px rgba(0, 0, 0, 0.9);
+  25% {
+    box-shadow: 0 0 16px -2px rgba(139, 92, 246, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
   }
-  40% {
-    box-shadow: 0 0 32px -1px rgba(0, 180, 255, 0.65), 0 16px 45px rgba(0, 0, 0, 0.9);
+  50% {
+    box-shadow: 0 0 16px -2px rgba(6, 182, 212, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
   }
-  60% {
-    box-shadow: 0 0 32px -1px rgba(0, 235, 180, 0.65), 0 16px 45px rgba(0, 0, 0, 0.9);
+  75% {
+    box-shadow: 0 0 16px -2px rgba(16, 185, 129, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
   }
-  80% {
-    box-shadow: 0 0 32px -1px rgba(255, 190, 0, 0.65), 0 16px 45px rgba(0, 0, 0, 0.9);
-  }
-}
-@keyframes rgbDotGlow {
-  0%, 100% { background-color: #ff007a; box-shadow: 0 0 10px #ff007a; }
-  25% { background-color: #00e5ff; box-shadow: 0 0 10px #00e5ff; }
-  50% { background-color: #00ff88; box-shadow: 0 0 10px #00ff88; }
-  75% { background-color: #ffbe00; box-shadow: 0 0 10px #ffbe00; }
 }
 .rgb-sidebar-frame {
   position: relative;
   background: linear-gradient(
     135deg,
-    #ff0055 0%,
-    #ff5500 15%,
-    #ffcc00 30%,
-    #00ff66 45%,
-    #00d4ff 60%,
-    #7928ca 75%,
-    #ff00aa 90%,
-    #ff0055 100%
+    #ec4899 0%,
+    #8b5cf6 20%,
+    #3b82f6 40%,
+    #06b6d4 60%,
+    #10b981 80%,
+    #f59e0b 90%,
+    #ec4899 100%
   );
-  background-size: 300% 300%;
-  animation: rgbBorderFlow 3.5s linear infinite, rgbAuraGlow 4s linear infinite;
+  background-size: 250% 250%;
+  animation: rgbBorderFlow 6s ease infinite, rgbAuraGlow 7s ease-in-out infinite;
 }
 .rgb-sidebar-frame::before {
   content: "";
   position: absolute;
-  inset: -3px;
+  inset: -2px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(12px);
-  opacity: 0.75;
+  filter: blur(8px);
+  opacity: 0.35;
   z-index: -1;
   pointer-events: none;
 }
 .rgb-sidebar-inner {
   background: linear-gradient(
     145deg,
-    rgba(255, 0, 85, 0.22) 0%,
-    rgba(121, 40, 202, 0.24) 20%,
-    rgba(0, 112, 243, 0.24) 40%,
-    rgba(0, 223, 216, 0.22) 60%,
-    rgba(16, 185, 129, 0.22) 80%,
-    rgba(255, 0, 85, 0.22) 100%
-  ), rgba(9, 10, 16, 0.90);
-  background-size: 250% 250%;
-  animation: rgbBackgroundShift 4s ease infinite;
+    rgba(236, 72, 153, 0.08) 0%,
+    rgba(139, 92, 246, 0.08) 25%,
+    rgba(6, 182, 212, 0.08) 50%,
+    rgba(16, 185, 129, 0.08) 75%,
+    rgba(236, 72, 153, 0.08) 100%
+  ), rgba(10, 11, 18, 0.94);
+  background-size: 200% 200%;
+  animation: rgbBackgroundShift 8s ease infinite;
 }
 .rgb-active-item {
-  background: linear-gradient(90deg, rgba(255, 0, 122, 0.28) 0%, rgba(0, 212, 255, 0.22) 50%, rgba(16, 185, 129, 0.18) 100%);
-  background-size: 200% 100%;
-  animation: rgbBackgroundShift 3.5s ease infinite;
-  border-left: 2.5px solid #00e5ff;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 0 15px rgba(0, 229, 255, 0.25);
-}
-.rgb-active-dot {
-  animation: rgbDotGlow 3.5s linear infinite;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.18) 0%, rgba(6, 182, 212, 0.12) 60%, transparent 100%);
+  border-left: 2px solid #38bdf8;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 .sidebar-scroll::-webkit-scrollbar {
   width: 4px;
@@ -788,12 +772,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic RGB Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
-            <div className="fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col p-[2.5px] rounded-[22px] rgb-sidebar-frame">
-              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto moodify-scroll w-full rounded-[19.5px] backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${
+            <div className="fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col p-[1.5px] rounded-[20px] rgb-sidebar-frame">
+              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto moodify-scroll w-full rounded-[18.5px] backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${
                 isVipShellActive ? currentShellTheme.sidebarBg : "rgb-sidebar-inner"
               }`}>
-                {/* Dynamic RGB Top Lightbar Accent */}
-                <div className="absolute top-0 left-3 right-3 h-[2px] rounded-full rgb-sidebar-frame opacity-90 pointer-events-none" />
 
             {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
             <div className="space-y-1">
@@ -817,7 +799,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 </div>
                 {isHome && (
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "rgb-active-dot"
+                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
                   }`} />
                 )}
               </Link>
@@ -842,7 +824,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 </div>
                 {isSearch && (
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "rgb-active-dot"
+                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
                   }`} />
                 )}
               </Link>
@@ -867,7 +849,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 </div>
                 {isLibrary && (
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "rgb-active-dot"
+                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
                   }`} />
                 )}
               </Link>
