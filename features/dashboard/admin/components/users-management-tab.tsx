@@ -161,7 +161,7 @@ export function UsersManagementTab({
     if (!selectedUserForRole) return;
     onChangeUserRole(selectedUserForRole.id, targetRole, {
       staffCode: targetRole === "MODERATOR" ? staffCodeInput : undefined,
-      artistSpotifyId: targetRole === "ARTIST" ? artistSpotifyIdInput : undefined,
+      artistSpotifyId: targetRole === "ARTIST" || targetRole === "CONTENT_LEAD" ? artistSpotifyIdInput : undefined,
     });
     setSelectedUserForRole(null);
     if (inspectingUser?.id === selectedUserForRole.id) {
@@ -294,6 +294,7 @@ export function UsersManagementTab({
             <option value="ALL" className="bg-[#12131a]">Tất cả vai trò</option>
             <option value="USER" className="bg-[#12131a]">Thính giả (USER)</option>
             <option value="ARTIST" className="bg-[#12131a]">Nghệ sĩ (ARTIST)</option>
+            <option value="CONTENT_LEAD" className="bg-[#12131a]">Quản lý Nội dung (CONTENT_LEAD)</option>
             <option value="MODERATOR" className="bg-[#12131a]">Kiểm duyệt (MODERATOR)</option>
             <option value="ADMIN" className="bg-[#12131a]">Quản trị (ADMIN)</option>
           </select>
@@ -389,6 +390,8 @@ export function UsersManagementTab({
                               ? "text-indigo-400 font-medium"
                               : user.role === "ARTIST"
                               ? "text-amber-400 font-medium"
+                              : user.role === "CONTENT_LEAD"
+                              ? "text-violet-400 font-medium"
                               : "text-zinc-400"
                           }
                         >
@@ -842,7 +845,7 @@ export function UsersManagementTab({
               <div>
                 <label className="block text-[12px] font-medium text-white/70 mb-1.5">Chọn vai trò mới</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["USER", "ARTIST", "MODERATOR", "ADMIN"] as AdminUserRole[]).map((r) => (
+                  {(["USER", "ARTIST", "CONTENT_LEAD", "MODERATOR", "ADMIN"] as AdminUserRole[]).map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -872,7 +875,7 @@ export function UsersManagementTab({
                 </div>
               )}
 
-              {targetRole === "ARTIST" && (
+              {(targetRole === "ARTIST" || targetRole === "CONTENT_LEAD") && (
                 <div>
                   <label className="block text-[12px] font-medium text-white/70 mb-1">Mã Định Danh Nghệ Sĩ (Artist Code)</label>
                   <input
@@ -1106,6 +1109,7 @@ export function UsersManagementTab({
                   >
                     <option value="USER" className="bg-[#12131a]">Thính giả (USER)</option>
                     <option value="ARTIST" className="bg-[#12131a]">Nghệ sĩ (ARTIST)</option>
+                    <option value="CONTENT_LEAD" className="bg-[#12131a]">Quản lý Nội dung (CONTENT_LEAD)</option>
                     <option value="MODERATOR" className="bg-[#12131a]">Kiểm duyệt viên (MODERATOR)</option>
                     <option value="ADMIN" className="bg-[#12131a]">Quản trị viên (ADMIN)</option>
                   </select>

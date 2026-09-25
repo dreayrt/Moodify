@@ -9,7 +9,7 @@ export type AdminTab =
   | "licensing"
   | "settings";
 
-export type AdminUserRole = "USER" | "ARTIST" | "MODERATOR" | "ADMIN";
+export type AdminUserRole = "USER" | "ARTIST" | "CONTENT_LEAD" | "MODERATOR" | "ADMIN";
 export type AdminUserStatus = "ACTIVE" | "INACTIVE" | "BANNED";
 
 export type AdminUser = {
