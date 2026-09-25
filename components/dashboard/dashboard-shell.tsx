@@ -655,13 +655,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 placeholder="Tìm kiếm bài hát, nghệ sĩ, album..."
                 value={headerSearch}
                 onChange={(e) => setHeaderSearch(e.target.value)}
-                className="w-full pl-9 pr-10 py-2 bg-white/[0.05] hover:bg-white/[0.08] focus:bg-white/[0.12] border border-white/12 focus:border-purple-400/50 rounded-full text-xs text-white placeholder:text-white/40 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] focus:shadow-[0_0_16px_rgba(168,85,247,0.25)]"
+                className="w-full pl-9 pr-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] focus:bg-white/[0.12] border border-white/12 focus:border-purple-400/50 rounded-full text-xs text-white placeholder:text-white/40 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] focus:shadow-[0_0_16px_rgba(168,85,247,0.25)]"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center pointer-events-none">
-                <kbd className="px-1.5 py-0.5 text-[9px] font-mono text-white/35 bg-white/[0.08] border border-white/10 rounded">
-                  ↵
-                </kbd>
-              </div>
             </form>
           </div>
 
