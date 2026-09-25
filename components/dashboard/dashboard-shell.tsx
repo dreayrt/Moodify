@@ -15,6 +15,8 @@ import {
   Settings,
   Sparkles,
   Crown,
+  Bell,
+  Mail,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -284,6 +286,174 @@ function MascotAccountTrigger({
   );
 }
 
+function HeaderNotifications() {
+  const [open, setOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(true);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const notifications = [
+    {
+      id: 1,
+      title: "Chào mừng đến với Moodify 🎵",
+      desc: "Trải nghiệm 147 bài hát Việt Nam đặc sắc với chất lượng phòng thu Studio.",
+      time: "Vừa xong",
+    },
+    {
+      id: 2,
+      title: "Gợi ý thịnh hành hôm nay",
+      desc: "V-Pop và Indie đang có nhiều bản phối mới được thêm vào danh mục.",
+      time: "2 giờ trước",
+    },
+    {
+      id: 3,
+      title: "Đặc quyền giao diện VIP",
+      desc: "Tùy biến theme cho Sidebar & Thanh phát nhạc ngay trong phần Cài đặt.",
+      time: "1 ngày trước",
+    },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(!open);
+          if (!open) setHasUnread(false);
+        }}
+        className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.08] transition-all relative cursor-pointer active:scale-95"
+        title="Thông báo"
+        aria-label="Thông báo"
+      >
+        <Bell className="w-[18px] h-[18px]" strokeWidth={1.8} />
+        {hasUnread && (
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+            <span className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+              <Bell className="w-3.5 h-3.5 text-rose-400" /> Thông báo
+            </span>
+            <span className="text-[10px] text-white/40">3 thông báo mới</span>
+          </div>
+
+          <div className="space-y-1.5 max-h-72 overflow-y-auto moodify-scroll pr-1">
+            {notifications.map((n) => (
+              <div
+                key={n.id}
+                className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-white group-hover:text-purple-300 transition-colors truncate">
+                    {n.title}
+                  </p>
+                  <span className="text-[10px] font-mono text-white/40 shrink-0">{n.time}</span>
+                </div>
+                <p className="text-[11px] text-white/60 mt-1 leading-relaxed line-clamp-2">
+                  {n.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HeaderMessages() {
+  const [open, setOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(true);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const messages = [
+    {
+      id: 1,
+      sender: "Ban Quản Trị Moodify",
+      desc: "Cảm ơn bạn đã trải nghiệm Moodify. Chúc bạn có những phút giây thư giãn tuyệt vời!",
+      time: "Hôm nay",
+    },
+    {
+      id: 2,
+      sender: "Hệ thống hỗ trợ",
+      desc: "Trang cá nhân và linh vật đã được kích hoạt. Hãy ghé Cài đặt để tùy biến linh vật của bạn.",
+      time: "Hôm qua",
+    },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(!open);
+          if (!open) setHasUnread(false);
+        }}
+        className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.08] transition-all relative cursor-pointer active:scale-95"
+        title="Hộp thư & Tin nhắn"
+        aria-label="Hộp thư"
+      >
+        <Mail className="w-[18px] h-[18px]" strokeWidth={1.8} />
+        {hasUnread && (
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+            <span className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-cyan-400" /> Hộp thư Moodify
+            </span>
+            <span className="text-[10px] text-white/40">Hộp thư đến</span>
+          </div>
+
+          <div className="space-y-1.5 max-h-72 overflow-y-auto moodify-scroll pr-1">
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-white group-hover:text-cyan-300 transition-colors truncate">
+                    {m.sender}
+                  </p>
+                  <span className="text-[10px] font-mono text-white/40 shrink-0">{m.time}</span>
+                </div>
+                <p className="text-[11px] text-white/60 mt-1 leading-relaxed line-clamp-2">
+                  {m.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -490,25 +660,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             </form>
           </div>
 
-          <div className="ml-auto flex items-center gap-2.5 md:gap-3 shrink-0">
-            {subInfo?.isPremium ? (
-              <Link
-                href="/dashboard/premium"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/25 to-amber-500/10 border border-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.35)] text-amber-300 text-xs font-bold tracking-wider hover:brightness-110 transition-all cursor-pointer"
-                title="Tài khoản Moodify VIP đang kích hoạt"
-              >
-                <Crown className="w-3.5 h-3.5 text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />
-                <span className="hidden sm:inline">MOODIFY</span> VIP
-              </Link>
-            ) : (
-              <Link
-                href="/dashboard/premium"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-300 hover:brightness-110 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-              >
-                <Crown className="w-3.5 h-3.5 text-slate-950" />
-                <span className="hidden sm:inline">Nâng cấp</span> VIP
-              </Link>
-            )}
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <HeaderNotifications />
+            <HeaderMessages />
+
+            <div className="w-px h-5 bg-white/10 mx-1 hidden sm:block" />
 
             <MascotAccountTrigger
               user={user}
