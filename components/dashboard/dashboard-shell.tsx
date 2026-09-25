@@ -70,6 +70,77 @@ const KEYFRAMES = `
   0%, 100% { transform: scaleY(0.25); }
   50% { transform: scaleY(1); }
 }
+@keyframes rgbBorderFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@keyframes rgbBackgroundShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@keyframes rgbAuraGlow {
+  0%, 100% {
+    box-shadow: 0 0 25px -4px rgba(255, 0, 128, 0.4), 0 16px 40px rgba(0, 0, 0, 0.8);
+  }
+  20% {
+    box-shadow: 0 0 25px -4px rgba(121, 40, 202, 0.4), 0 16px 40px rgba(0, 0, 0, 0.8);
+  }
+  40% {
+    box-shadow: 0 0 25px -4px rgba(0, 112, 243, 0.4), 0 16px 40px rgba(0, 0, 0, 0.8);
+  }
+  60% {
+    box-shadow: 0 0 25px -4px rgba(0, 223, 216, 0.4), 0 16px 40px rgba(0, 0, 0, 0.8);
+  }
+  80% {
+    box-shadow: 0 0 25px -4px rgba(16, 185, 129, 0.4), 0 16px 40px rgba(0, 0, 0, 0.8);
+  }
+}
+.rgb-sidebar-frame {
+  background: linear-gradient(
+    135deg,
+    #ff0055 0%,
+    #7928ca 18%,
+    #0070f3 36%,
+    #00dfd8 54%,
+    #10b981 72%,
+    #f59e0b 88%,
+    #ff0055 100%
+  );
+  background-size: 300% 300%;
+  animation: rgbBorderFlow 8s ease infinite, rgbAuraGlow 10s ease-in-out infinite;
+}
+.rgb-sidebar-inner {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 0, 85, 0.12) 0%,
+    rgba(121, 40, 202, 0.12) 20%,
+    rgba(0, 112, 243, 0.12) 40%,
+    rgba(0, 223, 216, 0.12) 60%,
+    rgba(16, 185, 129, 0.12) 80%,
+    rgba(255, 0, 85, 0.12) 100%
+  ), rgba(11, 12, 20, 0.88);
+  background-size: 300% 300%;
+  animation: rgbBackgroundShift 12s ease infinite;
+}
+.rgb-active-item {
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.28) 0%, rgba(6, 182, 212, 0.16) 60%, transparent 100%);
+  border-left: 2px solid #38bdf8;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
 .sidebar-scroll::-webkit-scrollbar {
   width: 4px;
 }
@@ -286,7 +357,7 @@ function MascotAccountTrigger({
   );
 }
 
-function HeaderNotifications() {
+function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
@@ -336,7 +407,13 @@ function HeaderNotifications() {
       >
         <Bell className="w-[18px] h-[18px]" strokeWidth={1.8} />
         {hasUnread && (
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
+          <span
+            className={`absolute top-2 right-2 w-2 h-2 rounded-full transition-all duration-300 animate-pulse ${
+              isPremium
+                ? "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.95)]"
+                : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)]"
+            }`}
+          />
         )}
       </button>
 
@@ -344,7 +421,7 @@ function HeaderNotifications() {
         <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
             <span className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
-              <Bell className="w-3.5 h-3.5 text-rose-400" /> Thông báo
+              <Bell className={`w-3.5 h-3.5 ${isPremium ? "text-amber-400" : "text-emerald-400"}`} /> Thông báo
             </span>
             <span className="text-[10px] text-white/40">3 thông báo mới</span>
           </div>
@@ -373,7 +450,7 @@ function HeaderNotifications() {
   );
 }
 
-function HeaderMessages() {
+function HeaderMessages({ isPremium = false }: { isPremium?: boolean }) {
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
@@ -417,7 +494,13 @@ function HeaderMessages() {
       >
         <Mail className="w-[18px] h-[18px]" strokeWidth={1.8} />
         {hasUnread && (
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+          <span
+            className={`absolute top-2 right-2 w-2 h-2 rounded-full transition-all duration-300 animate-pulse ${
+              isPremium
+                ? "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.95)]"
+                : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)]"
+            }`}
+          />
         )}
       </button>
 
@@ -661,8 +744,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
-            <HeaderNotifications />
-            <HeaderMessages />
+            <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
+            <HeaderMessages isPremium={Boolean(subInfo?.isPremium)} />
 
             <div className="w-px h-5 bg-white/10 mx-0.5 hidden sm:block" />
 
@@ -677,9 +760,12 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
-          {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered */}
+          {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic RGB Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
-            <aside className={`flex flex-col fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 max-h-[calc(100vh-170px)] overflow-y-auto moodify-scroll w-[240px] rounded-2xl border backdrop-blur-2xl p-2.5 space-y-3 transition-colors duration-300 ${currentShellTheme.sidebarBorder} ${currentShellTheme.sidebarBg}`}>
+            <div className="fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col p-[1.5px] rounded-[22px] rgb-sidebar-frame">
+              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto moodify-scroll w-full rounded-[20.5px] backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${
+                isVipShellActive ? currentShellTheme.sidebarBg : "rgb-sidebar-inner"
+              }`}>
             {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
             <div className="space-y-1">
               {/* 1. Trang chủ */}
@@ -687,19 +773,23 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard"
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHome
-                    ? currentShellTheme.sidebarActiveItem
+                    ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
                     : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Home
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${currentShellTheme.sidebarIconColor}`}
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${
+                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
+                    }`}
                     strokeWidth={isHome ? 2.2 : 1.7}
                   />
                   <span>Trang chủ</span>
                 </div>
                 {isHome && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${currentShellTheme.sidebarActiveDot}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse"
+                  }`} />
                 )}
               </Link>
 
@@ -708,19 +798,23 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/search"
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSearch
-                    ? currentShellTheme.sidebarActiveItem
+                    ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
                     : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Search
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${currentShellTheme.sidebarIconColor}`}
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${
+                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
+                    }`}
                     strokeWidth={isSearch ? 2.2 : 1.7}
                   />
                   <span>Tìm kiếm</span>
                 </div>
                 {isSearch && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${currentShellTheme.sidebarActiveDot}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse"
+                  }`} />
                 )}
               </Link>
 
@@ -729,19 +823,23 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/library"
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isLibrary
-                    ? currentShellTheme.sidebarActiveItem
+                    ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
                     : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Library
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${currentShellTheme.sidebarIconColor}`}
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${
+                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
+                    }`}
                     strokeWidth={isLibrary ? 2.2 : 1.7}
                   />
                   <span>Thư viện</span>
                 </div>
                 {isLibrary && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${currentShellTheme.sidebarActiveDot}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse"
+                  }`} />
                 )}
               </Link>
 
@@ -757,13 +855,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   } font-medium`}
                 >
                   <div className="flex items-center gap-3">
-                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${currentShellTheme.sidebarIconColor}`} />
+                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${
+                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
+                    }`} />
                     <span>Thể loại</span>
                   </div>
                   <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 ${currentShellTheme.sidebarIconColor} ${
-                      isGenresOpen ? "rotate-180" : ""
-                    }`}
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300"
+                    } ${isGenresOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
@@ -779,7 +879,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                           onClick={() => handleVibeClick(v.id)}
                           className={`w-full group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all duration-150 cursor-pointer ${
                             isVibeActive
-                              ? `${currentShellTheme.sidebarActiveItem}`
+                              ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
                               : "text-white/65 hover:text-white hover:bg-white/[0.04] hover:translate-x-0.5"
                           }`}
                         >
@@ -818,7 +918,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
                   title="Tạo playlist mới"
                 >
-                  <Plus className={`w-3 h-3 ${currentShellTheme.sidebarIconColor}`} />
+                  <Plus className={`w-3 h-3 ${isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300"}`} />
                   <span>Mới</span>
                 </button>
               </div>
@@ -836,7 +936,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                       className="w-full group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-white/65 hover:text-white hover:bg-white/[0.05] transition-all"
                     >
                       <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
-                        <Music className={`w-3 h-3 ${currentShellTheme.sidebarIconColor} transition-colors`} />
+                        <Music className={`w-3 h-3 ${isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300"} transition-colors`} />
                       </div>
                       <span className="text-[12px] truncate group-hover:translate-x-0.5 transition-transform">
                         {pl.name}
@@ -847,6 +947,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </aside>
+          </div>
           </div>
 
           {/* Right Column: Page Content */}
