@@ -13,6 +13,8 @@ import {
   ChevronDown,
   Disc,
   Settings,
+  Sparkles,
+  Crown,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -22,14 +24,18 @@ import {
   logout,
   type UserProfileResponse,
 } from "@/lib/auth-client";
-import { fetchUserPlaylists, type Playlist } from "@/lib/api-client";
+import {
+  fetchUserPlaylists,
+  fetchMySubscription,
+  type Playlist,
+  type SubscriptionInfo,
+} from "@/lib/api-client";
 import CreatePlaylistModal from "./create-playlist-modal";
 import MoodifyMascot from "./moodify-mascot";
 import UserSettingsModal from "./user-settings-modal";
 import { useCurrentMascot } from "@/lib/mascots";
-
-const VIDEO_SRC =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_115057_94c3699b-0fd1-4124-bcf3-3626bb8c1f77.mp4";
+import { BrandLogo } from "@/components/shared/logo-mark";
+import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 
 export type Vibe = {
   id: string;
@@ -41,79 +47,106 @@ export type Vibe = {
 };
 
 export const VIBES: Vibe[] = [
-  { id: "all",    label: "TẤT CẢ (147)", caption: "Toàn bộ 147 bài hát Việt Nam đặc sắc trên Moodify.", accent: "#A0B0FF", ring: "rgba(160,176,255,0.45)", bg: "linear-gradient(135deg,#1f1f3f 0%,#0d0d22 100%)" },
-  { id: "pop",    label: "V-POP (58)",   caption: "Bản hit V-Pop, ballad ngọt ngào, giai điệu bắt tai.", accent: "#FFD978", ring: "rgba(255,213,120,0.45)", bg: "linear-gradient(135deg,#4a3210 0%,#1f1408 100%)" },
-  { id: "hiphop", label: "HIP-HOP (47)", caption: "Underground flow, rap Việt đỉnh cao, beat chất lượng.", accent: "#FF8FBF", ring: "rgba(255,143,191,0.45)", bg: "linear-gradient(135deg,#4a1a30 0%,#1f0a17 100%)" },
-  { id: "indie",  label: "INDIE (42)",   caption: "Acoustic mộc mạc, chill nhẹ nhàng, sâu lắng.",        accent: "#A8DBB2", ring: "rgba(168,219,178,0.45)", bg: "linear-gradient(135deg,#1e3a2a 0%,#0c1a13 100%)" },
-  { id: "edm",    label: "REMIX/EDM (15)", caption: "Bản phối sôi động, vinahouse, drop bùng nổ.",     accent: "#AFDDFF", ring: "rgba(175,221,255,0.45)", bg: "linear-gradient(135deg,#2c2c52 0%,#16162e 100%)" },
+  { id: "all",    label: "TẤT CẢ",    caption: "Toàn bộ bài hát Việt Nam đặc sắc trên Moodify.", accent: "#818cf8", ring: "rgba(129,140,248,0.45)", bg: "linear-gradient(135deg,#3730a3 0%,#0f172a 100%)" },
+  { id: "pop",    label: "V-POP",      caption: "Bản hit V-Pop, ballad ngọt ngào, giai điệu bắt tai.", accent: "#fb7185", ring: "rgba(251,113,133,0.45)", bg: "linear-gradient(135deg,#881337 0%,#1e1b4b 100%)" },
+  { id: "hiphop", label: "HIP-HOP",    caption: "Underground flow, rap Việt đỉnh cao, beat chất lượng.", accent: "#fbbf24", ring: "rgba(251,191,36,0.45)", bg: "linear-gradient(135deg,#78350f 0%,#180d2b 100%)" },
+  { id: "indie",  label: "INDIE",      caption: "Acoustic mộc mạc, chill nhẹ nhàng, sâu lắng.",        accent: "#c084fc", ring: "rgba(192,132,252,0.45)", bg: "linear-gradient(135deg,#581c87 0%,#180d2b 100%)" },
+  { id: "edm",    label: "REMIX/EDM",  caption: "Bản phối sôi động, vinahouse, drop bùng nổ.",     accent: "#38bdf8", ring: "rgba(56,189,248,0.45)", bg: "linear-gradient(135deg,#0369a1 0%,#0f172a 100%)" },
 ];
 
 const KEYFRAMES = `
-@keyframes bflyGlide {
-  0%   { transform: translate3d(0,0,0) rotate(-6deg) scale(0.6); opacity: 0; }
-  10%  { opacity: 0.7; }
-  50%  { transform: translate3d(30px,-44px,0) rotate(8deg) scale(1); }
-  90%  { opacity: 0.55; }
-  100% { transform: translate3d(0,0,0) rotate(-4deg) scale(0.7); opacity: 0; }
+@keyframes auraGlowPulse {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.45; }
+  50% { transform: scale(1.15) translate(30px, -20px); opacity: 0.75; }
 }
-@keyframes bflyFlap {
-  0%, 100% { transform: scaleX(1); }
-  50%      { transform: scaleX(0.55); }
+@keyframes soundMeshShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes liveEqBar {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 `;
 
-function ButterflySwarm({ count = 7, className = "" }: { count?: number; className?: string }) {
-  const butterflies = useMemo(() => {
-    const seeded = (i: number, salt: number) => {
-      const x = Math.sin(i * 9301 + salt * 49297) * 233280;
-      return x - Math.floor(x);
-    };
-    return Array.from({ length: count }, (_, i) => ({
-      id: i,
-      startX: 42 + seeded(i, 1) * 24,
-      startY: 16 + seeded(i, 2) * 56,
-      size: 8 + seeded(i, 3) * 6,
-      hue: 195 + seeded(i, 4) * 35,
-      duration: 9000 + seeded(i, 5) * 5000,
-      delay: seeded(i, 6) * 3500,
-    }));
-  }, [count]);
-
+function AudioAuraBackdrop({ isPremium = false }: { isPremium?: boolean }) {
   return (
-    <div className={`pointer-events-none absolute inset-0 overflow-hidden z-[4] ${className}`}>
-      {butterflies.map((b) => (
-        <div
-          key={b.id}
-          className="absolute"
-          style={{
-            left: `${b.startX}%`,
-            top: `${b.startY}%`,
-            animation: `bflyGlide ${b.duration}ms ease-in-out infinite`,
-            animationDelay: `${b.delay}ms`,
-          }}
-        >
-          <svg
-            width={b.size}
-            height={b.size}
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{
-              filter: `drop-shadow(0 0 3px hsla(${b.hue}, 92%, 78%, 0.35))`,
-              transformOrigin: "center",
-              animation: "bflyFlap 280ms ease-in-out infinite",
-            }}
-          >
-            <path
-              d="M12 12c-1.4-3-4.2-5-6.8-4.7 0 2.9 2.2 5.6 5.1 6.4-2.9 0.8-5.1 3.5-5.1 6.4 2.6 0.3 5.4-1.7 6.8-4.7 1.4 3 4.2 5 6.8 4.7 0-2.9-2.2-5.6-5.1-6.4 2.9-0.8 5.1-3.5 5.1-6.4-2.6-0.3-5.4 1.7-6.8 4.7z"
-              fill={`hsla(${b.hue}, 88%, 80%, 0.35)`}
-              stroke={`hsla(${b.hue}, 96%, 90%, 0.7)`}
-              strokeWidth="0.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-      ))}
+    <div
+      className={`fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000 ${
+        isPremium ? "bg-[#040406]" : "bg-[#06070a]"
+      }`}
+    >
+      {/* Studio Deep Obsidian Gradient Base */}
+      <div
+        className="absolute inset-0 transition-opacity duration-1000"
+        style={{
+          background: isPremium
+            ? "radial-gradient(ellipse 85% 55% at 50% -20%, rgba(245,158,11,0.22), transparent 70%), radial-gradient(ellipse 65% 45% at 10% 80%, rgba(217,119,6,0.16), transparent 60%), radial-gradient(ellipse 55% 55% at 90% 60%, rgba(251,191,36,0.14), transparent 60%), #040406"
+            : "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.18), transparent 70%), radial-gradient(ellipse 60% 40% at 10% 80%, rgba(168,85,247,0.12), transparent 60%), radial-gradient(ellipse 50% 50% at 90% 60%, rgba(244,63,94,0.10), transparent 60%), #06070a",
+        }}
+      />
+
+      {/* Floating Audio Aura Orbs */}
+      <div
+        className="absolute -top-[15%] left-[15%] w-[650px] h-[650px] rounded-full blur-[140px] pointer-events-none opacity-40 mix-blend-screen transition-all duration-1000"
+        style={{
+          background: isPremium
+            ? "radial-gradient(circle, #f59e0b 0%, #d97706 45%, transparent 70%)"
+            : "radial-gradient(circle, #6366f1 0%, #a855f7 45%, transparent 70%)",
+          animation: "auraGlowPulse 16s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="absolute top-[35%] -right-[10%] w-[580px] h-[580px] rounded-full blur-[150px] pointer-events-none opacity-30 mix-blend-screen transition-all duration-1000"
+        style={{
+          background: isPremium
+            ? "radial-gradient(circle, #fbbf24 0%, #b45309 50%, transparent 70%)"
+            : "radial-gradient(circle, #ec4899 0%, #3b82f6 50%, transparent 70%)",
+          animation: "auraGlowPulse 20s ease-in-out 3s infinite reverse",
+        }}
+      />
+      <div
+        className="absolute -bottom-[10%] left-[30%] w-[500px] h-[500px] rounded-full blur-[130px] pointer-events-none opacity-25 mix-blend-screen transition-all duration-1000"
+        style={{
+          background: isPremium
+            ? "radial-gradient(circle, #f43f5e 0%, #ea580c 50%, transparent 70%)"
+            : "radial-gradient(circle, #8b5cf6 0%, #06b6d4 50%, transparent 70%)",
+          animation: "auraGlowPulse 18s ease-in-out 6s infinite",
+        }}
+      />
+
+      {/* Modern Studio Acoustic Grid Texture (Subtle sound-studio feel) */}
+      <div
+        className="absolute inset-0 opacity-[0.035] pointer-events-none"
+        style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+          backgroundSize: "48px 48px",
+        }}
+      />
+
+      {/* Vignette Overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: isPremium
+            ? "radial-gradient(circle at center, transparent 40%, rgba(4,4,6,0.88) 100%)"
+            : "radial-gradient(circle at center, transparent 40%, rgba(6,7,10,0.85) 100%)",
+        }}
+      />
     </div>
   );
 }
@@ -121,10 +154,12 @@ function ButterflySwarm({ count = 7, className = "" }: { count?: number; classNa
 function MascotAccountTrigger({
   user,
   loading,
+  subInfo,
   onOpenSettings,
 }: {
   user: UserProfileResponse | null;
   loading: boolean;
+  subInfo: SubscriptionInfo | null;
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -164,7 +199,8 @@ function MascotAccountTrigger({
     <div className="relative" ref={menuRef}>
       {/* Interactive Mascot as the sole Account Trigger */}
       <MoodifyMascot
-        size={74}
+        size={54}
+        isVip={Boolean(subInfo?.isPremium) || Boolean(mascot.isVip)}
         onClick={() => setOpen(!open)}
         className="cursor-pointer hover:scale-105 transition-transform"
       />
@@ -189,6 +225,14 @@ function MascotAccountTrigger({
               <span className="text-white/40">Linh vật:</span>
               <span className="font-semibold text-cyan-300">{mascot.name}</span>
             </div>
+            {subInfo?.isPremium && (
+              <div className="mt-1.5 pt-1.5 border-t border-amber-400/20 flex items-center justify-between text-[10.5px]">
+                <span className="text-amber-300/80 flex items-center gap-1 font-semibold">
+                  <Crown className="w-3 h-3 text-amber-400" /> VIP
+                </span>
+                <span className="font-bold text-amber-300 truncate max-w-[130px]">{subInfo.packageName}</span>
+              </div>
+            )}
           </div>
 
           {/* Option: Settings */}
@@ -200,7 +244,7 @@ function MascotAccountTrigger({
             }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors text-left cursor-pointer group"
           >
-            <Settings className="w-4 h-4 text-cyan-400 group-hover:rotate-45 transition-transform duration-300" />
+            <Settings className="w-4 h-4 text-purple-400 group-hover:rotate-45 transition-transform duration-300" />
             <span>Cài đặt</span>
           </button>
 
@@ -208,19 +252,29 @@ function MascotAccountTrigger({
           <Link
             href="/dashboard/library"
             onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors group"
           >
-            <Disc className="w-4 h-4 text-purple-400" />
+            <Disc className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
             <span>Thư viện & Playlist</span>
+          </Link>
+
+          {/* VIP Premium Center */}
+          <Link
+            href="/dashboard/premium"
+            onClick={() => setOpen(false)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors group"
+          >
+            <Crown className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+            <span>{subInfo?.isPremium ? "Quản lý gói VIP" : "Gói Moodify VIP"}</span>
           </Link>
 
           {/* Logout */}
           <div className="pt-1 border-t border-white/10 mt-1">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/15 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-red-300 hover:bg-red-500/15 transition-colors cursor-pointer group"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 text-purple-400 group-hover:text-red-400 transition-colors" />
               <span>Đăng xuất</span>
             </button>
           </div>
@@ -241,13 +295,22 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfileResponse | null>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
+  const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isGenresOpen, setIsGenresOpen] = useState(true);
 
   const refreshPlaylists = async () => {
     try {
       const pl = await fetchUserPlaylists().catch(() => []);
       setUserPlaylists(pl);
+    } catch (_) {}
+  };
+
+  const refreshSubscription = async () => {
+    try {
+      const sub = await fetchMySubscription().catch(() => null);
+      setSubInfo(sub);
     } catch (_) {}
   };
 
@@ -266,6 +329,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           if (!cancelled) {
             setUserPlaylists(pl);
           }
+          const sub = await fetchMySubscription().catch(() => null);
+          if (!cancelled) {
+            setSubInfo(sub);
+          }
         } else {
           if (!cancelled) setUserLoading(false);
         }
@@ -278,14 +345,21 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
-  // Listen for global playlist changes
+  // Listen for global playlist changes and subscription changes
   useEffect(() => {
     const handlePlaylistChange = () => {
       refreshPlaylists();
     };
+    const handleSubChange = () => {
+      refreshSubscription();
+    };
+
     window.addEventListener("moodify-playlist-updated", handlePlaylistChange);
+    window.addEventListener("moodify-subscription-updated", handleSubChange);
+
     return () => {
       window.removeEventListener("moodify-playlist-updated", handlePlaylistChange);
+      window.removeEventListener("moodify-subscription-updated", handleSubChange);
     };
   }, []);
 
@@ -299,52 +373,72 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     router.push(`/dashboard/library?playlistId=${newPlaylist.id}`);
   };
 
-  const handleVibeClick = (vibeId: string) => {
-    if (pathname === "/dashboard") {
-      router.push(`/dashboard?vibe=${vibeId}`);
-    } else {
-      router.push(`/dashboard?vibe=${vibeId}`);
+  const [activeVibeId, setActiveVibeId] = useState<string>(() => searchParams?.get("vibe") || "all");
+
+  useEffect(() => {
+    const param = searchParams?.get("vibe");
+    if (param) {
+      setActiveVibeId(param);
+    } else if (param === null && (pathname === "/dashboard" || pathname === "/dashboard/user")) {
+      setActiveVibeId("all");
     }
+  }, [searchParams, pathname]);
+
+  useEffect(() => {
+    const handleVibeEvent = (e: Event) => {
+      const ce = e as CustomEvent<{ vibeId: string }>;
+      if (ce.detail?.vibeId) {
+        setActiveVibeId(ce.detail.vibeId);
+      }
+    };
+    window.addEventListener("moodify-vibe-changed", handleVibeEvent);
+    return () => window.removeEventListener("moodify-vibe-changed", handleVibeEvent);
+  }, []);
+
+  const handleVibeClick = (vibeId: string) => {
+    setActiveVibeId(vibeId);
+    const target = pathname.startsWith("/dashboard/user") ? "/dashboard/user" : "/dashboard";
+    router.push(`${target}?vibe=${vibeId}`);
+    window.dispatchEvent(new CustomEvent("moodify-vibe-changed", { detail: { vibeId } }));
   };
 
-  const isHome = pathname === "/dashboard";
+  const isHome = pathname === "/dashboard" || pathname === "/dashboard/user";
   const isSearch = pathname === "/dashboard/search";
   const isLibrary = pathname.startsWith("/dashboard/library");
 
+  const [headerSearch, setHeaderSearch] = useState("");
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (headerSearch.trim()) {
+      router.push(`/dashboard/search?q=${encodeURIComponent(headerSearch.trim())}`);
+    } else {
+      router.push("/dashboard/search");
+    }
+  };
+
+  const { goldThemeEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
+  const isVipShellActive = Boolean(subInfo?.isPremium) && vipShellEnabled;
+  const currentShellTheme = isVipShellActive ? currentVipTheme : normalTheme;
+  const isGoldActive = Boolean(subInfo?.isPremium) && goldThemeEnabled;
+
   return (
-    <div className="relative w-full min-h-screen overflow-x-hidden bg-black text-white">
+    <div className="relative w-full min-h-screen overflow-x-clip bg-black text-white">
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
 
-      {/* Background ambient video + dark overlay */}
-      <video
-        className="fixed inset-0 w-full h-full object-cover pointer-events-none opacity-40 z-0"
-        src={VIDEO_SRC}
-        autoPlay
-        muted
-        loop
-        playsInline
-      />
-      <div
-        className="fixed inset-0 pointer-events-none z-0"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(8,9,13,0.7) 0%, rgba(8,9,13,0.5) 40%, rgba(8,9,13,0.92) 100%)",
-        }}
-      />
-
-      {/* Butterflies */}
-      <ButterflySwarm count={7} className="hidden lg:block fixed" />
+      {/* Ambient Audio Aura Backdrop (Switches to Obsidian Royal Gold if Premium & Theme Enabled) */}
+      <AudioAuraBackdrop isPremium={isGoldActive} />
 
       {/* Main Shell Container */}
       <div className="relative z-10 w-full min-h-screen flex flex-col">
-        {/* Top Header Bar */}
-        <header className="flex items-center justify-between gap-4 px-5 md:px-[35px] pt-5 md:pt-[24px]">
-          <div className="flex items-center gap-6">
+        {/* Top Header Bar - Fixed/Sticky SoundCloud Style */}
+        <header className="sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 bg-[#06070a]/90 backdrop-blur-2xl border-b border-white/10 shadow-xl shadow-black/40">
+          <div className="flex items-center gap-5 md:gap-7 shrink-0">
             <Link
               href="/dashboard"
-              className="font-graphik text-[20px] md:text-[24px] font-bold leading-[21px] whitespace-nowrap tracking-[-0.02em] bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent hover:opacity-90 transition-opacity"
+              className="flex items-center gap-3 group py-1 shrink-0"
             >
-              Moodify
+              <BrandLogo variant="horizontal-dark" className="h-8 md:h-9 w-auto transition-transform group-hover:scale-105" />
             </Link>
 
             {/* Mobile / Tablet nav pills (visible when sidebar is hidden on <lg) */}
@@ -353,7 +447,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard"
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHome
-                    ? "bg-white/10 text-cyan-300 border border-cyan-400/30 shadow-[0_0_12px_rgba(56,189,248,0.2)]"
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
                 }`}
               >
@@ -363,7 +457,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/search"
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isSearch
-                    ? "bg-white/10 text-cyan-300 border border-cyan-400/30 shadow-[0_0_12px_rgba(56,189,248,0.2)]"
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
                 }`}
               >
@@ -373,7 +467,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/library"
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isLibrary
-                    ? "bg-white/10 text-cyan-300 border border-cyan-400/30 shadow-[0_0_12px_rgba(56,189,248,0.2)]"
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
                 }`}
               >
@@ -382,158 +476,222 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
 
-          <div className="ml-auto flex items-center gap-3">
+          {/* Quick Search Bar (SoundCloud Style) */}
+          <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
+            <form onSubmit={handleSearchSubmit} className="relative w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Tìm bài hát, nghệ sĩ..."
+                value={headerSearch}
+                onChange={(e) => setHeaderSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] focus:bg-white/[0.12] border border-white/10 focus:border-purple-500/50 rounded-full text-xs text-white placeholder:text-white/40 outline-none transition-all"
+              />
+            </form>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2.5 md:gap-3 shrink-0">
+            {subInfo?.isPremium ? (
+              <Link
+                href="/dashboard/premium"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/25 to-amber-500/10 border border-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.35)] text-amber-300 text-xs font-bold tracking-wider hover:brightness-110 transition-all cursor-pointer"
+                title="Tài khoản Moodify VIP đang kích hoạt"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />
+                <span className="hidden sm:inline">MOODIFY</span> VIP
+              </Link>
+            ) : (
+              <Link
+                href="/dashboard/premium"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-300 hover:brightness-110 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+              >
+                <Crown className="w-3.5 h-3.5 text-slate-950" />
+                <span className="hidden sm:inline">Nâng cấp</span> VIP
+              </Link>
+            )}
+
             <MascotAccountTrigger
               user={user}
               loading={userLoading}
+              subInfo={subInfo}
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
           </div>
         </header>
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-6 md:mt-8 px-5 md:px-[35px] pb-[140px]">
-          {/* Left Rail (Visible on lg+) */}
-          <nav className="hidden lg:flex flex-col gap-5 shrink-0 self-start sticky top-8 z-20">
-            {/* Primary Navigation Box */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-2 shadow-2xl space-y-1">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
+          {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered */}
+          <div className="hidden lg:block w-[240px] shrink-0">
+            <aside className={`flex flex-col fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 max-h-[calc(100vh-170px)] overflow-y-auto moodify-scroll w-[240px] rounded-2xl border backdrop-blur-2xl p-2.5 space-y-3 transition-colors duration-300 ${currentShellTheme.sidebarBorder} ${currentShellTheme.sidebarBg}`}>
+            {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
+            <div className="space-y-1">
+              {/* 1. Trang chủ */}
               <Link
                 href="/dashboard"
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-all ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHome
-                    ? "bg-white/[0.12] text-white border border-white/10 shadow-[0_0_20px_rgba(175,221,255,0.15)] font-semibold"
-                    : "text-white/70 hover:text-white hover:bg-white/5 font-medium"
+                    ? currentShellTheme.sidebarActiveItem
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
-                <Home
-                  className={`w-[18px] h-[18px] ${
-                    isHome ? "text-cyan-300" : "text-white/70"
-                  }`}
-                  strokeWidth={isHome ? 2 : 1.7}
-                />
-                <span>Trang chủ</span>
+                <div className="flex items-center gap-3">
+                  <Home
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${currentShellTheme.sidebarIconColor}`}
+                    strokeWidth={isHome ? 2.2 : 1.7}
+                  />
+                  <span>Trang chủ</span>
+                </div>
+                {isHome && (
+                  <span className={`w-1.5 h-1.5 rounded-full ${currentShellTheme.sidebarActiveDot}`} />
+                )}
               </Link>
 
+              {/* 2. Tìm kiếm */}
               <Link
                 href="/dashboard/search"
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-all ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSearch
-                    ? "bg-white/[0.12] text-white border border-white/10 shadow-[0_0_20px_rgba(175,221,255,0.15)] font-semibold"
-                    : "text-white/70 hover:text-white hover:bg-white/5 font-medium"
+                    ? currentShellTheme.sidebarActiveItem
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
-                <Search
-                  className={`w-[18px] h-[18px] ${
-                    isSearch ? "text-cyan-300" : "text-white/70"
-                  }`}
-                  strokeWidth={isSearch ? 2 : 1.7}
-                />
-                <span>Tìm kiếm</span>
+                <div className="flex items-center gap-3">
+                  <Search
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${currentShellTheme.sidebarIconColor}`}
+                    strokeWidth={isSearch ? 2.2 : 1.7}
+                  />
+                  <span>Tìm kiếm</span>
+                </div>
+                {isSearch && (
+                  <span className={`w-1.5 h-1.5 rounded-full ${currentShellTheme.sidebarActiveDot}`} />
+                )}
               </Link>
 
+              {/* 3. Thư viện */}
               <Link
                 href="/dashboard/library"
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-all ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isLibrary
-                    ? "bg-white/[0.12] text-white border border-white/10 shadow-[0_0_20px_rgba(175,221,255,0.15)] font-semibold"
-                    : "text-white/70 hover:text-white hover:bg-white/5 font-medium"
+                    ? currentShellTheme.sidebarActiveItem
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
-                <Library
-                  className={`w-[18px] h-[18px] ${
-                    isLibrary ? "text-cyan-300" : "text-white/70"
-                  }`}
-                  strokeWidth={isLibrary ? 2 : 1.7}
-                />
-                <span>Thư viện</span>
+                <div className="flex items-center gap-3">
+                  <Library
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${currentShellTheme.sidebarIconColor}`}
+                    strokeWidth={isLibrary ? 2.2 : 1.7}
+                  />
+                  <span>Thư viện</span>
+                </div>
+                {isLibrary && (
+                  <span className={`w-1.5 h-1.5 rounded-full ${currentShellTheme.sidebarActiveDot}`} />
+                )}
               </Link>
-            </div>
 
-            {/* Playlists & Moods Box */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl p-3.5 shadow-2xl space-y-4">
+              {/* 4. Thể loại (Dropdown) */}
               <div>
-                <p className="font-manrope text-[10px] tracking-[0.06em] text-white/50 uppercase font-semibold px-1 mb-2">
-                  TÂM TRẠNG & THỂ LOẠI
-                </p>
-                <div className="space-y-1">
-                  {VIBES.map((v) => {
-                    const isVibeActive = isHome && currentVibe === v.id;
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => handleVibeClick(v.id)}
-                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition-all hover:bg-white/5 cursor-pointer"
-                        style={{
-                          background: isVibeActive
-                            ? "rgba(255,255,255,0.08)"
-                            : "transparent",
-                          border: isVibeActive
-                            ? "1px solid rgba(255,255,255,0.12)"
-                            : "1px solid transparent",
-                        }}
-                      >
-                        <span
-                          className="w-[20px] h-[20px] rounded-[6px] shrink-0"
-                          style={{
-                            background: v.bg,
-                            boxShadow: `inset 0 0 0 1px ${v.ring}`,
-                          }}
-                        />
-                        <span
-                          className="font-manrope text-[12px] font-medium truncate"
-                          style={{
-                            color: isVibeActive
-                              ? v.accent
-                              : "rgba(255,255,255,0.7)",
-                          }}
+                <button
+                  type="button"
+                  onClick={() => setIsGenresOpen(!isGenresOpen)}
+                  className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 cursor-pointer ${
+                    isGenresOpen
+                      ? "text-white bg-white/[0.04]"
+                      : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5"
+                  } font-medium`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${currentShellTheme.sidebarIconColor}`} />
+                    <span>Thể loại</span>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${currentShellTheme.sidebarIconColor} ${
+                      isGenresOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Dropdown Genres List */}
+                {isGenresOpen && (
+                  <div className="mt-1 ml-3 pl-2.5 border-l border-white/10 space-y-0.5 transition-all">
+                    {VIBES.map((v) => {
+                      const isVibeActive = isHome && activeVibeId === v.id;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => handleVibeClick(v.id)}
+                          className={`w-full group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all duration-150 cursor-pointer ${
+                            isVibeActive
+                              ? `${currentShellTheme.sidebarActiveItem}`
+                              : "text-white/65 hover:text-white hover:bg-white/[0.04] hover:translate-x-0.5"
+                          }`}
                         >
-                          {v.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* User Custom Playlists Section */}
-              <div className="pt-3 border-t border-white/10">
-                <div className="flex items-center justify-between px-1 mb-2">
-                  <p className="font-manrope text-[10px] tracking-[0.06em] text-white/50 uppercase font-semibold">
-                    DANH SÁCH PHÁT
-                  </p>
-                  <button
-                    onClick={() => setIsCreateOpen(true)}
-                    className="p-1 rounded-md text-white/50 hover:text-cyan-400 hover:bg-white/10 transition-colors"
-                    title="Tạo playlist mới"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="max-h-48 overflow-y-auto space-y-0.5 pr-1">
-                  {userPlaylists.length === 0 ? (
-                    <div className="px-2 py-2 text-[11px] text-white/40 italic">
-                      Chưa có playlist nào
-                    </div>
-                  ) : (
-                    userPlaylists.map((pl) => (
-                      <Link
-                        key={pl.id}
-                        href={`/dashboard/library?playlistId=${pl.id}`}
-                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-white/65 hover:text-white hover:bg-white/5 transition-colors group"
-                      >
-                        <Music className="w-3.5 h-3.5 shrink-0 text-white/40 group-hover:text-cyan-400 transition-colors" />
-                        <span className="font-manrope text-[12px] truncate">
-                          {pl.name}
-                        </span>
-                      </Link>
-                    ))
-                  )}
-                </div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0 transition-transform group-hover:scale-125"
+                              style={{
+                                backgroundColor: v.accent,
+                                boxShadow: `0 0 6px ${v.accent}`,
+                              }}
+                            />
+                            <span className="text-[12px] truncate">{v.label}</span>
+                          </div>
+                          {isVibeActive && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: v.accent }}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-          </nav>
+
+            {/* Danh sách phát (Playlists) Section */}
+            <div className="pt-3 border-t border-white/[0.08]">
+              <div className="flex items-center justify-between px-1 mb-2">
+                <p className="text-[10px] tracking-[0.08em] text-white/45 uppercase font-bold">
+                  DANH SÁCH PHÁT
+                </p>
+                <button
+                  onClick={() => setIsCreateOpen(true)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
+                  title="Tạo playlist mới"
+                >
+                  <Plus className={`w-3 h-3 ${currentShellTheme.sidebarIconColor}`} />
+                  <span>Mới</span>
+                </button>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto sidebar-scroll space-y-0.5 pr-1">
+                {userPlaylists.length === 0 ? (
+                  <div className="px-2 py-2 text-[11px] text-white/40 italic">
+                    Chưa có playlist nào
+                  </div>
+                ) : (
+                  userPlaylists.map((pl) => (
+                    <Link
+                      key={pl.id}
+                      href={`/dashboard/library?playlistId=${pl.id}`}
+                      className="w-full group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-white/65 hover:text-white hover:bg-white/[0.05] transition-all"
+                    >
+                      <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
+                        <Music className={`w-3 h-3 ${currentShellTheme.sidebarIconColor} transition-colors`} />
+                      </div>
+                      <span className="text-[12px] truncate group-hover:translate-x-0.5 transition-transform">
+                        {pl.name}
+                      </span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          </aside>
+          </div>
 
           {/* Right Column: Page Content */}
           <div className="min-w-0 flex-1">
@@ -554,6 +712,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         user={user}
+        isPremium={Boolean(subInfo?.isPremium)}
         onProfileUpdated={(updated) => setUser(updated)}
       />
     </div>

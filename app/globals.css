@@ -8,9 +8,10 @@
   --text-primary: #f4f2ed;
   --text-secondary: rgba(244, 242, 237, 0.72);
   --text-muted: rgba(244, 242, 237, 0.5);
-  /* Centralized Typography Tokens */
-  --font-display: var(--font-sora), var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --font-body: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* Centralized Typography Tokens - Nunito (Curved, Soft, Friendly Rounded Sans matching logo) */
+  --font-nunito-family: var(--font-nunito), "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-nunito-family);
+  --font-body: var(--font-nunito-family);
   --font-sans-stack: var(--font-body);
   --font-display-stack: var(--font-display);
 
@@ -36,39 +37,44 @@
   --font-display: var(--font-display);
   --font-sora: var(--font-display);
   --font-manrope: var(--font-body);
+  --font-jakarta: var(--font-body);
+  --font-nunito: var(--font-body);
 }
 
 @layer base {
+  *, ::before, ::after {
+    font-family: inherit;
+  }
+
   html {
-    font-family: var(--font-body);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: var(--font-body) !important;
   }
 
   body {
-    font-family: var(--font-body);
-    letter-spacing: 0;
+    font-family: var(--font-body) !important;
+    letter-spacing: -0.012em;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1 {
-    font-family: var(--font-display);
-    font-weight: 700;
+    font-family: var(--font-display) !important;
+    font-weight: 750;
     letter-spacing: -0.025em;
     line-height: 1.15;
   }
 
   h2 {
-    font-family: var(--font-display);
-    font-weight: 650;
+    font-family: var(--font-display) !important;
+    font-weight: 700;
     letter-spacing: -0.018em;
     line-height: 1.2;
   }
 
   h3 {
-    font-family: var(--font-display);
-    font-weight: 600;
+    font-family: var(--font-display) !important;
+    font-weight: 650;
     letter-spacing: -0.01em;
     line-height: 1.25;
   }
@@ -78,13 +84,13 @@
   optgroup,
   select,
   textarea {
-    font-family: var(--font-body);
+    font-family: var(--font-body) !important;
   }
 
   table,
   th,
   td {
-    font-family: var(--font-body);
+    font-family: var(--font-body) !important;
   }
 }
 
@@ -293,27 +299,73 @@ a {
     transform: scaleX(1);
   }
 
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  .custom-scrollbar::-webkit-scrollbar,
+  .moodify-scroll::-webkit-scrollbar,
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-track {
+  .custom-scrollbar::-webkit-scrollbar-button,
+  .moodify-scroll::-webkit-scrollbar-button,
+  .scrollbar-thin::-webkit-scrollbar-button,
+  ::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track,
+  .moodify-scroll::-webkit-scrollbar-track,
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 9999px;
+    margin: 4px 0;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb,
+  .moodify-scroll::-webkit-scrollbar-thumb,
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 9999px;
+    transition: background 0.2s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+  .moodify-scroll::-webkit-scrollbar-thumb:hover,
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.45);
+  }
+
+  .custom-scrollbar,
+  .moodify-scroll,
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  }
+
+  /* Global baseline scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
     border-radius: 9999px;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 124, 56, 0.35);
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
   }
 
-  .custom-scrollbar {
+  * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -495,3 +547,112 @@ a {
     transform: none !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   PREMIUM SLEEK SCROLLBARS (Universal + Moodify Custom)
+   ══════════════════════════════════════════════════════════════ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.moodify-scroll,
+.custom-scrollbar,
+.scrollbar-thin,
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.moodify-scroll::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar,
+.scrollbar-thin::-webkit-scrollbar,
+.sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.moodify-scroll::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track,
+.scrollbar-thin::-webkit-scrollbar-track,
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 9999px;
+}
+
+.moodify-scroll::-webkit-scrollbar-button,
+.custom-scrollbar::-webkit-scrollbar-button,
+.scrollbar-thin::-webkit-scrollbar-button,
+.sidebar-scroll::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.moodify-scroll::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.scrollbar-thin::-webkit-scrollbar-thumb,
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  transition: all 0.25s ease;
+}
+
+.moodify-scroll:hover::-webkit-scrollbar-thumb,
+.custom-scrollbar:hover::-webkit-scrollbar-thumb,
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.32) 0%,
+    rgba(255, 255, 255, 0.22) 100%
+  );
+}
+
+.moodify-scroll::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
+

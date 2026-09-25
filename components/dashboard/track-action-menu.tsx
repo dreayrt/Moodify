@@ -13,16 +13,20 @@ import {
   Share2,
   Music,
   Sparkles,
+  Download,
+  Crown,
   X,
 } from "lucide-react";
 import {
   addToLibrary,
   removeFromLibrary,
   isTrackInLibrary,
+  downloadTrackFile,
   type Track,
 } from "@/lib/api-client";
 import { usePlayer } from "./player-context";
 import AddToPlaylistModal from "./add-to-playlist-modal";
+import ShareSongCardModal from "./share-song-card-modal";
 
 export interface TrackActionMenuProps {
   track: {
@@ -267,6 +271,25 @@ export function TrackInlineActions({
     });
   };
 
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isDownloading) return;
+    setIsDownloading(true);
+    showToast("Đang chuẩn bị tệp bài hát... ⏳");
+    try {
+      await downloadTrackFile(trackSpotifyId, trackTitle);
+      showToast("Đã tải bài hát về máy thành công! 💾");
+    } catch (err: any) {
+      showToast(err?.message || "Cần tài khoản Premium để tải nhạc ngoại tuyến.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleOpenPlaylistModal = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -480,22 +503,39 @@ export function TrackInlineActions({
           </span>
         </button>
 
-        {/* Orb 3: Share link */}
+        {/* Orb 3: Download MP3 (VIP Feature) */}
         <button
           type="button"
-          onClick={handleCopyLink}
+          onClick={handleDownload}
+          disabled={isDownloading}
+          className="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl hover:bg-yellow-500/15 border border-transparent hover:border-yellow-500/30 transition-all duration-200 group cursor-pointer active:scale-95"
+          title="Tải bài hát ngoại tuyến (Dành cho VIP)"
+        >
+          <div className="relative w-7 h-7 rounded-lg bg-yellow-500/15 text-yellow-300 border border-yellow-500/25 flex items-center justify-center transition-transform group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(234,179,8,0.4)]">
+            <Download className={`w-3.5 h-3.5 ${isDownloading ? "animate-bounce" : ""}`} />
+            <Crown className="w-2 h-2 text-amber-400 absolute -top-1 -right-1" />
+          </div>
+          <span className="text-[10px] font-medium text-white/70 group-hover:text-yellow-200 mt-1 truncate">
+            {isDownloading ? "Đang tải..." : "Tải MP3"}
+          </span>
+        </button>
+
+        {/* Orb 4: Share Story Card */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsShareModalOpen(true);
+          }}
           className="flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl hover:bg-emerald-500/15 border border-transparent hover:border-emerald-500/30 transition-all duration-200 group cursor-pointer active:scale-95"
-          title="Sao chép liên kết"
+          title="Tạo Story & Card bài hát"
         >
           <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 flex items-center justify-center transition-transform group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(16,185,129,0.4)]">
-            {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-300" />
-            ) : (
-              <Share2 className="w-3.5 h-3.5" />
-            )}
+            <Share2 className="w-3.5 h-3.5" />
           </div>
           <span className="text-[10px] font-medium text-white/70 group-hover:text-emerald-200 mt-1 truncate">
-            {copied ? "Đã copy" : "Chia sẻ"}
+            Tạo Story
           </span>
         </button>
 
@@ -529,6 +569,22 @@ export function TrackInlineActions({
               detail: { trackSpotifyId },
             })
           );
+        }}
+      />
+
+      {/* Share Song Card / Story Modal */}
+      <ShareSongCardModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        track={{
+          spotifyId: trackSpotifyId,
+          name: trackTitle,
+          artistName: trackArtist,
+          albumName: track.albumName || "",
+          imageUrl: trackCover,
+          durationMs: track.durationMs,
+          lyricsPlain: track.lyricsPlain,
+          lyricsSynced: track.lyricsSynced,
         }}
       />
 

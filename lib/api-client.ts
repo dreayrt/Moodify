@@ -471,3 +471,129 @@ export async function deletePlaylist(playlistId: string): Promise<void> {
     throw new Error('Failed to delete playlist');
   }
 }
+
+// ============================================================================
+// Subscription & Package APIs
+// ============================================================================
+
+export interface ServicePackage {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  duration_days: number;
+  display_order: number;
+}
+
+export interface SubscriptionInfo {
+  isPremium: boolean;
+  tier: "INDIVIDUAL" | "FAMILY" | "FREE";
+  packageName: string;
+  price?: number;
+  daysRemaining: number;
+  startAt?: string;
+  expiresAt?: string;
+  benefits: string[];
+}
+
+export async function fetchServicePackages(): Promise<ServicePackage[]> {
+  const res = await fetch(`${API_BASE}/packages`);
+  if (!res.ok) throw new Error("Failed to fetch packages");
+  return res.json();
+}
+
+export async function fetchMySubscription(): Promise<SubscriptionInfo> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/subscriptions/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    return {
+      isPremium: false,
+      tier: "FREE",
+      packageName: "Tài khoản Miễn phí",
+      daysRemaining: 0,
+      benefits: [],
+    };
+  }
+  return res.json();
+}
+
+export async function subscribePackage(
+  packageId: number,
+  paymentMethod: string = "QR_TRANSFER"
+): Promise<{ success: boolean; message: string; isPremium: boolean }> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/subscriptions/subscribe`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ packageId, paymentMethod }),
+  });
+  if (!res.ok) throw new Error("Đăng ký gói không thành công");
+  return res.json();
+}
+
+export async function devTogglePremium(
+  enable: boolean,
+  days: number = 30
+): Promise<{ success: boolean; message: string; isPremium: boolean }> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/subscriptions/dev-toggle`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ enable, days }),
+  });
+  if (!res.ok) throw new Error("Chuyển trạng thái thất bại");
+  return res.json();
+}
+
+export async function downloadTrackFile(
+  spotifyId: string,
+  trackName: string = "track"
+): Promise<void> {
+  const token = await getValidAccessToken();
+  if (!token) {
+    throw new Error("Vui lòng đăng nhập để tải bài hát.");
+  }
+  const res = await fetch(
+    `${API_BASE}/subscriptions/tracks/${encodeURIComponent(spotifyId)}/download`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (res.status === 403) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(
+      errorJson.message ||
+        "Tính năng tải nhạc ngoại tuyến chỉ dành cho tài khoản Moodify Premium."
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error("Không thể tải bài hát vào lúc này.");
+  }
+
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  const safeFilename = trackName.replace(/[/\\?%*:|"<>]/g, "_").trim() || "track";
+  anchor.download = `${safeFilename}.mp3`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(blobUrl);
+}
+
+
