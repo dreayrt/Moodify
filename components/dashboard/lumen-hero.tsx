@@ -164,6 +164,8 @@ function TrackRow({
   active,
   playing,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   vipTheme,
 }: {
   track: Track;
