@@ -151,6 +151,157 @@ const KEYFRAMES = `
   border-left: 2px solid #38bdf8;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
 }
+@keyframes goldBorderFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@keyframes goldAuraGlow {
+  0%, 100% {
+    box-shadow: 0 0 18px -2px rgba(223, 186, 99, 0.35), 0 16px 40px rgba(0, 0, 0, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 22px -1px rgba(245, 158, 11, 0.45), 0 16px 40px rgba(0, 0, 0, 0.7);
+  }
+}
+.pre-sidebar-frame-gold {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #caa048 0%,
+    #f59e0b 20%,
+    #edd087 40%,
+    #fff0ba 55%,
+    #fbbf24 70%,
+    #dfba63 85%,
+    #caa048 100%
+  );
+  background-size: 250% 250%;
+  animation: goldBorderFlow 6s ease infinite, goldAuraGlow 7s ease-in-out infinite;
+}
+.pre-sidebar-frame-gold::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  background-size: inherit;
+  animation: inherit;
+  filter: blur(8px);
+  opacity: 0.4;
+  z-index: -1;
+  pointer-events: none;
+}
+.pre-sidebar-frame-amber {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #d97706 0%,
+    #f59e0b 25%,
+    #fef3c7 50%,
+    #fbbf24 75%,
+    #d97706 100%
+  );
+  background-size: 250% 250%;
+  animation: goldBorderFlow 6s ease infinite, goldAuraGlow 7s ease-in-out infinite;
+}
+.pre-sidebar-frame-amber::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  background-size: inherit;
+  animation: inherit;
+  filter: blur(8px);
+  opacity: 0.4;
+  z-index: -1;
+  pointer-events: none;
+}
+.pre-sidebar-frame-cyan {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #0284c7 0%,
+    #06b6d4 25%,
+    #e0f2fe 50%,
+    #38bdf8 75%,
+    #0284c7 100%
+  );
+  background-size: 250% 250%;
+  animation: goldBorderFlow 6s ease infinite;
+}
+.pre-sidebar-frame-cyan::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  background-size: inherit;
+  animation: inherit;
+  filter: blur(8px);
+  opacity: 0.35;
+  z-index: -1;
+  pointer-events: none;
+}
+.pre-sidebar-frame-emerald {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #059669 0%,
+    #10b981 25%,
+    #d1fae5 50%,
+    #34d399 75%,
+    #059669 100%
+  );
+  background-size: 250% 250%;
+  animation: goldBorderFlow 6s ease infinite;
+}
+.pre-sidebar-frame-emerald::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  background-size: inherit;
+  animation: inherit;
+  filter: blur(8px);
+  opacity: 0.35;
+  z-index: -1;
+  pointer-events: none;
+}
+.pre-sidebar-frame-ruby {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #e11d48 0%,
+    #f43f5e 25%,
+    #ffe4e6 50%,
+    #fb7185 75%,
+    #e11d48 100%
+  );
+  background-size: 250% 250%;
+  animation: goldBorderFlow 6s ease infinite;
+}
+.pre-sidebar-frame-ruby::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  background-size: inherit;
+  animation: inherit;
+  filter: blur(8px);
+  opacity: 0.35;
+  z-index: -1;
+  pointer-events: none;
+}
 .sidebar-scroll::-webkit-scrollbar {
   width: 4px;
 }
@@ -684,6 +835,49 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isVipShellActive = Boolean(subInfo?.isPremium) && vipShellEnabled;
   const currentShellTheme = isVipShellActive ? currentVipTheme : normalTheme;
   const isGoldActive = Boolean(subInfo?.isPremium) && goldThemeEnabled;
+  const isPre = Boolean(subInfo?.isPremium);
+
+  // Tone-matched dynamic LED frame for sidebar:
+  // For Pre: Flowing Royal Gold / Champagne or chosen VIP theme
+  // For Normal: Dynamic RGB Chroma flow
+  let sidebarFrameClass = "rgb-sidebar-frame";
+  if (isPre) {
+    if (isVipShellActive && currentVipTheme?.id === "amber") {
+      sidebarFrameClass = "pre-sidebar-frame-amber";
+    } else if (isVipShellActive && currentVipTheme?.id === "cyan") {
+      sidebarFrameClass = "pre-sidebar-frame-cyan";
+    } else if (isVipShellActive && currentVipTheme?.id === "emerald") {
+      sidebarFrameClass = "pre-sidebar-frame-emerald";
+    } else if (isVipShellActive && currentVipTheme?.id === "ruby") {
+      sidebarFrameClass = "pre-sidebar-frame-ruby";
+    } else {
+      sidebarFrameClass = "pre-sidebar-frame-gold";
+    }
+  }
+
+  const sidebarBgClass = isVipShellActive
+    ? currentShellTheme.sidebarBg
+    : isPre
+    ? "bg-gradient-to-b from-[#241c0e]/95 via-[#161108]/90 to-[#0b0803]/95"
+    : "rgb-sidebar-inner";
+
+  const navActiveItemClass = isVipShellActive
+    ? currentShellTheme.sidebarActiveItem
+    : isPre
+    ? "bg-gradient-to-r from-[#caa048]/25 via-[#edd087]/15 to-transparent text-[#faeaba] font-semibold border-l-2 border-[#caa048] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]"
+    : "rgb-active-item text-white font-semibold";
+
+  const navActiveDotClass = isVipShellActive
+    ? currentShellTheme.sidebarActiveDot
+    : isPre
+    ? "bg-[#edd087] shadow-[0_0_8px_#edd087]"
+    : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]";
+
+  const navIconClass = isVipShellActive
+    ? currentShellTheme.sidebarIconColor
+    : isPre
+    ? "text-[#edd087]"
+    : "text-purple-300 group-hover:text-cyan-300";
 
   return (
     <div className="relative w-full min-h-screen overflow-x-clip bg-black text-white">
@@ -770,12 +964,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
-          {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic RGB Chroma Aura */}
+          {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
-            <div className="fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col p-[1.5px] rounded-[20px] rgb-sidebar-frame">
-              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto moodify-scroll w-full rounded-[18.5px] backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${
-                isVipShellActive ? currentShellTheme.sidebarBg : "rgb-sidebar-inner"
-              }`}>
+            <div className={`fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col p-[1.5px] rounded-[20px] ${sidebarFrameClass}`}>
+              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto moodify-scroll w-full rounded-[18.5px] backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
 
             {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
             <div className="space-y-1">
@@ -784,23 +976,19 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard"
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHome
-                    ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
+                    ? navActiveItemClass
                     : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Home
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${
-                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
-                    }`}
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
                     strokeWidth={isHome ? 2.2 : 1.7}
                   />
                   <span>Trang chủ</span>
                 </div>
                 {isHome && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
-                  }`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${navActiveDotClass}`} />
                 )}
               </Link>
 
@@ -809,23 +997,19 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/search"
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSearch
-                    ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
+                    ? navActiveItemClass
                     : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Search
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${
-                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
-                    }`}
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
                     strokeWidth={isSearch ? 2.2 : 1.7}
                   />
                   <span>Tìm kiếm</span>
                 </div>
                 {isSearch && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
-                  }`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${navActiveDotClass}`} />
                 )}
               </Link>
 
@@ -834,23 +1018,19 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/library"
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isLibrary
-                    ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
+                    ? navActiveItemClass
                     : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Library
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${
-                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
-                    }`}
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
                     strokeWidth={isLibrary ? 2.2 : 1.7}
                   />
                   <span>Thư viện</span>
                 </div>
                 {isLibrary && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    isVipShellActive ? currentShellTheme.sidebarActiveDot : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
-                  }`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${navActiveDotClass}`} />
                 )}
               </Link>
 
@@ -866,15 +1046,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   } font-medium`}
                 >
                   <div className="flex items-center gap-3">
-                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${
-                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300 group-hover:text-cyan-300"
-                    }`} />
+                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${navIconClass}`} />
                     <span>Thể loại</span>
                   </div>
                   <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300"
-                    } ${isGenresOpen ? "rotate-180" : ""}`}
+                    className={`w-4 h-4 transition-transform duration-200 ${navIconClass} ${isGenresOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
@@ -890,7 +1066,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                           onClick={() => handleVibeClick(v.id)}
                           className={`w-full group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all duration-150 cursor-pointer ${
                             isVibeActive
-                              ? (isVipShellActive ? currentShellTheme.sidebarActiveItem : "rgb-active-item text-white font-semibold")
+                              ? navActiveItemClass
                               : "text-white/65 hover:text-white hover:bg-white/[0.04] hover:translate-x-0.5"
                           }`}
                         >
@@ -929,7 +1105,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
                   title="Tạo playlist mới"
                 >
-                  <Plus className={`w-3 h-3 ${isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300"}`} />
+                  <Plus className={`w-3 h-3 ${navIconClass}`} />
                   <span>Mới</span>
                 </button>
               </div>
@@ -947,7 +1123,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                       className="w-full group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-white/65 hover:text-white hover:bg-white/[0.05] transition-all"
                     >
                       <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
-                        <Music className={`w-3 h-3 ${isVipShellActive ? currentShellTheme.sidebarIconColor : "text-purple-300"} transition-colors`} />
+                        <Music className={`w-3 h-3 ${navIconClass} transition-colors`} />
                       </div>
                       <span className="text-[12px] truncate group-hover:translate-x-0.5 transition-transform">
                         {pl.name}
