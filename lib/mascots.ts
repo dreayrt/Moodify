@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-export type MascotCategory = "all" | "animals" | "people" | "objects";
+export type MascotCategory = "all" | "vip" | "animals" | "people" | "objects";
 
 export interface MascotItem {
   id: string;
@@ -10,35 +10,36 @@ export interface MascotItem {
   category: "animals" | "people" | "objects";
   icon: string;
   tagline: string;
+  isVip?: boolean;
 }
 
 export const MASCOTS: MascotItem[] = [
   // ── Động vật (21) ──────────────────────────────────
   { id: "koala",    name: "Gấu Koala",       category: "animals", icon: "🐨", tagline: "Dễ thương & thích chill" },
-  { id: "cat",      name: "Mèo Mun",         category: "animals", icon: "🐱", tagline: "Tinh nghịch, thích nghe nhạc êm" },
-  { id: "fox",      name: "Cáo Cam",         category: "animals", icon: "🦊", tagline: "Nhanh nhẹn & sành điệu" },
-  { id: "dino",     name: "Khủng Long Xanh", category: "animals", icon: "🦖", tagline: "Bé bự ngộ nghĩnh" },
-  { id: "panda",    name: "Gấu Trúc",        category: "animals", icon: "🐼", tagline: "Trầm ấm, mê ăn ngủ" },
+  { id: "tiger",    name: "Hổ Hoàng Gia",    category: "animals", icon: "🐯", tagline: "Mắt biếc long lanh, chúa tể vương giả", isVip: true },
+  { id: "fox",      name: "Cáo Cam Tuyệt Sắc", category: "animals", icon: "🦊", tagline: "Nhanh nhẹn, sành điệu & quý phái", isVip: true },
+  { id: "redpanda", name: "Gấu Trúc Đỏ",     category: "animals", icon: "🦊", tagline: "Đuôi xù mềm mại hoàng cung", isVip: true },
+  { id: "dino",     name: "Khủng Long Tí Hon", category: "animals", icon: "🦖", tagline: "Bé bự ngộ nghĩnh siêu đáng yêu", isVip: true },
+  { id: "cat",      name: "Mèo Mun Quý Tộc", category: "animals", icon: "🐱", tagline: "Mắt to tròn, đáng yêu quý phái", isVip: true },
+  { id: "panda",    name: "Gấu Trúc Quốc Bảo", category: "animals", icon: "🐼", tagline: "Trầm ấm, bảo vật hiền lành", isVip: true },
+  { id: "owl",      name: "Cú Mèo Dạ Nguyệt", category: "animals", icon: "🦉", tagline: "Cú đêm mê nhạc acoustic", isVip: true },
+  { id: "otter",    name: "Rái Cá Thủy Tinh", category: "animals", icon: "🦦", tagline: "Thân thiện, tinh nghịch bơi lội", isVip: true },
   { id: "bunny",    name: "Thỏ Trắng",       category: "animals", icon: "🐰", tagline: "Nhanh nhảu, yêu giai điệu ngọt ngào" },
   { id: "bear",     name: "Gấu Nâu",         category: "animals", icon: "🐻", tagline: "Ấm áp, đáng tin cậy" },
   { id: "frog",     name: "Ếch Cốm",         category: "animals", icon: "🐸", tagline: "Vui nhộn, thích nhảy theo beat" },
   { id: "hamster",  name: "Chuột Hamster",   category: "animals", icon: "🐹", tagline: "Nhỏ nhắn, má phúng phính" },
   { id: "hedgehog", name: "Nhím Xù",         category: "animals", icon: "🦔", tagline: "Dễ gần, gai góc bên ngoài" },
-  { id: "otter",    name: "Rái Cá",          category: "animals", icon: "🦦", tagline: "Thân thiện, thích bơi lội" },
-  { id: "owl",      name: "Cú Mèo",          category: "animals", icon: "🦉", tagline: "Cú đêm mê nhạc acoustic" },
   { id: "penguin",  name: "Chim Cánh Cụt",   category: "animals", icon: "🐧", tagline: "Mặc vest đi nghe nhạc" },
   { id: "pug",      name: "Chó Mặt Xệ Pug",  category: "animals", icon: "🐶", tagline: "Mắt to tròn, đáng yêu" },
   { id: "raccoon",  name: "Gấu Mèo Raccoon", category: "animals", icon: "🦝", tagline: "Thám tử tò mò" },
-  { id: "redpanda", name: "Gấu Trúc Đỏ",     category: "animals", icon: "🦊", tagline: "Đuôi xù mềm mại" },
   { id: "sheep",    name: "Cừu Bông",        category: "animals", icon: "🐑", tagline: "Mơ màng, du dương" },
   { id: "sloth",    name: "Con Lười Sloth",  category: "animals", icon: "🦥", tagline: "Chậm rãi, cực kỳ chill" },
-  { id: "tiger",    name: "Hổ Con",          category: "animals", icon: "🐯", tagline: "Mạnh mẽ & sôi động" },
   { id: "deer",     name: "Hươu Sao",        category: "animals", icon: "🦌", tagline: "Thanh lịch, dịu dàng" },
   { id: "mouse",    name: "Chuột Nhắt",      category: "animals", icon: "🐭", tagline: "Tí hon, hoạt bát" },
 
   // ── Nhân vật & Nghề nghiệp (19) ─────────────────────
-  { id: "astronaut",  name: "Phi Hành Gia",  category: "people",  icon: "👨‍🚀", tagline: "Bay bổng giữa không gian âm nhạc" },
-  { id: "wizard",     name: "Phù Thủy",      category: "people",  icon: "🧙", tagline: "Phép thuật âm thanh diệu kỳ" },
+  { id: "astronaut",  name: "Phi Hành Gia VIP", category: "people",  icon: "👨‍🚀", tagline: "Bay bổng giữa không gian âm nhạc", isVip: true },
+  { id: "wizard",     name: "Phù Thủy Thần Bí", category: "people",  icon: "🧙", tagline: "Phép thuật âm thanh diệu kỳ", isVip: true },
   { id: "skater",     name: "Dân Trượt Ván", category: "people",  icon: "🛹", tagline: "Bụi bặm, đậm chất Hip-Hop" },
   { id: "scientist",  name: "Nhà Khoa Học",  category: "people",  icon: "🔬", tagline: "Khám phá tần số âm nhạc" },
   { id: "chef",       name: "Bếp Trưởng",    category: "people",  icon: "👨‍🍳", tagline: "Nấu những món giai điệu ngon miệng" },
@@ -58,12 +59,12 @@ export const MASCOTS: MascotItem[] = [
   { id: "sikh",       name: "Chàng Trai Sikh", category: "people", icon: "👳", tagline: "Hào sảng, nhiệt huyết" },
 
   // ── Robot & Đồ vật (13) ────────────────────────────
-  { id: "robot",      name: "Robot Gearbot", category: "objects", icon: "🤖", tagline: "Nhịp đập điện tử, EDM mê say" },
+  { id: "knight",     name: "Hiệp Sĩ Hoàng Kim", category: "objects", icon: "🛡️", tagline: "Bảo hộ vương triều âm nhạc", isVip: true },
+  { id: "robot",      name: "Robot Cyberpunk VIP", category: "objects", icon: "🤖", tagline: "Nhịp đập điện tử, EDM mê say", isVip: true },
+  { id: "rocket",     name: "Tên Lửa Siêu Thanh", category: "objects", icon: "🚀", tagline: "Tốc độ drop bùng nổ vũ trụ" },
+  { id: "drone",      name: "Drone Bay",     category: "objects", icon: "🛸", tagline: "Góc nhìn âm thanh 360 độ" },
   { id: "crt",        name: "Màn Hình CRT Retro", category: "objects", icon: "🖥️", tagline: "Hơi thở Vaporwave cổ điển" },
   { id: "radio",      name: "Đài Radio Vintage", category: "objects", icon: "📻", tagline: "Lofi vibes & radio cassette" },
-  { id: "rocket",     name: "Tên Lửa Siêu Thanh", category: "objects", icon: "🚀", tagline: "Tốc độ drop bùng nổ" },
-  { id: "drone",      name: "Drone Bay",     category: "objects", icon: "🛸", tagline: "Góc nhìn âm thanh 360 độ" },
-  { id: "knight",     name: "Hiệp Sĩ Thiết Giáp", category: "objects", icon: "🛡️", tagline: "Kiên cường bảo vệ playlist" },
   { id: "clockwork",  name: "Đồng Hồ Cơ",    category: "objects", icon: "⚙️", tagline: "Chuẩn xác từng mili-giây beat" },
   { id: "cube",       name: "Khối Lập Phương Cube", category: "objects", icon: "🧊", tagline: "Ảo diệu đa chiều" },
   { id: "lantern",    name: "Đèn Lồng Ấm Áp", category: "objects", icon: "🏮", tagline: "Thắp sáng không gian đêm" },

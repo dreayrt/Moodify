@@ -72,7 +72,9 @@ export function middleware(request: NextRequest) {
 
     // 3. Neu truy cap /dashboard hoac /dashboard/ -> Chuyen huong ve dung dashboard cua role do
     if (pathname === "/dashboard" || pathname === "/dashboard/") {
-      return NextResponse.redirect(new URL(correctDashboard, request.url));
+      const redirectUrl = new URL(correctDashboard, request.url);
+      redirectUrl.search = request.nextUrl.search;
+      return NextResponse.redirect(redirectUrl);
     }
 
     // 4. KIEM TRA PHAN QUYEN TUNG ROUTE:

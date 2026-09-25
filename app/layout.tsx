@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
-import { Manrope, Sora } from "next/font/google";
+import { Nunito } from "next/font/google";
 
 import { I18nProvider } from "@/components/i18n/i18n-provider";
 
 import "./globals.css";
 
-const manrope = Manrope({
+const nunito = Nunito({
   subsets: ["latin", "latin-ext", "vietnamese"],
-  variable: "--font-manrope",
-  display: "swap",
-});
-
-const sora = Sora({
-  subsets: ["latin", "latin-ext"],
-  variable: "--font-sora",
+  variable: "--font-nunito",
   display: "swap",
 });
 
@@ -52,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning className={`${nunito.variable} ${nunito.className}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -94,7 +88,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${manrope.variable} ${sora.variable}`} suppressHydrationWarning>
+      <body className={`${nunito.className} font-sans`} suppressHydrationWarning>
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>

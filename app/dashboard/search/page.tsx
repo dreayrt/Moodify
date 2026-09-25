@@ -14,25 +14,28 @@ import {
 import TrackCard from "@/components/dashboard/track-card";
 import ArtistCard from "@/components/dashboard/artist-card";
 import { usePlayer } from "@/components/dashboard/player-context";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 type Tab = "tracks" | "artists";
 
 const GENRE_FILTERS = [
-  { id: "all", label: "Tất cả (147)" },
-  { id: "v-pop", label: "V-Pop (58)" },
-  { id: "hiphop", label: "Hip-Hop (47)" },
-  { id: "indie", label: "Indie (42)" },
-  { id: "edm", label: "Remix/EDM (15)" },
+  { id: "all", label: "Tất cả" },
+  { id: "v-pop", label: "V-Pop" },
+  { id: "hiphop", label: "Hip-Hop" },
+  { id: "indie", label: "Indie" },
+  { id: "edm", label: "Remix/EDM" },
 ];
 
-export default function SearchPage() {
+function SearchContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const qParam = searchParams.get("q") || "";
   const { playTrack, currentTrack, isPlaying } = usePlayer();
 
   const [activeTab, setActiveTab] = useState<Tab>("tracks");
   const [selectedGenre, setSelectedGenre] = useState("all");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(qParam);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(false);
@@ -332,5 +335,19 @@ export default function SearchPage() {
           </div>
         )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-20 text-center text-white/50">
+          Đang tải trang tìm kiếm...
+        </div>
+      }
+    >
+      <SearchContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { PlayerTrack } from "./player-context";
+import { PlayerTrack, usePlayer } from "./player-context";
+import { useVipTheme } from "@/lib/theme";
 import { Play, Pause, Music, Mic2, ArrowDown } from "lucide-react";
 
 export interface LyricLine {
@@ -130,6 +131,10 @@ export default function RealtimeLyrics({
   onTogglePlay,
   className = "",
 }: RealtimeLyricsProps) {
+  const { isPremiumUser } = usePlayer();
+  const { vipButtonsEnabled, currentVipTheme } = useVipTheme();
+  const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [userIsScrolling, setUserIsScrolling] = useState(false);
@@ -219,7 +224,7 @@ export default function RealtimeLyrics({
         className={`relative overflow-hidden rounded-3xl border border-white/12 bg-gradient-to-b from-[#121626]/90 to-[#0b0c16]/90 backdrop-blur-2xl p-6 md:p-8 shadow-2xl ${className}`}
       >
         {/* Glow ambient */}
-        <div className="absolute top-0 right-1/4 w-80 h-80 rounded-full bg-cyan-500/10 blur-[100px] pointer-events-none" />
+        <div className="absolute top-0 right-1/4 w-80 h-80 rounded-full bg-purple-500/15 blur-[100px] pointer-events-none" />
 
         <div className="flex items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -231,7 +236,7 @@ export default function RealtimeLyrics({
                 className="w-12 h-12 rounded-xl object-cover shadow-lg border border-white/10"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-cyan-500/20 grid place-items-center text-cyan-300">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/20 grid place-items-center text-purple-300">
                 <Music className="w-6 h-6" />
               </div>
             )}
@@ -244,7 +249,7 @@ export default function RealtimeLyrics({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-manrope text-cyan-300/90 font-medium px-2.5 py-1 rounded-full bg-cyan-400/10 border border-cyan-400/20">
+            <span className="text-xs font-mono text-purple-200 font-medium px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-400/25">
               {formatTime(currentTime)} / {formatTime(duration || (track.durationMs ? track.durationMs / 1000 : 0))}
             </span>
           </div>
@@ -256,7 +261,7 @@ export default function RealtimeLyrics({
               <Mic2 className="w-8 h-8 text-white/40" />
             </div>
             {isPlaying && (
-              <div className="absolute -inset-1 rounded-full border border-cyan-400/40 animate-ping" />
+              <div className="absolute -inset-1 rounded-full border border-pink-400/40 animate-ping" />
             )}
           </div>
           <h4 className="font-graphik text-white/90 text-lg font-medium mb-1">
@@ -271,7 +276,7 @@ export default function RealtimeLyrics({
             {[0.4, 0.8, 0.6, 1.0, 0.7, 0.9, 0.5, 0.8, 0.3].map((h, i) => (
               <span
                 key={i}
-                className="w-1 bg-cyan-400 rounded-full transition-all"
+                className="w-1 bg-gradient-to-t from-pink-500 to-purple-400 rounded-full transition-all"
                 style={{
                   height: isPlaying ? `${h * 100}%` : "20%",
                   animation: isPlaying ? `waveBar 800ms ease-in-out ${i * 90}ms infinite` : "none",
@@ -292,8 +297,8 @@ export default function RealtimeLyrics({
       }}
     >
       {/* Dynamic ambient radial light */}
-      <div className="absolute -top-24 left-1/3 w-96 h-96 rounded-full bg-cyan-500/15 blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-24 right-1/4 w-80 h-80 rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
+      <div className="absolute -top-24 left-1/3 w-96 h-96 rounded-full bg-purple-600/15 blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-24 right-1/4 w-80 h-80 rounded-full bg-pink-600/15 blur-[100px] pointer-events-none" />
 
       {/* Header bar */}
       <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4 mb-4 relative z-10">
@@ -306,14 +311,14 @@ export default function RealtimeLyrics({
               className="w-12 h-12 md:w-14 md:h-14 rounded-xl object-cover shadow-lg border border-white/15 shrink-0"
             />
           ) : (
-            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-cyan-500/20 grid place-items-center text-cyan-300 shrink-0">
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-purple-500/20 grid place-items-center text-purple-300 shrink-0">
               <Music className="w-6 h-6" />
             </div>
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-400/15 text-cyan-300 border border-cyan-400/25 tracking-wider uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/20 text-purple-200 border border-purple-400/30 tracking-wider uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
                 Live Lyrics
               </span>
               <span className="text-[11px] font-manrope text-white/40">
@@ -330,7 +335,7 @@ export default function RealtimeLyrics({
         {/* Quick controls & time */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right hidden sm:block">
-            <span className="font-mono text-xs text-cyan-300 font-semibold">
+            <span className="font-mono text-xs text-purple-300 font-semibold">
               {formatTime(currentTime)}
             </span>
             <span className="font-mono text-xs text-white/40">
@@ -343,7 +348,11 @@ export default function RealtimeLyrics({
             <button
               type="button"
               onClick={onTogglePlay}
-              className="w-9 h-9 rounded-full grid place-items-center bg-white text-black hover:scale-105 active:scale-95 transition-all shadow-md"
+              className={`w-9 h-9 rounded-full grid place-items-center hover:scale-108 active:scale-95 transition-all shadow-md cursor-pointer ${
+                isVipButtonsActive
+                  ? currentVipTheme.primaryBtnClass
+                  : "bg-gradient-to-tr from-purple-500 to-pink-500 text-white"
+              }`}
               aria-label={isPlaying ? "Tạm dừng" : "Phát"}
             >
               {isPlaying ? (
@@ -365,7 +374,11 @@ export default function RealtimeLyrics({
               setUserIsScrolling(false);
               scrollToActiveLine(activeIndex, true);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 text-xs font-bold shadow-lg backdrop-blur-md transition-all active:scale-95"
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+              isVipButtonsActive
+                ? currentVipTheme.primaryBtnClass
+                : "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-[0_4px_16px_rgba(168,85,247,0.5)]"
+            }`}
           >
             <ArrowDown className="w-3.5 h-3.5" />
             <span>Cuộn về lời đang phát</span>
@@ -387,7 +400,7 @@ export default function RealtimeLyrics({
       >
         {/* Intro placeholder if song hasn't started first lyric yet */}
         {activeIndex === -1 && (
-          <div className="text-center py-6 text-cyan-300/60 text-sm font-manrope italic animate-pulse">
+          <div className="text-center py-6 text-purple-300/60 text-sm font-manrope italic animate-pulse">
             ♪ Giai điệu mở đầu...
           </div>
         )}
@@ -408,18 +421,18 @@ export default function RealtimeLyrics({
                 }}
                 className={`group flex items-start gap-3 cursor-pointer rounded-xl px-3 py-1.5 transition-all duration-300 ${
                   isActive
-                    ? "text-white scale-[1.02] origin-left drop-shadow-[0_0_25px_rgba(175,221,255,0.7)]"
+                    ? "text-white scale-[1.02] origin-left drop-shadow-[0_0_25px_rgba(244,63,94,0.7)]"
                     : isPast
                     ? "text-white/40 hover:text-white/80 hover:bg-white/[0.04]"
                     : "text-white/30 hover:text-white/70 hover:bg-white/[0.04]"
                 }`}
               >
-                {/* Left indicator: Cyan bullet or quick jump icon */}
+                {/* Left indicator: Pink bullet or quick jump icon */}
                 <div className="w-5 shrink-0 pt-1 flex items-center justify-center">
                   {isActive ? (
-                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#38bdf8] animate-pulse" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-pink-400 shadow-[0_0_12px_#f43f5e] animate-pulse" />
                   ) : (
-                    <span className="text-[10px] font-mono text-white/20 group-hover:text-cyan-400 group-hover:opacity-100 opacity-0 transition-opacity">
+                    <span className="text-[10px] font-mono text-white/20 group-hover:text-purple-300 group-hover:opacity-100 opacity-0 transition-opacity">
                       ▶
                     </span>
                   )}
@@ -430,14 +443,14 @@ export default function RealtimeLyrics({
                   <p
                     className={`font-graphik tracking-tight leading-snug transition-all ${
                       isActive
-                        ? "text-[20px] sm:text-[23px] md:text-[26px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-[#d8efff] to-cyan-200"
+                        ? "text-[20px] sm:text-[23px] md:text-[26px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-pink-100 to-purple-200"
                         : "text-[16px] sm:text-[18px] md:text-[20px] font-semibold"
                     }`}
                   >
                     {line.text}
                   </p>
                   {/* Subtle timestamp on hover */}
-                  <span className="text-[10px] font-mono text-cyan-400/0 group-hover:text-cyan-400/80 transition-colors">
+                  <span className="text-[10px] font-mono text-purple-400/0 group-hover:text-purple-400/80 transition-colors">
                     {formatTime(line.time)}
                   </span>
                 </div>
@@ -448,7 +461,7 @@ export default function RealtimeLyrics({
 
         {/* Outro placeholder */}
         {activeIndex === lyrics.length - 1 && (
-          <div className="text-center py-8 text-cyan-300/60 text-sm font-manrope italic">
+          <div className="text-center py-8 text-purple-300/60 text-sm font-manrope italic">
             ♪ Giai điệu kết thúc...
           </div>
         )}
