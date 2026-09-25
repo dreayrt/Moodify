@@ -78,10 +78,10 @@ export function AdminPagination({
                 onPageSizeChange(Number(e.target.value));
                 onPageChange(1);
               }}
-              className="bg-[#121622] border border-white/10 text-white rounded-md px-2 py-1 outline-none font-mono focus:border-[#ff7a2c]/60 cursor-pointer"
+              className="bg-[#171822] border border-[#222432] text-white rounded-md px-2 py-1 outline-none font-mono focus:border-[#ff5500] cursor-pointer"
             >
               {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt} className="bg-[#0c1017] text-white">
+                <option key={opt} value={opt} className="bg-[#12131a] text-white">
                   {opt}
                 </option>
               ))}
@@ -97,7 +97,7 @@ export function AdminPagination({
           type="button"
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage <= 1}
-          className="p-1.5 rounded-md border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition"
+          className="p-1.5 rounded-md border border-[#222432] text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition"
           title="Trang trước"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -124,8 +124,8 @@ export function AdminPagination({
                 onClick={() => onPageChange(pageNum)}
                 className={`min-w-[32px] h-8 px-2 font-mono rounded-md text-xs font-semibold transition ${
                   isActive
-                    ? "bg-[#ff7a2c] text-black shadow-sm font-bold"
-                    : "border border-white/5 bg-white/[0.02] text-zinc-300 hover:bg-white/10 hover:text-white"
+                    ? "bg-[#ff5500] text-white shadow-sm font-bold"
+                    : "border border-[#222432] bg-[#171822] text-zinc-300 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {pageNum}

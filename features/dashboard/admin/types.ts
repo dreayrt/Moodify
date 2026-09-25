@@ -1,8 +1,10 @@
 export type AdminTab =
   | "overview"
+  | "analytics"
+  | "catalog"
+  | "favorites"
   | "users"
   | "moderation"
-  | "catalog"
   | "monetization"
   | "licensing"
   | "settings";
@@ -178,3 +180,84 @@ export type AdminToast = {
   type: "success" | "error" | "info" | "warning";
   message: string;
 };
+
+export type UserSubscription = {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  servicePackageId: number;
+  packageName: string;
+  startAt: string;
+  endAt: string;
+  autoRenew: boolean;
+  status: "ACTIVE" | "EXPIRED" | "CANCELLED" | "SUSPENDED" | "PENDING";
+  price: number;
+};
+
+export type PlatformAnalytics = {
+  streaming: {
+    totalStreams: number;
+    weeklyGrowth: number;
+    totalListenedHours: number;
+    completionRate: number; // e.g. 84.6%
+    skipRate: number; // e.g. 15.4%
+    sources: { source: string; label: string; percentage: number; count: number }[];
+    devices: { device: string; label: string; percentage: number; count: number }[];
+    dailyVelocity: { date: string; day: string; streams: number; listeners: number }[];
+  };
+  emotions: {
+    distribution: { vibe: string; label: string; percentage: number; count: number; color: string }[];
+    avgConfidence: number; // e.g. 86.8%
+    timeOfDayHeatmap: { timeSlot: string; topVibe: string; description: string; activityLevel: number }[];
+    topSearchKeywords: { keyword: string; count: number; emotion: string }[];
+  };
+  financial: {
+    totalRevenue: number;
+    mrr: number; // Monthly recurring revenue
+    arpu: number; // Average revenue per user
+    vipConversionRate: number; // % free to paid
+    packageShare: { packageName: string; revenue: number; percentage: number; subscribers: number }[];
+    providerShare: { provider: string; percentage: number; amount: number }[];
+    monthlyTrend: { month: string; revenue: number; newSubs: number }[];
+  };
+  topCharts: {
+    topTracks: { id: string; title: string; artist: string; coverUrl: string; streams: number; vibe: string }[];
+    topArtists: { id: string; name: string; avatarUrl: string; followers: number; streams: number; genre: string }[];
+  };
+  systemHealth: {
+    mysqlStatus: "healthy" | "degraded" | "down";
+    mysqlLatencyMs: number;
+    mysqlConnections: number;
+    mongoStatus: "healthy" | "degraded" | "down";
+    mongoLatencyMs: number;
+    mongoDocsCount: number;
+  };
+};
+
+
+export type FavoriteRecord = {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  userAvatar: string | null;
+  type: "SONG" | "ARTIST" | "ALBUM";
+  targetId: string;
+  targetTitle: string;
+  targetSubtitle?: string;
+  targetCoverUrl: string;
+  audioUrl?: string;
+  createdAt: string;
+};
+
+export type FavoriteLeaderboardItem = {
+  targetId: string;
+  targetTitle: string;
+  targetSubtitle?: string;
+  targetCoverUrl: string;
+  audioUrl?: string;
+  favoriteCount: number;
+  type: "SONG" | "ARTIST" | "ALBUM";
+};
+

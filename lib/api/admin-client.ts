@@ -4,6 +4,8 @@ import {
   CatalogTrack,
   DistributionContract,
   Distributor,
+  FavoriteLeaderboardItem,
+  FavoriteRecord,
   PaymentTransaction,
   ReviewRequest,
   ServicePackage,
@@ -13,7 +15,7 @@ import {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8080";
+  "http://localhost:8088";
 
 async function adminRequest<T>(
   path: string,
@@ -63,6 +65,40 @@ export type AdminOverviewResponse = {
   totalTracks: number;
   publishedTracks: number;
   pendingReviews: number;
+  totalStreams: number;
+  totalFavorites: number;
+  topListenedTracks: {
+    trackId: string;
+    title: string;
+    artist: string;
+    coverUrl: string;
+    duration: string;
+    genre: string;
+    audioUrl?: string;
+    streamCount: number;
+  }[];
+  topFavoritedTracks: {
+    trackId: string;
+    title: string;
+    artist: string;
+    coverUrl: string;
+    duration: string;
+    genre: string;
+    audioUrl?: string;
+    favoriteCount: number;
+  }[];
+  listeningTrend: {
+    date: string;
+    label: string;
+    streams: number;
+  }[];
+  recentActivities: {
+    id: string;
+    type: "PAYMENT" | "FAVORITE";
+    title: string;
+    detail: string;
+    timestamp: string;
+  }[];
 };
 
 export async function fetchAdminOverview(): Promise<AdminOverviewResponse> {
@@ -315,4 +351,44 @@ export type AdminLicensingResponse = {
 
 export async function fetchAdminLicensing(): Promise<AdminLicensingResponse> {
   return adminRequest<AdminLicensingResponse>("/api/admin/licensing");
+}
+
+
+// 8. Favorites Management
+export type AdminFavoritesResponse = {
+  items: FavoriteRecord[];
+  total: number;
+  page: number;
+  size: number;
+  type: string;
+};
+
+export async function fetchAdminFavorites(params?: {
+  type?: "SONG" | "ARTIST" | "ALBUM";
+  query?: string;
+  page?: number;
+  size?: number;
+}): Promise<AdminFavoritesResponse> {
+  const q = new URLSearchParams();
+  if (params?.type) q.set("type", params.type);
+  if (params?.query) q.set("query", params.query);
+  if (params?.page !== undefined) q.set("page", String(params.page));
+  if (params?.size !== undefined) q.set("size", String(params.size));
+  const qs = q.toString();
+  return adminRequest<AdminFavoritesResponse>(`/api/admin/favorites${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchAdminFavoritesLeaderboard(): Promise<FavoriteLeaderboardItem[]> {
+  return adminRequest<FavoriteLeaderboardItem[]>("/api/admin/favorites/leaderboard");
+}
+
+export async function deleteAdminFavorite(
+  id: number
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/favorites/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
 }

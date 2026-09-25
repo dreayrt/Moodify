@@ -430,13 +430,10 @@ export function AdminAudioPlayerDock({
         }}
       />
 
-      <div className="relative flex flex-col sm:flex-row items-center justify-between gap-3.5 rounded-xl border border-[#1e2330] bg-[#0c1017]/98 p-3.5 sm:px-5 sm:py-3 shadow-2xl backdrop-blur-2xl ring-1 ring-white/10">
-        {/* Glow ambient background */}
-        <div className="absolute inset-0 -z-10 rounded-xl bg-gradient-to-r from-[#ff7a2c]/10 via-[#00f2fe]/10 to-transparent blur-xl pointer-events-none" />
-
+      <div className="relative flex flex-col sm:flex-row items-center justify-between gap-3.5 rounded-2xl border border-[#222432] bg-[#12131a] p-3 sm:px-5 sm:py-3 shadow-2xl ring-1 ring-white/5">
         {/* Left: Track Info & Cover */}
         <div className="flex items-center gap-3 w-full sm:w-auto min-w-[220px]">
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow-md group">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[#222432] bg-[#171822] shadow-md group">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={track.coverUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=160"}
@@ -446,7 +443,7 @@ export function AdminAudioPlayerDock({
               }`}
             />
             {isPlaying && (
-              <span className="absolute bottom-1 right-1 h-2 w-2 rounded-full bg-[#ff7a2c] animate-ping" />
+              <span className="absolute bottom-1 right-1 h-2 w-2 rounded-full bg-[#ff5500] animate-ping" />
             )}
           </div>
 
@@ -455,7 +452,7 @@ export function AdminAudioPlayerDock({
               <h4 className="truncate font-graphik text-xs font-semibold text-white">
                 {track.title}
               </h4>
-              <span className="shrink-0 rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-mono font-medium text-[#00f2fe]">
+              <span className="shrink-0 rounded-md border border-[#222432] bg-[#171822] px-1.5 py-0.5 text-[9px] font-mono font-medium text-zinc-400">
                 {track.bpm} BPM
               </span>
             </div>
@@ -488,13 +485,13 @@ export function AdminAudioPlayerDock({
             <button
               type="button"
               onClick={() => handleSetIsPlaying(!isPlaying)}
-              className="grid h-9 w-9 place-items-center rounded-lg bg-[#ff7a2c] text-black shadow-md shadow-[#ff7a2c]/20 hover:opacity-90 active:scale-95 transition cursor-pointer"
+              className="grid h-9 w-9 place-items-center rounded-full bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
               title={isPlaying ? "Tạm dừng" : "Phát nhạc"}
             >
               {isPlaying ? (
-                <Pause className="h-4 w-4 fill-black text-black" />
+                <Pause className="h-4 w-4 fill-white text-white" />
               ) : (
-                <Play className="h-4 w-4 fill-black text-black ml-0.5" />
+                <Play className="h-4 w-4 fill-white text-white ml-0.5" />
               )}
             </button>
 
@@ -521,7 +518,7 @@ export function AdminAudioPlayerDock({
               onSeek={handleSeek}
               barCount={48}
               height={26}
-              activeColor="#ff7a2c"
+              activeColor="#ff5500"
             />
           </div>
         </div>
@@ -530,8 +527,8 @@ export function AdminAudioPlayerDock({
         <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
           {/* Sound Engine Status Badge */}
           <div className="hidden lg:flex items-center">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-mono text-emerald-300 font-semibold">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#222432] bg-[#171822] px-2.5 py-1 text-[10px] font-mono text-zinc-300 font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5500] animate-pulse" />
               Master Studio MP3 (320kbps)
             </span>
           </div>
@@ -561,7 +558,7 @@ export function AdminAudioPlayerDock({
                 setVolume(val);
                 if (isMuted && val > 0) setIsMuted(false);
               }}
-              className="h-1 w-16 cursor-pointer appearance-none rounded-lg bg-white/20 accent-[#ff7a2c]"
+              className="h-1 w-16 cursor-pointer appearance-none rounded-lg bg-white/20 accent-[#ff5500]"
               title={`Âm lượng: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
             />
           </div>
@@ -574,7 +571,7 @@ export function AdminAudioPlayerDock({
               audioRef.current?.pause();
               onClose();
             }}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/10 hover:text-white transition"
+            className="grid h-8 w-8 place-items-center rounded-lg border border-[#222432] bg-[#171822] text-zinc-400 hover:bg-white/10 hover:text-white transition"
             title="Đóng thanh phát thử"
           >
             <X className="h-4 w-4" />
