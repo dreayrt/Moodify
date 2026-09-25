@@ -94,20 +94,19 @@ const KEYFRAMES = `
 }
 @keyframes rgbAuraGlow {
   0%, 100% {
-    box-shadow: 0 0 16px -2px rgba(236, 72, 153, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 10px -2px rgba(236, 72, 153, 0.16), 0 12px 30px rgba(0, 0, 0, 0.65);
   }
   25% {
-    box-shadow: 0 0 16px -2px rgba(139, 92, 246, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 10px -2px rgba(139, 92, 246, 0.16), 0 12px 30px rgba(0, 0, 0, 0.65);
   }
   50% {
-    box-shadow: 0 0 16px -2px rgba(6, 182, 212, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 10px -2px rgba(6, 182, 212, 0.16), 0 12px 30px rgba(0, 0, 0, 0.65);
   }
   75% {
-    box-shadow: 0 0 16px -2px rgba(16, 185, 129, 0.28), 0 16px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 10px -2px rgba(16, 185, 129, 0.16), 0 12px 30px rgba(0, 0, 0, 0.65);
   }
 }
 .rgb-sidebar-frame {
-  position: relative;
   background: linear-gradient(
     135deg,
     #ec4899 0%,
@@ -124,13 +123,13 @@ const KEYFRAMES = `
 .rgb-sidebar-frame::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1.5px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(8px);
-  opacity: 0.35;
+  filter: blur(5px);
+  opacity: 0.15;
   z-index: -1;
   pointer-events: none;
 }
@@ -164,14 +163,13 @@ const KEYFRAMES = `
 }
 @keyframes goldAuraGlow {
   0%, 100% {
-    box-shadow: 0 0 18px -2px rgba(223, 186, 99, 0.35), 0 16px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 10px -2px rgba(223, 186, 99, 0.18), 0 12px 30px rgba(0, 0, 0, 0.65);
   }
   50% {
-    box-shadow: 0 0 22px -1px rgba(245, 158, 11, 0.45), 0 16px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 12px -1px rgba(245, 158, 11, 0.22), 0 12px 30px rgba(0, 0, 0, 0.65);
   }
 }
 .pre-sidebar-frame-gold {
-  position: relative;
   background: linear-gradient(
     135deg,
     #caa048 0%,
@@ -188,18 +186,17 @@ const KEYFRAMES = `
 .pre-sidebar-frame-gold::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1.5px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(8px);
-  opacity: 0.4;
+  filter: blur(5px);
+  opacity: 0.16;
   z-index: -1;
   pointer-events: none;
 }
 .pre-sidebar-frame-amber {
-  position: relative;
   background: linear-gradient(
     135deg,
     #d97706 0%,
@@ -214,18 +211,17 @@ const KEYFRAMES = `
 .pre-sidebar-frame-amber::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1.5px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(8px);
-  opacity: 0.4;
+  filter: blur(5px);
+  opacity: 0.16;
   z-index: -1;
   pointer-events: none;
 }
 .pre-sidebar-frame-cyan {
-  position: relative;
   background: linear-gradient(
     135deg,
     #0284c7 0%,
@@ -240,18 +236,17 @@ const KEYFRAMES = `
 .pre-sidebar-frame-cyan::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1.5px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(8px);
-  opacity: 0.35;
+  filter: blur(5px);
+  opacity: 0.15;
   z-index: -1;
   pointer-events: none;
 }
 .pre-sidebar-frame-emerald {
-  position: relative;
   background: linear-gradient(
     135deg,
     #059669 0%,
@@ -266,18 +261,17 @@ const KEYFRAMES = `
 .pre-sidebar-frame-emerald::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1.5px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(8px);
-  opacity: 0.35;
+  filter: blur(5px);
+  opacity: 0.15;
   z-index: -1;
   pointer-events: none;
 }
 .pre-sidebar-frame-ruby {
-  position: relative;
   background: linear-gradient(
     135deg,
     #e11d48 0%,
@@ -292,13 +286,13 @@ const KEYFRAMES = `
 .pre-sidebar-frame-ruby::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1.5px;
   border-radius: inherit;
   background: inherit;
   background-size: inherit;
   animation: inherit;
-  filter: blur(8px);
-  opacity: 0.35;
+  filter: blur(5px);
+  opacity: 0.15;
   z-index: -1;
   pointer-events: none;
 }
@@ -314,6 +308,12 @@ const KEYFRAMES = `
 }
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+aside::-webkit-scrollbar:horizontal,
+.moodify-scroll::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
 }
 `;
 
@@ -839,8 +839,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
   // Tone-matched dynamic LED frame for sidebar:
   // For Pre: Flowing Royal Gold / Champagne or chosen VIP theme
-  // For Normal: Dynamic RGB Chroma flow
-  let sidebarFrameClass = "rgb-sidebar-frame";
+  // For Normal: Clean solid glass border (gradient disabled)
+  let sidebarFrameClass = "";
   if (isPre) {
     if (isVipShellActive && currentVipTheme?.id === "amber") {
       sidebarFrameClass = "pre-sidebar-frame-amber";
@@ -853,31 +853,33 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     } else {
       sidebarFrameClass = "pre-sidebar-frame-gold";
     }
+  } else {
+    sidebarFrameClass = "border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6)]";
   }
 
   const sidebarBgClass = isVipShellActive
     ? currentShellTheme.sidebarBg
     : isPre
-    ? "bg-gradient-to-b from-[#241c0e]/95 via-[#161108]/90 to-[#0b0803]/95"
-    : "rgb-sidebar-inner";
+    ? "bg-gradient-to-b from-[#120e06]/98 via-[#0c0903]/96 to-[#050402]/98"
+    : "bg-[#0b0c14]/90";
 
   const navActiveItemClass = isVipShellActive
     ? currentShellTheme.sidebarActiveItem
     : isPre
-    ? "bg-gradient-to-r from-[#caa048]/25 via-[#edd087]/15 to-transparent text-[#faeaba] font-semibold border-l-2 border-[#caa048] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]"
-    : "rgb-active-item text-white font-semibold";
+    ? "bg-amber-400/[0.14] text-[#fff3d4] font-semibold shadow-[inset_0_1px_0_rgba(251,191,36,0.15)]"
+    : "bg-white/10 text-white font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
 
   const navActiveDotClass = isVipShellActive
     ? currentShellTheme.sidebarActiveDot
     : isPre
     ? "bg-[#edd087] shadow-[0_0_8px_#edd087]"
-    : "bg-cyan-400 shadow-[0_0_8px_#22d3ee]";
+    : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]";
 
   const navIconClass = isVipShellActive
     ? currentShellTheme.sidebarIconColor
     : isPre
     ? "text-[#edd087]"
-    : "text-purple-300 group-hover:text-cyan-300";
+    : "text-white/70 group-hover:text-white";
 
   return (
     <div className="relative w-full min-h-screen overflow-x-clip bg-black text-white">
@@ -966,8 +968,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
-            <div className={`fixed left-5 md:left-[35px] top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col p-[1.5px] rounded-[20px] ${sidebarFrameClass}`}>
-              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto moodify-scroll w-full rounded-[18.5px] backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
+            <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
+              <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden moodify-scroll w-full ${isPre ? "rounded-[18.8px]" : "rounded-[20px]"} backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
 
             {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
             <div className="space-y-1">
@@ -987,9 +989,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   />
                   <span>Trang chủ</span>
                 </div>
-                {isHome && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${navActiveDotClass}`} />
-                )}
               </Link>
 
               {/* 2. Tìm kiếm */}
@@ -1008,9 +1007,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   />
                   <span>Tìm kiếm</span>
                 </div>
-                {isSearch && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${navActiveDotClass}`} />
-                )}
               </Link>
 
               {/* 3. Thư viện */}
@@ -1029,9 +1025,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   />
                   <span>Thư viện</span>
                 </div>
-                {isLibrary && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${navActiveDotClass}`} />
-                )}
               </Link>
 
               {/* 4. Thể loại (Dropdown) */}
@@ -1064,28 +1057,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                           key={v.id}
                           type="button"
                           onClick={() => handleVibeClick(v.id)}
-                          className={`w-full group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all duration-150 cursor-pointer ${
+                          className={`w-full flex items-center px-3 py-1.5 rounded-lg text-left text-[12px] transition-all duration-150 cursor-pointer ${
                             isVibeActive
-                              ? navActiveItemClass
-                              : "text-white/65 hover:text-white hover:bg-white/[0.04] hover:translate-x-0.5"
+                              ? isPre
+                                ? "bg-amber-400/[0.12] text-[#fff3d4] font-semibold"
+                                : "bg-white/[0.08] text-white font-semibold"
+                              : "text-white/60 hover:text-white hover:bg-white/[0.04] font-medium"
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0 transition-transform group-hover:scale-125"
-                              style={{
-                                backgroundColor: v.accent,
-                                boxShadow: `0 0 6px ${v.accent}`,
-                              }}
-                            />
-                            <span className="text-[12px] truncate">{v.label}</span>
-                          </div>
-                          {isVibeActive && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ backgroundColor: v.accent }}
-                            />
-                          )}
+                          <span className="truncate">{v.label}</span>
                         </button>
                       );
                     })}

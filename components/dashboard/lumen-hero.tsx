@@ -183,9 +183,13 @@ function TrackRow({
     <div
       className={`w-full flex flex-col rounded-2xl transition-all duration-300 ${
         isExpanded
-          ? "bg-slate-950/80 border border-purple-500/40 shadow-[0_12px_36px_rgba(0,0,0,0.7)] my-1.5 backdrop-blur-xl"
+          ? vipTheme
+            ? "bg-slate-950/85 border border-[#dfba63]/50 shadow-[0_12px_36px_rgba(0,0,0,0.8)] my-1.5 backdrop-blur-xl"
+            : "bg-slate-950/80 border border-purple-500/40 shadow-[0_12px_36px_rgba(0,0,0,0.7)] my-1.5 backdrop-blur-xl"
           : active
-          ? "bg-gradient-to-r from-purple-500/20 via-indigo-500/10 to-transparent border border-purple-500/30 shadow-[0_4px_24px_rgba(168,85,247,0.15)]"
+          ? vipTheme
+            ? "bg-gradient-to-r from-[#caa048]/18 via-[#edd087]/10 to-transparent border border-[#caa048]/35 shadow-[0_4px_24px_rgba(202,152,57,0.18)]"
+            : "bg-gradient-to-r from-purple-500/20 via-indigo-500/10 to-transparent border border-purple-500/30 shadow-[0_4px_24px_rgba(168,85,247,0.15)]"
           : "border border-white/5 bg-slate-950/40 hover:bg-white/[0.05] hover:border-white/10"
       }`}
     >
@@ -204,7 +208,11 @@ function TrackRow({
         <div className="relative w-7 h-7 flex items-center justify-center">
           <span
             className={`font-mono text-[12px] font-medium ${
-              active ? "text-purple-300 font-bold" : "text-white/40 group-hover:opacity-0"
+              active
+                ? vipTheme
+                  ? "text-[#edd087] font-bold"
+                  : "text-purple-300 font-bold"
+                : "text-white/40 group-hover:opacity-0"
             }`}
           >
             {active && playing ? (
@@ -255,7 +263,11 @@ function TrackRow({
           <p
             className={`font-manrope text-[14px] leading-[18px] truncate transition-colors ${
               active
-                ? "font-bold text-purple-200"
+                ? vipTheme
+                  ? "font-bold text-[#fff3d4]"
+                  : "font-bold text-purple-200"
+                : vipTheme
+                ? "font-semibold text-white group-hover:text-[#edd087]"
                 : "font-semibold text-white group-hover:text-purple-300"
             }`}
           >
@@ -392,25 +404,30 @@ function MoodChip({
   vibe,
   active,
   onClick,
+  vipTheme,
 }: {
   vibe: Vibe;
   active: boolean;
   onClick: () => void;
+  vipTheme?: ThemeOption | null;
 }) {
+  const chipAccent = vipTheme && vibe.id === "all" ? vipTheme.accent : vibe.accent;
+  const chipRing = vipTheme && vibe.id === "all" ? vipTheme.glow : vibe.ring;
+
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
       style={{
-        background: active ? `${vibe.accent}25` : "rgba(255,255,255,0.04)",
-        borderColor: active ? vibe.accent : "rgba(255,255,255,0.12)",
-        boxShadow: active ? `0 0 16px ${vibe.ring}, inset 0 0 10px ${vibe.accent}20` : "none",
+        background: active ? `${chipAccent}25` : "rgba(255,255,255,0.04)",
+        borderColor: active ? chipAccent : "rgba(255,255,255,0.12)",
+        boxShadow: active ? `0 0 16px ${chipRing}, inset 0 0 10px ${chipAccent}20` : "none",
       }}
     >
       <span
         className="inline-block w-[7px] h-[7px] rounded-full"
-        style={{ background: vibe.accent, boxShadow: `0 0 8px ${vibe.ring}` }}
+        style={{ background: chipAccent, boxShadow: `0 0 8px ${chipRing}` }}
       />
       <span
         className="font-manrope text-[11px] font-semibold tracking-[0.14em]"
@@ -718,6 +735,7 @@ function LumenHeroContent() {
                   vibe={v}
                   active={v.id === activeVibe}
                   onClick={() => handleVibeChange(v.id)}
+                  vipTheme={activeVipTheme}
                 />
               ))}
             </div>
@@ -839,6 +857,7 @@ function LumenHeroContent() {
                       vibe={v}
                       active={v.id === activeVibe}
                       onClick={() => handleVibeChange(v.id)}
+                      vipTheme={activeVipTheme}
                     />
                   ))}
                 </div>
