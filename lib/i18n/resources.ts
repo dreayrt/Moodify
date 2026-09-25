@@ -57,21 +57,21 @@ export const resources = {
         },
         artist: {
           hero: {
-            badge: "Content Lead Studio",
+            badge: "Studio phụ trách nội dung",
           },
           access: {
             eyebrow: "Quyền truy cập Content Lead",
             checkingTitle: "Đang kiểm tra tài khoản...",
-            deniedTitle: "Trang này chỉ dành cho tài khoản Content Lead (Phụ trách Nội dung).",
+            deniedTitle: "Trang này chỉ dành cho tài khoản Content Lead (Phụ trách nội dung).",
             checkingCopy: "Moodify đang xác minh phiên đăng nhập và vai trò trước khi mở Content Lead Studio.",
             deniedCopy: "Bạn sẽ được chuyển đến trang phù hợp với phiên đăng nhập hiện tại.",
           },
           header: {
             eyebrow: "Moodify Content Lead",
-            title: "Dashboard Phụ trách Nội dung",
+            title: "Dashboard phụ trách nội dung",
             searchLabel: "Tìm kiếm dashboard",
             searchPlaceholder: "Tìm bài hát, chiến dịch, người hâm mộ...",
-            studio: "Content Lead Studio",
+            studio: "Studio phụ trách nội dung",
           },
           upload: {
             upgrade: "Mở khóa upload không giới hạn",
@@ -209,18 +209,18 @@ export const resources = {
             eyebrow: "Gợi ý quản trị nội dung",
           },
           studio: {
-            eyebrow: "Content Lead",
-            insight: "Insights",
+            eyebrow: "Phụ trách nội dung",
+            insight: "Thông số chuyên sâu",
             earnings: "Doanh thu",
-            fans: "Fans",
+            fans: "Người hâm mộ",
             benefits: "Quyền lợi",
           },
           stats: {
-            plays: "SC plays",
-            reposts: "Reposts",
-            downloads: "Downloads",
-            likes: "Likes",
-            comments: "Comments",
+            plays: "Lượt phát",
+            reposts: "Lượt chia sẻ",
+            downloads: "Lượt tải",
+            likes: "Lượt thích",
+            comments: "Bình luận",
           },
           release: {
             eyebrow: "Nhịp phát hành",
@@ -251,7 +251,7 @@ export const resources = {
           audience: {
             eyebrow: "Phân phối nội dung",
             title: "Kênh tiếp cận đa nền tảng",
-            subtitle: "Lượt tiếp cận thính giả đa kênh (Cross-platform Listeners)",
+            subtitle: "Lượt tiếp cận thính giả đa nền tảng",
           },
           actions: {
             eyebrow: "Hành động studio",

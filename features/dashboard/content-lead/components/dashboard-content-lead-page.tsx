@@ -101,7 +101,7 @@ const KEYFRAMES = `
 const RELEASES: Release[] = [
   {
     title: "Neon Horizon - Extended EP",
-    type: "EP Release (5 Tracks)",
+    type: "Phát hành EP (5 bài hát)",
     stage: "Đang hoàn thiện Master",
     date: "18/03/2026",
     progress: "85%",
@@ -109,7 +109,7 @@ const RELEASES: Release[] = [
   },
   {
     title: "Midnight Echoes (Acoustic Version)",
-    type: "Single / Video Clip",
+    type: "Đĩa đơn / Video âm nhạc",
     stage: "Lên lịch phát hành",
     date: "25/03/2026",
     progress: "50%",
@@ -117,7 +117,7 @@ const RELEASES: Release[] = [
   },
   {
     title: "Cyberpunk Tokyo Vinyl Edition",
-    type: "Physical Drop (500 copies)",
+    type: "Bản đĩa vật lý (500 bản)",
     stage: "Đặt trước đợt 1",
     date: "10/04/2026",
     progress: "30%",
@@ -394,7 +394,7 @@ function StatCard({ item, delay }: { item: Stat; delay: number }) {
       <p className="mt-5 font-graphik text-[28px] font-semibold leading-none tracking-[-0.025em] text-white">
         {item.value}
       </p>
-      <p className="mt-2 text-[12px] font-medium tracking-[0.06em] text-white/46 uppercase">
+      <p className="mt-2 text-[12px] font-medium tracking-[0.06em] text-white/46">
         {t(`dashboard.artist.stats.${item.key}`)}
       </p>
     </div>
@@ -537,7 +537,7 @@ function TracksPanel({
         >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
+              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff]">
                 {t("dashboard.artist.release.eyebrow")}
               </p>
               <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
@@ -605,7 +605,7 @@ function CommentsPanel() {
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
+          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">
             {t("dashboard.artist.commentsPanel.eyebrow")}
           </p>
           <h3 className="mt-2 font-graphik text-[26px] font-semibold tracking-[-0.02em] text-white">
@@ -676,7 +676,7 @@ function RightRail() {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff]">
               {t("dashboard.artist.audience.eyebrow")}
             </p>
             <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
@@ -695,7 +695,7 @@ function RightRail() {
             18.4K
           </p>
           <p className="mt-2 max-w-[240px] text-[13px] leading-6 text-white/58">
-            {t("dashboard.artist.audience.subtitle", "Lượt tiếp cận thính giả đa kênh (Cross-platform Listeners)")}
+            {t("dashboard.artist.audience.subtitle", "Lượt tiếp cận thính giả đa nền tảng")}
           </p>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
             <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#8fb4ff_0%,#dce9ff_100%)]" />
@@ -724,7 +724,7 @@ function RightRail() {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">
               {t("dashboard.artist.analytics.eyebrow")}
             </p>
             <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
@@ -738,7 +738,7 @@ function RightRail() {
             {
               icon: Bell,
               title: "Hoàn thiện bản quyền tác giả",
-              copy: "Đăng ký ISRC code cho single Midnight Echoes trước ngày phát hành.",
+              copy: "Đăng ký mã ISRC cho đĩa đơn Midnight Echoes trước ngày phát hành.",
             },
             {
               icon: CircleDollarSign,
@@ -747,8 +747,8 @@ function RightRail() {
             },
             {
               icon: Flame,
-              title: "Tăng tốc quảng bá Single mới",
-              copy: "Gửi bản nghe thử tới 12 Playlist Curators hàng đầu trên hệ thống.",
+              title: "Tăng tốc quảng bá đĩa đơn mới",
+              copy: "Gửi bản nghe thử tới 12 Curators danh sách phát hàng đầu trên hệ thống.",
             },
           ].map((task, index) => {
             const Icon = task.icon;
@@ -1320,7 +1320,7 @@ export default function ContentLeadDashboardPage() {
                 <p className="text-[13px] text-white font-medium">
                   {artistDisplayName}
                 </p>
-                <p className="mt-0.5 text-[11px] tracking-[0.16em] text-white/42 uppercase">
+                <p className="mt-0.5 text-[11px] tracking-[0.16em] text-white/42">
                   {t("dashboard.artist.header.studio")}
                 </p>
               </div>
@@ -1348,15 +1348,15 @@ export default function ContentLeadDashboardPage() {
             >
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
                 <div>
-                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">{t("dashboard.artist.studio.eyebrow")}</p>
+                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">{t("dashboard.artist.studio.eyebrow")}</p>
                   <div className="mt-4 flex flex-wrap items-end gap-3">
                     <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
                       {artistDisplayName}
                     </h2>
-                    <p className="pb-1 text-[14px] text-white/52">Content Lead Verified</p>
+                    <p className="pb-1 text-[14px] text-white/52">Phụ trách nội dung</p>
                   </div>
                   <p className="mt-4 max-w-[640px] text-[15px] leading-7 text-white/60">
-                    Chào mừng bạn quay lại Trung tâm Quản lý Nội dung số. Quản lý các bản phát hành, theo dõi tương tác của thính giả và tối ưu hóa từng tác phẩm nội dung trên Moodify.
+                    Chào mừng bạn quay lại trung tâm quản lý nội dung số. Quản lý các bản phát hành, theo dõi tương tác của thính giả và tối ưu hóa từng tác phẩm nội dung trên Moodify.
                   </p>
                 </div>
 
@@ -1390,7 +1390,7 @@ export default function ContentLeadDashboardPage() {
                 {[
                   { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nội dung thịnh hành" },
                   { icon: CircleDollarSign, label: t("dashboard.artist.studio.earnings"), copy: "$1,420.80 tháng này" },
-                  { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 fans theo dõi mới" },
+                  { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 người theo dõi mới" },
                   { icon: Sparkles, label: t("dashboard.artist.studio.benefits"), copy: "Đặc quyền phân phối cấp 2" },
                 ].map((item, index) => {
                   const Icon = item.icon;

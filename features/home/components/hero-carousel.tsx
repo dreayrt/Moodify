@@ -656,18 +656,18 @@ export function HeroCarousel() {
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
                 <button
-                  className="inline-flex h-11 items-center justify-center rounded-full border border-white/14 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition duration-300 hover:border-white/28 hover:bg-white/16"
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-white/14 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition duration-300 hover:border-white/28 hover:bg-white/16 cursor-pointer"
                   onClick={openSignIn}
                   type="button"
                 >
-                  Log in
+                  Đăng nhập
                 </button>
                 <button
-                  className="inline-flex h-11 items-center justify-center rounded-full bg-white px-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0d0d11] transition duration-300 hover:scale-105 hover:bg-white/90"
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-white px-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0d0d11] transition duration-300 hover:scale-105 hover:bg-white/90 cursor-pointer"
                   onClick={openCreateAccount}
                   type="button"
                 >
-                  Join now
+                  Tham gia ngay
                 </button>
               </div>
             )}
@@ -853,10 +853,10 @@ function SignInModal({
 
         <div className="relative flex items-start justify-between gap-4">
           <div className="modal-item">
-            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-white/45">
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-white/45 font-mono">
               {"Đăng nhập"}
             </p>
-            <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-[-0.025em] leading-[1.05] text-white sm:text-[3rem]">
+            <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-[-0.025em] leading-[1.05] sm:text-[3rem] title-gradient-flow">
               Moodify
             </h2>
             <div className="mt-4 h-px w-20 bg-[linear-gradient(90deg,rgba(255,124,56,0.65),rgba(255,255,255,0.06))]" />
@@ -1136,10 +1136,10 @@ function CreateAccountModal({
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ff7c38]/30 bg-[#ff7c38]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#ff9359]">
                     Moodify Studio Pass
                   </span>
-                  <h2 className="font-display mt-2 text-2xl font-bold uppercase tracking-[-0.02em] leading-tight text-white sm:text-3xl">
+                  <h2 className="font-display mt-2 text-2xl font-bold uppercase tracking-[-0.02em] leading-tight text-white sm:text-3xl title-gradient-flow">
                     Join Moodify
                   </h2>
-                  <p className="mt-1.5 text-xs leading-relaxed text-white/60">
+                  <p className="mt-1.5 text-xs leading-relaxed text-white/70 desc-readable">
                     Chọn vai trò để mở khóa các đặc quyền âm nhạc riêng biệt trên Moodify.
                   </p>
                 </div>

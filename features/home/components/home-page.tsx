@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
+import { BrandLogo } from "@/components/shared/logo-mark";
 import { HeroCarousel } from "@/features/home/components/hero-carousel";
 
 const HOME_ROUTE = "/";
@@ -8,30 +8,30 @@ const HOME_ROUTE = "/";
 const playlists = [
   {
     title: "Midnight Drift",
-    meta: "Synthwave, alt-pop, after-hours cuts",
+    meta: "Synthwave, alt-pop, giai điệu đêm muộn",
     accent: "from-[#f56600] via-[#ff9151] to-[#fbcfb2]",
   },
   {
     title: "Quiet Focus",
-    meta: "Lo-fi, ambient textures, piano sketches",
+    meta: "Lo-fi, ambient, giai điệu piano nhẹ nhàng",
     accent: "from-[#275d73] via-[#4da5a4] to-[#d6f1eb]",
   },
   {
     title: "Underground Heat",
-    meta: "Club edits, afro-house, rap discoveries",
+    meta: "Club edits, afro-house, khám phá rap mới",
     accent: "from-[#462449] via-[#8c4dd6] to-[#f2b3ff]",
   },
 ];
 
 const footerLinks = [
-  "About",
-  "Artists",
-  "Newsroom",
-  "Licensing",
-  "Support",
-  "Privacy",
-  "Cookies",
-  "Developers",
+  "Giới thiệu",
+  "Nghệ sĩ",
+  "Tin tức",
+  "Bản quyền",
+  "Hỗ trợ",
+  "Quyền riêng tư",
+  "Cookie",
+  "Nhà phát triển",
 ];
 
 export default function Home() {
@@ -44,36 +44,38 @@ export default function Home() {
           <div className="flex w-full max-w-3xl items-center gap-3 rounded-full border border-white/10 bg-white/6 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur">
             <SearchIcon />
             <input
-              aria-label="Search artists, tracks and playlists"
+              aria-label="Tìm kiếm nghệ sĩ, bài hát và danh sách phát"
               className="w-full bg-transparent text-base text-white outline-none placeholder:text-white/45"
-              placeholder="Search for artists, bands, tracks, playlists"
+              placeholder="Tìm kiếm nghệ sĩ, nhóm nhạc, bài hát, danh sách phát..."
             />
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <button className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#101010] transition hover:scale-[1.01]">
-              Upload your own
+            <button className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#101010] transition hover:scale-[1.01] cursor-pointer">
+              Tải nhạc của bạn
             </button>
-            <button className="rounded-full border border-white/12 bg-white/6 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-              Explore artist tools
+            <button className="rounded-full border border-white/12 bg-white/6 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 cursor-pointer">
+              Khám phá công cụ nghệ sĩ
             </button>
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[2rem] border border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.32)]">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
-              Listen Anywhere
-            </p>
-            <h2 className="font-display max-w-md text-4xl font-bold uppercase tracking-[-0.02em] leading-[1.05] sm:text-5xl">
-              Never Stop Listening
-            </h2>
-            <div className="mt-8 grid gap-6 md:grid-cols-[180px_1fr] md:items-center">
-              <div className="grid h-[180px] w-[180px] grid-cols-6 gap-1 rounded-[1.5rem] bg-white p-3">
+        <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <div className="flex flex-col justify-between rounded-[2rem] border border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-7 sm:p-8 shadow-[0_30px_80px_rgba(0,0,0,0.32)]">
+            <div>
+              <p className="mb-3 text-[11px] font-semibold tracking-[0.08em] text-[var(--text-muted)] font-mono">
+                Nghe nhạc mọi nơi
+              </p>
+              <h2 className="font-display text-2xl sm:text-3xl lg:text-[32px] font-bold tracking-tight leading-snug title-gradient-flow">
+                Âm nhạc không ngừng nghỉ
+              </h2>
+            </div>
+            <div className="mt-6 grid gap-5 sm:grid-cols-[150px_1fr] sm:items-center">
+              <div className="grid h-[150px] w-[150px] shrink-0 grid-cols-6 gap-1 rounded-[1.25rem] bg-white p-2.5">
                 {Array.from({ length: 36 }).map((_, index) => (
                   <div
                     key={index}
-                    className={`rounded-[4px] ${
+                    className={`rounded-[3px] ${
                       index % 5 === 0 || index % 7 === 0
                         ? "bg-[#111111]"
                         : "bg-transparent"
@@ -81,47 +83,44 @@ export default function Home() {
                   />
                 ))}
               </div>
-              <p className="max-w-md text-base leading-7 text-[var(--text-secondary)]">
-                Moodify looks great on web, tablet, mobile and smart speakers.
-                Keep the visual direction bold while letting the content stay
-                centered and easy to scan.
+              <p className="text-sm leading-6 desc-readable">
+                Moodify tương thích mượt mà trên web, máy tính bảng, điện thoại và loa thông minh.
+                Trải nghiệm thị giác hiện đại, giúp bạn dễ dàng khám phá và lắng nghe âm nhạc mọi lúc mọi nơi.
               </p>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[2rem] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,112,43,0.24),transparent_38%),linear-gradient(145deg,#17171c,#0d0d10_62%,#17171f)] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.36)]">
-            <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-              <div className="min-h-[300px] overflow-hidden rounded-[1.75rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] p-5">
-                <div className="relative h-full min-h-[260px] overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,#173246_0%,#0d1220_58%,#090a0f_100%)]">
-                  <div className="absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,154,104,0.55),transparent_58%)]" />
-                  <div className="absolute -bottom-10 left-4 h-56 w-40 rounded-[2rem] bg-[linear-gradient(180deg,#ff7f3f,#ef4a17)] opacity-90 shadow-[0_0_80px_rgba(255,101,37,0.28)]" />
-                  <div className="absolute bottom-0 left-24 h-64 w-52 rounded-t-[45%] rounded-b-[18%] bg-[linear-gradient(180deg,#f3f3f3_0%,#979797_32%,#202020_100%)]" />
-                  <div className="absolute right-6 top-6 h-24 w-24 rounded-full border border-white/35 bg-[radial-gradient(circle_at_35%_35%,#ffffff_0%,#8e7aff_28%,#201c35_72%,#09090c_100%)] shadow-[0_0_40px_rgba(139,120,255,0.3)]" />
-                  <div className="absolute bottom-6 right-6 max-w-[180px] rounded-3xl border border-white/10 bg-black/30 px-4 py-3 backdrop-blur">
-                    <p className="text-xs uppercase tracking-[0.28em] text-white/55">
-                      Creator kit
+          <div className="flex flex-col justify-between overflow-hidden rounded-[2rem] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,112,43,0.24),transparent_38%),linear-gradient(145deg,#17171c,#0d0d10_62%,#17171f)] p-7 sm:p-8 shadow-[0_30px_80px_rgba(0,0,0,0.36)]">
+            <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:items-center">
+              <div className="h-[220px] overflow-hidden rounded-[1.5rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] p-3">
+                <div className="relative h-full overflow-hidden rounded-[1.15rem] bg-[linear-gradient(180deg,#173246_0%,#0d1220_58%,#090a0f_100%)]">
+                  <div className="absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,154,104,0.55),transparent_58%)]" />
+                  <div className="absolute -bottom-8 left-2 h-44 w-32 rounded-[1.5rem] bg-[linear-gradient(180deg,#ff7f3f,#ef4a17)] opacity-90 shadow-[0_0_60px_rgba(255,101,37,0.28)]" />
+                  <div className="absolute bottom-0 left-16 h-52 w-40 rounded-t-[45%] rounded-b-[18%] bg-[linear-gradient(180deg,#f3f3f3_0%,#979797_32%,#202020_100%)]" />
+                  <div className="absolute right-4 top-4 h-16 w-16 rounded-full border border-white/35 bg-[radial-gradient(circle_at_35%_35%,#ffffff_0%,#8e7aff_28%,#201c35_72%,#09090c_100%)] shadow-[0_0_30px_rgba(139,120,255,0.3)]" />
+                  <div className="absolute bottom-3 right-3 max-w-[150px] rounded-2xl border border-white/10 bg-black/40 p-2.5 backdrop-blur">
+                    <p className="text-[10px] tracking-[0.08em] text-white/55 font-mono">
+                      Bộ sáng tạo
                     </p>
-                    <p className="mt-2 text-sm font-medium text-white/80">
-                      Abstract visual block you can swap with generated banner
-                      art later.
+                    <p className="mt-1 text-xs leading-4 font-medium text-white/80 desc-readable">
+                      Không gian hình ảnh nghệ thuật cho các bản phát hành.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
-                  For Creators
+                <p className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-[var(--text-muted)] font-mono">
+                  Dành cho nhà sáng tạo
                 </p>
-                <h2 className="font-display text-4xl font-bold uppercase tracking-[-0.02em] leading-[1.05] sm:text-5xl">
-                  Calling All Creators
+                <h2 className="font-display text-2xl sm:text-3xl lg:text-[32px] font-bold tracking-tight leading-snug title-hover-glow">
+                  Mở khóa tiềm năng sáng tạo
                 </h2>
-                <p className="mt-5 max-w-md text-base leading-7 text-[var(--text-secondary)]">
-                  This block matches the hero direction and gives you a reusable
-                  area for campaigns, creator onboarding or spotlight releases.
+                <p className="mt-3 text-sm leading-6 desc-readable">
+                  Không gian chuyên biệt dành cho các nghệ sĩ, quản lý bản phát hành và tiếp cận hàng triệu thính giả trên Moodify.
                 </p>
-                <button className="mt-8 rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#111111] transition hover:scale-[1.01]">
-                  Find out more
+                <button className="mt-6 rounded-full bg-white px-5 py-2.5 text-xs font-semibold text-[#111111] transition hover:scale-[1.02] cursor-pointer">
+                  Tìm hiểu thêm
                 </button>
               </div>
             </div>
@@ -131,15 +130,15 @@ export default function Home() {
         <section className="space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--text-muted)]">
-                Trending Now
+              <p className="text-[11px] font-semibold tracking-[0.08em] text-[#ff7a2c] font-mono">
+                Xu hướng hiện tại
               </p>
-              <h2 className="font-display mt-2 text-3xl font-bold uppercase tracking-[-0.02em] sm:text-4xl">
-                Hear What&apos;s Next
+              <h2 className="font-display mt-1.5 text-2xl sm:text-3xl font-bold tracking-tight leading-snug title-hover-glow">
+                Lắng nghe giai điệu mới
               </h2>
             </div>
-            <button className="w-fit rounded-full border border-white/12 bg-white/6 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-              Explore trending playlists
+            <button className="w-fit rounded-full border border-white/12 bg-white/6 px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-white/10 cursor-pointer">
+              Khám phá danh sách phát thịnh hành
             </button>
           </div>
 
@@ -156,7 +155,7 @@ export default function Home() {
                   <h3 className="text-xl font-semibold text-white">
                     {playlist.title}
                   </h3>
-                  <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                  <p className="text-sm leading-6 desc-readable">
                     {playlist.meta}
                   </p>
                 </div>

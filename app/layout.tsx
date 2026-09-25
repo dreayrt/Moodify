@@ -1,14 +1,29 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Sora, Be_Vietnam_Pro, Space_Grotesk } from "next/font/google";
 
 import { I18nProvider } from "@/components/i18n/i18n-provider";
 
 import "./globals.css";
 
-const nunito = Nunito({
-  subsets: ["latin", "latin-ext", "vietnamese"],
-  variable: "--font-nunito",
+const sora = Sora({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-sora",
   display: "swap",
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  variable: "--font-be-vietnam-pro",
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -46,7 +61,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" suppressHydrationWarning className={`${nunito.variable} ${nunito.className}`}>
+    <html
+      lang="vi"
+      suppressHydrationWarning
+      className={`${sora.variable} ${beVietnamPro.variable} ${spaceGrotesk.variable}`}
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -88,7 +107,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${nunito.className} font-sans`} suppressHydrationWarning>
+      <body className={`${beVietnamPro.className} font-sans`} suppressHydrationWarning>
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>

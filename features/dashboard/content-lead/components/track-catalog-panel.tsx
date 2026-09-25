@@ -701,7 +701,7 @@ export function TrackCatalogPanel({
         <span>
           Đang hiển thị <strong className="text-white/80">{filteredTracks.length}</strong> / {tracks.length} bài hát
         </span>
-        <span>Studio Audio Engine v2.4 • Moodify</span>
+        <span>Bộ xử lý âm thanh Studio v2.4 • Moodify</span>
       </div>
     </div>
   );
