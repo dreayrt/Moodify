@@ -171,6 +171,8 @@ function TrackRow({
   active: boolean;
   playing: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   vipTheme?: ThemeOption | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -188,6 +190,8 @@ function TrackRow({
       {/* Top Track Row */}
       <div
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         className="group w-full grid grid-cols-[28px_46px_1fr_auto_32px] items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-left cursor-pointer transition-all"
         style={{
           animation: `lumenFadeIn 500ms cubic-bezier(0.16,1,0.3,1) both`,
@@ -431,8 +435,23 @@ function LumenHeroContent() {
   const [activeVibe, setActiveVibe] = useState<string>(vibeFromUrl);
   const [viewMode, setViewMode] = useState<"lyrics" | "hero">("hero");
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
+  const [hoveredTrackIdx, setHoveredTrackIdx] = useState<number | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
+
+  // Determine the track currently in spotlight (hovered > playing > selected by index > first track)
+  const activeSelectedTrack =
+    (hoveredTrackIdx !== null ? tracks[hoveredTrackIdx] : null) ||
+    tracks.find(
+      (t) =>
+        t.spotifyId &&
+        currentTrack?.spotifyId &&
+        t.spotifyId === currentTrack.spotifyId
+    ) ||
+    tracks[activeTrackIdx] ||
+    tracks[0];
+
+  const selectedImageUrl = currentTrack?.imageUrl || activeSelectedTrack?.raw?.imageUrl;
 
   useEffect(() => {
     if (vibeFromUrl) {
@@ -730,17 +749,62 @@ function LumenHeroContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      const firstPlayable = tracks.find((t) => t.raw?.localPath) || tracks[0];
-                      if (firstPlayable) handlePlayTrack(firstPlayable, 0);
+                      if (isPlaying && currentTrack?.spotifyId === activeSelectedTrack?.spotifyId) {
+                        togglePlay();
+                      } else {
+                        const target =
+                          activeSelectedTrack?.raw?.localPath
+                            ? activeSelectedTrack
+                            : tracks.find((t) => t.raw?.localPath) || activeSelectedTrack || tracks[0];
+                        if (target) handlePlayTrack(target);
+                      }
                     }}
-                    className={`flex items-center gap-2.5 px-6 py-3 rounded-full text-[13px] font-bold tracking-wide hover:scale-105 active:scale-95 transition-all cursor-pointer ${
+                    className={`group relative flex items-center gap-2.5 px-6 py-3 rounded-full text-[13px] font-bold tracking-wide hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer overflow-hidden border shadow-lg ${
                       isVipButtonsActive
-                        ? currentVipTheme.primaryBtnClass
-                        : "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-[0_8px_25px_rgba(168,85,247,0.45)]"
+                        ? "shadow-[0_8px_25px_rgba(0,0,0,0.6)]"
+                        : "border-white/30 hover:border-white/60 shadow-[0_8px_25px_rgba(0,0,0,0.5)]"
                     }`}
+                    style={{
+                      borderColor: isVipButtonsActive ? currentVipTheme.accent : undefined,
+                      boxShadow: isVipButtonsActive
+                        ? `0 0 20px ${currentVipTheme.accent}40, 0 8px 25px rgba(0,0,0,0.6)`
+                        : undefined,
+                    }}
+                    title={
+                      activeSelectedTrack
+                        ? `Phát: ${activeSelectedTrack.title} - ${activeSelectedTrack.artist}`
+                        : "Nghe ngay"
+                    }
                   >
-                    <Play className="w-4 h-4 fill-current ml-0.5" />
-                    <span>Nghe ngay</span>
+                    {/* Background layer: Song artwork cover image */}
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-115"
+                      style={{
+                        backgroundImage: selectedImageUrl
+                          ? isVipButtonsActive
+                            ? `linear-gradient(135deg, ${currentVipTheme.accent}50 0%, rgba(0, 0, 0, 0.72) 100%), url(${selectedImageUrl})`
+                            : `linear-gradient(135deg, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.68) 100%), url(${selectedImageUrl})`
+                          : isVipButtonsActive
+                          ? undefined
+                          : "linear-gradient(135deg, #a855f7 0%, #ec4899 100%)",
+                        backgroundColor: "#1a1336",
+                      }}
+                    />
+
+                    {/* Shimmer sweep effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
+
+                    {/* Button content */}
+                    {isPlaying && currentTrack?.spotifyId === activeSelectedTrack?.spotifyId ? (
+                      <Pause className="w-4 h-4 fill-current ml-0.5 relative z-10 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                    ) : (
+                      <Play className="w-4 h-4 fill-current ml-0.5 relative z-10 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                    )}
+                    <span className="relative z-10 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                      {isPlaying && currentTrack?.spotifyId === activeSelectedTrack?.spotifyId
+                        ? "Tạm dừng"
+                        : "Nghe ngay"}
+                    </span>
                   </button>
 
                   <button
@@ -800,8 +864,8 @@ function LumenHeroContent() {
                     <div
                       className="relative w-44 h-44 md:w-48 md:h-48 rounded-full border-2 border-white/30 shadow-2xl overflow-hidden flex items-center justify-center"
                       style={{
-                        background: currentTrack?.imageUrl
-                          ? `url(${currentTrack.imageUrl}) center/cover no-repeat`
+                        background: selectedImageUrl
+                          ? `url(${selectedImageUrl}) center/cover no-repeat`
                           : (tracks[0]?.cover || "linear-gradient(135deg,#7A5CFF,#F557B6)"),
                       }}
                     >
@@ -855,6 +919,8 @@ function LumenHeroContent() {
                         currentTrack?.spotifyId === track.spotifyId && isPlaying
                       }
                       onClick={() => handlePlayTrack(track, originalIndex)}
+                      onMouseEnter={() => setHoveredTrackIdx(originalIndex)}
+                      onMouseLeave={() => setHoveredTrackIdx(null)}
                     />
                   ))}
               </div>
@@ -879,6 +945,8 @@ function LumenHeroContent() {
                         currentTrack?.spotifyId === track.spotifyId && isPlaying
                       }
                       onClick={() => handlePlayTrack(track, originalIndex)}
+                      onMouseEnter={() => setHoveredTrackIdx(originalIndex)}
+                      onMouseLeave={() => setHoveredTrackIdx(null)}
                     />
                   ))}
               </div>
@@ -899,6 +967,8 @@ function LumenHeroContent() {
                   }
                   playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
                   onClick={() => handlePlayTrack(t, i)}
+                  onMouseEnter={() => setHoveredTrackIdx(i)}
+                  onMouseLeave={() => setHoveredTrackIdx(null)}
                 />
               ))}
             </div>
