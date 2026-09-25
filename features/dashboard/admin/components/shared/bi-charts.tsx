@@ -11,7 +11,7 @@ const VIBE_CONFIG: Record<
   string,
   { label: string; color: string; bg: string; border: string }
 > = {
-  Energetic: { label: "Hưng phấn (Energetic)", color: "#ff7a2c", bg: "bg-[#ff7a2c]/10", border: "border-[#ff7a2c]/30" },
+  Energetic: { label: "Hưng phấn (Energetic)", color: "#ff5500", bg: "bg-[#ff5500]/10", border: "border-[#ff5500]/30" },
   Chill: { label: "Thư thái (Chill)", color: "#00f2fe", bg: "bg-[#00f2fe]/10", border: "border-[#00f2fe]/30" },
   Sadness: { label: "Tâm trạng (Sadness)", color: "#818cf8", bg: "bg-[#818cf8]/10", border: "border-[#818cf8]/30" },
   Focus: { label: "Tập trung (Focus)", color: "#10b981", bg: "bg-[#10b981]/10", border: "border-[#10b981]/30" },
@@ -223,11 +223,11 @@ export function RevenueVelocityChart() {
       <div className="flex items-center justify-between mb-3 text-xs">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-[#ff7a2c]" />
+            <span className="h-2 w-2 rounded-sm bg-[#ff5500]" />
             <span className="text-zinc-300 font-medium">Lượt stream tuần (nghìn lượt)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-[#00f2fe]" />
+            <span className="h-2 w-2 rounded-sm bg-zinc-500" />
             <span className="text-zinc-400">Doanh thu dự phóng</span>
           </div>
         </div>
@@ -239,7 +239,7 @@ export function RevenueVelocityChart() {
       {/* Floating Tooltip */}
       {hoveredPoint && (
         <div
-          className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full rounded-xl border border-[#ff7a2c]/40 bg-[#070a10]/95 px-3 py-2 text-xs shadow-2xl backdrop-blur-md transition-all duration-150 min-w-[140px]"
+          className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full rounded-xl border border-[#222432] bg-[#12131a]/95 px-3 py-2 text-xs shadow-2xl backdrop-blur-md transition-all duration-150 min-w-[140px]"
           style={{
             left: `${(hoveredPoint.x / width) * 100}%`,
             top: `${Math.max(10, (hoveredPoint.y / height) * 100 - 10)}%`,
@@ -252,11 +252,11 @@ export function RevenueVelocityChart() {
           <div className="space-y-1 font-mono text-[11px]">
             <div className="flex items-center justify-between gap-3 text-zinc-300">
               <span className="text-zinc-400">Streams:</span>
-              <span className="font-bold text-[#ff9b57]">{hoveredPoint.streams.toLocaleString()}k</span>
+              <span className="font-bold text-[#ff5500]">{hoveredPoint.streams.toLocaleString()}k</span>
             </div>
             <div className="flex items-center justify-between gap-3 text-zinc-300">
               <span className="text-zinc-400">Dự phóng:</span>
-              <span className="font-bold text-[#00f2fe]">{hoveredPoint.revenue}M đ</span>
+              <span className="font-bold text-zinc-200">{hoveredPoint.revenue}M đ</span>
             </div>
           </div>
         </div>
@@ -270,8 +270,8 @@ export function RevenueVelocityChart() {
       >
         <defs>
           <linearGradient id="streamGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ff7a2c" stopOpacity="0.30" />
-            <stop offset="100%" stopColor="#ff7a2c" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#ff5500" stopOpacity="0.30" />
+            <stop offset="100%" stopColor="#ff5500" stopOpacity="0.0" />
           </linearGradient>
         </defs>
 
@@ -298,7 +298,7 @@ export function RevenueVelocityChart() {
         <path
           d={pathD}
           fill="none"
-          stroke="#ff7a2c"
+          stroke="#ff5500"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -311,7 +311,7 @@ export function RevenueVelocityChart() {
             y1={padY}
             x2={hoveredPoint.x}
             y2={height - padY}
-            stroke="#ff7a2c"
+            stroke="#ff5500"
             strokeDasharray="3 3"
             strokeWidth="1.5"
             opacity="0.8"
@@ -329,7 +329,7 @@ export function RevenueVelocityChart() {
                   cx={p.x}
                   cy={p.y}
                   r="9"
-                  fill="#ff7a2c"
+                  fill="#ff5500"
                   opacity="0.3"
                   className="animate-ping"
                 />
@@ -339,8 +339,8 @@ export function RevenueVelocityChart() {
                 cx={p.x}
                 cy={p.y}
                 r={isHovered ? 5.5 : 4}
-                fill={isHovered ? "#ff7a2c" : "#08090c"}
-                stroke={isHovered ? "#ffffff" : "#ff7a2c"}
+                fill={isHovered ? "#ff5500" : "#08090c"}
+                stroke={isHovered ? "#ffffff" : "#ff5500"}
                 strokeWidth={isHovered ? 2.5 : 2}
                 className="transition-all duration-200"
               />
@@ -398,119 +398,117 @@ export function DatabaseTelemetryCard({
     <div className="space-y-4">
       {/* 2 Database Nodes Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Node 1: Core Transactional & IAM Cluster */}
-        <div className="rounded-xl border border-emerald-500/20 bg-[#080d14] p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+        {/* Node 1: Core Transactional & User Cluster */}
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 flex flex-col justify-between shadow-sm">
           <div>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-mono font-bold text-sm">
-                  IAM
+                <div className="grid h-10 w-10 place-items-center rounded-lg border border-[#ff5500]/30 bg-[#ff5500]/10 text-[#ff5500] font-mono font-bold text-xs">
+                  AUTH
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h5 className="text-base font-bold text-white tracking-tight">Phân Hệ Nghiệp Vụ &amp; Giao Dịch</h5>
-                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    <h5 className="text-base font-bold text-white tracking-tight">Phân Hệ Tài Khoản &amp; Giao Dịch</h5>
+                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold bg-[#ff5500]/15 text-[#ff8c42] border border-[#ff5500]/30">
                       Bảo Toàn Giao Dịch
                     </span>
                   </div>
                   <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                    Định danh: <span className="text-white font-semibold">SYS-IAM-01</span> · Trạng thái: <span className="text-emerald-300 font-semibold">Đồng bộ liên tục</span>
+                    Hệ thống: <span className="text-white font-semibold">Moodify Core Storage</span> · Trạng thái: <span className="text-emerald-300 font-semibold">Đồng bộ liên tục</span>
                   </p>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-mono font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                ACID Live
+                Trực Tuyến
               </span>
             </div>
 
             {/* Purpose & Responsibility */}
-            <div className="mt-4 p-3 rounded-lg border border-emerald-500/15 bg-emerald-950/20 text-xs leading-relaxed text-zinc-200">
-              <span className="text-emerald-400 font-bold block mb-1">Nhiệm Vụ Kiến Trúc:</span>
-              Đảm bảo <strong>tính toàn vẹn giao dịch (ACID)</strong>, quản lý tài khoản định danh người dùng, kiểm soát phân quyền IAM, bảng giá gói cước và dòng tiền thanh toán VNPAY/MOMO không được phép thất thoát.
+            <div className="mt-4 p-3 rounded-lg border border-[#222432] bg-[#171822] text-xs leading-relaxed text-zinc-300">
+              <span className="text-[#ff5500] font-bold block mb-1">Nhiệm Vụ Chính:</span>
+              Quản lý tài khoản người dùng, phân quyền truy cập quản trị viên và nghệ sĩ, quản lý bảng giá các gói thuê bao và đối soát giao dịch thanh toán trực tuyến.
             </div>
 
             {/* Managed Entities */}
             <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
-                <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Tài Khoản IAM Users</span>
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
+                <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Tài Khoản Người Dùng</span>
                 <span className="font-bold text-white text-sm mt-0.5 block">{usersCount} tài khoản</span>
-                <span className="text-[10px] text-zinc-500 font-mono">users, roles, permissions</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Người dùng &amp; phân quyền</span>
               </div>
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
                 <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Gói Cước &amp; Thuê Bao</span>
-                <span className="font-bold text-emerald-300 text-sm mt-0.5 block">{packagesCount} gói đang bán</span>
-                <span className="text-[10px] text-zinc-500 font-mono">service_packages, subs</span>
+                <span className="font-bold text-[#ff8c42] text-sm mt-0.5 block">{packagesCount} gói đang bán</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Gói dịch vụ &amp; thuê bao</span>
               </div>
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
                 <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Bản Quyền &amp; Hợp Đồng</span>
                 <span className="font-bold text-white text-sm mt-0.5 block">147 bản ghi phép</span>
-                <span className="text-[10px] text-zinc-500 font-mono">song_licenses, contracts</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Hợp đồng &amp; giấy phép</span>
               </div>
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
-                <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Giao Dịch Tài Chính</span>
-                <span className="font-bold text-amber-300 text-sm mt-0.5 block">VNPAY · MOMO</span>
-                <span className="text-[10px] text-zinc-500 font-mono">payment_transactions</span>
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
+                <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Giao Dịch Thanh Toán</span>
+                <span className="font-bold text-emerald-400 text-sm mt-0.5 block">Cổng Trực Tuyến</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Lịch sử thanh toán</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Node 2: Catalog & Streaming Cluster */}
-        <div className="rounded-xl border border-cyan-500/20 bg-[#080d14] p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 flex flex-col justify-between shadow-sm">
           <div>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 font-mono font-bold text-sm">
-                  CAT
+                <div className="grid h-10 w-10 place-items-center rounded-lg border border-[#ff5500]/30 bg-[#ff5500]/10 text-[#ff5500] font-mono font-bold text-xs">
+                  SONG
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h5 className="text-base font-bold text-white tracking-tight">Phân Hệ Âm Nhạc &amp; Streaming</h5>
-                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                      Truy Xuất Tốc Độ Cao
+                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold bg-[#ff5500]/15 text-[#ff8c42] border border-[#ff5500]/30">
+                      Truy Xuất Nhanh
                     </span>
                   </div>
                   <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                    Định danh: <span className="text-white font-semibold">SYS-CAT-02</span> · Trạng thái: <span className="text-cyan-300 font-semibold">Sẵn sàng trực tuyến</span>
+                    Hệ thống: <span className="text-white font-semibold">Moodify Music Store</span> · Trạng thái: <span className="text-emerald-300 font-semibold">Sẵn sàng phục vụ</span>
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-mono font-semibold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30">
-                <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-                Catalog Live
+              <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-mono font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                Trực Tuyến
               </span>
             </div>
 
             {/* Purpose & Responsibility */}
-            <div className="mt-4 p-3 rounded-lg border border-cyan-500/15 bg-cyan-950/20 text-xs leading-relaxed text-zinc-200">
-              <span className="text-cyan-400 font-bold block mb-1">Nhiệm Vụ Kiến Trúc:</span>
-              Lưu trữ danh mục âm nhạc quy mô lớn với <strong>tốc độ đọc throughput cực cao</strong>, cấu trúc dữ liệu linh hoạt chứa siêu dữ liệu bài hát, hồ sơ nghệ sĩ, đường dẫn âm thanh và vector đặc trưng âm học AI.
+            <div className="mt-4 p-3 rounded-lg border border-[#222432] bg-[#171822] text-xs leading-relaxed text-zinc-300">
+              <span className="text-[#ff5500] font-bold block mb-1">Nhiệm Vụ Chính:</span>
+              Lưu trữ danh mục bài hát, thông tin nghệ sĩ, dữ liệu phát trực tuyến âm thanh chất lượng cao và các thông số âm học DSP phục vụ trải nghiệm thính giác tối ưu.
             </div>
 
             {/* Managed Collections */}
             <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
                 <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Kho Bài Hát Streaming</span>
-                <span className="font-bold text-white text-sm mt-0.5 block">{tracksCount} bài hát số hóa</span>
-                <span className="text-[10px] text-zinc-500 font-mono">mp3 320kbps, lyrics, ISRC</span>
+                <span className="font-bold text-white text-sm mt-0.5 block">{tracksCount} bài hát</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Nhạc 320kbps &amp; lời bài hát</span>
               </div>
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
                 <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Hồ Sơ Nghệ Sĩ</span>
-                <span className="font-bold text-cyan-300 text-sm mt-0.5 block">{artistsCount} nghệ sĩ</span>
-                <span className="text-[10px] text-zinc-500 font-mono">artist_id, bio, avatars</span>
+                <span className="font-bold text-white text-sm mt-0.5 block">{artistsCount} nghệ sĩ</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Tiểu sử &amp; ảnh đại diện</span>
               </div>
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
                 <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Album &amp; Tuyển Tập</span>
                 <span className="font-bold text-white text-sm mt-0.5 block">128 phát hành</span>
-                <span className="text-[10px] text-zinc-500 font-mono">EP, Singles, Studio Albums</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Đĩa đơn, EP &amp; album</span>
               </div>
-              <div className="rounded-lg bg-black/40 p-2.5 border border-white/5">
-                <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Đặc Trưng Âm Học AI</span>
-                <span className="font-bold text-[#ff7a2c] text-sm mt-0.5 block">Audio Features</span>
-                <span className="text-[10px] text-zinc-500 font-mono">BPM, Energy, Valence, Vibe</span>
+              <div className="rounded-lg bg-[#0e0f14] p-2.5 border border-[#222432]">
+                <span className="text-[10px] font-mono text-zinc-400 block uppercase font-medium">Đặc Trưng Âm Học</span>
+                <span className="font-bold text-[#ff5500] text-sm mt-0.5 block">DSP &amp; Beats</span>
+                <span className="text-[10px] text-zinc-500 font-mono">Nhịp điệu &amp; năng lượng</span>
               </div>
             </div>
           </div>
@@ -518,20 +516,20 @@ export function DatabaseTelemetryCard({
       </div>
 
       {/* Logical Bridge Box */}
-      <div className="rounded-xl border border-white/10 bg-[#0e121b] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+      <div className="rounded-xl border border-[#222432] bg-[#12131a] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-[#ff7a2c]/15 text-[#ff7a2c] border border-[#ff7a2c]/30 px-2 py-0.5 font-mono text-[11px] font-bold uppercase">
-            Data Federation Bridge
+          <span className="rounded-md bg-[#ff5500]/15 text-[#ff5500] border border-[#ff5500]/30 px-2 py-0.5 font-mono text-[11px] font-bold uppercase">
+            ĐỒNG BỘ DỮ LIỆU
           </span>
           <span className="text-zinc-300 font-medium">
-            Liên kết giữa hai phân hệ dữ liệu qua khóa logic:
+            Liên kết dữ liệu nghệ sĩ và kho bài hát thông qua mã định danh hệ thống:
           </span>
-          <code className="font-mono text-cyan-300 bg-black/60 px-2.5 py-1 rounded border border-white/10 text-xs">
-            users.artist_spotify_id ⟷ artists.spotify_id ⟷ tracks.artist_spotify_id
+          <code className="font-mono text-white bg-black/60 px-2.5 py-1 rounded border border-[#222432] text-xs">
+            Hồ Sơ Nghệ Sĩ ⟷ Danh Mục Bài Hát ⟷ Quản Lý Tác Quyền
           </code>
         </div>
         <span className="text-zinc-400 text-xs shrink-0 font-medium">
-          Mô hình phân tầng chuyên biệt: Tách biệt giao dịch toàn vẹn &amp; Kho streaming tốc độ cao
+          Đảm bảo tính đồng nhất dữ liệu và truyền phát âm thanh mượt mà
         </span>
       </div>
     </div>

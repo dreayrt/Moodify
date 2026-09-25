@@ -91,6 +91,7 @@ export function UsersManagementTab({
 
   // Create User Modal State
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
   const [newUserData, setNewUserData] = useState({
     username: "",
     fullName: "",
@@ -177,6 +178,7 @@ export function UsersManagementTab({
   };
 
   const handleOpenCreateUser = () => {
+    setCreateUserError(null);
     setIsCreateUserModalOpen(true);
     setNewUserData({
       username: `user_${Math.floor(1000 + Math.random() * 9000)}`,
@@ -191,7 +193,7 @@ export function UsersManagementTab({
 
   const handleSaveCreateUser = () => {
     if (!newUserData.username.trim() || !newUserData.fullName.trim() || !newUserData.email.trim()) {
-      alert("Vui lòng điền đầy đủ Tên đăng nhập, Họ tên và Email.");
+      setCreateUserError("Vui lòng điền đầy đủ Tên đăng nhập, Họ tên và Email.");
       return;
     }
     if (onCreateUser) {
@@ -202,7 +204,6 @@ export function UsersManagementTab({
 
   const handleDeleteUser = (user: AdminUser) => {
     if (user.username === "admin01" || user.id === 1) {
-      alert("Không thể xóa tài khoản Quản trị viên root (admin01).");
       return;
     }
     setSelectedUserForDelete(user);
@@ -239,14 +240,14 @@ export function UsersManagementTab({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
-              Quản Trị Người Dùng & Phân Quyền IAM
+              Quản Lý Người Dùng &amp; Phân Quyền
             </h2>
-            <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300 font-semibold">
-              Cơ Sở Dữ Liệu Định Danh IAM
+            <span className="font-mono text-xs text-zinc-400">
+              · {users.length} tài khoản
             </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Giám sát tài khoản thực tế (nghệ sĩ, admin, listener), bổ nhiệm nhân sự, kiểm soát bảo mật và khóa tài khoản.
+            Giám sát tài khoản hệ thống (thính giả, nghệ sĩ, quản trị viên), bổ nhiệm nhân sự và quản lý quyền truy cập.
           </p>
         </div>
 
@@ -254,20 +255,20 @@ export function UsersManagementTab({
           <button
             type="button"
             onClick={handleOpenCreateUser}
-            className="flex items-center gap-2 rounded-xl bg-[#ff7a2c] px-4 py-2.5 text-xs font-bold text-black shadow-md shadow-[#ff7a2c]/20 hover:brightness-110 transition cursor-pointer"
+            className="flex items-center gap-2 rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
           >
             <UserPlus className="h-4 w-4" /> Thêm Người Dùng Mới
           </button>
-          <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-mono text-zinc-300">
-            Hiển thị: <strong className="text-white">{filteredUsers.length}</strong> / {users.length} tài khoản
+          <span className="text-xs font-mono text-zinc-400">
+            Hiển thị {filteredUsers.length} / {users.length} tài khoản
           </span>
         </div>
       </div>
 
       {/* Filter Ribbon */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 rounded-[20px] border border-white/8 bg-[#0c0e14]/80 p-3 backdrop-blur-xl">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 rounded-2xl border border-[#222432] bg-[#12131a] p-3">
         <div className="relative sm:col-span-2">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="text"
             value={searchQuery}
@@ -275,8 +276,8 @@ export function UsersManagementTab({
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="Tìm theo tên, username, email, Spotify ID..."
-            className="w-full rounded-[14px] border border-white/8 bg-black/40 py-2.5 pl-10 pr-4 text-[13px] text-white placeholder-white/40 outline-none transition focus:border-[#ff7a2c]/60"
+            placeholder="Tìm theo tên, username, email, mã nghệ sĩ / nhân sự..."
+            className="w-full rounded-xl border border-[#222432] bg-[#171822] py-2.5 pl-10 pr-4 text-[13px] text-white placeholder-zinc-500 outline-none transition focus:border-[#ff5500]"
           />
         </div>
 
@@ -288,13 +289,13 @@ export function UsersManagementTab({
               setRoleFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full rounded-[14px] border border-white/8 bg-black/40 px-3 py-2.5 text-[12px] font-mono text-white outline-none transition focus:border-[#ff7a2c]/60"
+            className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-[12px] font-mono text-white outline-none transition focus:border-[#ff5500]"
           >
-            <option value="ALL" className="bg-[#0c0e14]">Tất cả vai trò</option>
-            <option value="USER" className="bg-[#0c0e14]">Thính giả (USER)</option>
-            <option value="ARTIST" className="bg-[#0c0e14]">Nghệ sĩ (ARTIST)</option>
-            <option value="MODERATOR" className="bg-[#0c0e14]">Kiểm duyệt (MODERATOR)</option>
-            <option value="ADMIN" className="bg-[#0c0e14]">Quản trị (ADMIN)</option>
+            <option value="ALL" className="bg-[#12131a]">Tất cả vai trò</option>
+            <option value="USER" className="bg-[#12131a]">Thính giả (USER)</option>
+            <option value="ARTIST" className="bg-[#12131a]">Nghệ sĩ (ARTIST)</option>
+            <option value="MODERATOR" className="bg-[#12131a]">Kiểm duyệt (MODERATOR)</option>
+            <option value="ADMIN" className="bg-[#12131a]">Quản trị (ADMIN)</option>
           </select>
         </div>
 
@@ -306,32 +307,32 @@ export function UsersManagementTab({
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full rounded-[14px] border border-white/8 bg-black/40 px-3 py-2.5 text-[12px] font-mono text-white outline-none transition focus:border-[#ff7a2c]/60"
+            className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-[12px] font-mono text-white outline-none transition focus:border-[#ff5500]"
           >
-            <option value="ALL" className="bg-[#0c0e14]">Tất cả trạng thái</option>
-            <option value="ACTIVE" className="bg-[#0c0e14]">Hoạt động (ACTIVE)</option>
-            <option value="INACTIVE" className="bg-[#0c0e14]">Chưa kích hoạt (INACTIVE)</option>
-            <option value="BANNED" className="bg-[#0c0e14]">Đã khóa (BANNED)</option>
+            <option value="ALL" className="bg-[#12131a]">Tất cả trạng thái</option>
+            <option value="ACTIVE" className="bg-[#12131a]">Hoạt động (ACTIVE)</option>
+            <option value="INACTIVE" className="bg-[#12131a]">Chưa kích hoạt (INACTIVE)</option>
+            <option value="BANNED" className="bg-[#12131a]">Đã khóa (BANNED)</option>
           </select>
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0c1017] shadow-xl">
+      <div className="overflow-hidden rounded-2xl border border-[#222432] bg-[#12131a] shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+            <thead className="border-b border-[#222432] bg-[#171822] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
               <tr>
                 <th className="py-3.5 pl-5 pr-3">Người Dùng</th>
                 <th className="py-3.5 px-3">Liên Hệ</th>
                 <th className="py-3.5 px-3">Vai Trò</th>
                 <th className="py-3.5 px-3">Trạng Thái</th>
-                <th className="py-3.5 px-3">Spotify ID / Code</th>
+                <th className="py-3.5 px-3">Mã Định Danh / Code</th>
                 <th className="py-3.5 px-3">Thiết Bị</th>
                 <th className="py-3.5 pl-3 pr-5 text-right">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 font-sans">
+            <tbody className="divide-y divide-[#222432]/60 font-sans">
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-zinc-400 font-mono">
@@ -346,7 +347,7 @@ export function UsersManagementTab({
                   return (
                     <tr
                       key={user.id}
-                      className="transition hover:bg-white/[0.02] cursor-pointer group"
+                      className="transition hover:bg-[#171822]/60 cursor-pointer group"
                       onClick={() => setInspectingUser(user)}
                     >
                       {/* Name + Avatar */}
@@ -356,97 +357,99 @@ export function UsersManagementTab({
                             <img
                               src={user.avatarUrl}
                               alt={user.fullName}
-                              className="h-9 w-9 rounded-full object-cover border border-white/10 shrink-0"
+                              className="h-9 w-9 rounded-full object-cover border border-[#222432] shrink-0"
                             />
                           ) : (
-                            <div className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] font-mono font-bold text-white/70 shrink-0">
+                            <div className="grid h-9 w-9 place-items-center rounded-full border border-[#222432] bg-[#171822] font-mono font-bold text-white/70 shrink-0">
                               {user.fullName.charAt(0)}
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="font-semibold text-white truncate max-w-[160px] group-hover:text-[#ff7a2c] transition">
+                            <p className="font-semibold text-white truncate max-w-[160px] group-hover:text-[#ff5500] transition">
                               {user.fullName}
                             </p>
-                            <p className="font-mono text-[10px] text-white/40 truncate">@{user.username}</p>
+                            <p className="font-mono text-[10px] text-zinc-400 truncate">@{user.username}</p>
                           </div>
                         </div>
                       </td>
 
                       {/* Contact */}
                       <td className="py-3 px-3">
-                        <p className="text-white/80 truncate max-w-[170px]">{user.email}</p>
-                        <p className="font-mono text-[10px] text-white/40">{user.phone}</p>
+                        <p className="text-zinc-200 truncate max-w-[170px]">{user.email}</p>
+                        <p className="font-mono text-[10px] text-zinc-400">{user.phone}</p>
                       </td>
 
-                      {/* Role Badge */}
-                      <td className="py-3 px-3">
+                      {/* Role */}
+                      <td className="py-3 px-3 font-mono text-[11px]">
                         <span
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[10px] font-semibold ${
+                          className={
                             user.role === "ADMIN"
-                              ? "border border-[#ff7a2c]/30 bg-[#ff7a2c]/15 text-[#ffb488]"
+                              ? "text-[#ff9966] font-semibold flex items-center gap-1"
                               : user.role === "MODERATOR"
-                              ? "border border-indigo-500/30 bg-indigo-500/15 text-indigo-300"
+                              ? "text-indigo-400 font-medium"
                               : user.role === "ARTIST"
-                              ? "border border-cyan-500/30 bg-cyan-500/15 text-cyan-300"
-                              : "border border-zinc-700 bg-zinc-800/60 text-zinc-300"
-                          }`}
+                              ? "text-amber-400 font-medium"
+                              : "text-zinc-400"
+                          }
                         >
-                          {user.role === "ADMIN" && <Shield className="h-2.5 w-2.5" />}
+                          {user.role === "ADMIN" && <Shield className="h-3 w-3" />}
                           {user.role}
                         </span>
                       </td>
 
                       {/* Status */}
-                      <td className="py-3 px-3">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[10px] font-medium ${
-                            user.status === "ACTIVE"
-                              ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
-                              : user.status === "BANNED"
-                              ? "bg-rose-500/10 text-rose-300 border border-rose-500/30"
-                              : "bg-white/10 text-zinc-300 border border-white/10"
-                          }`}
-                        >
+                      <td className="py-3 px-3 font-mono text-[11px]">
+                        <span className="inline-flex items-center gap-1.5">
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${
                               user.status === "ACTIVE"
-                                ? "bg-emerald-400 animate-pulse"
+                                ? "bg-emerald-400"
                                 : user.status === "BANNED"
                                 ? "bg-rose-400"
-                                : "bg-zinc-400"
+                                : "bg-zinc-500"
                             }`}
                           />
-                          {user.status === "ACTIVE" ? "Hoạt động" : user.status === "BANNED" ? "Đã khóa" : "Chưa kích hoạt"}
+                          <span
+                            className={
+                              user.status === "ACTIVE"
+                                ? "text-zinc-300"
+                                : user.status === "BANNED"
+                                ? "text-rose-400 font-semibold"
+                                : "text-zinc-500"
+                            }
+                          >
+                            {user.status === "ACTIVE" ? "Hoạt động" : user.status === "BANNED" ? "Đã khóa" : "Chưa kích hoạt"}
+                          </span>
                         </span>
                       </td>
 
                       {/* Spotify ID / Staff Code */}
-                      <td className="py-3 px-3 font-mono text-[10px] text-white/50">
+                      <td className="py-3 px-3 font-mono text-[11px]">
                         {user.artistSpotifyId ? (
-                          <span className="text-[#00f2fe] bg-[#00f2fe]/10 px-1.5 py-0.5 rounded border border-[#00f2fe]/20">
-                            {user.artistSpotifyId.substring(0, 10)}...
+                          <span className="text-zinc-300">
+                            {user.artistSpotifyId.substring(0, 12)}...
                           </span>
                         ) : user.staffCode ? (
-                          <span className="text-teal-300 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">
+                          <span className="text-teal-400 font-medium">
                             {user.staffCode}
                           </span>
                         ) : (
-                          <span className="text-white/20">-</span>
+                          <span className="text-zinc-600">-</span>
                         )}
                       </td>
 
                       {/* Devices */}
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 font-mono text-xs">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedUserForDevices(user);
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-xs text-white/70 hover:bg-white/10 hover:text-white transition"
+                          className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer"
                         >
-                          <Smartphone className="h-3.5 w-3.5 text-white/50" />
-                          {user.devicesCount} thiết bị
+                          <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
+                          {user.devicesCount} máy
                         </button>
                       </td>
 
@@ -548,7 +551,7 @@ export function UsersManagementTab({
             <div className="w-full max-w-md bg-[#0c0e14] border-l border-white/10 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
             <div>
               <div className="flex items-center justify-between border-b border-white/8 pb-4">
-                <h3 className="font-graphik text-[18px] font-bold text-white">Hồ Sơ Định Danh IAM</h3>
+                <h3 className="font-graphik text-[18px] font-bold text-white">Thông Tin Chi Tiết Tài Khoản</h3>
                 <button
                   type="button"
                   onClick={() => setInspectingUser(null)}
@@ -578,7 +581,7 @@ export function UsersManagementTab({
                     <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white">
                       ID: #{inspectingUser.id}
                     </span>
-                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ff7a2c]/15 text-[#ffb488]">
+                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ff5500]/15 text-[#ff9966]">
                       {inspectingUser.role}
                     </span>
                   </div>
@@ -587,13 +590,13 @@ export function UsersManagementTab({
 
               {/* Metadata Fields / Edit Form */}
               {isEditProfileMode ? (
-                <div className="mt-6 space-y-3 font-mono text-[12px] p-4 rounded-2xl border border-[#ff7a2c]/30 bg-black/40">
-                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                <div className="mt-6 space-y-3 font-mono text-[12px] p-4 rounded-2xl border border-[#ff5500]/30 bg-[#171822]">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#222432]">
                     <span className="font-bold text-white text-xs">Chỉnh Sửa Hồ Sơ Người Dùng</span>
                     <button
                       type="button"
                       onClick={() => setIsEditProfileMode(false)}
-                      className="text-white/40 hover:text-white text-xs"
+                      className="text-zinc-400 hover:text-white text-xs"
                     >
                       Hủy
                     </button>
@@ -604,7 +607,7 @@ export function UsersManagementTab({
                       type="text"
                       value={editProfileForm.fullName}
                       onChange={(e) => setEditProfileForm({ ...editProfileForm, fullName: e.target.value })}
-                      className="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-lg border border-[#222432] bg-[#12131a] px-3 py-2 text-xs text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -613,7 +616,7 @@ export function UsersManagementTab({
                       type="email"
                       value={editProfileForm.email}
                       onChange={(e) => setEditProfileForm({ ...editProfileForm, email: e.target.value })}
-                      className="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-lg border border-[#222432] bg-[#12131a] px-3 py-2 text-xs text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -622,13 +625,13 @@ export function UsersManagementTab({
                       type="text"
                       value={editProfileForm.phone}
                       onChange={(e) => setEditProfileForm({ ...editProfileForm, phone: e.target.value })}
-                      className="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-lg border border-[#222432] bg-[#12131a] px-3 py-2 text-xs text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleSaveProfileEdit}
-                    className="w-full mt-2 rounded-xl bg-[#ff7a2c] py-2 text-xs font-bold text-black hover:brightness-110 transition"
+                    className="w-full mt-2 rounded-xl bg-[#ff5500] py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
                   >
                     Lưu Thay Đổi Hồ Sơ
                   </button>
@@ -653,18 +656,18 @@ export function UsersManagementTab({
                   </div>
 
                   {inspectingUser.artistSpotifyId && (
-                    <div className="flex justify-between p-3 rounded-[12px] bg-[#00f2fe]/5 border border-[#00f2fe]/20">
-                      <span className="text-[#00f2fe]">Spotify Artist ID:</span>
+                    <div className="flex justify-between p-3 rounded-[12px] bg-[#ff5500]/5 border border-[#ff5500]/20">
+                      <span className="text-[#ff5500]">Mã Định Danh Nghệ Sĩ:</span>
                       <span className="text-white font-bold">{inspectingUser.artistSpotifyId}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between p-3 rounded-[12px] bg-white/[0.02] border border-white/6">
+                  <div className="flex justify-between p-3 rounded-[12px] bg-[#12131a] border border-[#222432]">
                     <span className="text-white/40">Lần đăng nhập cuối:</span>
                     <span className="text-white/80">{inspectingUser.lastLoginAt || "Chưa có"}</span>
                   </div>
 
-                  <div className="flex justify-between p-3 rounded-[12px] bg-white/[0.02] border border-white/6">
+                  <div className="flex justify-between p-3 rounded-[12px] bg-[#12131a] border border-[#222432]">
                     <span className="text-white/40">Ngày tham gia:</span>
                     <span className="text-white/80">{inspectingUser.createdAt}</span>
                   </div>
@@ -673,14 +676,14 @@ export function UsersManagementTab({
             </div>
 
             {/* Bottom Actions */}
-            <div className="pt-6 border-t border-white/8 space-y-2.5">
+            <div className="pt-6 border-t border-[#222432] space-y-2.5">
               {!isEditProfileMode && (
                 <button
                   type="button"
                   onClick={() => handleStartEditProfile(inspectingUser)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.06] py-2.5 text-xs font-semibold text-white hover:bg-white/10 transition"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#222432] bg-[#171822] py-2.5 text-xs font-semibold text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"
                 >
-                  <UserCog className="h-4 w-4 text-[#ff7a2c]" /> Chỉnh Sửa Thông Tin Cá Nhân
+                  <UserCog className="h-4 w-4 text-[#ff5500]" /> Chỉnh Sửa Thông Tin Cá Nhân
                 </button>
               )}
 
@@ -820,7 +823,7 @@ export function UsersManagementTab({
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
             <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
-              <h3 className="font-graphik text-[17px] font-semibold text-white">Bổ Nhiệm & Đổi Vai Trò (IAM)</h3>
+              <h3 className="font-graphik text-[17px] font-semibold text-white">Bổ Nhiệm &amp; Thay Đổi Vai Trò</h3>
               <button
                 type="button"
                 onClick={() => setSelectedUserForRole(null)}
@@ -844,10 +847,10 @@ export function UsersManagementTab({
                       key={r}
                       type="button"
                       onClick={() => setTargetRole(r)}
-                      className={`rounded-[12px] border p-2.5 text-center text-[12px] font-medium transition ${
+                      className={`rounded-xl border p-2.5 text-center text-[12px] font-medium transition ${
                         targetRole === r
-                          ? "border-[#ff7a2c] bg-[#ff7a2c]/15 text-[#ffb488] font-semibold"
-                          : "border-white/8 bg-white/[0.02] text-white/70 hover:bg-white/[0.06]"
+                          ? "border-[#ff5500] bg-[#ff5500]/15 text-[#ff9966] font-semibold"
+                          : "border-[#222432] bg-[#171822] text-zinc-400 hover:text-white"
                       }`}
                     >
                       {r}
@@ -864,20 +867,20 @@ export function UsersManagementTab({
                     value={staffCodeInput}
                     onChange={(e) => setStaffCodeInput(e.target.value)}
                     placeholder="VD: STAFF-VN-009"
-                    className="w-full rounded-[12px] border border-white/10 bg-black/40 p-2.5 text-[13px] text-white outline-none focus:border-teal-400 font-mono"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] p-2.5 text-[13px] text-white outline-none focus:border-[#ff5500] font-mono"
                   />
                 </div>
               )}
 
               {targetRole === "ARTIST" && (
                 <div>
-                  <label className="block text-[12px] font-medium text-white/70 mb-1">Spotify Artist ID liên kết</label>
+                  <label className="block text-[12px] font-medium text-white/70 mb-1">Mã Định Danh Nghệ Sĩ (Artist Code)</label>
                   <input
                     type="text"
                     value={artistSpotifyIdInput}
                     onChange={(e) => setArtistSpotifyIdInput(e.target.value)}
-                    placeholder="VD: 4OCl7UfKRXLcYouOYa3Bwc"
-                    className="w-full rounded-[12px] border border-white/10 bg-black/40 p-2.5 text-[13px] text-white outline-none focus:border-[#00f2fe] font-mono"
+                    placeholder="VD: artist_tranminh_01"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] p-2.5 text-[13px] text-white outline-none focus:border-[#ff5500] font-mono"
                   />
                 </div>
               )}
@@ -894,7 +897,7 @@ export function UsersManagementTab({
               <button
                 type="button"
                 onClick={handleConfirmRoleChange}
-                className="rounded-full bg-[#ff7a2c] px-5 py-2 text-[12px] font-semibold text-black shadow-lg shadow-[#ff7a2c]/20 hover:opacity-95"
+                className="rounded-full bg-[#ff5500] px-5 py-2 text-[12px] font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
               >
                 Cập nhật vai trò
               </button>
@@ -1019,124 +1022,131 @@ export function UsersManagementTab({
       {isCreateUserModalOpen && (
         <ModalPortal>
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
-            <div className="relative my-auto w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="relative my-auto w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[#222432] bg-[#12131a] p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-[#222432] pb-4">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#ff7a2c]/15 text-[#ff7a2c]">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#ff5500]/15 text-[#ff5500]">
                   <UserPlus className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="font-graphik text-lg font-bold text-white">Thêm Người Dùng Mới</h3>
-                  <p className="font-mono text-xs text-white/50">Cấp mới tài khoản truy cập vào hệ thống</p>
+                  <p className="font-mono text-xs text-zinc-400">Cấp mới tài khoản truy cập vào hệ thống</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateUserModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white"
+                className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
+            {createUserError && (
+              <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300 font-sans">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                <span>{createUserError}</span>
+              </div>
+            )}
+
             <div className="space-y-4 text-xs font-mono">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-white/70 block mb-1 font-semibold">Tên Đăng Nhập (@username) *</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Tên Đăng Nhập (@username) *</label>
                   <input
                     type="text"
                     value={newUserData.username}
                     onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
                     placeholder="vidu_user"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white focus:border-[#ff7a2c] focus:outline-none"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-white/70 block mb-1 font-semibold">Họ và Tên Đầy Đủ *</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Họ và Tên Đầy Đủ *</label>
                   <input
                     type="text"
                     value={newUserData.fullName}
                     onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
                     placeholder="Nguyễn Văn A"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white focus:border-[#ff7a2c] focus:outline-none"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-white/70 block mb-1 font-semibold">Email *</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Email *</label>
                   <input
                     type="email"
                     value={newUserData.email}
                     onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
                     placeholder="user@moodify.com"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white focus:border-[#ff7a2c] focus:outline-none"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-white/70 block mb-1 font-semibold">Số Điện Thoại</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Số Điện Thoại</label>
                   <input
                     type="text"
                     value={newUserData.phone}
                     onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
                     placeholder="0912345678"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white focus:border-[#ff7a2c] focus:outline-none"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-white/70 block mb-1 font-semibold">Vai Trò (Role)</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Vai Trò (Role)</label>
                   <select
                     value={newUserData.role}
                     onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value as AdminUserRole })}
-                    className="w-full rounded-xl border border-white/10 bg-[#121622] px-3.5 py-2.5 text-xs text-white focus:border-[#ff7a2c] focus:outline-none"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none"
                   >
-                    <option value="USER">Thính giả (USER)</option>
-                    <option value="ARTIST">Nghệ sĩ (ARTIST)</option>
-                    <option value="MODERATOR">Kiểm duyệt viên (MODERATOR)</option>
-                    <option value="ADMIN">Quản trị viên (ADMIN)</option>
+                    <option value="USER" className="bg-[#12131a]">Thính giả (USER)</option>
+                    <option value="ARTIST" className="bg-[#12131a]">Nghệ sĩ (ARTIST)</option>
+                    <option value="MODERATOR" className="bg-[#12131a]">Kiểm duyệt viên (MODERATOR)</option>
+                    <option value="ADMIN" className="bg-[#12131a]">Quản trị viên (ADMIN)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-white/70 block mb-1 font-semibold">Trạng Thái Ban Đầu</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Trạng Thái Ban Đầu</label>
                   <select
                     value={newUserData.status}
                     onChange={(e) => setNewUserData({ ...newUserData, status: e.target.value as AdminUserStatus })}
-                    className="w-full rounded-xl border border-white/10 bg-[#121622] px-3.5 py-2.5 text-xs text-white focus:border-[#ff7a2c] focus:outline-none"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none"
                   >
-                    <option value="ACTIVE">Kích hoạt ngay (ACTIVE)</option>
-                    <option value="INACTIVE">Chưa kích hoạt (INACTIVE)</option>
+                    <option value="ACTIVE" className="bg-[#12131a]">Kích hoạt ngay (ACTIVE)</option>
+                    <option value="INACTIVE" className="bg-[#12131a]">Chưa kích hoạt (INACTIVE)</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-white/70 block mb-1 font-semibold">Mật Khẩu Khởi Tạo</label>
+                <label className="text-zinc-300 block mb-1 font-semibold">Mật Khẩu Khởi Tạo</label>
                 <input
                   type="text"
                   value={newUserData.password}
                   onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
                   placeholder="Mặc định: User@123456"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm font-mono text-emerald-400 font-bold focus:border-[#ff7a2c] focus:outline-none"
+                  className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm font-mono text-emerald-400 font-bold focus:border-[#ff5500] focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222432]">
               <button
                 type="button"
                 onClick={() => setIsCreateUserModalOpen(false)}
-                className="rounded-xl border border-white/15 px-4 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 transition"
+                className="rounded-full border border-[#222432] px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-[#171822] transition"
               >
                 Hủy Bỏ
               </button>
               <button
                 type="button"
                 onClick={handleSaveCreateUser}
-                className="rounded-xl bg-[#ff7a2c] px-5 py-2 text-xs font-bold text-black hover:brightness-110 shadow-lg shadow-[#ff7a2c]/20 transition"
+                className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] shadow-lg shadow-[#ff5500]/25 active:scale-[0.98] transition cursor-pointer"
               >
                 Tạo Người Dùng
               </button>

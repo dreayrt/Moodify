@@ -113,43 +113,37 @@ export function ModerationTab({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-graphik text-[26px] font-semibold text-white">Kiểm Duyệt & Bản Quyền Nội Dung</h2>
-          <p className="mt-1 text-[13px] text-white/50">
-            Hàng đợi kiểm duyệt bài hát/album mới từ Nghệ sĩ (`content_review_requests`) & Nhật ký kiểm duyệt viên (`content_review_actions`).
+          <div className="flex items-center gap-2">
+            <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
+              Kiểm Duyệt Bài Hát &amp; Nội Dung
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">
+            Hàng đợi tiếp nhận và phê duyệt bài hát, album mới từ Nghệ sĩ trước khi phát hành chính thức lên hệ thống.
           </p>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {["ALL", "PENDING", "IN_REVIEW", "APPROVED", "REJECTED"].map((st) => (
-            <button
-              key={st}
-              type="button"
-              onClick={() => setStatusFilter(st)}
-              className={`rounded-full px-3.5 py-1.5 text-[12px] font-medium transition ${
-                statusFilter === st
-                  ? "bg-[#ff7a2c] text-black"
-                  : "border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]"
-              }`}
-            >
-              {st === "ALL"
-                ? "Tất cả"
-                : st === "PENDING"
-                ? "Chờ duyệt"
-                : st === "IN_REVIEW"
-                ? "Đang duyệt"
-                : st === "APPROVED"
-                ? "Đã duyệt"
-                : "Từ chối"}
-            </button>
-          ))}
+        {/* Status Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-zinc-400 font-mono">Trạng thái:</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border border-[#222432] bg-[#12131a] px-3 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500] cursor-pointer"
+          >
+            <option value="ALL">Tất cả ({reviews.length})</option>
+            <option value="PENDING">Chờ duyệt ({reviews.filter((r) => r.status === "PENDING").length})</option>
+            <option value="IN_REVIEW">Đang duyệt ({reviews.filter((r) => r.status === "IN_REVIEW").length})</option>
+            <option value="APPROVED">Đã duyệt ({reviews.filter((r) => r.status === "APPROVED").length})</option>
+            <option value="REJECTED">Từ chối ({reviews.filter((r) => r.status === "REJECTED").length})</option>
+          </select>
         </div>
       </div>
 
       {/* Review Queue Cards Grid */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {filteredReviews.length === 0 ? (
-          <div className="col-span-2 rounded-[24px] border border-white/8 bg-white/[0.02] py-14 text-center text-white/40">
+          <div className="col-span-2 rounded-2xl border border-[#222432] bg-[#12131a] py-14 text-center text-zinc-400">
             <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400/50 mb-3" />
             <p className="text-[14px]">Hiện không có yêu cầu nào trong hàng đợi trạng thái này.</p>
           </div>
@@ -160,7 +154,7 @@ export function ModerationTab({
             return (
               <div
                 key={item.id}
-                className="relative overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.03] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.35)] transition hover:border-white/14"
+                className="relative overflow-hidden rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl transition hover:border-[#ff5500]/40"
               >
                 {/* Top Strip */}
                 <div className="flex items-start justify-between gap-3">
@@ -169,16 +163,16 @@ export function ModerationTab({
                       <img
                         src={item.coverUrl}
                         alt={item.title}
-                        className="h-16 w-16 rounded-[16px] object-cover border border-white/10 shadow-md"
+                        className="h-16 w-16 rounded-xl object-cover border border-[#222432] shadow-md"
                       />
                       {item.audioUrl && (
                         <button
                           type="button"
                           onClick={() => togglePlayAudio(item)}
-                          className="absolute inset-0 grid place-items-center rounded-[16px] bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute inset-0 grid place-items-center rounded-xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                         >
                           {isPlaying ? (
-                            <Pause className="h-6 w-6 text-[#ff7a2c]" />
+                            <Pause className="h-6 w-6 text-[#ff5500]" />
                           ) : (
                             <Play className="h-6 w-6 text-white ml-0.5" />
                           )}
@@ -186,27 +180,47 @@ export function ModerationTab({
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[10px] uppercase font-semibold text-white/70">
+                      <div className="flex items-center gap-2 text-[11px] font-mono">
+                        <span className="text-zinc-400 uppercase font-semibold">
                           {item.contentType} · {item.requestType}
                         </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            item.status === "APPROVED"
-                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                        <span className="text-zinc-600">·</span>
+                        <span className="inline-flex items-center gap-1 font-semibold">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              item.status === "APPROVED"
+                                ? "bg-emerald-400"
+                                : item.status === "PENDING"
+                                ? "bg-amber-400"
+                                : item.status === "IN_REVIEW"
+                                ? "bg-sky-400"
+                                : "bg-rose-400"
+                            }`}
+                          />
+                          <span
+                            className={
+                              item.status === "APPROVED"
+                                ? "text-emerald-400"
+                                : item.status === "PENDING"
+                                ? "text-amber-400"
+                                : item.status === "IN_REVIEW"
+                                ? "text-sky-400"
+                                : "text-rose-400"
+                            }
+                          >
+                            {item.status === "APPROVED"
+                              ? "Đã duyệt"
                               : item.status === "PENDING"
-                              ? "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                              ? "Chờ duyệt"
                               : item.status === "IN_REVIEW"
-                              ? "bg-sky-500/15 text-sky-400 border border-sky-500/20"
-                              : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
-                          }`}
-                        >
-                          {item.status}
+                              ? "Đang duyệt"
+                              : "Từ chối"}
+                          </span>
                         </span>
                       </div>
                       <h3 className="mt-1 font-graphik text-[17px] font-semibold text-white">{item.title}</h3>
-                      <p className="text-[12px] text-white/50">
-                        Nghệ sĩ: <span className="text-white/80 font-medium">{item.artistName}</span> · Thể loại: {item.genre}
+                      <p className="text-[12px] text-zinc-400">
+                        Nghệ sĩ: <span className="text-zinc-200 font-medium">{item.artistName}</span> · Thể loại: {item.genre}
                       </p>
                     </div>
                   </div>
@@ -217,8 +231,8 @@ export function ModerationTab({
                       onClick={() => togglePlayAudio(item)}
                       className={`grid h-10 w-10 place-items-center rounded-full border transition ${
                         isPlaying
-                          ? "border-[#ff7a2c] bg-[#ff7a2c]/20 text-[#ff7a2c]"
-                          : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]"
+                          ? "border-[#ff5500] bg-[#ff5500]/20 text-[#ff5500]"
+                          : "border-[#222432] bg-[#171822] text-zinc-300 hover:bg-[#ff5500] hover:text-white"
                       }`}
                       title={isPlaying ? "Tạm dừng nghe thử" : "Nghe thử bản master"}
                     >
@@ -229,26 +243,26 @@ export function ModerationTab({
 
                 {/* Audio Features Indicators */}
                 {item.audioFeatures && (
-                  <div className="mt-4 rounded-[18px] border border-white/6 bg-black/25 p-3 text-[11px]">
-                    <div className="flex items-center justify-between text-white/44 mb-2">
-                      <span className="font-semibold uppercase tracking-wider text-[#ffb488]">Chỉ Số Âm Học (Audio Features)</span>
+                  <div className="mt-4 rounded-xl border border-[#222432] bg-[#171822] p-3 text-[11px]">
+                    <div className="flex items-center justify-between text-zinc-400 mb-2">
+                      <span className="font-semibold uppercase tracking-wider text-[#ff5500]">Chỉ Số Âm Học (Audio Features)</span>
                       <span>Key: {item.audioFeatures.keySignature}</span>
                     </div>
                     <div className="grid grid-cols-4 gap-2 text-center">
-                      <div className="rounded-[10px] bg-white/[0.03] p-1.5 border border-white/6">
-                        <p className="text-white/40">BPM</p>
+                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
+                        <p className="text-zinc-500 text-[10px]">BPM</p>
                         <p className="font-graphik font-semibold text-white">{item.audioFeatures.bpm}</p>
                       </div>
-                      <div className="rounded-[10px] bg-white/[0.03] p-1.5 border border-white/6">
-                        <p className="text-white/40">Energy</p>
+                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
+                        <p className="text-zinc-500 text-[10px]">Energy</p>
                         <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.energy * 100)}%</p>
                       </div>
-                      <div className="rounded-[10px] bg-white/[0.03] p-1.5 border border-white/6">
-                        <p className="text-white/40">Dance</p>
+                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
+                        <p className="text-zinc-500 text-[10px]">Dance</p>
                         <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.danceability * 100)}%</p>
                       </div>
-                      <div className="rounded-[10px] bg-white/[0.03] p-1.5 border border-white/6">
-                        <p className="text-white/40">Valence</p>
+                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
+                        <p className="text-zinc-500 text-[10px]">Valence</p>
                         <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.valence * 100)}%</p>
                       </div>
                     </div>
@@ -257,21 +271,21 @@ export function ModerationTab({
 
                 {/* Lyrics Excerpt */}
                 {item.lyricsPlain && (
-                  <p className="mt-3 text-[12px] italic text-white/50 line-clamp-2">
+                  <p className="mt-3 text-[12px] italic text-zinc-400 line-clamp-2">
                     &ldquo;{item.lyricsPlain.replace(/\n/g, " ")}&rdquo;
                   </p>
                 )}
 
                 {/* Action Controls */}
-                <div className="mt-5 flex items-center justify-between border-t border-white/8 pt-3.5">
-                  <span className="text-[11px] text-white/40">Gửi lúc: {item.submittedAt}</span>
+                <div className="mt-5 flex items-center justify-between border-t border-[#222432] pt-3.5">
+                  <span className="text-[11px] text-zinc-500">Gửi lúc: {item.submittedAt}</span>
 
                   <div className="flex items-center gap-2">
                     {item.status !== "APPROVED" && (
                       <button
                         type="button"
                         onClick={() => onApproveReview(item.id)}
-                        className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-[12px] font-medium text-white transition hover:bg-emerald-500"
+                        className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-[12px] font-medium text-white transition hover:bg-emerald-500 active:scale-[0.98]"
                       >
                         Phê duyệt
                       </button>
@@ -281,7 +295,7 @@ export function ModerationTab({
                       <button
                         type="button"
                         onClick={() => handleOpenReturnModal(item)}
-                        className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[12px] text-amber-300 transition hover:bg-amber-500/20"
+                        className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[12px] text-amber-300 transition hover:bg-amber-500/20 active:scale-[0.98]"
                       >
                         Yêu cầu sửa
                       </button>
@@ -291,7 +305,7 @@ export function ModerationTab({
                       <button
                         type="button"
                         onClick={() => handleOpenRejectModal(item)}
-                        className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] text-rose-300 transition hover:bg-rose-500/20"
+                        className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98]"
                       >
                         Từ chối
                       </button>
@@ -305,20 +319,20 @@ export function ModerationTab({
       </div>
 
       {/* Section 2: Moderator Actions Audit Log */}
-      <div className="rounded-[26px] border border-white/8 bg-white/[0.03] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
+      <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-graphik text-[20px] font-semibold text-white">Nhật Ký Kiểm Duyệt Viên (`content_review_actions`)</h3>
-            <p className="mt-1 text-[13px] text-white/50">Lịch sử các quyết định duyệt/từ chối của Moderator để audit kiểm toán</p>
+            <p className="mt-1 text-[13px] text-zinc-400">Lịch sử các quyết định duyệt/từ chối của Moderator để audit kiểm toán</p>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] text-white/70">
+          <span className="rounded-xl border border-[#222432] bg-[#171822] px-3 py-1 text-[12px] text-zinc-300 font-mono">
             {reviewActions.length} thao tác
           </span>
         </div>
 
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-left text-[13px]">
-            <thead className="border-b border-white/8 text-[11px] uppercase tracking-[0.14em] text-white/44">
+            <thead className="border-b border-[#222432] bg-[#171822] text-[10px] font-mono uppercase tracking-wider text-zinc-400">
               <tr>
                 <th className="py-3 px-3">Thời gian</th>
                 <th className="py-3 px-3">Kiểm duyệt viên</th>
@@ -327,10 +341,10 @@ export function ModerationTab({
                 <th className="py-3 px-3">Lý do / Phản hồi ghi chú</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/6 text-white/75">
+            <tbody className="divide-y divide-[#222432]/60 text-zinc-300">
               {reviewActions.map((act) => (
-                <tr key={act.id}>
-                  <td className="py-3 px-3 text-white/50 text-[12px]">{act.createdAt}</td>
+                <tr key={act.id} className="hover:bg-[#171822]/60 transition">
+                  <td className="py-3 px-3 text-zinc-500 text-[12px] font-mono">{act.createdAt}</td>
                   <td className="py-3 px-3 font-medium text-white">{act.moderatorName}</td>
                   <td className="py-3 px-3">
                     <span

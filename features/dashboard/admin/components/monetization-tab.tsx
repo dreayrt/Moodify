@@ -44,7 +44,7 @@ const POPULAR_BENEFITS = [
   "Nghe nhạc không quảng cáo ngắt quãng",
   "Tải offline không giới hạn trên 3 thiết bị",
   "Chuyển bài không giới hạn (Unlimited Skips)",
-  "Trí tuệ nhân tạo gợi ý Playlist theo cảm xúc (Mood AI)",
+  "Âm thanh chuẩn phòng thu Studio Master (Lossless)",
   "Lời bài hát Karaoke đồng bộ thời gian thực",
   "Âm thanh Hi-Res FLAC 24-bit/96kHz",
   "Huy hiệu VIP thành viên trên hồ sơ",
@@ -233,14 +233,11 @@ export function MonetizationTab({
         <div>
           <div className="flex items-center gap-3">
             <h2 className="font-graphik text-2xl font-bold text-white tracking-tight">
-              Quản Trị Gói Cước, Dòng Tiền & Doanh Thu
+              Quản Lý Gói Dịch Vụ &amp; Doanh Thu
             </h2>
-            <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] text-amber-300 font-semibold">
-              Chính Sách Bảng Giá &amp; Thu Phí
-            </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Quản trị biểu giá dịch vụ thuê bao hệ thống, thiết lập quyền lợi và đối soát giao dịch cổng thanh toán VNPAY/MOMO.
+            Quản trị biểu giá dịch vụ thuê bao Moodify, thiết lập quyền lợi người dùng và đối soát giao dịch thanh toán.
           </p>
         </div>
 
@@ -250,20 +247,20 @@ export function MonetizationTab({
             <button
               type="button"
               onClick={handleOpenCreate}
-              className="flex items-center gap-2 rounded-xl bg-[#ff7a2c] px-4 py-2.5 text-xs font-bold text-black shadow-md shadow-[#ff7a2c]/20 hover:brightness-110 transition"
+              className="flex items-center gap-2 rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
             >
               <Plus className="h-4 w-4" /> Thêm Gói Cước Mới
             </button>
           )}
 
           {/* Subtab Toggle Buttons */}
-          <div className="flex items-center rounded-xl border border-white/10 bg-black/40 p-1">
+          <div className="flex items-center rounded-xl border border-[#222432] bg-[#12131a] p-1">
             <button
               type="button"
               onClick={() => setActiveSubTab("packages")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 activeSubTab === "packages"
-                  ? "bg-white/15 text-white shadow"
+                  ? "bg-[#ff5500] text-white shadow"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -274,11 +271,11 @@ export function MonetizationTab({
               onClick={() => setActiveSubTab("transactions")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 activeSubTab === "transactions"
-                  ? "bg-white/15 text-white shadow"
+                  ? "bg-[#ff5500] text-white shadow"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <Receipt className="h-3.5 w-3.5" /> Đối Soát ({transactions.length})
+              <Receipt className="h-3.5 w-3.5" /> Lịch Sử Giao Dịch ({transactions.length})
             </button>
           </div>
         </div>
@@ -295,15 +292,15 @@ export function MonetizationTab({
               return (
                 <div
                   key={pkg.id}
-                  className={`relative flex flex-col justify-between overflow-hidden rounded-xl border bg-[#0c1017] p-5 shadow-xl transition hover:border-white/20 ${
-                    isActive ? "border-[#1e2330]" : "border-rose-500/20 opacity-70"
+                  className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-[#12131a] p-5 shadow-xl transition hover:border-[#ff5500]/50 ${
+                    isActive ? "border-[#222432]" : "border-rose-500/20 opacity-70"
                   }`}
                 >
                   {/* Top info */}
                   <div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="rounded-md border border-white/10 bg-white/[0.05] px-2.5 py-1 font-mono text-xs text-zinc-300 font-semibold">
+                        <span className="font-mono text-xs text-zinc-400 font-semibold">
                           {pkg.durationDays} Ngày
                         </span>
                         <span className="font-mono text-xs text-zinc-500">
@@ -314,18 +311,15 @@ export function MonetizationTab({
                       <button
                         type="button"
                         onClick={() => onTogglePackageStatus(pkg.id)}
-                        className="text-zinc-400 hover:text-white transition"
+                        className="text-zinc-400 hover:text-white transition cursor-pointer"
                         title={isActive ? "Tạm ngưng cung cấp" : "Kích hoạt gói"}
                       >
-                        {isActive ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Hoạt động
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-rose-400"}`} />
+                          <span className={isActive ? "text-zinc-300" : "text-rose-400"}>
+                            {isActive ? "Hoạt động" : "Tạm dừng"}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/30">
-                            <XCircle className="h-3.5 w-3.5" /> Tạm dừng
-                          </span>
-                        )}
+                        </span>
                       </button>
                     </div>
 
@@ -335,33 +329,33 @@ export function MonetizationTab({
 
                     {/* Price Tag */}
                     <div className="mt-2.5 flex items-baseline gap-1.5">
-                      <span className="font-display text-2xl font-bold text-[#ff7a2c] tracking-tight">
+                      <span className="font-display text-2xl font-bold text-[#ff5500] tracking-tight">
                         {formatVND(pkg.price)}
                       </span>
-                      <span className="text-xs text-white/50 font-mono">
+                      <span className="text-xs text-zinc-400 font-mono">
                         / {pkg.durationDays === 30 ? "tháng" : `${pkg.durationDays} ngày`}
                       </span>
                     </div>
 
                     {/* Active subscribers count badge */}
-                    <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/5 px-3 py-1.5">
+                    <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#171822] border border-[#222432] px-3 py-1.5">
                       <Users className="h-3.5 w-3.5 text-emerald-400" />
                       <span className="font-mono text-xs text-emerald-400 font-semibold">
                         {pkg.subscribersCount ?? 0}
                       </span>
-                      <span className="text-xs text-white/50">thuê bao đang kích hoạt</span>
+                      <span className="text-xs text-zinc-400">thuê bao đang kích hoạt</span>
                     </div>
 
                     {/* Features list */}
-                    <div className="mt-4 border-t border-white/8 pt-4 space-y-2">
+                    <div className="mt-4 border-t border-[#222432] pt-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="font-mono text-xs uppercase tracking-wider text-white/40 font-semibold">
+                        <p className="font-mono text-xs uppercase tracking-wider text-zinc-400 font-semibold">
                           Quyền Lợi Gói ({features.length})
                         </p>
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(pkg)}
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-[#ff7a2c] hover:underline"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-[#ff5500] hover:underline"
                           title="Bấm để mở danh sách quyền lợi và thêm quyền lợi mới"
                         >
                           <Plus className="h-3 w-3" /> Thêm quyền lợi
@@ -369,18 +363,18 @@ export function MonetizationTab({
                       </div>
                       {features.length > 0 ? (
                         features.slice(0, 4).map((feat, idx) => (
-                          <div key={idx} className="flex items-start gap-2 text-xs text-white/75">
-                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff7a2c] mt-0.5" />
+                          <div key={idx} className="flex items-start gap-2 text-xs text-zinc-300">
+                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff5500] mt-0.5" />
                             <span className="line-clamp-2">{feat}</span>
                           </div>
                         ))
                       ) : (
                         <div className="flex items-center justify-between py-1">
-                          <p className="text-xs text-white/40 italic">Chưa có quyền lợi chi tiết.</p>
+                          <p className="text-xs text-zinc-500 italic">Chưa có quyền lợi chi tiết.</p>
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(pkg)}
-                            className="text-xs font-semibold text-[#ff7a2c] hover:underline"
+                            className="text-xs font-semibold text-[#ff5500] hover:underline"
                           >
                             + Thiết lập ngay
                           </button>
@@ -395,13 +389,13 @@ export function MonetizationTab({
                   </div>
 
                   {/* Actions Footer */}
-                  <div className="mt-6 border-t border-white/8 pt-4 flex items-center justify-between gap-2">
+                  <div className="mt-6 border-t border-[#222432] pt-4 flex items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(pkg)}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:border-white/30 transition"
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:border-[#ff5500]/40 transition"
                     >
-                      <Settings2 className="h-3.5 w-3.5 text-[#ff7a2c]" /> Chỉnh Sửa Chi Tiết
+                      <Settings2 className="h-3.5 w-3.5 text-[#ff5500]" /> Chỉnh Sửa Chi Tiết
                     </button>
 
                     <button
@@ -435,19 +429,19 @@ export function MonetizationTab({
                   setTxPage(1);
                 }}
                 placeholder="Tìm mã giao dịch, họ tên, email, tên gói..."
-                className="w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-[#ff7a2c] focus:outline-none"
+                className="w-full rounded-xl border border-[#222432] bg-[#12131a] pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-[#ff5500] focus:outline-none"
               />
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-white/50">Trạng thái:</span>
+              <span className="font-mono text-xs text-zinc-400">Trạng thái:</span>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setTxPage(1);
                 }}
-                className="rounded-xl border border-white/10 bg-[#121622] px-3 py-2 text-xs font-mono text-white focus:border-[#ff7a2c] focus:outline-none"
+                className="rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
               >
                 <option value="ALL">Tất cả ({transactions.length})</option>
                 <option value="SUCCESS">Thành công (SUCCESS)</option>
@@ -594,7 +588,7 @@ export function MonetizationTab({
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white focus:border-[#ff7a2c] focus:outline-none font-semibold"
+                  className="w-full rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none font-semibold"
                 />
               </div>
 
@@ -608,37 +602,39 @@ export function MonetizationTab({
                   step="1000"
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold focus:border-[#ff7a2c] focus:outline-none"
+                  className="w-full rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold focus:border-[#ff5500] focus:outline-none"
                 />
               </div>
 
               {/* Duration Days */}
               <div>
                 <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Chu Kỳ (Số Ngày): {formData.durationDays} ngày
+                  Chu Kỳ Gói Cước
                 </label>
-                <div className="flex gap-2 mb-2">
-                  {[30, 90, 180, 365].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, durationDays: d })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition ${
-                        formData.durationDays === d
-                          ? "bg-[#ff7a2c] text-black"
-                          : "bg-white/5 text-white/60 hover:bg-white/10"
-                      }`}
-                    >
-                      {d === 30 ? "1 Tháng" : d === 90 ? "3 Tháng" : d === 180 ? "6 Tháng" : "1 Năm"}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={[30, 90, 180, 365].includes(formData.durationDays) ? formData.durationDays : "custom"}
+                    onChange={(e) => {
+                      if (e.target.value !== "custom") {
+                        setFormData({ ...formData, durationDays: Number(e.target.value) });
+                      }
+                    }}
+                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
+                  >
+                    <option value={30} className="bg-[#12131a]">1 Tháng (30 ngày)</option>
+                    <option value={90} className="bg-[#12131a]">3 Tháng (90 ngày)</option>
+                    <option value={180} className="bg-[#12131a]">6 Tháng (180 ngày)</option>
+                    <option value={365} className="bg-[#12131a]">1 Năm (365 ngày)</option>
+                    <option value="custom" className="bg-[#12131a]">Tùy chỉnh số ngày...</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={formData.durationDays}
+                    onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
+                    placeholder="Số ngày..."
+                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                  />
                 </div>
-                <input
-                  type="number"
-                  value={formData.durationDays}
-                  onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-xs font-mono text-white focus:border-[#ff7a2c] focus:outline-none"
-                />
               </div>
 
               {/* Display Order & Status */}
@@ -652,7 +648,7 @@ export function MonetizationTab({
                       type="number"
                       value={formData.displayOrder}
                       onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
 
@@ -663,7 +659,7 @@ export function MonetizationTab({
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as "ACTIVE" | "INACTIVE" })}
-                      className="w-full rounded-xl border border-white/10 bg-[#121622] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
                     >
                       <option value="ACTIVE">ACTIVE (Kích hoạt)</option>
                       <option value="INACTIVE">INACTIVE (Tạm ngưng)</option>
@@ -694,15 +690,15 @@ export function MonetizationTab({
                     }
                   }}
                   placeholder="Ví dụ: Tải nhạc chất lượng FLAC không giới hạn..."
-                  className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-[#ff7a2c] focus:outline-none"
+                  className="flex-1 rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-[#ff5500] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => handleAddFeatureItem()}
                   disabled={!newFeatureInput.trim()}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  className={`px-4 py-2.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
                     newFeatureInput.trim()
-                      ? "bg-[#ff7a2c] text-black shadow-md shadow-[#ff7a2c]/20 hover:brightness-110 cursor-pointer"
+                      ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] cursor-pointer"
                       : "bg-white/10 text-white/40 cursor-not-allowed"
                   }`}
                 >
@@ -710,47 +706,39 @@ export function MonetizationTab({
                 </button>
               </div>
 
-              {/* Quick suggestion chips */}
-              <div className="mb-3 space-y-1.5">
-                <span className="text-[11px] font-mono text-zinc-400">Gợi ý nhanh 1-chạm (bấm để thêm vào danh sách):</span>
-                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                  {POPULAR_BENEFITS.map((item) => {
-                    const isAdded = formData.featureItems.includes(item);
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => handleAddFeatureItem(item)}
-                        disabled={isAdded}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-sans transition flex items-center gap-1 ${
-                          isAdded
-                            ? "bg-emerald-500/10 text-emerald-400/50 border border-emerald-500/20 cursor-not-allowed"
-                            : "bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 cursor-pointer"
-                        }`}
-                      >
-                        {isAdded ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3 text-[#ff7a2c]" />}
-                        <span>{item}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Quick suggestion dropdown */}
+              <div className="mb-3">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) handleAddFeatureItem(e.target.value);
+                  }}
+                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-zinc-400 outline-none focus:border-[#ff5500] cursor-pointer"
+                >
+                  <option value="" className="bg-[#12131a]">-- Chọn nhanh quyền lợi mẫu để thêm --</option>
+                  {POPULAR_BENEFITS.filter((item) => !formData.featureItems.includes(item)).map((item) => (
+                    <option key={item} value={item} className="bg-[#12131a] text-white">
+                      + {item}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-black/30 border border-white/5">
+              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-[#171822] border border-[#222432]">
                 {formData.featureItems.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-white/40 font-mono italic">
+                  <p className="py-4 text-center text-xs text-zinc-500 font-mono italic">
                     Chưa có quyền lợi nào. Hãy nhập ở trên hoặc bấm vào gợi ý nhanh để thêm.
                   </p>
                 ) : (
                   formData.featureItems.map((feat, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] text-xs text-white/90">
+                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#12131a] text-xs text-white/90 border border-[#222432]/60">
                       <span className="flex items-center gap-2 font-medium">
-                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff7a2c]" /> {feat}
+                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveFeatureItem(idx)}
-                        className="p-1 rounded-md text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                        className="p-1 rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
                         title="Xóa quyền lợi này"
                       >
                         <X className="h-4 w-4" />
@@ -762,11 +750,11 @@ export function MonetizationTab({
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between border-t border-white/10 pt-4">
+            <div className="flex items-center justify-between border-t border-[#222432] pt-4">
               <button
                 type="button"
                 onClick={() => setPackageToDelete(editingPackage)}
-                className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
+                className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" /> Xóa Gói Cước Này
               </button>
@@ -775,14 +763,14 @@ export function MonetizationTab({
                 <button
                   type="button"
                   onClick={() => setEditingPackage(null)}
-                  className="rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5 transition"
+                  className="rounded-full border border-[#222432] px-5 py-2.5 text-sm font-semibold text-zinc-400 hover:bg-[#171822] transition"
                 >
                   Hủy Bỏ
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveEditPackage}
-                  className="rounded-xl bg-gradient-to-r from-[#ff7a2c] to-[#ff944d] px-6 py-2.5 text-sm font-bold text-black shadow-lg shadow-[#ff7a2c]/20 hover:brightness-110 transition"
+                  className="rounded-full bg-[#ff5500] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
                 >
                   Lưu Thay Đổi
                 </button>
@@ -826,7 +814,7 @@ export function MonetizationTab({
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Ví dụ: Moodify Family Pro"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white focus:border-[#ff7a2c] focus:outline-none font-semibold"
+                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none font-semibold"
                 />
               </div>
 
@@ -839,36 +827,38 @@ export function MonetizationTab({
                   step="1000"
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold focus:border-[#ff7a2c] focus:outline-none"
+                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold focus:border-[#ff5500] focus:outline-none"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Chu Kỳ: {formData.durationDays} ngày
+                  Chu Kỳ Gói Cước
                 </label>
-                <div className="flex gap-2 mb-2">
-                  {[30, 90, 180, 365].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, durationDays: d })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition ${
-                        formData.durationDays === d
-                          ? "bg-[#ff7a2c] text-black"
-                          : "bg-white/5 text-white/60 hover:bg-white/10"
-                      }`}
-                    >
-                      {d === 30 ? "1 Tháng" : d === 90 ? "3 Tháng" : d === 180 ? "6 Tháng" : "1 Năm"}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={[30, 90, 180, 365].includes(formData.durationDays) ? formData.durationDays : "custom"}
+                    onChange={(e) => {
+                      if (e.target.value !== "custom") {
+                        setFormData({ ...formData, durationDays: Number(e.target.value) });
+                      }
+                    }}
+                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
+                  >
+                    <option value={30} className="bg-[#12131a]">1 Tháng (30 ngày)</option>
+                    <option value={90} className="bg-[#12131a]">3 Tháng (90 ngày)</option>
+                    <option value={180} className="bg-[#12131a]">6 Tháng (180 ngày)</option>
+                    <option value={365} className="bg-[#12131a]">1 Năm (365 ngày)</option>
+                    <option value="custom" className="bg-[#12131a]">Tùy chỉnh số ngày...</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={formData.durationDays}
+                    onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
+                    placeholder="Số ngày..."
+                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                  />
                 </div>
-                <input
-                  type="number"
-                  value={formData.durationDays}
-                  onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-xs font-mono text-white focus:border-[#ff7a2c] focus:outline-none"
-                />
               </div>
 
               <div>
@@ -881,7 +871,7 @@ export function MonetizationTab({
                       type="number"
                       value={formData.displayOrder}
                       onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
 
@@ -892,7 +882,7 @@ export function MonetizationTab({
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as "ACTIVE" | "INACTIVE" })}
-                      className="w-full rounded-xl border border-white/10 bg-[#121622] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff7a2c] focus:outline-none"
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
                     >
                       <option value="ACTIVE">ACTIVE (Kích hoạt)</option>
                       <option value="INACTIVE">INACTIVE (Tạm dừng)</option>
@@ -903,7 +893,7 @@ export function MonetizationTab({
             </div>
 
             {/* Feature items */}
-            <div className="border-t border-white/10 pt-4">
+            <div className="border-t border-[#222432] pt-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-mono text-white/70 uppercase tracking-wider font-semibold">
                   Quyền Lợi Gói Mới ({formData.featureItems.length})
@@ -923,15 +913,15 @@ export function MonetizationTab({
                     }
                   }}
                   placeholder="Nhập quyền lợi nổi bật..."
-                  className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-[#ff7a2c] focus:outline-none"
+                  className="flex-1 rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-[#ff5500] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => handleAddFeatureItem()}
                   disabled={!newFeatureInput.trim()}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-[0.98] ${
                     newFeatureInput.trim()
-                      ? "bg-[#ff7a2c] text-black shadow-md shadow-[#ff7a2c]/20 hover:brightness-110 cursor-pointer"
+                      ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/25 hover:brightness-110 cursor-pointer"
                       : "bg-white/10 text-white/40 cursor-not-allowed"
                   }`}
                 >
@@ -939,42 +929,34 @@ export function MonetizationTab({
                 </button>
               </div>
 
-              {/* Quick suggestion chips */}
-              <div className="mb-3 space-y-1.5">
-                <span className="text-[11px] font-mono text-zinc-400">Gợi ý nhanh 1-chạm (bấm để thêm vào danh sách):</span>
-                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                  {POPULAR_BENEFITS.map((item) => {
-                    const isAdded = formData.featureItems.includes(item);
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => handleAddFeatureItem(item)}
-                        disabled={isAdded}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-sans transition flex items-center gap-1 ${
-                          isAdded
-                            ? "bg-emerald-500/10 text-emerald-400/50 border border-emerald-500/20 cursor-not-allowed"
-                            : "bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 cursor-pointer"
-                        }`}
-                      >
-                        {isAdded ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3 text-[#ff7a2c]" />}
-                        <span>{item}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Quick suggestion dropdown */}
+              <div className="mb-3">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) handleAddFeatureItem(e.target.value);
+                  }}
+                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-zinc-400 outline-none focus:border-[#ff5500] cursor-pointer"
+                >
+                  <option value="" className="bg-[#12131a]">-- Chọn nhanh quyền lợi mẫu để thêm --</option>
+                  {POPULAR_BENEFITS.filter((item) => !formData.featureItems.includes(item)).map((item) => (
+                    <option key={item} value={item} className="bg-[#12131a] text-white">
+                      + {item}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-black/30 border border-white/5">
+              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-[#12131a] border border-[#222432]">
                 {formData.featureItems.length === 0 ? (
                   <p className="py-4 text-center text-xs text-white/40 font-mono italic">
                     Chưa có quyền lợi nào. Hãy nhập ở trên hoặc bấm vào gợi ý nhanh để thêm.
                   </p>
                 ) : (
                   formData.featureItems.map((feat, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] text-xs text-white/90">
+                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#171822] text-xs text-white/90 border border-[#222432]/60">
                       <span className="flex items-center gap-2 font-medium">
-                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff7a2c]" /> {feat}
+                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
                       </span>
                       <button
                         type="button"
@@ -1002,7 +984,7 @@ export function MonetizationTab({
               <button
                 type="button"
                 onClick={handleSaveCreatePackage}
-                className="rounded-xl bg-gradient-to-r from-[#ff7a2c] to-[#ff944d] px-6 py-2.5 text-sm font-bold text-black shadow-lg shadow-[#ff7a2c]/20 hover:brightness-110 transition"
+                className="rounded-full bg-[#ff5500] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
               >
                 Tạo Gói Cước
               </button>

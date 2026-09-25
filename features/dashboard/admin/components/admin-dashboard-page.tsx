@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronRight,
   DollarSign,
+  Heart,
   HelpCircle,
   Key,
   Layers,
@@ -24,6 +25,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Star,
   Users,
   XCircle,
 } from "lucide-react";
@@ -43,6 +45,8 @@ import {
   fetchAdminPackages,
   fetchAdminTransactions,
   fetchAdminUsers,
+  fetchAdminOverview,
+  type AdminOverviewResponse,
   refundAdminTransaction,
   takedownAdminTrack,
   restoreAdminTrack,
@@ -58,12 +62,20 @@ import {
   deleteAdminUser,
   updateAdminUserProfile,
   revokeAdminDevice,
+  fetchAdminModerationQueue,
+  submitAdminReviewDecision,
+  fetchAdminLicensing,
 } from "@/lib/api/admin-client";
 
 import {
   INITIAL_AUDIT_LOGS,
+  INITIAL_CONTRACTS,
   INITIAL_DEVICES,
+  INITIAL_DISTRIBUTORS,
+  INITIAL_LICENSES,
   INITIAL_PACKAGES,
+  INITIAL_REVIEWS,
+  INITIAL_REVIEW_ACTIONS,
   INITIAL_TRACKS,
   INITIAL_TRANSACTIONS,
   INITIAL_USERS,
@@ -75,8 +87,13 @@ import {
   AdminUserRole,
   AdminUserStatus,
   CatalogTrack,
+  DistributionContract,
+  Distributor,
   PaymentTransaction,
+  ReviewAction,
+  ReviewRequest,
   ServicePackage,
+  SongLicense,
   SystemAuditLog,
   UserDevice,
 } from "../types";
@@ -84,8 +101,11 @@ import {
 import { OverviewTab } from "./overview-tab";
 import { UsersManagementTab } from "./users-management-tab";
 import { CatalogManagementTab } from "./catalog-management-tab";
+import { FavoritesManagementTab } from "./favorites-management-tab";
+import { ModerationTab } from "./moderation-tab";
 import { MonetizationTab } from "./monetization-tab";
-import { SystemSettingsTab } from "./system-settings-tab";
+import { LicensingTab } from "./licensing-tab";
+import { SystemSettingsTab, type SystemConfig } from "./system-settings-tab";
 import { AdminAudioPlayerDock } from "./shared/admin-audio-player-dock";
 
 const HOME_ROUTE = "/dashboard";
@@ -110,7 +130,13 @@ export default function AdminDashboardPage() {
   const [tracks, setTracks] = useState<CatalogTrack[]>(INITIAL_TRACKS);
   const [packages, setPackages] = useState<ServicePackage[]>(INITIAL_PACKAGES);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>(INITIAL_TRANSACTIONS);
+  const [reviews, setReviews] = useState<ReviewRequest[]>(INITIAL_REVIEWS);
+  const [reviewActions, setReviewActions] = useState<ReviewAction[]>(INITIAL_REVIEW_ACTIONS);
+  const [distributors, setDistributors] = useState<Distributor[]>(INITIAL_DISTRIBUTORS);
+  const [contracts, setContracts] = useState<DistributionContract[]>(INITIAL_CONTRACTS);
+  const [licenses, setLicenses] = useState<SongLicense[]>(INITIAL_LICENSES);
   const [auditLogs, setAuditLogs] = useState<SystemAuditLog[]>(INITIAL_AUDIT_LOGS);
+  const [overviewData, setOverviewData] = useState<AdminOverviewResponse | null>(null);
 
   // Global Audio Preview Player state
   const [previewTrack, setPreviewTrack] = useState<CatalogTrack | null>(null);
@@ -184,7 +210,7 @@ export default function AdminDashboardPage() {
         minute: "2-digit",
         second: "2-digit",
       }).format(new Date()),
-      operatorName: currentAdmin?.fullName || "Phạm Quốc Admin",
+      operatorName: currentAdmin?.fullName || "Quản trị viên",
       operatorRole: "ADMIN",
       category,
       action,
@@ -200,11 +226,14 @@ export default function AdminDashboardPage() {
     setIsLoadingData(true);
     setDbStatus("connecting");
     try {
-      const [usersRes, catalogRes, packagesRes, transactionsRes] = await Promise.allSettled([
+      const [usersRes, catalogRes, packagesRes, transactionsRes, moderationRes, licensingRes, overviewRes] = await Promise.allSettled([
         fetchAdminUsers(),
         fetchAdminCatalog(),
         fetchAdminPackages(),
         fetchAdminTransactions(),
+        fetchAdminModerationQueue(),
+        fetchAdminLicensing(),
+        fetchAdminOverview(),
       ]);
 
       let successCount = 0;
@@ -225,6 +254,26 @@ export default function AdminDashboardPage() {
         setTransactions(transactionsRes.value);
         successCount++;
       }
+      if (moderationRes.status === "fulfilled" && Array.isArray(moderationRes.value) && moderationRes.value.length > 0) {
+        setReviews(moderationRes.value);
+        successCount++;
+      }
+      if (overviewRes.status === "fulfilled" && overviewRes.value) {
+        setOverviewData(overviewRes.value);
+        successCount++;
+      }
+      if (licensingRes.status === "fulfilled" && licensingRes.value) {
+        if (Array.isArray(licensingRes.value.distributors) && licensingRes.value.distributors.length > 0) {
+          setDistributors(licensingRes.value.distributors);
+        }
+        if (Array.isArray(licensingRes.value.contracts) && licensingRes.value.contracts.length > 0) {
+          setContracts(licensingRes.value.contracts);
+        }
+        if (Array.isArray(licensingRes.value.licenses) && licensingRes.value.licenses.length > 0) {
+          setLicenses(licensingRes.value.licenses);
+        }
+        successCount++;
+      }
 
       const syncStr = new Intl.DateTimeFormat("vi-VN", {
         hour: "2-digit",
@@ -236,7 +285,7 @@ export default function AdminDashboardPage() {
         setDbStatus("connected");
         setLastSyncTime(syncStr);
         if (!silent) {
-          addToast(`Đã đồng bộ trực tiếp dữ liệu quản trị hệ thống (${users.length} Users, ${tracks.length} Tracks).`, "success");
+          addToast(`Đã đồng bộ trực tiếp dữ liệu quản trị hệ thống (${users.length} người dùng, ${tracks.length} bài hát).`, "success");
         }
       } else {
         setDbStatus("error");
@@ -457,11 +506,20 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleChangeTrackVibe = (trackId: string, newVibe: CatalogTrack["vibeCategory"]) => {
+  const handleDeleteTrack = (trackId: string) => {
+    const target = tracks.find((t) => t.id === trackId);
+    setTracks((prev) => prev.filter((t) => t.id !== trackId));
+    recordAudit("DELETE_TRACK", target?.title || trackId, "Xóa vĩnh viễn bài hát khỏi danh mục hệ thống", "CATALOG", "critical");
+    addToast(`Đã xóa bài hát "${target?.title || trackId}" khỏi hệ thống thành công.`, "warning");
+  };
+
+  const handleChangeTrackGenre = (trackId: string, newGenre: string) => {
+    const target = tracks.find((t) => t.id === trackId);
     setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, vibeCategory: newVibe } : t))
+      prev.map((t) => (t.id === trackId ? { ...t, genre: newGenre } : t))
     );
-    addToast(`Đã chuyển Vibe bài hát sang "${newVibe}".`, "success");
+    recordAudit("UPDATE_TRACK_GENRE", target?.title || trackId, `Cập nhật thể loại bài hát thành ${newGenre}`, "CATALOG", "info");
+    addToast(`Đã cập nhật thể loại bài hát "${target?.title || trackId}" thành "${newGenre}".`, "success");
   };
 
   const handleTogglePackageStatus = async (packageId: number) => {
@@ -647,23 +705,70 @@ export default function AdminDashboardPage() {
   };
 
   // 4. System Settings Actions
-  const handleSaveSettings = (settings: { aiThreshold: number; maxDevices: number }) => {
+  const handleSaveSettings = (settings: SystemConfig) => {
     recordAudit(
       "UPDATE_SYSTEM_CONFIG",
-      "Core Settings",
-      `Ngưỡng AI: ${(settings.aiThreshold * 100).toFixed(0)}%, Giới hạn thiết bị: ${settings.maxDevices}`,
+      "Cấu hình Hệ thống Moodify",
+      `Bảo trì: ${settings.maintenanceMode ? "BẬT" : "TẮT"}, Đăng ký: ${
+        settings.allowRegistration ? "MỞ" : "ĐÓNG"
+      }, Kiểm duyệt: ${
+        settings.moderationMode === "PRE_MODERATION" ? "Tiền kiểm" : "Hậu kiểm"
+      }, Banner: ${settings.announcementEnabled ? "BẬT" : "TẮT"}`,
       "SYSTEM",
       "info"
     );
-    addToast("Đã lưu thiết lập tham số hệ thống thành công.", "success");
+    addToast("Đã lưu và áp dụng toàn bộ cấu hình hệ thống thành công.", "success");
+  };
+
+  // 5. Moderation Actions
+  const handleApproveReview = async (requestId: number) => {
+    try {
+      await submitAdminReviewDecision(requestId, "APPROVE");
+      setReviews((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: "APPROVED" } : r))
+      );
+      recordAudit("APPROVE_TRACK", `Yêu cầu #${requestId}`, "Phê duyệt phát hành bài hát/album mới", "MODERATION", "info");
+      addToast("Đã phê duyệt xuất bản tác phẩm thành công.", "success");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi phê duyệt: ${msg}`, "error");
+    }
+  };
+
+  const handleRejectReview = async (requestId: number, reason: string) => {
+    try {
+      await submitAdminReviewDecision(requestId, "REJECT", reason);
+      setReviews((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: "REJECTED" } : r))
+      );
+      recordAudit("REJECT_TRACK", `Yêu cầu #${requestId}`, `Từ chối phát hành: ${reason}`, "MODERATION", "warning");
+      addToast("Đã từ chối tác phẩm.", "warning");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi từ chối: ${msg}`, "error");
+    }
+  };
+
+  const handleReturnReview = async (requestId: number, reason: string) => {
+    try {
+      await submitAdminReviewDecision(requestId, "RETURN_FOR_EDIT", reason);
+      setReviews((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: "IN_REVIEW" } : r))
+      );
+      recordAudit("RETURN_TRACK", `Yêu cầu #${requestId}`, `Yêu cầu chỉnh sửa: ${reason}`, "MODERATION", "info");
+      addToast("Đã gửi yêu cầu chỉnh sửa cho nghệ sĩ.", "info");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Lỗi khi gửi yêu cầu sửa: ${msg}`, "error");
+    }
   };
 
   // ================= RENDER GUARD STATES =================
   if (authState === "checking") {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#07080b] text-white">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#ff7a2c] border-t-transparent" />
-        <p className="mt-4 font-graphik text-[13px] tracking-[0.16em] uppercase text-white/50">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#0e0f14] text-white">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#ff5500] border-t-transparent" />
+        <p className="mt-4 font-graphik text-[13px] tracking-[0.16em] uppercase text-zinc-400">
           Đang xác thực quyền Quản trị viên Moodify...
         </p>
       </div>
@@ -672,24 +777,24 @@ export default function AdminDashboardPage() {
 
   if (authState === "denied") {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#07080b] p-6 text-center text-white">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#0e0f14] p-6 text-center text-white">
         <div className="grid h-16 w-16 place-items-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-400">
           <ShieldAlert className="h-8 w-8" />
         </div>
         <h1 className="mt-5 font-graphik text-[26px] font-semibold text-white">Truy Cập Bị Từ Chối (403 Forbidden)</h1>
-        <p className="mt-2 max-w-md text-[14px] leading-6 text-white/50">
-          Tài khoản của bạn không có vai trò Quản trị viên (ADMIN) để truy cập vào Studio Command Console.
+        <p className="mt-2 max-w-md text-[14px] leading-6 text-zinc-400">
+          Tài khoản của bạn không có vai trò Quản trị viên (ADMIN) để truy cập vào Bảng điều khiển quản trị.
         </p>
         <div className="mt-6 flex gap-3">
           <Link
             href={USER_DASHBOARD_ROUTE}
-            className="rounded-full bg-white/10 px-5 py-2.5 text-[13px] font-medium text-white hover:bg-white/15"
+            className="rounded-xl border border-[#222432] bg-[#171822] px-5 py-2.5 text-[13px] font-medium text-white hover:bg-white/10 transition active:scale-[0.98]"
           >
             Về Trang Nghe Nhạc
           </Link>
           <Link
             href={HOME_ROUTE}
-            className="rounded-full bg-[#ff7a2c] px-5 py-2.5 text-[13px] font-medium text-black hover:opacity-90"
+            className="rounded-xl bg-[#ff5500] px-5 py-2.5 text-[13px] font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:brightness-110 transition active:scale-[0.98]"
           >
             Về Trang Chủ
           </Link>
@@ -698,41 +803,35 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // ================= 5 CORE ADMIN TABS =================
+  // ================= 8 CORE ADMIN TABS =================
+  const pendingModerationCount = reviews.filter((r) => r.status === "PENDING" || r.status === "IN_REVIEW").length;
+
   const CORE_ADMIN_TABS: { key: AdminTab; label: string; count?: number; icon: React.ComponentType<{ className?: string }> }[] = [
-    { key: "overview", label: "Tổng Quan & BI", icon: LayoutDashboard },
-    { key: "users", label: "Người Dùng (IAM)", count: users.length, icon: Users },
-    { key: "catalog", label: "Kho Nhạc & Âm Học", count: tracks.length, icon: Music2 },
-    { key: "monetization", label: "Gói Cước & Dòng Tiền", count: packages.length, icon: DollarSign },
-    { key: "settings", label: "Cấu Hình & Audit Vault", icon: Settings },
+    { key: "overview", label: "Tổng Quan", icon: LayoutDashboard },
+    { key: "users", label: "Quản Lý Người Dùng", count: users.length, icon: Users },
+    { key: "catalog", label: "Kho Bài Hát", count: tracks.length, icon: Music2 },
+    { key: "favorites", label: "Lượt Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
+    { key: "moderation", label: "Kiểm Duyệt Phát Hành", count: pendingModerationCount, icon: ShieldCheck },
+    { key: "monetization", label: "Gói Dịch Vụ & Doanh Thu", count: packages.length, icon: DollarSign },
+    { key: "licensing", label: "Bản Quyền & Phân Phối", count: contracts.length, icon: Key },
+    { key: "settings", label: "Cài Đặt & Nhật Ký", icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#07080b] text-white font-sans flex">
-      {/* Studio Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none opacity-30 z-0">
-        <div className="absolute left-[15%] top-[5%] h-[500px] w-[500px] rounded-full bg-[#ff7a2c]/8 blur-[160px]" />
-        <div className="absolute right-[10%] top-[25%] h-[450px] w-[450px] rounded-full bg-[#00f2fe]/8 blur-[160px]" />
-      </div>
-
+    <div className="min-h-screen w-full bg-[#0e0f14] text-white font-sans flex antialiased">
       {/* ================= LEFT SIDEBAR NAVIGATION ================= */}
-      <aside className="w-72 shrink-0 border-r border-[#1a1d26] bg-[#090b11] flex flex-col justify-between sticky top-0 h-screen z-30 overflow-y-auto">
-        {/* Top: Brand Logo & Ops Console Badge */}
-        <div className="p-5 border-b border-[#1a1d26]">
+      <aside className="w-64 shrink-0 border-r border-[#222432] bg-[#12131a] flex flex-col justify-between sticky top-0 h-screen z-30 select-none">
+        {/* Top: Brand Logo & Station Badge */}
+        <div className="p-5 border-b border-[#222432]">
           <Link href={HOME_ROUTE} className="flex items-center gap-2 group">
-            <BrandLogo variant="horizontal-dark" className="h-8 w-auto transition-transform group-hover:scale-105" />
+            <BrandLogo variant="horizontal-dark" className="h-7 w-auto transition-transform group-hover:scale-[1.02]" />
           </Link>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#ff7a2c]/30 bg-[#ff7a2c]/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-[#ffb488]">
-              <Shield className="h-3.5 w-3.5 text-[#ff7a2c]" /> BẢNG ĐIỀU HÀNH DOANH NGHIỆP
-            </span>
-          </div>
         </div>
 
         {/* Middle: Navigation Tabs List */}
-        <div className="flex-1 px-4 py-5 space-y-1.5">
-          <div className="px-3 pb-2 font-mono text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
-            Phân Hệ Quản Trị
+        <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <div className="px-3 pb-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Danh Mục Quản Trị
           </div>
 
           {CORE_ADMIN_TABS.map((tab) => {
@@ -744,20 +843,20 @@ export default function AdminDashboardPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
                   isActive
-                    ? "bg-[#ff7a2c] text-black font-bold shadow-md shadow-[#ff7a2c]/20"
-                    : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                    ? "bg-[#ff5500] text-white font-bold shadow-md shadow-[#ff5500]/25"
+                    : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className={`h-4 w-4 ${isActive ? "text-black" : "text-zinc-400"}`} />
+                <div className="flex items-center gap-2.5">
+                  <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-zinc-400"}`} />
                   <span>{tab.label}</span>
                 </div>
                 {tab.count !== undefined && (
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-md font-mono font-bold ${
-                      isActive ? "bg-black/20 text-black" : "bg-white/10 text-zinc-300"
+                    className={`text-[11px] px-2 py-0.5 rounded font-mono font-bold ${
+                      isActive ? "bg-black/25 text-white" : "bg-white/[0.06] text-zinc-400"
                     }`}
                   >
                     {tab.count}
@@ -769,18 +868,18 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Bottom: Admin Profile & Logout */}
-        <div className="p-4 border-t border-[#1a1d26] bg-[#07080b]">
+        <div className="p-3.5 border-t border-[#222432] bg-[#0e0f14]">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="h-9 w-9 shrink-0 rounded-full bg-gradient-to-tr from-[#ff7a2c] to-[#00f2fe] flex items-center justify-center text-xs font-bold text-black font-mono shadow-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 shrink-0 rounded-lg bg-[#ff5500] flex items-center justify-center text-xs font-bold text-white font-mono shadow-sm">
                 {currentAdmin?.fullName.charAt(0) || "A"}
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-white truncate">
-                  {currentAdmin?.fullName || "Phạm Quốc Admin"}
+                <div className="text-xs font-semibold text-white truncate">
+                  {currentAdmin?.fullName || "Quản trị viên"}
                 </div>
-                <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-1.5">
-                  <span className="text-emerald-400 font-semibold">ADMIN</span> · @{currentAdmin?.username || "admin01"}
+                <div className="text-[10px] text-zinc-500 font-mono truncate">
+                  @{currentAdmin?.username || "admin"}
                 </div>
               </div>
             </div>
@@ -790,7 +889,7 @@ export default function AdminDashboardPage() {
               onClick={handleLogout}
               disabled={loggingOut}
               title="Đăng xuất"
-              className="p-2 rounded-lg border border-white/5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/20 transition"
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -799,18 +898,20 @@ export default function AdminDashboardPage() {
       </aside>
 
       {/* ================= RIGHT MAIN WORKSPACE ================= */}
-      <div className="flex-1 min-w-0 min-h-screen flex flex-col z-10">
-        {/* Top Navbar of Main Workspace: Breadcrumbs & Language */}
-        <header className="h-14 px-6 border-b border-[#1a1d26] bg-[#07080b]/90 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-2.5 font-mono text-xs">
-            <span className="text-zinc-400">Moodify Ops</span>
-            <span className="text-zinc-600">/</span>
-            <span className="text-[#ff7a2c] font-semibold">
-              {CORE_ADMIN_TABS.find((t) => t.key === activeTab)?.label}
-            </span>
+      <div className="flex-1 min-w-0 min-h-screen flex flex-col z-10 bg-[#0e0f14]">
+        {/* Top Navbar */}
+        <header className="h-14 px-6 border-b border-[#222432] bg-[#12131a]/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <span className="text-zinc-500">Moodify Operations</span>
+              <span className="text-zinc-700">/</span>
+              <span className="text-white font-semibold">
+                {CORE_ADMIN_TABS.find((t) => t.key === activeTab)?.label}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <LanguageSwitcher />
           </div>
         </header>
@@ -823,6 +924,10 @@ export default function AdminDashboardPage() {
               tracks={tracks}
               transactions={transactions}
               auditLogs={auditLogs}
+              overviewData={overviewData}
+              previewTrack={previewTrack}
+              isPlayingPreview={isPlayingPreview}
+              onTogglePreview={handleTogglePreviewTrack}
               onNavigateTab={(tab) => setActiveTab(tab)}
             />
           )}
@@ -847,10 +952,30 @@ export default function AdminDashboardPage() {
               tracks={tracks}
               onTakedownTrack={handleTakedownTrack}
               onRestoreTrack={handleRestoreTrack}
-              onChangeTrackVibe={handleChangeTrackVibe}
+              onChangeTrackGenre={handleChangeTrackGenre}
+              onDeleteTrack={handleDeleteTrack}
               onPreviewTrack={handleTogglePreviewTrack}
               playingTrackId={previewTrack?.id || null}
               isPlayingPreview={isPlayingPreview}
+            />
+          )}
+
+          {activeTab === "favorites" && (
+            <FavoritesManagementTab
+              previewTrack={previewTrack}
+              isPlayingPreview={isPlayingPreview}
+              onTogglePreview={handleTogglePreviewTrack}
+              onToast={addToast}
+            />
+          )}
+
+          {activeTab === "moderation" && (
+            <ModerationTab
+              reviews={reviews}
+              reviewActions={reviewActions}
+              onApproveReview={handleApproveReview}
+              onRejectReview={handleRejectReview}
+              onReturnReview={handleReturnReview}
             />
           )}
 
@@ -867,10 +992,20 @@ export default function AdminDashboardPage() {
             />
           )}
 
+          {activeTab === "licensing" && (
+            <LicensingTab
+              distributors={distributors}
+              contracts={contracts}
+              licenses={licenses}
+            />
+          )}
+
           {activeTab === "settings" && (
             <SystemSettingsTab
               auditLogs={auditLogs}
               onSaveSettings={handleSaveSettings}
+              onRecordAudit={recordAudit}
+              onAddToast={addToast}
             />
           )}
         </main>
