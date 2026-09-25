@@ -170,7 +170,7 @@ export const NORMAL_THEME = {
   sidebarIconColor: "text-purple-400",
   sidebarActiveItem: "bg-gradient-to-r from-purple-500/25 via-indigo-500/15 to-transparent text-white font-semibold border-l-2 border-purple-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]",
   sidebarActiveDot: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
-  playerBg: "bg-slate-950/85",
+  playerBg: "bg-gradient-to-r from-[#0d0d1a]/95 via-[#141226]/90 to-[#0b0a14]/95",
   playerBorder: "border-t border-white/10 shadow-[0_-15px_40px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.08)]",
   playerAccent: "#c084fc",
 };
