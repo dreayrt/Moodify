@@ -36,7 +36,7 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const totalUsersCount = users.length;
   const activeUsersCount = users.filter((u) => u.status === "ACTIVE").length;
-  const artistsCount = users.filter((u) => u.role === "ARTIST").length;
+  const contentLeadsCount = users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length;
   const totalRevenue = transactions
     .filter((t) => t.status === "SUCCESS")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -65,7 +65,7 @@ export function OverviewTab({
             </p>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-graphik text-3xl font-bold text-white tracking-tight">{totalUsersCount}</span>
-              <span className="text-xs text-zinc-400 font-mono">({artistsCount} nghệ sĩ)</span>
+              <span className="text-xs text-zinc-400 font-mono">({contentLeadsCount} Content Lead)</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
@@ -251,7 +251,7 @@ export function OverviewTab({
         <DatabaseTelemetryCard
           usersCount={totalUsersCount}
           tracksCount={tracks.length}
-          artistsCount={artistsCount}
+          artistsCount={contentLeadsCount}
           packagesCount={6}
         />
       </div>

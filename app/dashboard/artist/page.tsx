@@ -1,5 +1,5 @@
-import ArtistDashboardPage from "@/features/dashboard/artist/components/dashboard-artist-page";
+import { redirect } from "next/navigation";
 
 export default function DashboardArtistPage() {
-  return <ArtistDashboardPage />;
+  redirect("/dashboard/content-lead");
 }

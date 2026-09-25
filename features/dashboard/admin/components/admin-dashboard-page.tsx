@@ -90,7 +90,8 @@ import { AdminAudioPlayerDock } from "./shared/admin-audio-player-dock";
 
 const HOME_ROUTE = "/dashboard";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
-const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
+const CONTENT_LEAD_DASHBOARD_ROUTE = "/dashboard/content-lead";
+const ARTIST_DASHBOARD_ROUTE = "/dashboard/content-lead";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -271,8 +272,10 @@ export default function AdminDashboardPage() {
 
             if (normalizedRole !== "ADMIN") {
               setAuthState("denied");
-              if (normalizedRole === "ARTIST") {
-                router.replace(ARTIST_DASHBOARD_ROUTE);
+              if (normalizedRole === "CONTENT_LEAD" || normalizedRole === "ARTIST") {
+                router.replace(CONTENT_LEAD_DASHBOARD_ROUTE);
+              } else if (normalizedRole === "MODERATOR") {
+                router.replace("/dashboard/moderator");
               } else {
                 router.replace(USER_DASHBOARD_ROUTE);
               }

@@ -91,6 +91,11 @@ export type ArtistCatalogResponse = {
   totalTrackPages: number;
 };
 
+export type ContentLeadProfileResponse = ArtistProfileResponse;
+export type ContentLeadTrackResponse = ArtistTrackResponse;
+export type ContentLeadAlbumResponse = ArtistAlbumResponse;
+export type ContentLeadCatalogResponse = ArtistCatalogResponse;
+
 export type StoredAuthSession = {
   accessToken: string;
   refreshToken: string;
@@ -276,9 +281,9 @@ export async function uploadArtistTrack(
 ): Promise<ArtistTrackResponse> {
   const validToken = token || (await getValidAccessToken());
   if (!validToken) {
-    throw new Error("Phiên làm việc đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+    throw new Error("Phiên làm việc đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại tài khoản Content Lead.");
   }
-  const fullUrl = `${API_BASE_URL}/api/artists/me/tracks`;
+  const fullUrl = `${API_BASE_URL}/api/content-lead/me/tracks`;
   const response = await fetch(fullUrl, {
     method: "POST",
     headers: {
@@ -289,7 +294,7 @@ export async function uploadArtistTrack(
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("Phiên đăng nhập đã hết hạn hoặc tài khoản không có quyền Nghệ sĩ (ARTIST). Vui lòng đăng xuất và đăng nhập lại.");
+      throw new Error("Phiên đăng nhập đã hết hạn hoặc tài khoản không có quyền Content Lead (CONTENT_LEAD). Vui lòng đăng xuất và đăng nhập lại.");
     }
     const errorMsg = await extractErrorMessage(response);
     throw new Error(errorMsg);
@@ -315,10 +320,10 @@ export async function updateArtistTrack(
 ): Promise<ArtistTrackResponse> {
   const validToken = token || (await getValidAccessToken());
   if (!validToken) {
-    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Content Lead.");
   }
 
-  return requestJson<ArtistTrackResponse>(`/api/artists/me/tracks/${encodeURIComponent(trackId)}`, {
+  return requestJson<ArtistTrackResponse>(`/api/content-lead/me/tracks/${encodeURIComponent(trackId)}`, {
     method: "PATCH",
     token: validToken,
     body: payload,
@@ -328,10 +333,10 @@ export async function updateArtistTrack(
 export async function deleteArtistTrack(trackId: string, token?: string): Promise<void> {
   const validToken = token || (await getValidAccessToken());
   if (!validToken) {
-    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Content Lead.");
   }
 
-  return requestJson<void>(`/api/artists/me/tracks/${encodeURIComponent(trackId)}`, {
+  return requestJson<void>(`/api/content-lead/me/tracks/${encodeURIComponent(trackId)}`, {
     method: "DELETE",
     token: validToken,
   });
@@ -396,10 +401,15 @@ export async function getCurrentArtistCatalog(
   }
 
   return requestJson<ArtistCatalogResponse>(
-    `/api/artists/me/catalog?${searchParams.toString()}`,
+    `/api/content-lead/me/catalog?${searchParams.toString()}`,
     { token: accessToken },
   );
 }
+
+export const getCurrentContentLeadCatalog = getCurrentArtistCatalog;
+export const uploadContentLeadTrack = uploadArtistTrack;
+export const updateContentLeadTrack = updateArtistTrack;
+export const deleteContentLeadTrack = deleteArtistTrack;
 
 export async function getValidAccessToken(): Promise<string | null> {
   const session = getStoredAuthSession();

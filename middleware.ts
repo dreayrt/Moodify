@@ -28,7 +28,8 @@ function parseJwtPayload(token: string): { role?: string; sub?: string; exp?: nu
 const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
   USER: "/dashboard/user",
   MODERATOR: "/dashboard/moderator",
-  ARTIST: "/dashboard/artist",
+  ARTIST: "/dashboard/content-lead",
+  CONTENT_LEAD: "/dashboard/content-lead",
   ADMIN: "/dashboard/admin",
 };
 
@@ -85,8 +86,18 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(correctDashboard, request.url));
     }
 
-    // Nguoi khong phai ARTIST/ADMIN co tinh vao /dashboard/artist
-    if (pathname.startsWith("/dashboard/artist") && role !== "ARTIST" && role !== "ADMIN") {
+    // Chuyen huong /dashboard/artist sang /dashboard/content-lead
+    if (pathname.startsWith("/dashboard/artist")) {
+      return NextResponse.redirect(new URL("/dashboard/content-lead", request.url));
+    }
+
+    // Nguoi khong phai CONTENT_LEAD/ADMIN co tinh vao /dashboard/content-lead
+    if (
+      pathname.startsWith("/dashboard/content-lead") &&
+      role !== "CONTENT_LEAD" &&
+      role !== "ARTIST" &&
+      role !== "ADMIN"
+    ) {
       return NextResponse.redirect(new URL(correctDashboard, request.url));
     }
 

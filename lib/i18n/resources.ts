@@ -56,19 +56,22 @@ export const resources = {
           },
         },
         artist: {
+          hero: {
+            badge: "Content Lead Studio",
+          },
           access: {
-            eyebrow: "Quyền truy cập Artist",
+            eyebrow: "Quyền truy cập Content Lead",
             checkingTitle: "Đang kiểm tra tài khoản...",
-            deniedTitle: "Trang này chỉ dành cho tài khoản nghệ sĩ.",
-            checkingCopy: "Moodify đang xác minh phiên đăng nhập và vai trò trước khi mở artist studio.",
+            deniedTitle: "Trang này chỉ dành cho tài khoản Content Lead (Phụ trách Nội dung).",
+            checkingCopy: "Moodify đang xác minh phiên đăng nhập và vai trò trước khi mở Content Lead Studio.",
             deniedCopy: "Bạn sẽ được chuyển đến trang phù hợp với phiên đăng nhập hiện tại.",
           },
           header: {
-            eyebrow: "Moodify cho nghệ sĩ",
-            title: "Dashboard nghệ sĩ",
+            eyebrow: "Moodify Content Lead",
+            title: "Dashboard Phụ trách Nội dung",
             searchLabel: "Tìm kiếm dashboard",
             searchPlaceholder: "Tìm bài hát, chiến dịch, người hâm mộ...",
-            studio: "Artist studio",
+            studio: "Content Lead Studio",
           },
           upload: {
             upgrade: "Mở khóa upload không giới hạn",
@@ -90,6 +93,9 @@ export const resources = {
               all: "Tất cả",
               draft: "Bản nháp",
               published: "Đã phát hành",
+              pending: "Chờ kiểm duyệt",
+              rejected: "Bị từ chối",
+              needs_revision: "Cần chỉnh sửa",
             },
             visibilities: {
               all: "Tất cả hiển thị",
@@ -192,14 +198,18 @@ export const resources = {
             },
           },
           tabs: {
-            tracks: "SoundCloud Tracks",
+            tracks: "Danh mục bài hát",
             distribution: "Phân phối",
             vinyl: "Đĩa vinyl",
             comments: "Bình luận",
             benefits: "Quyền lợi",
           },
+          analytics: {
+            kpi: "Chỉ số tương tác nội dung",
+            eyebrow: "Gợi ý quản trị nội dung",
+          },
           studio: {
-            eyebrow: "Artist Studio",
+            eyebrow: "Content Lead",
             insight: "Insights",
             earnings: "Doanh thu",
             fans: "Fans",
@@ -236,11 +246,12 @@ export const resources = {
             moderate: "Kiểm duyệt",
           },
           benefitsPanel: {
-            title: "Quyền lợi nghệ sĩ",
+            title: "Quyền lợi Content Lead",
           },
           audience: {
-            eyebrow: "Nhịp khán giả",
-            title: "Fans đang tương tác",
+            eyebrow: "Phân phối nội dung",
+            title: "Kênh tiếp cận đa nền tảng",
+            subtitle: "Lượt tiếp cận thính giả đa kênh (Cross-platform Listeners)",
           },
           actions: {
             eyebrow: "Hành động studio",
@@ -322,19 +333,22 @@ export const resources = {
           },
         },
         artist: {
+          hero: {
+            badge: "Content Lead Studio",
+          },
           access: {
-            eyebrow: "Artist Access",
+            eyebrow: "Content Lead Access",
             checkingTitle: "Checking your account...",
-            deniedTitle: "This page is only for artist accounts.",
-            checkingCopy: "We are verifying your session and role before opening the artist studio.",
+            deniedTitle: "This page is only for Content Lead accounts.",
+            checkingCopy: "We are verifying your session and role before opening the Content Lead Studio.",
             deniedCopy: "You will be redirected to the appropriate page based on your current session.",
           },
           header: {
-            eyebrow: "Moodify for Artists",
-            title: "Artist dashboard",
+            eyebrow: "Moodify for Content Leads",
+            title: "Content Lead Dashboard",
             searchLabel: "Search dashboard",
             searchPlaceholder: "Search tracks, campaigns, fans...",
-            studio: "Artist studio",
+            studio: "Content Lead Studio",
           },
           upload: {
             upgrade: "Get unlimited uploads",
@@ -356,6 +370,9 @@ export const resources = {
               all: "All",
               draft: "Draft",
               published: "Published",
+              pending: "Pending Review",
+              rejected: "Rejected",
+              needs_revision: "Needs Revision",
             },
             visibilities: {
               all: "All visibility",
@@ -458,14 +475,18 @@ export const resources = {
             },
           },
           tabs: {
-            tracks: "SoundCloud Tracks",
+            tracks: "Danh mục bài hát",
             distribution: "Distribution",
             vinyl: "Vinyl Records",
             comments: "Comments",
             benefits: "Benefits",
           },
+          analytics: {
+            kpi: "Content Analytics KPI",
+            eyebrow: "Next Best Actions",
+          },
           studio: {
-            eyebrow: "Artist Studio",
+            eyebrow: "Content Lead",
             insight: "Insights",
             earnings: "Earnings",
             fans: "Fans",
@@ -502,11 +523,12 @@ export const resources = {
             moderate: "Moderate",
           },
           benefitsPanel: {
-            title: "Artist benefits",
+            title: "Content Lead Benefits",
           },
           audience: {
-            eyebrow: "Audience pulse",
-            title: "Fans are leaning in",
+            eyebrow: "Content Distribution",
+            title: "Multi-Platform Reach",
+            subtitle: "Cross-platform listeners and streaming reach",
           },
           actions: {
             eyebrow: "Studio actions",

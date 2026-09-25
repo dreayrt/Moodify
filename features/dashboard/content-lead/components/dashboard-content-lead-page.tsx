@@ -29,6 +29,7 @@ import {
   FastForward,
   UploadCloud,
   Users,
+  Share2,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { LogoMark } from "@/components/shared/logo-mark";
@@ -124,11 +125,11 @@ const RELEASES: Release[] = [
   },
 ];
 
-const FAN_TOUCHPOINTS = [
-  { city: "TP. Hồ Chí Minh", share: "38% thính giả", tone: "Cao điểm 21:00 - 01:00" },
-  { city: "Hà Nội", share: "26% thính giả", tone: "Tăng trưởng +34% tháng này" },
-  { city: "Đà Nẵng", share: "15% thính giả", tone: "Top thể loại EDM / House" },
-  { city: "Tokyo & Seoul", share: "12% thính giả", tone: "Khán giả Synthwave" },
+const DISTRIBUTION_CHANNELS = [
+  { channel: "Moodify Mobile App", share: "45% lưu lượng", note: "Kênh phát nhạc chính, tỷ lệ hoàn tất 88%" },
+  { channel: "Moodify Web Player", share: "30% lưu lượng", note: "Lưu lượng truy cập máy tính & văn phòng" },
+  { channel: "Playlist & Khám phá AI", share: "15% lưu lượng", note: "Đề xuất thuật toán & Moodify Curated" },
+  { channel: "Đối tác & Nhúng ngoài", share: "10% lưu lượng", note: "Liên kết bên ngoài & chia sẻ mạng xã hội" },
 ];
 
 const COMMENT_PREVIEWS = [
@@ -642,7 +643,7 @@ function BenefitsPanel() {
           body: "Nhận tiền bản quyền trực tiếp từ người nghe với tỉ lệ chi trả cao nhất thị trường.",
         },
         {
-          title: "Xác thực nghệ sĩ chính thức",
+          title: "Chứng nhận Content Lead chính thức",
           body: "Huy hiệu tick xanh độc quyền và trang profile nghệ sĩ tùy biến giao diện.",
         },
         {
@@ -676,13 +677,13 @@ function RightRail() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
-              {t("dashboard.artist.analytics.kpi")}
+              {t("dashboard.artist.audience.eyebrow")}
             </p>
             <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
               {t("dashboard.artist.audience.title")}
             </h3>
           </div>
-          <Users className="h-5 w-5 text-white/40" strokeWidth={1.7} />
+          <Share2 className="h-5 w-5 text-white/40" strokeWidth={1.7} />
         </div>
 
         <div className="relative mt-6 rounded-[24px] border border-white/8 bg-black/20 p-5">
@@ -693,8 +694,8 @@ function RightRail() {
           <p className="text-[42px] font-graphik leading-none tracking-[-0.04em] text-white">
             18.4K
           </p>
-          <p className="mt-2 max-w-[220px] text-[13px] leading-6 text-white/58">
-            Người nghe hoạt động hàng tháng (Monthly Listeners)
+          <p className="mt-2 max-w-[240px] text-[13px] leading-6 text-white/58">
+            {t("dashboard.artist.audience.subtitle", "Lượt tiếp cận thính giả đa kênh (Cross-platform Listeners)")}
           </p>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
             <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#8fb4ff_0%,#dce9ff_100%)]" />
@@ -702,16 +703,16 @@ function RightRail() {
         </div>
 
         <div className="mt-5 space-y-3">
-          {FAN_TOUCHPOINTS.map((point, index) => (
+          {DISTRIBUTION_CHANNELS.map((item, index) => (
             <div
-              key={`fan-touchpoint-${index}`}
+              key={`channel-${index}`}
               className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-black/20 px-4 py-3"
             >
               <div>
-                <p className="text-[13px] text-white">{point.city}</p>
-                <p className="mt-1 text-[11px] text-white/42">{point.tone}</p>
+                <p className="text-[13px] text-white">{item.channel}</p>
+                <p className="mt-1 text-[11px] text-white/42">{item.note}</p>
               </div>
-              <p className="text-[13px] text-[#ffb488] font-medium">{point.share}</p>
+              <p className="text-[13px] text-[#ffb488] font-medium">{item.share}</p>
             </div>
           ))}
         </div>
@@ -771,7 +772,7 @@ function RightRail() {
   );
 }
 
-export default function ArtistDashboardPage() {
+export default function ContentLeadDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("tracks");
@@ -1111,9 +1112,15 @@ export default function ArtistDashboardPage() {
           return;
         }
 
-        if (normalizedRole !== "artist") {
+        if (normalizedRole !== "content_lead" && normalizedRole !== "artist") {
           setAuthState("denied");
-          router.replace(USER_DASHBOARD_ROUTE);
+          if (normalizedRole === "moderator") {
+            router.replace("/dashboard/moderator");
+          } else if (normalizedRole === "admin") {
+            router.replace("/dashboard/admin");
+          } else {
+            router.replace(USER_DASHBOARD_ROUTE);
+          }
           return;
         }
 
@@ -1346,10 +1353,10 @@ export default function ArtistDashboardPage() {
                     <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
                       {artistDisplayName}
                     </h2>
-                    <p className="pb-1 text-[14px] text-white/52">Studio Verified</p>
+                    <p className="pb-1 text-[14px] text-white/52">Content Lead Verified</p>
                   </div>
                   <p className="mt-4 max-w-[640px] text-[15px] leading-7 text-white/60">
-                    Chào mừng bạn quay lại phòng thu âm thanh kỹ thuật số. Quản lý các bản phát hành, theo dõi tương tác của người hâm mộ và tối ưu hóa từng bài nhạc của bạn.
+                    Chào mừng bạn quay lại Trung tâm Quản lý Nội dung số. Quản lý các bản phát hành, theo dõi tương tác của thính giả và tối ưu hóa từng tác phẩm nội dung trên Moodify.
                   </p>
                 </div>
 
@@ -1381,7 +1388,7 @@ export default function ArtistDashboardPage() {
 
               <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {[
-                  { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nghệ sĩ thịnh hành" },
+                  { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nội dung thịnh hành" },
                   { icon: CircleDollarSign, label: t("dashboard.artist.studio.earnings"), copy: "$1,420.80 tháng này" },
                   { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 fans theo dõi mới" },
                   { icon: Sparkles, label: t("dashboard.artist.studio.benefits"), copy: "Đặc quyền phân phối cấp 2" },
@@ -1428,7 +1435,7 @@ export default function ArtistDashboardPage() {
               )}
               {catalogState === "error" && (
                 <div className="mt-5 rounded-[22px] border border-red-400/20 bg-red-500/10 px-5 py-4 text-[13px] text-red-100">
-                  Không thể tải catalog nghệ sĩ: {catalogError}
+                  Không thể tải catalog nội dung: {catalogError}
                 </div>
               )}
               <div className="mt-5">{renderActivePanel()}</div>

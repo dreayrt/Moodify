@@ -53,7 +53,7 @@ type CreateAccountForm = {
   phone: string;
   password: string;
   confirmPassword: string;
-  role: "USER" | "ARTIST";
+  role: "USER" | "CONTENT_LEAD" | "ARTIST";
   genres: string[];
   genresRaw: string[];
 };
@@ -170,15 +170,16 @@ const emptyCreateAccountForm: CreateAccountForm = {
 
 const HOME_ROUTE = "/";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
-const ARTIST_DASHBOARD_ROUTE = "/dashboard/artist";
+const CONTENT_LEAD_DASHBOARD_ROUTE = "/dashboard/content-lead";
+const ARTIST_DASHBOARD_ROUTE = "/dashboard/content-lead";
 const MODERATOR_DASHBOARD_ROUTE = "/dashboard/moderator";
 const ADMIN_DASHBOARD_ROUTE = "/dashboard/admin";
 
 function getDashboardPathForRole(role: string) {
   const normalizedRole = role.trim().toLowerCase();
 
-  if (normalizedRole === "artist") {
-    return ARTIST_DASHBOARD_ROUTE;
+  if (normalizedRole === "content_lead" || normalizedRole === "artist") {
+    return CONTENT_LEAD_DASHBOARD_ROUTE;
   }
 
   if (normalizedRole === "moderator") {
@@ -331,7 +332,7 @@ export function HeroCarousel() {
     }));
   };
 
-  const handleRoleChange = (role: "USER" | "ARTIST") => {
+  const handleRoleChange = (role: "USER" | "CONTENT_LEAD" | "ARTIST") => {
     setCreateAccountForm((current) => ({
       ...current,
       role,
@@ -453,9 +454,9 @@ export function HeroCarousel() {
       setCreateAccountError("Vui lòng nhập họ và tên.");
       return;
     }
-    if (createAccountForm.role === "ARTIST") {
+    if (createAccountForm.role === "CONTENT_LEAD" || createAccountForm.role === "ARTIST") {
       if (!createAccountForm.stageName.trim()) {
-        setCreateAccountError("Vui lòng nhập nghệ danh của bạn.");
+        setCreateAccountError("Vui lòng nhập nghệ danh hoặc tên hiển thị của bạn.");
         return;
       }
       if (createAccountForm.stageName.trim().length < 2) {
@@ -514,7 +515,7 @@ export function HeroCarousel() {
       const auth = await registerRequest({
         fullName: createAccountForm.fullName.trim(),
         stageName:
-          createAccountForm.role === "ARTIST"
+          createAccountForm.role === "CONTENT_LEAD" || createAccountForm.role === "ARTIST"
             ? createAccountForm.stageName.trim()
             : undefined,
         phone: createAccountForm.phone.trim(),
@@ -809,7 +810,7 @@ type CreateAccountModalProps = {
   avatarPreviewUrl: string | null;
   selectedPresetAvatar: string | null;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onRoleChange: (role: "USER" | "ARTIST") => void;
+  onRoleChange: (role: "USER" | "CONTENT_LEAD" | "ARTIST") => void;
   onAvatarFileSelect: (file: File) => void;
   onClearAvatar: () => void;
   onPresetAvatarSelect: (url: string) => void;
@@ -1014,12 +1015,12 @@ function CreateAccountModal({
 
   const activeAvatarSrc = avatarPreviewUrl || selectedPresetAvatar;
   const displayName =
-    form.role === "ARTIST" && form.stageName.trim()
+    (form.role === "CONTENT_LEAD" || form.role === "ARTIST") && form.stageName.trim()
       ? form.stageName.trim()
       : form.fullName || form.username || "Tài khoản Moodify";
 
   const userInitials = (
-    form.role === "ARTIST" && form.stageName.trim()
+    (form.role === "CONTENT_LEAD" || form.role === "ARTIST") && form.stageName.trim()
       ? form.stageName
       : form.fullName || form.username || "M"
   )
@@ -1197,12 +1198,12 @@ function CreateAccountModal({
                     </p>
                   </button>
 
-                  {/* Artist Role Card */}
+                  {/* Content Lead Role Card */}
                   <button
                     type="button"
-                    onClick={() => onRoleChange("ARTIST")}
+                    onClick={() => onRoleChange("CONTENT_LEAD")}
                     className={`group w-full text-left rounded-2xl border p-3.5 transition-all duration-200 cursor-pointer ${
-                      form.role === "ARTIST"
+                      form.role === "CONTENT_LEAD" || form.role === "ARTIST"
                         ? "border-[#ff7c38]/60 bg-gradient-to-br from-[#ff7c38]/18 to-[#ff5722]/10 shadow-[0_8px_30px_rgba(255,124,56,0.2)] ring-1 ring-[#ff7c38]/40"
                         : "border-white/8 bg-white/[0.02] hover:border-white/16 hover:bg-white/[0.04]"
                     }`}
@@ -1211,7 +1212,7 @@ function CreateAccountModal({
                       <div className="flex items-center gap-2.5">
                         <div
                           className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
-                            form.role === "ARTIST"
+                            form.role === "CONTENT_LEAD" || form.role === "ARTIST"
                               ? "bg-gradient-to-r from-[#ff7c38] to-[#ff5722] text-white font-bold shadow-[0_0_15px_rgba(255,124,56,0.4)]"
                               : "border border-white/10 bg-white/5 text-white/70 group-hover:text-white"
                           }`}
@@ -1221,18 +1222,18 @@ function CreateAccountModal({
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-bold text-white">
-                              Nghệ sĩ
+                              Content Lead
                             </span>
                             <span className="rounded-full bg-[#ff7c38]/25 border border-[#ff7c38]/40 px-2 py-0.2 text-[10px] font-bold text-[#ff985f]">
-                              Creator Hub
+                              Content Hub
                             </span>
                           </div>
-                          <span className="text-[11px] text-white/50">Artist / Creator</span>
+                          <span className="text-[11px] text-white/50">Phụ trách Nội dung</span>
                         </div>
                       </div>
                       <span
                         className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-black transition ${
-                          form.role === "ARTIST"
+                          form.role === "CONTENT_LEAD" || form.role === "ARTIST"
                             ? "bg-[#ff7c38] text-white shadow-[0_0_8px_#ff7c38]"
                             : "border border-white/20 text-transparent"
                         }`}
@@ -1241,7 +1242,7 @@ function CreateAccountModal({
                       </span>
                     </div>
                     <p className="mt-2 text-[11px] leading-relaxed text-white/60">
-                      Đăng tải tác phẩm lossless, thiết lập nghệ danh, quản lý bài hát & tiếp cận cộng đồng người nghe.
+                      Đăng tải tác phẩm lossless, thiết lập thông tin hiển thị, quản lý bài hát & tiếp cận cộng đồng người nghe.
                     </p>
                   </button>
                 </div>
@@ -1417,8 +1418,8 @@ function CreateAccountModal({
                   </div>
                 </div>
 
-                {/* ARTIST EXCLUSIVE SECTION: STAGE NAME & GENRES / GENRES RAW */}
-                {form.role === "ARTIST" ? (
+                {/* CONTENT LEAD EXCLUSIVE SECTION: STAGE NAME & GENRES / GENRES RAW */}
+                {form.role === "CONTENT_LEAD" || form.role === "ARTIST" ? (
                   <div className="rounded-2xl border border-[#ff7c38]/35 bg-gradient-to-b from-[#ff7c38]/[0.08] to-[#ff7c38]/[0.02] p-3.5 sm:p-4 space-y-3.5 transition-all">
                     {/* Stage Name */}
                     <div className="space-y-1.5">
@@ -1428,10 +1429,10 @@ function CreateAccountModal({
                           htmlFor={stageNameId}
                         >
                           <ArtistRoleIcon className="h-3.5 w-3.5 text-[#ff7c38]" />
-                          Nghệ danh / Tên nghệ sĩ <span className="text-[#ff7c38]">*</span>
+                          Nghệ danh / Tên hiển thị đại diện <span className="text-[#ff7c38]">*</span>
                         </label>
                         <span className="rounded-full bg-[#ff7c38]/20 px-2 py-0.5 text-[10px] font-bold text-[#ff985f] border border-[#ff7c38]/30">
-                          Bắt buộc cho Nghệ sĩ
+                          Bắt buộc cho Content Lead
                         </span>
                       </div>
                       <input
@@ -1442,7 +1443,7 @@ function CreateAccountModal({
                         placeholder="VD: Sơn Tùng M-TP, Đen Vâu, Suboi, Vũ..."
                         type="text"
                         value={form.stageName}
-                        required={form.role === "ARTIST"}
+                        required={form.role === "CONTENT_LEAD" || form.role === "ARTIST"}
                       />
                     </div>
 
@@ -1643,7 +1644,7 @@ function CreateAccountModal({
                 <p className="text-base font-bold text-white">
                   {displayName}
                 </p>
-                {form.role === "ARTIST" && form.fullName ? (
+                {form.role === "CONTENT_LEAD" || form.role === "ARTIST" ? (
                   <p className="text-xs text-white/50 mt-0.5">
                     Họ tên: {form.fullName}
                   </p>
@@ -1657,15 +1658,15 @@ function CreateAccountModal({
               <div className="flex flex-wrap items-center justify-center gap-1.5">
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                    form.role === "ARTIST"
+                    form.role === "CONTENT_LEAD" || form.role === "ARTIST"
                       ? "bg-gradient-to-r from-[#ff7c38]/20 to-[#ff5722]/20 text-[#ff8e52] border border-[#ff7c38]/30"
                       : "bg-white/10 text-white/80 border border-white/12"
                   }`}
                 >
-                  {form.role === "ARTIST" ? (
+                  {form.role === "CONTENT_LEAD" || form.role === "ARTIST" ? (
                     <>
                       <ArtistRoleIcon className="h-3 w-3" />
-                      Nghệ sĩ
+                      Content Lead
                     </>
                   ) : (
                     <>

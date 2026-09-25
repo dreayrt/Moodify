@@ -160,7 +160,7 @@ export function UsersManagementTab({
     if (!selectedUserForRole) return;
     onChangeUserRole(selectedUserForRole.id, targetRole, {
       staffCode: targetRole === "MODERATOR" ? staffCodeInput : undefined,
-      artistSpotifyId: targetRole === "ARTIST" ? artistSpotifyIdInput : undefined,
+      artistSpotifyId: (targetRole === "CONTENT_LEAD" || targetRole === "ARTIST") ? artistSpotifyIdInput : undefined,
     });
     setSelectedUserForRole(null);
     if (inspectingUser?.id === selectedUserForRole.id) {
@@ -292,7 +292,7 @@ export function UsersManagementTab({
           >
             <option value="ALL" className="bg-[#0c0e14]">Tất cả vai trò</option>
             <option value="USER" className="bg-[#0c0e14]">Thính giả (USER)</option>
-            <option value="ARTIST" className="bg-[#0c0e14]">Nghệ sĩ (ARTIST)</option>
+            <option value="CONTENT_LEAD" className="bg-[#0c0e14]">Phụ trách Nội dung (CONTENT_LEAD)</option>
             <option value="MODERATOR" className="bg-[#0c0e14]">Kiểm duyệt (MODERATOR)</option>
             <option value="ADMIN" className="bg-[#0c0e14]">Quản trị (ADMIN)</option>
           </select>
@@ -386,7 +386,7 @@ export function UsersManagementTab({
                               ? "border border-[#ff7a2c]/30 bg-[#ff7a2c]/15 text-[#ffb488]"
                               : user.role === "MODERATOR"
                               ? "border border-indigo-500/30 bg-indigo-500/15 text-indigo-300"
-                              : user.role === "ARTIST"
+                              : user.role === "CONTENT_LEAD" || user.role === "ARTIST"
                               ? "border border-cyan-500/30 bg-cyan-500/15 text-cyan-300"
                               : "border border-zinc-700 bg-zinc-800/60 text-zinc-300"
                           }`}
@@ -839,7 +839,7 @@ export function UsersManagementTab({
               <div>
                 <label className="block text-[12px] font-medium text-white/70 mb-1.5">Chọn vai trò mới</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["USER", "ARTIST", "MODERATOR", "ADMIN"] as AdminUserRole[]).map((r) => (
+                  {(["USER", "CONTENT_LEAD", "MODERATOR", "ADMIN"] as AdminUserRole[]).map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -869,7 +869,7 @@ export function UsersManagementTab({
                 </div>
               )}
 
-              {targetRole === "ARTIST" && (
+              {(targetRole === "CONTENT_LEAD" || targetRole === "ARTIST") && (
                 <div>
                   <label className="block text-[12px] font-medium text-white/70 mb-1">Spotify Artist ID liên kết</label>
                   <input
@@ -1095,7 +1095,7 @@ export function UsersManagementTab({
                     className="w-full rounded-xl border border-white/10 bg-[#121622] px-3.5 py-2.5 text-xs text-white focus:border-[#ff7a2c] focus:outline-none"
                   >
                     <option value="USER">Thính giả (USER)</option>
-                    <option value="ARTIST">Nghệ sĩ (ARTIST)</option>
+                    <option value="CONTENT_LEAD">Phụ trách Nội dung (CONTENT_LEAD)</option>
                     <option value="MODERATOR">Kiểm duyệt viên (MODERATOR)</option>
                     <option value="ADMIN">Quản trị viên (ADMIN)</option>
                   </select>
