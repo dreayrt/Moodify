@@ -82,11 +82,65 @@ export type CreatePlaylistRequest = {
 /**
  * Fetch tracks with optional filters
  */
+export type EmotionInfo = {
+  text: string;
+  label: string;
+  emoji: string;
+  confidence: number;
+  probabilities?: Record<string, number>;
+  music_recommendation?: {
+    strategy?: string;
+    mood_analysis?: string;
+    target_valence?: number;
+    target_energy?: number;
+    seed_genres?: string[];
+  };
+};
+
+export type MoodRecommendationResponse = {
+  emotion: EmotionInfo;
+  tracks: Track[];
+  totalMatched: number;
+};
+
+/**
+ * Recommend tracks based on user emotion text
+ */
+export async function fetchMoodRecommendation(
+  text: string,
+  strategy: string = 'empathy',
+  limit: number = 50
+): Promise<MoodRecommendationResponse> {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  try {
+    const token = await getValidAccessToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {}
+
+  const response = await fetch(`${API_BASE}/emotions/recommend`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ text, strategy, limit }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to recommend tracks by mood: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch tracks with optional filters
+ */
 export async function fetchTracks(options?: {
   page?: number;
   size?: number;
   query?: string;
   genre?: string;
+  mode?: string;
 }): Promise<TrackPageResponse> {
   const params = new URLSearchParams();
   
@@ -94,6 +148,7 @@ export async function fetchTracks(options?: {
   if (options?.size !== undefined) params.set('size', options.size.toString());
   if (options?.query) params.set('query', options.query);
   if (options?.genre) params.set('genre', options.genre);
+  if (options?.mode) params.set('mode', options.mode);
 
   const headers: HeadersInit = {};
   try {

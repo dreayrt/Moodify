@@ -568,3 +568,7 @@ export function usePlayer() {
   }
   return context;
 }
+
+export function useOptionalPlayer() {
+  return useContext(PlayerContext);
+}

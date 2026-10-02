@@ -1,19 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Search as SearchIcon, X, Music, Sparkles } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X, Music, Sparkles, AudioLines, HeartPulse } from "lucide-react";
 import {
   fetchTracks,
   fetchArtists,
+  fetchMoodRecommendation,
   addToLibrary,
   removeFromLibrary,
   fetchLikedTrackIds,
   type Track,
   type Artist,
+  type EmotionInfo,
 } from "@/lib/api-client";
 import TrackCard from "@/components/dashboard/track-card";
 import ArtistCard from "@/components/dashboard/artist-card";
 import { usePlayer } from "@/components/dashboard/player-context";
+import MoodSearchBar from "@/components/dashboard/mood-search-bar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -31,30 +34,58 @@ function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("q") || "";
-  const { playTrack, currentTrack, isPlaying } = usePlayer();
+  const modeParam = searchParams.get("mode") || "";
+  const { playTrack, currentTrack, isPlaying, isPremiumUser } = usePlayer();
+  const isMoodMode = modeParam === "mood" && Boolean(isPremiumUser);
 
   const [activeTab, setActiveTab] = useState<Tab>("tracks");
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [query, setQuery] = useState(qParam);
+  const [prevQParam, setPrevQParam] = useState(qParam);
+
+  if (prevQParam !== qParam) {
+    setPrevQParam(qParam);
+    setQuery(qParam);
+  }
+
   const [tracks, setTracks] = useState<Track[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [moodInfo, setMoodInfo] = useState<EmotionInfo | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [likedTracks, setLikedTracks] = useState<Set<string>>(new Set());
   const [totalFound, setTotalFound] = useState<number | null>(null);
 
   // Perform search or catalog fetch
   const loadData = useCallback(
-    async (searchQuery: string, genre: string) => {
+    async (searchQuery: string, genre: string, isMood: boolean) => {
       setLoading(true);
       try {
         if (activeTab === "tracks") {
           let response;
           if (searchQuery.trim()) {
-            response = await fetchTracks({ query: searchQuery.trim(), size: 100 });
+            if (isMood && isPremiumUser) {
+              try {
+                const moodRes = await fetchMoodRecommendation(searchQuery.trim(), "empathy", 50);
+                setMoodInfo(moodRes.emotion);
+                setTracks(moodRes.tracks || []);
+                setTotalFound(moodRes.totalMatched ?? (moodRes.tracks ? moodRes.tracks.length : 0));
+                const likedIds = await fetchLikedTrackIds().catch(() => []);
+                setLikedTracks(new Set(likedIds));
+                return;
+              } catch (e) {
+                console.warn("Mood recommendation API error, falling back to fetchTracks with mode=mood", e);
+                response = await fetchTracks({ query: searchQuery.trim(), size: 100, mode: "mood" });
+              }
+            } else {
+              setMoodInfo(null);
+              response = await fetchTracks({ query: searchQuery.trim(), size: 100 });
+            }
           } else if (genre !== "all") {
+            setMoodInfo(null);
             response = await fetchTracks({ genre, size: 100 });
           } else {
+            setMoodInfo(null);
             response = await fetchTracks({ size: 200 });
           }
 
@@ -65,6 +96,7 @@ function SearchContent() {
           const likedIds = await fetchLikedTrackIds().catch(() => []);
           setLikedTracks(new Set(likedIds));
         } else {
+          setMoodInfo(null);
           const artistsData = await fetchArtists(searchQuery);
           setArtists(artistsData);
           setTotalFound(artistsData.length);
@@ -80,20 +112,18 @@ function SearchContent() {
 
   // Debounced search when query changes
   useEffect(() => {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
 
-    const timeout = setTimeout(() => {
-      loadData(query, selectedGenre);
+    timeoutRef.current = setTimeout(() => {
+      loadData(query, selectedGenre, isMoodMode);
     }, query ? 350 : 0);
 
-    setSearchTimeout(timeout);
-
     return () => {
-      if (timeout) clearTimeout(timeout);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [query, selectedGenre, loadData]);
+  }, [query, selectedGenre, isMoodMode, loadData]);
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
@@ -206,31 +236,102 @@ function SearchContent() {
             Tìm kiếm bài hát
           </h1>
 
-          {/* Search bar */}
-          <div className="relative max-w-2xl">
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm theo tên bài hát, nghệ sĩ (Vô Tình, Ngọt, HIEUTHUHAI, v.v.)..."
-              className="w-full pl-12 pr-12 py-3.5 bg-slate-900/90 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all text-sm md:text-base shadow-lg"
-            />
-            {query && (
+          {/* Transferred Header Search Bar with Mood Switch */}
+          <MoodSearchBar
+            size="lg"
+            className="max-w-2xl"
+            value={query}
+            onChange={(val) => {
+              setQuery(val);
+              const params = new URLSearchParams(window.location.search);
+              if (val.trim()) {
+                params.set("q", val.trim());
+              } else {
+                params.delete("q");
+              }
+              const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+              window.history.replaceState(null, "", newUrl);
+            }}
+            isMoodMode={isMoodMode}
+            onToggleMood={(next) => {
+              if (!isPremiumUser) return;
+              const params = new URLSearchParams(window.location.search);
+              if (query.trim()) params.set("q", query.trim());
+              if (next) {
+                params.set("mode", "mood");
+              } else {
+                params.delete("mode");
+              }
+              router.push(`/dashboard/search?${params.toString()}`);
+            }}
+            onSubmit={(val, isMood) => {
+              const params = new URLSearchParams();
+              if (val.trim()) params.set("q", val.trim());
+              if (isMood && isPremiumUser) params.set("mode", "mood");
+              router.push(`/dashboard/search?${params.toString()}`);
+            }}
+            isPremium={Boolean(isPremiumUser)}
+            autoFocus={!qParam}
+          />
+
+          {/* Active Mood Mode Banner (Only for VIP) */}
+          {isMoodMode && isPremiumUser && (
+            <div className="flex items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-purple-500/15 border border-purple-400/30 text-xs text-purple-200 w-fit">
+              <HeartPulse className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+              <span>Chế độ: <strong>Tìm kiếm theo cảm xúc (VIP)</strong></span>
               <button
                 type="button"
-                onClick={() => setQuery("")}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
-                aria-label="Xóa tìm kiếm"
+                onClick={() => {
+                  router.push(`/dashboard/search?q=${encodeURIComponent(query)}`);
+                }}
+                className="ml-1 text-white/50 hover:text-white transition-colors cursor-pointer"
+                title="Tắt chế độ cảm xúc"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3" />
               </button>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* AI Emotion Analysis Card */}
+          {isMoodMode && moodInfo && query.trim() && (
+            <div className="mt-3 p-4 rounded-xl bg-gradient-to-r from-purple-950/40 via-purple-900/20 to-slate-900/40 border border-purple-500/30 backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-purple-500/20 border border-purple-400/30 shrink-0 text-purple-300 shadow-[0_0_14px_rgba(168,85,247,0.35)] flex items-center justify-center">
+                  <AudioLines className="w-6 h-6 animate-pulse text-purple-300" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-purple-300">Tâm trạng nhận diện:</span>
+                    <span className="text-sm font-bold text-white px-2 py-0.5 rounded-md bg-purple-500/30 border border-purple-400/30">
+                      {moodInfo.label}
+                    </span>
+                    <span className="text-[11px] text-purple-300/80">
+                      ({Math.round((moodInfo.confidence || 0) * 100)}% độ tin cậy)
+                    </span>
+                  </div>
+                  {moodInfo.music_recommendation?.mood_analysis && (
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                      {moodInfo.music_recommendation.mood_analysis}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {moodInfo.music_recommendation?.seed_genres && moodInfo.music_recommendation.seed_genres.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] uppercase text-purple-300/70 font-semibold mr-1">Gợi ý:</span>
+                  {moodInfo.music_recommendation.seed_genres.slice(0, 4).map((g) => (
+                    <span key={g} className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-slate-200 border border-white/10">
+                      #{g}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Genre quick filters */}
           {activeTab === "tracks" && (
-            <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 scrollbar-none">
+            <div className="flex items-center gap-2 mt-2 overflow-x-auto pb-2 scrollbar-none">
               {GENRE_FILTERS.map((g) => (
                 <button
                   key={g.id}

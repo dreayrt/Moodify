@@ -38,6 +38,7 @@ import UserSettingsModal from "./user-settings-modal";
 import { useCurrentMascot } from "@/lib/mascots";
 import { BrandLogo } from "@/components/shared/logo-mark";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
+import MoodSearchBar from "./mood-search-bar";
 
 export type Vibe = {
   id: string;
@@ -817,19 +818,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   };
 
   const isHome = pathname === "/dashboard" || pathname === "/dashboard/user";
-  const isSearch = pathname === "/dashboard/search";
+  const isSearch = pathname === "/dashboard/search" || pathname.startsWith("/dashboard/search");
   const isLibrary = pathname.startsWith("/dashboard/library");
-
-  const [headerSearch, setHeaderSearch] = useState("");
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (headerSearch.trim()) {
-      router.push(`/dashboard/search?q=${encodeURIComponent(headerSearch.trim())}`);
-    } else {
-      router.push("/dashboard/search");
-    }
-  };
 
   const { goldThemeEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
   const isVipShellActive = Boolean(subInfo?.isPremium) && vipShellEnabled;
@@ -935,19 +925,14 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
 
-          {/* Quick Search Bar (Centered) */}
-          <div className="hidden md:flex items-center justify-center flex-1 max-w-xl mx-auto px-4">
-            <form onSubmit={handleSearchSubmit} className="relative w-full max-w-md group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-purple-300 pointer-events-none transition-colors" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm bài hát, nghệ sĩ, album..."
-                value={headerSearch}
-                onChange={(e) => setHeaderSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] focus:bg-white/[0.12] border border-white/12 focus:border-purple-400/50 rounded-full text-xs text-white placeholder:text-white/40 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] focus:shadow-[0_0_16px_rgba(168,85,247,0.25)]"
-              />
-            </form>
-          </div>
+          {/* Quick Search Bar with Mood Finder (Centered) - Hidden on Search Page */}
+          {!isSearch ? (
+            <div className="hidden md:flex items-center justify-center flex-1 max-w-xl mx-auto px-4">
+              <MoodSearchBar isPremium={Boolean(subInfo?.isPremium)} />
+            </div>
+          ) : (
+            <div className="hidden md:flex flex-1" />
+          )}
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
             <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
