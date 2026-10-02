@@ -47,6 +47,8 @@ export function GlobalPlayerBar() {
     isMuted,
     isAdPlaying,
     isPremiumUser,
+    subTier,
+    adReason,
     playbackRate,
     isShuffle,
     repeatMode,
@@ -186,10 +188,18 @@ export function GlobalPlayerBar() {
 
             <div className="min-w-0 flex-1">
               <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
-                {isAdPlaying ? "📢 Moodify VIP Sponsor" : currentTrack.name}
+                {isAdPlaying
+                  ? (subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
+                    ? "📢 Nâng Hạn Mức • Moodify"
+                    : "📢 Moodify VIP Sponsor")
+                  : currentTrack.name}
               </h4>
               <p className="text-xs text-slate-400 leading-tight truncate mt-0.5">
-                {isAdPlaying ? "Quảng cáo âm thanh đang phát..." : currentTrack.artistName}
+                {isAdPlaying
+                  ? (subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
+                    ? "Đang phát thông điệp nâng hạn mức gói..."
+                    : "Quảng cáo âm thanh đang phát...")
+                  : currentTrack.artistName}
               </p>
             </div>
 
@@ -454,10 +464,10 @@ export function GlobalPlayerBar() {
               <button
                 type="button"
                 onClick={() => triggerAd(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-medium transition cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-[11px] font-mono tracking-wider transition-all cursor-pointer active:scale-95"
                 title="Kích hoạt quảng cáo ngay để kiểm thử trải nghiệm"
               >
-                <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
+                <Radio className="w-3 h-3 text-amber-300" />
                 <span>Test QC</span>
               </button>
             )}

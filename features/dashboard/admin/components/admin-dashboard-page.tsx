@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
+  BadgePercent,
   BarChart3,
   CheckCircle2,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   Layers,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Music2,
   Radio,
   Search,
@@ -46,6 +48,7 @@ import {
   fetchAdminTransactions,
   fetchAdminUsers,
   fetchAdminOverview,
+  fetchAdminAuditLogs,
   type AdminOverviewResponse,
   refundAdminTransaction,
   takedownAdminTrack,
@@ -68,7 +71,6 @@ import {
 } from "@/lib/api/admin-client";
 
 import {
-  INITIAL_AUDIT_LOGS,
   INITIAL_CONTRACTS,
   INITIAL_DEVICES,
   INITIAL_DISTRIBUTORS,
@@ -105,6 +107,8 @@ import { FavoritesManagementTab } from "./favorites-management-tab";
 import { ModerationTab } from "./moderation-tab";
 import { MonetizationTab } from "./monetization-tab";
 import { LicensingTab } from "./licensing-tab";
+import { NotificationsTab } from "./notifications-tab";
+import { AdsManagementTab } from "./ads-management-tab";
 import { SystemSettingsTab, type SystemConfig } from "./system-settings-tab";
 import { AdminAudioPlayerDock } from "./shared/admin-audio-player-dock";
 
@@ -136,7 +140,9 @@ export default function AdminDashboardPage() {
   const [distributors, setDistributors] = useState<Distributor[]>(INITIAL_DISTRIBUTORS);
   const [contracts, setContracts] = useState<DistributionContract[]>(INITIAL_CONTRACTS);
   const [licenses, setLicenses] = useState<SongLicense[]>(INITIAL_LICENSES);
-  const [auditLogs, setAuditLogs] = useState<SystemAuditLog[]>(INITIAL_AUDIT_LOGS);
+  // Nhật ký hành chính: bản ghi thật từ backend + bản ghi của phiên làm việc hiện tại
+  const [backendAuditLogs, setBackendAuditLogs] = useState<SystemAuditLog[]>([]);
+  const [sessionAuditLogs, setSessionAuditLogs] = useState<SystemAuditLog[]>([]);
   const [overviewData, setOverviewData] = useState<AdminOverviewResponse | null>(null);
 
   // Global Audio Preview Player state
@@ -193,6 +199,12 @@ export default function AdminDashboardPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Nhật ký hành chính hiển thị = bản ghi thật từ backend (MongoDB) + bản ghi phiên làm việc
+  const auditLogs = useMemo<SystemAuditLog[]>(
+    () => [...sessionAuditLogs, ...backendAuditLogs],
+    [sessionAuditLogs, backendAuditLogs]
+  );
+
   // Helper to record audit log
   const recordAudit = (
     action: string,
@@ -219,7 +231,7 @@ export default function AdminDashboardPage() {
       details,
       severity,
     };
-    setAuditLogs((prev) => [newLog, ...prev]);
+    setSessionAuditLogs((prev) => [newLog, ...prev]);
   };
 
   // ================= LOAD REAL DATA FROM DB =================
@@ -227,7 +239,7 @@ export default function AdminDashboardPage() {
     setIsLoadingData(true);
     setDbStatus("connecting");
     try {
-      const [usersRes, catalogRes, packagesRes, transactionsRes, moderationRes, licensingRes, overviewRes] = await Promise.allSettled([
+      const [usersRes, catalogRes, packagesRes, transactionsRes, moderationRes, licensingRes, overviewRes, auditRes] = await Promise.allSettled([
         fetchAdminUsers(),
         fetchAdminCatalog(),
         fetchAdminPackages(),
@@ -235,27 +247,28 @@ export default function AdminDashboardPage() {
         fetchAdminModerationQueue(),
         fetchAdminLicensing(),
         fetchAdminOverview(),
+        fetchAdminAuditLogs(),
       ]);
 
       let successCount = 0;
 
-      if (usersRes.status === "fulfilled" && Array.isArray(usersRes.value) && usersRes.value.length > 0) {
+      if (usersRes.status === "fulfilled" && Array.isArray(usersRes.value)) {
         setUsers(usersRes.value);
         successCount++;
       }
-      if (catalogRes.status === "fulfilled" && Array.isArray(catalogRes.value) && catalogRes.value.length > 0) {
+      if (catalogRes.status === "fulfilled" && Array.isArray(catalogRes.value)) {
         setTracks(catalogRes.value);
         successCount++;
       }
-      if (packagesRes.status === "fulfilled" && Array.isArray(packagesRes.value) && packagesRes.value.length > 0) {
+      if (packagesRes.status === "fulfilled" && Array.isArray(packagesRes.value)) {
         setPackages(packagesRes.value);
         successCount++;
       }
-      if (transactionsRes.status === "fulfilled" && Array.isArray(transactionsRes.value) && transactionsRes.value.length > 0) {
+      if (transactionsRes.status === "fulfilled" && Array.isArray(transactionsRes.value)) {
         setTransactions(transactionsRes.value);
         successCount++;
       }
-      if (moderationRes.status === "fulfilled" && Array.isArray(moderationRes.value) && moderationRes.value.length > 0) {
+      if (moderationRes.status === "fulfilled" && Array.isArray(moderationRes.value)) {
         setReviews(moderationRes.value);
         successCount++;
       }
@@ -264,16 +277,40 @@ export default function AdminDashboardPage() {
         successCount++;
       }
       if (licensingRes.status === "fulfilled" && licensingRes.value) {
-        if (Array.isArray(licensingRes.value.distributors) && licensingRes.value.distributors.length > 0) {
+        if (Array.isArray(licensingRes.value.distributors)) {
           setDistributors(licensingRes.value.distributors);
         }
-        if (Array.isArray(licensingRes.value.contracts) && licensingRes.value.contracts.length > 0) {
+        if (Array.isArray(licensingRes.value.contracts)) {
           setContracts(licensingRes.value.contracts);
         }
-        if (Array.isArray(licensingRes.value.licenses) && licensingRes.value.licenses.length > 0) {
+        if (Array.isArray(licensingRes.value.licenses)) {
           setLicenses(licensingRes.value.licenses);
         }
         successCount++;
+      }
+      if (auditRes.status === "fulfilled" && Array.isArray(auditRes.value)) {
+        // Map nhật ký backend (MongoDB) sang định dạng hiển thị của tab Cài Đặt
+        const categoryFor = (action: string): SystemAuditLog["category"] => {
+          if (action.includes("ROLE") || action.includes("BAN") || action.includes("USER") || action.includes("PASSWORD")) return "IAM";
+          if (action.includes("TRACK") || action.includes("CATALOG")) return "CATALOG";
+          if (action.includes("PACKAGE") || action.includes("REFUND") || action.includes("PAYMENT")) return "BILLING";
+          if (action.includes("MODERATION") || action.includes("REVIEW")) return "MODERATION";
+          if (action.includes("DEVICE") || action.includes("TOKEN")) return "SECURITY";
+          return "SYSTEM";
+        };
+        setBackendAuditLogs(
+          auditRes.value.map((log) => ({
+            id: log.id,
+            timestamp: log.createdAt || "",
+            operatorName: log.operatorName || "Hệ thống",
+            operatorRole: log.operatorRole || "SYSTEM",
+            category: categoryFor(log.action || ""),
+            action: log.action,
+            target: log.targetEntity ? `${log.targetEntity}${log.targetId ? ` #${log.targetId}` : ""}` : "—",
+            details: log.details || "",
+            severity: "info" as const,
+          }))
+        );
       }
 
       const syncStr = new Intl.DateTimeFormat("vi-VN", {
@@ -306,68 +343,46 @@ export default function AdminDashboardPage() {
   };
 
   // ================= ROUTE GUARD =================
+  // Fail-closed: chỉ cho phép vào khi có token hợp lệ VÀ vai trò là ADMIN.
+  // Không còn auto-login bằng tài khoản cứng và không còn mở khóa khi backend lỗi.
   useEffect(() => {
     let cancelled = false;
 
     const guardAdminAccess = async () => {
       try {
         const token = await getValidAccessToken();
-        if (token) {
-          try {
-            const profile = await getCurrentUser(token);
-            const normalizedRole = profile.role.trim().toUpperCase();
+        if (!token) {
+          if (!cancelled) setAuthState("denied");
+          return;
+        }
 
-            if (cancelled) return;
+        const profile = await getCurrentUser(token);
+        const normalizedRole = profile.role.trim().toUpperCase();
 
-            if (normalizedRole !== "ADMIN") {
-              setAuthState("denied");
-              if (normalizedRole === "CONTENT_LEAD" || normalizedRole === "ARTIST") {
-                router.replace(CONTENT_LEAD_DASHBOARD_ROUTE);
-              } else if (normalizedRole === "MODERATOR") {
-                router.replace("/dashboard/moderator");
-              } else {
-                router.replace(USER_DASHBOARD_ROUTE);
-              }
-              return;
-            }
+        if (cancelled) return;
 
-            setCurrentAdmin(profile);
-            setAuthState("allowed");
-            void loadRealData(true);
-            return;
-          } catch (profileErr) {
-            console.warn("Could not fetch user profile with token, using admin fallback:", profileErr);
-            const msg = profileErr instanceof Error ? profileErr.message : String(profileErr);
-            if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
-              clearAuthSession();
-            }
+        if (normalizedRole !== "ADMIN") {
+          setAuthState("denied");
+          if (normalizedRole === "CONTENT_LEAD" || normalizedRole === "ARTIST") {
+            router.replace(CONTENT_LEAD_DASHBOARD_ROUTE);
+          } else if (normalizedRole === "MODERATOR") {
+            router.replace("/dashboard/moderator");
+          } else {
+            router.replace(USER_DASHBOARD_ROUTE);
           }
+          return;
         }
 
-        // Fallback for local development or transient connection issues
-        if (!cancelled) {
-          const fallbackAdmin: UserProfileResponse = {
-            id: 1,
-            fullName: "Phạm Quốc Admin",
-            phone: "0901234567",
-            email: "admin01@moodify.local",
-            username: "admin01",
-            avatarUrl: null,
-            role: "ADMIN",
-            artistSpotifyId: null,
-            status: "ACTIVE",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          setCurrentAdmin(fallbackAdmin);
-          setAuthState("allowed");
-          void loadRealData(false);
-        }
+        setCurrentAdmin(profile);
+        setAuthState("allowed");
+        void loadRealData(true);
       } catch (err) {
         console.warn("Admin Guard error:", err);
-        if (!cancelled) {
-          setAuthState("allowed");
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+          clearAuthSession();
         }
+        if (!cancelled) setAuthState("denied");
       }
     };
 
@@ -692,15 +707,22 @@ export default function AdminDashboardPage() {
   const handleResetUserPassword = async (userId: number) => {
     const target = users.find((u) => u.id === userId);
     try {
-      await resetAdminUserPassword(userId);
+      const res = await resetAdminUserPassword(userId);
+      const tempPassword =
+        "tempPassword" in res && typeof res.tempPassword === "string" ? res.tempPassword : "";
       recordAudit(
         "RESET_PASSWORD",
         target?.fullName || `User #${userId}`,
-        "Đặt lại mật khẩu về mặc định 123456",
+        "Đặt lại mật khẩu bằng mật khẩu tạm ngẫu nhiên",
         "IAM",
         "warning"
       );
-      addToast(`Đã đặt lại mật khẩu cho "${target?.fullName}" về mặc định 123456 thành công.`, "success");
+      addToast(
+        tempPassword
+          ? `Đã đặt lại mật khẩu cho "${target?.fullName}". Mật khẩu tạm: ${tempPassword} (vui lòng ghi lại và chia sẻ cho người dùng).`
+          : `Đã đặt lại mật khẩu cho "${target?.fullName}" thành công.`,
+        "success"
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi đặt lại mật khẩu: ${msg}`, "error");
@@ -816,6 +838,8 @@ export default function AdminDashboardPage() {
     { key: "favorites", label: "Lượt Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
     { key: "moderation", label: "Kiểm Duyệt Phát Hành", count: pendingModerationCount, icon: ShieldCheck },
     { key: "monetization", label: "Gói Dịch Vụ & Doanh Thu", count: packages.length, icon: DollarSign },
+    { key: "notifications", label: "Thông Báo", icon: Megaphone },
+    { key: "ads", label: "Quản Lý Quảng Cáo", icon: BadgePercent },
     { key: "licensing", label: "Bản Quyền & Phân Phối", count: contracts.length, icon: Key },
     { key: "settings", label: "Cài Đặt & Nhật Ký", icon: Settings },
   ];
@@ -915,6 +939,15 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/user"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#222432] bg-[#171822] text-xs font-semibold text-zinc-300 hover:text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"
+              title="Mở giao diện nghe nhạc dành cho người dùng"
+            >
+              <Radio className="h-3.5 w-3.5 text-[#ff5500]" />
+              <span>Giao Diện Nghe Nhạc</span>
+            </Link>
+
             <LanguageSwitcher />
           </div>
         </header>
@@ -1002,6 +1035,10 @@ export default function AdminDashboardPage() {
               licenses={licenses}
             />
           )}
+
+          {activeTab === "notifications" && <NotificationsTab onToast={addToast} />}
+
+          {activeTab === "ads" && <AdsManagementTab onToast={addToast} />}
 
           {activeTab === "settings" && (
             <SystemSettingsTab

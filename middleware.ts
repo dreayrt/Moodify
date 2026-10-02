@@ -78,8 +78,8 @@ export function middleware(request: NextRequest) {
     }
 
     // 4. KIEM TRA PHAN QUYEN TUNG ROUTE:
-    // Moderator hoac role khac co tinh vao /dashboard/user
-    if (pathname.startsWith("/dashboard/user") && role !== "USER") {
+    // Chi USER va ADMIN moi duoc phep truy cap /dashboard/user (Admin co toan quyen truy cap de kiem tra)
+    if (pathname.startsWith("/dashboard/user") && role !== "USER" && role !== "ADMIN") {
       return NextResponse.redirect(new URL(correctDashboard, request.url));
     }
 

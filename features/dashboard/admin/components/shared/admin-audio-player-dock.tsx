@@ -32,16 +32,16 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:8080";
 
-export const AUDIO_SERVER_BASE_URL = "https://musiccollector.kandes.io.vn";
+export const AUDIO_SERVER_BASE_URL = "http://158.178.247.33";
 export const FALLBACK_REAL_AUDIO_URL =
-  "https://musiccollector.kandes.io.vn/data/audio/xesi-hoaprox/3b2kCFZhX9GYnQ58qL1cAM_vo-tinh.mp3";
+  "http://158.178.247.33/data/audio/xesi-hoaprox/3b2kCFZhX9GYnQ58qL1cAM_vo-tinh.mp3";
 
 export function resolveAudioStreamUrl(rawUrl?: string | null): string {
   if (!rawUrl || !rawUrl.trim()) return FALLBACK_REAL_AUDIO_URL;
   const url = rawUrl.trim();
 
-  if (url.includes("musiccollector.kandes.io.vn")) {
-    return url;
+  if (url.includes("158.178.247.33") || url.includes("musiccollector.kandes.io.vn")) {
+    return url.replace("https://musiccollector.kandes.io.vn", AUDIO_SERVER_BASE_URL);
   }
 
   if (url.includes("mixkit.co")) {

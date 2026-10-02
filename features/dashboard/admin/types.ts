@@ -7,6 +7,8 @@ export type AdminTab =
   | "moderation"
   | "monetization"
   | "licensing"
+  | "notifications"
+  | "ads"
   | "settings";
 
 export type AdminUserRole = "USER" | "CONTENT_LEAD" | "MODERATOR" | "ADMIN" | "ARTIST";
@@ -99,6 +101,24 @@ export type CatalogTrack = {
   createdAt: string;
 };
 
+export type PackageEntitlements = {
+  tier?: "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE";
+  adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
+  adFreeDailyLimit: number; // số bài hát nghe không quảng cáo mỗi ngày
+  adIntervalAfterLimit: number; // sau hạn mức, bao nhiêu bài có 1 quảng cáo
+  skipPolicy: "UNLIMITED" | "LIMITED";
+  skipDailyLimit: number; // số lượt chuyển bài mỗi ngày
+  audioQuality: "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC";
+  offlineAllowed: boolean;
+  offlineMaxTracks: number; // số bài offline tối đa
+  maxDevices: number; // số thiết bị cho phép
+  syncedLyrics: boolean; // xem lời karaoke đồng bộ
+  vipBadge: boolean; // huy hiệu VIP trên profile
+  customThemes: boolean; // tùy biến giao diện player VIP
+  familySharing: boolean; // chia sẻ gói gia đình
+  familyMembers?: number;
+};
+
 export type ServicePackage = {
   id: number;
   name: string;
@@ -109,6 +129,8 @@ export type ServicePackage = {
   status: "ACTIVE" | "INACTIVE";
   subscribersCount?: number;
   features?: string[];
+  featuresJson?: string;
+  entitlements?: PackageEntitlements;
 };
 
 export type PaymentTransaction = {
@@ -168,11 +190,11 @@ export type SystemAuditLog = {
   timestamp: string;
   operatorName: string;
   operatorRole: string;
-  category: "SECURITY" | "IAM" | "MODERATION" | "CATALOG" | "BILLING" | "SYSTEM";
+  category?: "SECURITY" | "IAM" | "MODERATION" | "CATALOG" | "BILLING" | "SYSTEM";
   action: string;
   target: string;
   details: string;
-  severity: "info" | "warning" | "critical";
+  severity?: "info" | "warning" | "critical";
 };
 
 export type AdminToast = {
@@ -259,5 +281,63 @@ export type FavoriteLeaderboardItem = {
   audioUrl?: string;
   favoriteCount: number;
   type: "SONG" | "ARTIST" | "ALBUM";
+};
+
+// ================= NOTIFICATIONS (Thông báo) =================
+export type NotificationType = "SYSTEM" | "PROMO" | "BILLING" | "MODERATION" | "ANNOUNCEMENT";
+
+export type NotificationBroadcast = {
+  id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  targetRole: string;
+  recipients: number;
+  lastSentAt: string | null;
+};
+
+// ================= AD MANAGEMENT (Quản lý quảng cáo) =================
+export type AdCategory = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  campaignCount: number;
+};
+
+export type AdCampaign = {
+  id: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  title: string;
+  advertiser: string | null;
+  audioUrl: string;
+  durationSeconds: number | null;
+  weight: number;
+  status: "ACTIVE" | "INACTIVE";
+  startDate: string | null;
+  endDate: string | null;
+  impressionCount: number;
+  createdAt: string | null;
+};
+
+export type AdCampaignPayload = {
+  categoryId?: string | null;
+  title: string;
+  advertiser?: string | null;
+  audioUrl: string;
+  durationSeconds?: number | null;
+  weight?: number;
+  status?: "ACTIVE" | "INACTIVE";
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+export type PublicAd = {
+  id: string;
+  title: string;
+  advertiser: string | null;
+  audioUrl: string;
+  durationSeconds: number | null;
 };
 
