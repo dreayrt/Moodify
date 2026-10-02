@@ -91,6 +91,56 @@ export type ArtistCatalogResponse = {
   totalTrackPages: number;
 };
 
+export type ContentLeadProfileResponse = ArtistProfileResponse;
+export type ContentLeadTrackResponse = ArtistTrackResponse;
+export type ContentLeadAlbumResponse = ArtistAlbumResponse;
+export type ContentLeadCatalogResponse = ArtistCatalogResponse;
+
+export type AudienceChannelItem = {
+  id: string;
+  channel: string;
+  subtitle: string;
+  streams: number;
+  share: number;
+  shareFormatted: string;
+  uniqueListeners: number;
+  completionRate: number;
+  color: string;
+  icon: string;
+  details?: Record<string, string | number>;
+};
+
+export type AudienceTrendItem = {
+  date: string;
+  label: string;
+  streams: number;
+  mobileStreams: number;
+  webStreams: number;
+  otherStreams: number;
+};
+
+export type AudienceTrackStat = {
+  trackId: string;
+  title: string;
+  coverUrl: string | null;
+  streams: number;
+  completionRate: number;
+  primaryChannel: string;
+};
+
+export type ContentLeadAudienceResponse = {
+  totalReach: number;
+  uniqueListeners: number;
+  avgCompletionRate: number;
+  totalListeningHours: number;
+  growthRate: number;
+  period: "7d" | "30d" | "90d" | "all";
+  selectedTrackId: string | null;
+  channels: AudienceChannelItem[];
+  dailyTrends: AudienceTrendItem[];
+  topTracks: AudienceTrackStat[];
+};
+
 export type StoredAuthSession = {
   accessToken: string;
   refreshToken: string;
@@ -276,9 +326,9 @@ export async function uploadArtistTrack(
 ): Promise<ArtistTrackResponse> {
   const validToken = token || (await getValidAccessToken());
   if (!validToken) {
-    throw new Error("Phiên làm việc đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+    throw new Error("Phiên làm việc đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại tài khoản Content Lead.");
   }
-  const fullUrl = `${API_BASE_URL}/api/artists/me/tracks`;
+  const fullUrl = `${API_BASE_URL}/api/content-lead/me/tracks`;
   const response = await fetch(fullUrl, {
     method: "POST",
     headers: {
@@ -289,7 +339,7 @@ export async function uploadArtistTrack(
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("Phiên đăng nhập đã hết hạn hoặc tài khoản không có quyền Nghệ sĩ (ARTIST). Vui lòng đăng xuất và đăng nhập lại.");
+      throw new Error("Phiên đăng nhập đã hết hạn hoặc tài khoản không có quyền Content Lead (CONTENT_LEAD). Vui lòng đăng xuất và đăng nhập lại.");
     }
     const errorMsg = await extractErrorMessage(response);
     throw new Error(errorMsg);
@@ -315,10 +365,10 @@ export async function updateArtistTrack(
 ): Promise<ArtistTrackResponse> {
   const validToken = token || (await getValidAccessToken());
   if (!validToken) {
-    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Content Lead.");
   }
 
-  return requestJson<ArtistTrackResponse>(`/api/artists/me/tracks/${encodeURIComponent(trackId)}`, {
+  return requestJson<ArtistTrackResponse>(`/api/content-lead/me/tracks/${encodeURIComponent(trackId)}`, {
     method: "PATCH",
     token: validToken,
     body: payload,
@@ -328,10 +378,10 @@ export async function updateArtistTrack(
 export async function deleteArtistTrack(trackId: string, token?: string): Promise<void> {
   const validToken = token || (await getValidAccessToken());
   if (!validToken) {
-    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Nghệ sĩ.");
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại tài khoản Content Lead.");
   }
 
-  return requestJson<void>(`/api/artists/me/tracks/${encodeURIComponent(trackId)}`, {
+  return requestJson<void>(`/api/content-lead/me/tracks/${encodeURIComponent(trackId)}`, {
     method: "DELETE",
     token: validToken,
   });
@@ -396,8 +446,62 @@ export async function getCurrentArtistCatalog(
   }
 
   return requestJson<ArtistCatalogResponse>(
-    `/api/artists/me/catalog?${searchParams.toString()}`,
+    `/api/content-lead/me/catalog?${searchParams.toString()}`,
     { token: accessToken },
+  );
+}
+
+export const getCurrentContentLeadCatalog = getCurrentArtistCatalog;
+export const uploadContentLeadTrack = uploadArtistTrack;
+export const updateContentLeadTrack = updateArtistTrack;
+export const deleteContentLeadTrack = deleteArtistTrack;
+
+export async function getContentLeadAudienceAnalytics(
+  accessToken: string,
+  params: { period?: "7d" | "30d" | "90d" | "all"; trackId?: string } = {},
+): Promise<ContentLeadAudienceResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.period) {
+    searchParams.set("period", params.period);
+  }
+  if (params.trackId && params.trackId !== "all") {
+    searchParams.set("trackId", params.trackId);
+  }
+
+  return requestJson<ContentLeadAudienceResponse>(
+    `/api/content-lead/me/analytics/audience-channels?${searchParams.toString()}`,
+    { token: accessToken },
+  );
+}
+
+export async function recordPlatformVisit(payload: {
+  targetType?: "TRACK" | "ARTIST" | "GENERAL";
+  targetId: string;
+  platform?: "WEB" | "ANDROID" | "IOS" | "OTHER";
+  referrerType?: "DIRECT" | "SEARCH" | "TIKTOK" | "FACEBOOK" | "AI_RECOMMEND" | "OTHER";
+  sessionId?: string;
+}) {
+  try {
+    const token = await getValidAccessToken();
+    return await requestJson<{ success: boolean; message: string }>("/api/analytics/track-visit", {
+      method: "POST",
+      token: token ?? undefined,
+      body: payload,
+    });
+  } catch {
+    // Non-blocking telemetry
+    return null;
+  }
+}
+
+export async function seedDemoTraffic(count = 150, token?: string) {
+  const validToken = token || (await getValidAccessToken());
+  return requestJson<{ success: boolean; inserted: number; message: string }>(
+    `/api/analytics/seed-traffic?count=${count}`,
+    {
+      method: "POST",
+      token: validToken ?? undefined,
+    },
   );
 }
 

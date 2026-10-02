@@ -2,7 +2,7 @@ export type TrackStatus = "draft" | "published" | "scheduled";
 
 export type TrackVisibility = "public" | "private" | "unlisted";
 
-export type ArtistTrack = {
+export type ContentLeadTrack = {
   id: string;
   title: string;
   artist: string;
@@ -32,6 +32,8 @@ export type ArtistTrack = {
   description?: string;
   license?: SongLicense;
 };
+
+export type ArtistTrack = ContentLeadTrack;
 
 export type LicenseType =
   | "DIGITAL_STREAMING"

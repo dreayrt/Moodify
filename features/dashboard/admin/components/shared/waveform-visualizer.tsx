@@ -21,8 +21,8 @@ export function WaveformVisualizer({
   onSeek,
   barCount = 42,
   height = 38,
-  activeColor = "#ff7a2c",
-  inactiveColor = "rgba(255, 255, 255, 0.16)",
+  activeColor = "#ff5500",
+  inactiveColor = "#222432",
   className = "",
 }: WaveformVisualizerProps) {
   // Deterministic heights generation based on trackId string

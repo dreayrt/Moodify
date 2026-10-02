@@ -469,10 +469,25 @@ export function TrackCatalogPanel({
 
                   {/* Column 2: Status */}
                   <div>
-                    {track.status === "published" ? (
+                    {track.status === "published" || track.moderationStatus === "approved" ? (
                       <span className="inline-flex items-center gap-2 text-[12px] text-emerald-400 font-medium">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         {t("dashboard.artist.trackCatalog.filters.published")}
+                      </span>
+                    ) : track.moderationStatus === "pending" ? (
+                      <span className="inline-flex items-center gap-2 text-[12px] text-amber-300 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        {t("dashboard.artist.trackCatalog.filters.pending", "Chờ kiểm duyệt")}
+                      </span>
+                    ) : track.moderationStatus === "needs_revision" ? (
+                      <span className="inline-flex items-center gap-2 text-[12px] text-orange-400 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                        {t("dashboard.artist.trackCatalog.filters.needs_revision", "Cần chỉnh sửa")}
+                      </span>
+                    ) : track.moderationStatus === "rejected" ? (
+                      <span className="inline-flex items-center gap-2 text-[12px] text-rose-400 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                        {t("dashboard.artist.trackCatalog.filters.rejected", "Bị từ chối")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-2 text-[12px] text-white/45 font-normal">
@@ -686,7 +701,7 @@ export function TrackCatalogPanel({
         <span>
           Đang hiển thị <strong className="text-white/80">{filteredTracks.length}</strong> / {tracks.length} bài hát
         </span>
-        <span>Studio Audio Engine v2.4 • Moodify</span>
+        <span>Bộ xử lý âm thanh Studio v2.4 • Moodify</span>
       </div>
     </div>
   );

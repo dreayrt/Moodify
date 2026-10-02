@@ -46,7 +46,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Editor & IDE configurations
+# Editor, Agent & IDE configurations
+.agents/
 .idea/
 .vscode/
 *.sublime-project

@@ -6,7 +6,7 @@ import {
   RotateCcw,
   Clock,
 } from "lucide-react";
-import { ToastNotification } from "../../artist/components/toast-notification";
+import { ToastNotification } from "../../content-lead/components/toast-notification";
 import {
   INITIAL_MODERATOR_PROFILE,
   INITIAL_MODERATOR_STATS,

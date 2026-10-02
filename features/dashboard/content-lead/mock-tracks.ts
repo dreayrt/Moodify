@@ -4,7 +4,7 @@ export const INITIAL_ARTIST_TRACKS: ArtistTrack[] = [
   {
     id: "trk-001",
     title: "Midnight Echoes (feat. Maya)",
-    artist: "You (Artist Studio)",
+    artist: "You (Content Lead)",
     genre: "EDM / Melodic House",
     duration: "3:42",
     status: "published",
@@ -22,7 +22,7 @@ export const INITIAL_ARTIST_TRACKS: ArtistTrack[] = [
   {
     id: "trk-002",
     title: "Cyberpunk Tokyo Drift (VIP Mix)",
-    artist: "You (Artist Studio)",
+    artist: "You (Content Lead)",
     genre: "Synthwave / Cyberpunk",
     duration: "4:05",
     status: "published",
@@ -40,7 +40,7 @@ export const INITIAL_ARTIST_TRACKS: ArtistTrack[] = [
   {
     id: "trk-003",
     title: "Acoustic Rain & Piano - Demo v3",
-    artist: "You (Artist Studio)",
+    artist: "You (Content Lead)",
     genre: "Lo-fi / Ambient",
     duration: "2:58",
     status: "draft",
@@ -58,7 +58,7 @@ export const INITIAL_ARTIST_TRACKS: ArtistTrack[] = [
   {
     id: "trk-004",
     title: "Neon Horizon (Club Extended Edit)",
-    artist: "You (Artist Studio)",
+    artist: "You (Content Lead)",
     genre: "Progressive House",
     duration: "5:12",
     status: "draft",
@@ -76,7 +76,7 @@ export const INITIAL_ARTIST_TRACKS: ArtistTrack[] = [
   {
     id: "trk-005",
     title: "Sunset Boulevard - Master 96k",
-    artist: "You (Artist Studio)",
+    artist: "You (Content Lead)",
     genre: "Future Bass",
     duration: "3:30",
     status: "published",
@@ -94,7 +94,7 @@ export const INITIAL_ARTIST_TRACKS: ArtistTrack[] = [
   {
     id: "trk-006",
     title: "Deep Resonance - Sub Bass Test",
-    artist: "You (Artist Studio)",
+    artist: "You (Content Lead)",
     genre: "Deep Tech / Minimal",
     duration: "2:15",
     status: "draft",

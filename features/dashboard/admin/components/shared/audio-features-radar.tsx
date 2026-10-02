@@ -68,16 +68,16 @@ export function AudioFeaturesRadar({
         viewBox="0 0 220 220"
         width={size}
         height={size}
-        className="overflow-visible filter drop-shadow-[0_4px_16px_rgba(0,242,254,0.15)]"
+        className="overflow-visible filter drop-shadow-[0_4px_16px_rgba(255,85,0,0.2)]"
       >
         <defs>
           <linearGradient id="radarFillGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00f2fe" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#ff7a2c" stopOpacity="0.25" />
+            <stop offset="0%" stopColor="#ff5500" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#ff5500" stopOpacity="0.08" />
           </linearGradient>
           <linearGradient id="radarStrokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00f2fe" />
-            <stop offset="100%" stopColor="#ff7a2c" />
+            <stop offset="0%" stopColor="#ff5500" />
+            <stop offset="100%" stopColor="#ff8c42" />
           </linearGradient>
         </defs>
 
@@ -129,9 +129,8 @@ export function AudioFeaturesRadar({
                 cy={point.y}
                 r="3.5"
                 fill="#ffffff"
-                stroke="#00f2fe"
+                stroke="#ff5500"
                 strokeWidth="2"
-                className="animate-pulse"
               />
 
               {/* Text label */}
@@ -149,7 +148,7 @@ export function AudioFeaturesRadar({
                 y={labelCoord.y + 11}
                 textAnchor="middle"
                 dominantBaseline="central"
-                className="fill-[#00f2fe] font-mono text-[9px] font-bold"
+                className="fill-[#ff8c42] font-mono text-[9px] font-bold"
               >
                 {axes[i].display}
               </text>

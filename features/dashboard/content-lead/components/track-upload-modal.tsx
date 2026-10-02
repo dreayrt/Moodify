@@ -82,6 +82,7 @@ const LICENSE_TYPES: Array<{
 ];
 
 const DISTRIBUTOR_OPTIONS = [
+  { id: "", name: "Không qua đơn vị phân phối (Tự phát hành độc lập)", share: "100%" },
   { id: "1", name: "Moodify Direct Distribution (Nội bộ)", share: "85%" },
   { id: "2", name: "DistroKid Music Group", share: "Đối tác" },
   { id: "3", name: "TuneCore Digital Media", share: "Đối tác" },
@@ -150,7 +151,7 @@ export function TrackUploadModal({
   // Step 2: License Metadata matching MySQL `song_licenses` table
   const [licenseType, setLicenseType] = useState<LicenseType>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("Independent Artist");
-  const [distributorId, setDistributorId] = useState<string>("1");
+  const [distributorId, setDistributorId] = useState<string>("");
   const [distributionContractId, setDistributionContractId] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>(getTodayDateString());
   const [expiryDate, setExpiryDate] = useState<string>(getDefaultExpiryDateString());
@@ -281,11 +282,14 @@ export function TrackUploadModal({
 
       // License Info
       formData.append("licenseType", licenseType);
-      formData.append("copyrightOwner", copyrightOwner.trim() || "Independent Artist");
-      if (distributorId) formData.append("distributorId", distributorId);
-      if (distributionContractId.trim()) {
-        const cleanContractId = distributionContractId.replace(/\D/g, "");
-        if (cleanContractId) formData.append("distributionContractId", cleanContractId);
+      if (distributorId && distributorId !== "0") {
+        formData.append("distributorId", distributorId);
+        if (distributionContractId.trim()) {
+          const cleanContractId = distributionContractId.replace(/\D/g, "");
+          if (cleanContractId) formData.append("distributionContractId", cleanContractId);
+        }
+      } else {
+        formData.append("copyrightOwner", copyrightOwner.trim() || "Independent Artist");
       }
       formData.append("issueDate", issueDate);
       if (!isPerpetual && expiryDate) {
@@ -315,7 +319,7 @@ export function TrackUploadModal({
       const newTrack: ArtistTrack = {
         id: savedResponse.id,
         title: savedResponse.title || finalTitle,
-        artist: savedResponse.artist || "You (Artist Studio)",
+        artist: savedResponse.artist || "You (Content Lead)",
         genre: savedResponse.genre || genre.trim() || "Pop",
         duration: savedResponse.duration || "0:00",
         status: (savedResponse.status as TrackStatus) || "draft",
@@ -883,19 +887,6 @@ export function TrackUploadModal({
                           </p>
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Legal Compliance Auto Badge */}
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-3.5 flex items-start gap-3">
-                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#ff7a2c]/15 text-[#ffb488]">
-                      <ShieldCheck className="h-4 w-4" />
-                    </div>
-                    <div className="text-[11px] leading-5">
-                      <p className="font-semibold text-white">Kiểm duyệt bản quyền tự động</p>
-                      <p className="text-white/50 mt-0.5">
-                        Hồ sơ bản quyền sẽ được tiếp nhận và xử lý thẩm định (<span className="text-amber-400 font-medium">PENDING</span>) bởi ban kiểm duyệt.
-                      </p>
                     </div>
                   </div>
                 </div>

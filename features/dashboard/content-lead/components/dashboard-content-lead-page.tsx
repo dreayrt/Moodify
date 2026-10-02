@@ -29,6 +29,7 @@ import {
   FastForward,
   UploadCloud,
   Users,
+  Share2,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { LogoMark } from "@/components/shared/logo-mark";
@@ -52,6 +53,7 @@ import { TrackEditModal } from "./track-edit-modal";
 import { TrackDeleteModal } from "./track-delete-modal";
 import { TrackUploadModal } from "./track-upload-modal";
 import { ToastNotification } from "./toast-notification";
+import { AudienceDistributionCard } from "./audience-distribution-card";
 
 type TabKey = "tracks" | "comments" | "benefits";
 
@@ -100,7 +102,7 @@ const KEYFRAMES = `
 const RELEASES: Release[] = [
   {
     title: "Neon Horizon - Extended EP",
-    type: "EP Release (5 Tracks)",
+    type: "Phát hành EP (5 bài hát)",
     stage: "Đang hoàn thiện Master",
     date: "18/03/2026",
     progress: "85%",
@@ -108,7 +110,7 @@ const RELEASES: Release[] = [
   },
   {
     title: "Midnight Echoes (Acoustic Version)",
-    type: "Single / Video Clip",
+    type: "Đĩa đơn / Video âm nhạc",
     stage: "Lên lịch phát hành",
     date: "25/03/2026",
     progress: "50%",
@@ -116,7 +118,7 @@ const RELEASES: Release[] = [
   },
   {
     title: "Cyberpunk Tokyo Vinyl Edition",
-    type: "Physical Drop (500 copies)",
+    type: "Bản đĩa vật lý (500 bản)",
     stage: "Đặt trước đợt 1",
     date: "10/04/2026",
     progress: "30%",
@@ -124,11 +126,11 @@ const RELEASES: Release[] = [
   },
 ];
 
-const FAN_TOUCHPOINTS = [
-  { city: "TP. Hồ Chí Minh", share: "38% thính giả", tone: "Cao điểm 21:00 - 01:00" },
-  { city: "Hà Nội", share: "26% thính giả", tone: "Tăng trưởng +34% tháng này" },
-  { city: "Đà Nẵng", share: "15% thính giả", tone: "Top thể loại EDM / House" },
-  { city: "Tokyo & Seoul", share: "12% thính giả", tone: "Khán giả Synthwave" },
+const DISTRIBUTION_CHANNELS = [
+  { channel: "Moodify Mobile App", share: "45% lưu lượng", note: "Kênh phát nhạc chính, tỷ lệ hoàn tất 88%" },
+  { channel: "Moodify Web Player", share: "30% lưu lượng", note: "Lưu lượng truy cập máy tính & văn phòng" },
+  { channel: "Playlist & Khám phá AI", share: "15% lưu lượng", note: "Đề xuất thuật toán & Moodify Curated" },
+  { channel: "Đối tác & Nhúng ngoài", share: "10% lưu lượng", note: "Liên kết bên ngoài & chia sẻ mạng xã hội" },
 ];
 
 const COMMENT_PREVIEWS = [
@@ -393,7 +395,7 @@ function StatCard({ item, delay }: { item: Stat; delay: number }) {
       <p className="mt-5 font-graphik text-[28px] font-semibold leading-none tracking-[-0.025em] text-white">
         {item.value}
       </p>
-      <p className="mt-2 text-[12px] font-medium tracking-[0.06em] text-white/46 uppercase">
+      <p className="mt-2 text-[12px] font-medium tracking-[0.06em] text-white/46">
         {t(`dashboard.artist.stats.${item.key}`)}
       </p>
     </div>
@@ -536,7 +538,7 @@ function TracksPanel({
         >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
+              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff]">
                 {t("dashboard.artist.release.eyebrow")}
               </p>
               <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
@@ -604,7 +606,7 @@ function CommentsPanel() {
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
+          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">
             {t("dashboard.artist.commentsPanel.eyebrow")}
           </p>
           <h3 className="mt-2 font-graphik text-[26px] font-semibold tracking-[-0.02em] text-white">
@@ -642,7 +644,7 @@ function BenefitsPanel() {
           body: "Nhận tiền bản quyền trực tiếp từ người nghe với tỉ lệ chi trả cao nhất thị trường.",
         },
         {
-          title: "Xác thực nghệ sĩ chính thức",
+          title: "Chứng nhận Content Lead chính thức",
           body: "Huy hiệu tick xanh độc quyền và trang profile nghệ sĩ tùy biến giao diện.",
         },
         {
@@ -664,58 +666,21 @@ function BenefitsPanel() {
   );
 }
 
-function RightRail() {
+function RightRail({
+  token,
+  tracks,
+}: {
+  token: string | null;
+  tracks?: ArtistTrack[];
+}) {
   const { t } = useTranslation();
 
   return (
     <div className="grid gap-5">
-      <div
-        className="anim-fade-up overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
-        style={{ animationDelay: "900ms" }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff] uppercase">
-              {t("dashboard.artist.analytics.kpi")}
-            </p>
-            <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
-              {t("dashboard.artist.audience.title")}
-            </h3>
-          </div>
-          <Users className="h-5 w-5 text-white/40" strokeWidth={1.7} />
-        </div>
-
-        <div className="relative mt-6 rounded-[24px] border border-white/8 bg-black/20 p-5">
-          <div
-            className="absolute right-[-10px] top-[-12px] h-24 w-24 rounded-full bg-[#ff7a2c]/12 blur-2xl"
-            style={{ animation: "artistPulse 4s ease-in-out infinite" }}
-          />
-          <p className="text-[42px] font-graphik leading-none tracking-[-0.04em] text-white">
-            18.4K
-          </p>
-          <p className="mt-2 max-w-[220px] text-[13px] leading-6 text-white/58">
-            Người nghe hoạt động hàng tháng (Monthly Listeners)
-          </p>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
-            <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#8fb4ff_0%,#dce9ff_100%)]" />
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {FAN_TOUCHPOINTS.map((point, index) => (
-            <div
-              key={`fan-touchpoint-${index}`}
-              className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-black/20 px-4 py-3"
-            >
-              <div>
-                <p className="text-[13px] text-white">{point.city}</p>
-                <p className="mt-1 text-[11px] text-white/42">{point.tone}</p>
-              </div>
-              <p className="text-[13px] text-[#ffb488] font-medium">{point.share}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <AudienceDistributionCard
+        token={token}
+        tracks={tracks as unknown as ArtistTrackResponse[]}
+      />
 
       <div
         className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
@@ -723,7 +688,7 @@ function RightRail() {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">
               {t("dashboard.artist.analytics.eyebrow")}
             </p>
             <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
@@ -737,7 +702,7 @@ function RightRail() {
             {
               icon: Bell,
               title: "Hoàn thiện bản quyền tác giả",
-              copy: "Đăng ký ISRC code cho single Midnight Echoes trước ngày phát hành.",
+              copy: "Đăng ký mã ISRC cho đĩa đơn Midnight Echoes trước ngày phát hành.",
             },
             {
               icon: CircleDollarSign,
@@ -746,8 +711,8 @@ function RightRail() {
             },
             {
               icon: Flame,
-              title: "Tăng tốc quảng bá Single mới",
-              copy: "Gửi bản nghe thử tới 12 Playlist Curators hàng đầu trên hệ thống.",
+              title: "Tăng tốc quảng bá đĩa đơn mới",
+              copy: "Gửi bản nghe thử tới 12 Curators danh sách phát hàng đầu trên hệ thống.",
             },
           ].map((task, index) => {
             const Icon = task.icon;
@@ -771,7 +736,7 @@ function RightRail() {
   );
 }
 
-export default function ArtistDashboardPage() {
+export default function ContentLeadDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("tracks");
@@ -783,6 +748,7 @@ export default function ArtistDashboardPage() {
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Tracks State & Modals
   const [tracks, setTracks] = useState<ArtistTrack[]>([]);
@@ -1111,14 +1077,21 @@ export default function ArtistDashboardPage() {
           return;
         }
 
-        if (normalizedRole !== "artist") {
+        if (normalizedRole !== "content_lead" && normalizedRole !== "artist") {
           setAuthState("denied");
-          router.replace(USER_DASHBOARD_ROUTE);
+          if (normalizedRole === "moderator") {
+            router.replace("/dashboard/moderator");
+          } else if (normalizedRole === "admin") {
+            router.replace("/dashboard/admin");
+          } else {
+            router.replace(USER_DASHBOARD_ROUTE);
+          }
           return;
         }
 
         setCurrentUser(profile);
         setAuthState("allowed");
+        setAccessToken(token);
         setCatalogState("loading");
         setCatalogError(null);
 
@@ -1313,7 +1286,7 @@ export default function ArtistDashboardPage() {
                 <p className="text-[13px] text-white font-medium">
                   {artistDisplayName}
                 </p>
-                <p className="mt-0.5 text-[11px] tracking-[0.16em] text-white/42 uppercase">
+                <p className="mt-0.5 text-[11px] tracking-[0.16em] text-white/42">
                   {t("dashboard.artist.header.studio")}
                 </p>
               </div>
@@ -1341,15 +1314,15 @@ export default function ArtistDashboardPage() {
             >
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
                 <div>
-                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">{t("dashboard.artist.studio.eyebrow")}</p>
+                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">{t("dashboard.artist.studio.eyebrow")}</p>
                   <div className="mt-4 flex flex-wrap items-end gap-3">
                     <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
                       {artistDisplayName}
                     </h2>
-                    <p className="pb-1 text-[14px] text-white/52">Studio Verified</p>
+                    <p className="pb-1 text-[14px] text-white/52">Phụ trách nội dung</p>
                   </div>
                   <p className="mt-4 max-w-[640px] text-[15px] leading-7 text-white/60">
-                    Chào mừng bạn quay lại phòng thu âm thanh kỹ thuật số. Quản lý các bản phát hành, theo dõi tương tác của người hâm mộ và tối ưu hóa từng bài nhạc của bạn.
+                    Chào mừng bạn quay lại trung tâm quản lý nội dung số. Quản lý các bản phát hành, theo dõi tương tác của thính giả và tối ưu hóa từng tác phẩm nội dung trên Moodify.
                   </p>
                 </div>
 
@@ -1381,9 +1354,9 @@ export default function ArtistDashboardPage() {
 
               <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {[
-                  { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nghệ sĩ thịnh hành" },
+                  { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nội dung thịnh hành" },
                   { icon: CircleDollarSign, label: t("dashboard.artist.studio.earnings"), copy: "$1,420.80 tháng này" },
-                  { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 fans theo dõi mới" },
+                  { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 người theo dõi mới" },
                   { icon: Sparkles, label: t("dashboard.artist.studio.benefits"), copy: "Đặc quyền phân phối cấp 2" },
                 ].map((item, index) => {
                   const Icon = item.icon;
@@ -1428,14 +1401,14 @@ export default function ArtistDashboardPage() {
               )}
               {catalogState === "error" && (
                 <div className="mt-5 rounded-[22px] border border-red-400/20 bg-red-500/10 px-5 py-4 text-[13px] text-red-100">
-                  Không thể tải catalog nghệ sĩ: {catalogError}
+                  Không thể tải catalog nội dung: {catalogError}
                 </div>
               )}
               <div className="mt-5">{renderActivePanel()}</div>
             </div>
           </div>
 
-          <RightRail />
+          <RightRail token={accessToken} tracks={tracks} />
         </div>
 
         {/* Footer Notes */}
