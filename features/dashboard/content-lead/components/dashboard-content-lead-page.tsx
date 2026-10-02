@@ -53,6 +53,7 @@ import { TrackEditModal } from "./track-edit-modal";
 import { TrackDeleteModal } from "./track-delete-modal";
 import { TrackUploadModal } from "./track-upload-modal";
 import { ToastNotification } from "./toast-notification";
+import { AudienceDistributionCard } from "./audience-distribution-card";
 
 type TabKey = "tracks" | "comments" | "benefits";
 
@@ -665,58 +666,21 @@ function BenefitsPanel() {
   );
 }
 
-function RightRail() {
+function RightRail({
+  token,
+  tracks,
+}: {
+  token: string | null;
+  tracks?: ArtistTrack[];
+}) {
   const { t } = useTranslation();
 
   return (
     <div className="grid gap-5">
-      <div
-        className="anim-fade-up overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
-        style={{ animationDelay: "900ms" }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff]">
-              {t("dashboard.artist.audience.eyebrow")}
-            </p>
-            <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
-              {t("dashboard.artist.audience.title")}
-            </h3>
-          </div>
-          <Share2 className="h-5 w-5 text-white/40" strokeWidth={1.7} />
-        </div>
-
-        <div className="relative mt-6 rounded-[24px] border border-white/8 bg-black/20 p-5">
-          <div
-            className="absolute right-[-10px] top-[-12px] h-24 w-24 rounded-full bg-[#ff7a2c]/12 blur-2xl"
-            style={{ animation: "artistPulse 4s ease-in-out infinite" }}
-          />
-          <p className="text-[42px] font-graphik leading-none tracking-[-0.04em] text-white">
-            18.4K
-          </p>
-          <p className="mt-2 max-w-[240px] text-[13px] leading-6 text-white/58">
-            {t("dashboard.artist.audience.subtitle", "Lượt tiếp cận thính giả đa nền tảng")}
-          </p>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
-            <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#8fb4ff_0%,#dce9ff_100%)]" />
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {DISTRIBUTION_CHANNELS.map((item, index) => (
-            <div
-              key={`channel-${index}`}
-              className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-black/20 px-4 py-3"
-            >
-              <div>
-                <p className="text-[13px] text-white">{item.channel}</p>
-                <p className="mt-1 text-[11px] text-white/42">{item.note}</p>
-              </div>
-              <p className="text-[13px] text-[#ffb488] font-medium">{item.share}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <AudienceDistributionCard
+        token={token}
+        tracks={tracks as unknown as ArtistTrackResponse[]}
+      />
 
       <div
         className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
@@ -784,6 +748,7 @@ export default function ContentLeadDashboardPage() {
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Tracks State & Modals
   const [tracks, setTracks] = useState<ArtistTrack[]>([]);
@@ -1126,6 +1091,7 @@ export default function ContentLeadDashboardPage() {
 
         setCurrentUser(profile);
         setAuthState("allowed");
+        setAccessToken(token);
         setCatalogState("loading");
         setCatalogError(null);
 
@@ -1442,7 +1408,7 @@ export default function ContentLeadDashboardPage() {
             </div>
           </div>
 
-          <RightRail />
+          <RightRail token={accessToken} tracks={tracks} />
         </div>
 
         {/* Footer Notes */}

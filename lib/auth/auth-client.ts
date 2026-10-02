@@ -96,6 +96,50 @@ export type ContentLeadTrackResponse = ArtistTrackResponse;
 export type ContentLeadAlbumResponse = ArtistAlbumResponse;
 export type ContentLeadCatalogResponse = ArtistCatalogResponse;
 
+export type AudienceChannelItem = {
+  id: string;
+  channel: string;
+  subtitle: string;
+  streams: number;
+  share: number;
+  shareFormatted: string;
+  uniqueListeners: number;
+  completionRate: number;
+  color: string;
+  icon: string;
+  details?: Record<string, string | number>;
+};
+
+export type AudienceTrendItem = {
+  date: string;
+  label: string;
+  streams: number;
+  mobileStreams: number;
+  webStreams: number;
+  otherStreams: number;
+};
+
+export type AudienceTrackStat = {
+  trackId: string;
+  title: string;
+  coverUrl: string | null;
+  streams: number;
+  completionRate: number;
+  primaryChannel: string;
+};
+
+export type ContentLeadAudienceResponse = {
+  totalReach: number;
+  uniqueListeners: number;
+  avgCompletionRate: number;
+  totalListeningHours: number;
+  growthRate: number;
+  period: "7d" | "30d" | "90d" | "all";
+  selectedTrackId: string | null;
+  channels: AudienceChannelItem[];
+  dailyTrends: AudienceTrendItem[];
+  topTracks: AudienceTrackStat[];
+};
 export type StoredAuthSession = {
   accessToken: string;
   refreshToken: string;
@@ -411,6 +455,54 @@ export const uploadContentLeadTrack = uploadArtistTrack;
 export const updateContentLeadTrack = updateArtistTrack;
 export const deleteContentLeadTrack = deleteArtistTrack;
 
+export async function getContentLeadAudienceAnalytics(
+  accessToken: string,
+  params: { period?: "7d" | "30d" | "90d" | "all"; trackId?: string } = {},
+): Promise<ContentLeadAudienceResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.period) {
+    searchParams.set("period", params.period);
+  }
+  if (params.trackId && params.trackId !== "all") {
+    searchParams.set("trackId", params.trackId);
+  }
+
+  return requestJson<ContentLeadAudienceResponse>(
+    `/api/content-lead/me/analytics/audience-channels?${searchParams.toString()}`,
+    { token: accessToken },
+  );
+}
+
+export async function recordPlatformVisit(payload: {
+  targetType?: "TRACK" | "ARTIST" | "GENERAL";
+  targetId: string;
+  platform?: "WEB" | "ANDROID" | "IOS" | "OTHER";
+  referrerType?: "DIRECT" | "SEARCH" | "TIKTOK" | "FACEBOOK" | "AI_RECOMMEND" | "OTHER";
+  sessionId?: string;
+}) {
+  try {
+    const token = await getValidAccessToken();
+    return await requestJson<{ success: boolean; message: string }>("/api/analytics/track-visit", {
+      method: "POST",
+      token: token ?? undefined,
+      body: payload,
+    });
+  } catch {
+    // Non-blocking telemetry
+    return null;
+  }
+}
+
+export async function seedDemoTraffic(count = 150, token?: string) {
+  const validToken = token || (await getValidAccessToken());
+  return requestJson<{ success: boolean; inserted: number; message: string }>(
+    `/api/analytics/seed-traffic?count=${count}`,
+    {
+      method: "POST",
+      token: validToken ?? undefined,
+    },
+  );
+}
 export async function getValidAccessToken(): Promise<string | null> {
   const session = getStoredAuthSession();
   if (!session) {

@@ -649,6 +649,7 @@ export function HeroCarousel() {
                   Đăng nhập
                 </button>
                 <button
+                  data-auth-trigger="register"
                   className="inline-flex h-11 items-center justify-center rounded-full bg-white px-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0d0d11] transition duration-300 hover:scale-105 hover:bg-white/90 cursor-pointer"
                   onClick={openCreateAccount}
                   type="button"

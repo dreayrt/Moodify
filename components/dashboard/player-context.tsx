@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import { getTrackStreamUrl, fetchTrackById, fetchMySubscription } from "@/lib/api-client";
+import { recordPlatformVisit } from "@/lib/auth/auth-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -250,6 +251,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const exists = prev.some((t) => t.spotifyId === track.spotifyId);
         if (!exists) return [...prev, track];
         return prev;
+      });
+    }
+
+    // Telemetry: Record web platform visit event for Content Lead acquisition analytics
+    const targetTrackId = track.id || track.spotifyId;
+    if (targetTrackId) {
+      recordPlatformVisit({
+        targetType: "TRACK",
+        targetId: targetTrackId,
+        platform: "WEB",
+        referrerType: "DIRECT",
       });
     }
 
