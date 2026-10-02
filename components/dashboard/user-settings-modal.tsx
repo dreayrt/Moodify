@@ -20,6 +20,7 @@ import {
   Palette,
   Play,
   LayoutGrid,
+  ArrowRight,
 } from "lucide-react";
 import {
   MASCOTS,
@@ -663,6 +664,54 @@ export default function UserSettingsModal({
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3">
+              {/* Role & Privileges Badge */}
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/8">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 flex items-center justify-center">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10.5px] text-white/50 block">Vai trò tài khoản:</span>
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      {user?.role || "USER"}
+                    </span>
+                  </div>
+                </div>
+
+                {user?.role === "ADMIN" && (
+                  <Link
+                    href="/dashboard/admin"
+                    onClick={onClose}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 transition-all shadow-sm"
+                  >
+                    <span>Vào Admin Console</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+
+                {(user?.role === "CONTENT_LEAD" || user?.role === "ARTIST") && (
+                  <Link
+                    href="/dashboard/content-lead"
+                    onClick={onClose}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all shadow-sm"
+                  >
+                    <span>Vào Content Studio</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+
+                {user?.role === "MODERATOR" && (
+                  <Link
+                    href="/dashboard/moderator"
+                    onClick={onClose}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-500/30 hover:bg-sky-500/25 transition-all shadow-sm"
+                  >
+                    <span>Vào Kênh Kiểm Duyệt</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Full Name */}
                 <div>

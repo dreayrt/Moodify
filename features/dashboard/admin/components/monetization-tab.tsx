@@ -23,8 +23,16 @@ import {
   Users,
   X,
   XCircle,
+  Crown,
+  Download,
+  Headphones,
+  Radio,
+  ShieldCheck,
+  SkipForward,
+  Sliders,
+  Smartphone,
 } from "lucide-react";
-import { PaymentTransaction, ServicePackage } from "../types";
+import { PaymentTransaction, ServicePackage, PackageEntitlements } from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
 
@@ -39,6 +47,135 @@ type MonetizationTabProps = {
   onRefundTransaction: (transactionId: number) => void;
 };
 
+export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlements {
+  if (pkg.featuresJson) {
+    try {
+      const parsed = JSON.parse(pkg.featuresJson);
+      if (parsed && typeof parsed === "object") {
+        return {
+          tier: parsed.tier,
+          adPolicy: parsed.adPolicy || "DAILY_QUOTA",
+          adFreeDailyLimit: parsed.adFreeDailyLimit ?? 15,
+          adIntervalAfterLimit: parsed.adIntervalAfterLimit ?? 7,
+          skipPolicy: parsed.skipPolicy || "LIMITED",
+          skipDailyLimit: parsed.skipDailyLimit ?? 30,
+          audioQuality: parsed.audioQuality || "HQ_320",
+          offlineAllowed: parsed.offlineAllowed ?? true,
+          offlineMaxTracks: parsed.offlineMaxTracks ?? 50,
+          maxDevices: parsed.maxDevices ?? 1,
+          syncedLyrics: parsed.syncedLyrics ?? true,
+          vipBadge: parsed.vipBadge ?? true,
+          customThemes: parsed.customThemes ?? false,
+          familySharing: parsed.familySharing ?? false,
+          familyMembers: parsed.familyMembers ?? 1,
+        };
+      }
+    } catch (_) {}
+  }
+
+  const name = pkg.name.toLowerCase();
+  if (name.includes("gia đình") || name.includes("family")) {
+    return {
+      tier: "FAMILY",
+      adPolicy: "NO_ADS",
+      adFreeDailyLimit: 9999,
+      adIntervalAfterLimit: 0,
+      skipPolicy: "UNLIMITED",
+      skipDailyLimit: 9999,
+      audioQuality: "LOSSLESS_FLAC",
+      offlineAllowed: true,
+      offlineMaxTracks: 9999,
+      maxDevices: 6,
+      syncedLyrics: true,
+      vipBadge: true,
+      customThemes: true,
+      familySharing: true,
+      familyMembers: 6,
+    };
+  }
+  if (name.includes("full") || name.includes("không giới hạn")) {
+    return {
+      tier: "INDIVIDUAL_FULL",
+      adPolicy: "NO_ADS",
+      adFreeDailyLimit: 9999,
+      adIntervalAfterLimit: 0,
+      skipPolicy: "UNLIMITED",
+      skipDailyLimit: 9999,
+      audioQuality: "LOSSLESS_FLAC",
+      offlineAllowed: true,
+      offlineMaxTracks: 9999,
+      maxDevices: 1,
+      syncedLyrics: true,
+      vipBadge: true,
+      customThemes: true,
+      familySharing: false,
+      familyMembers: 1,
+    };
+  }
+  return {
+    tier: "INDIVIDUAL_BASIC",
+    adPolicy: "DAILY_QUOTA",
+    adFreeDailyLimit: 15,
+    adIntervalAfterLimit: 7,
+    skipPolicy: "LIMITED",
+    skipDailyLimit: 30,
+    audioQuality: "HQ_320",
+    offlineAllowed: true,
+    offlineMaxTracks: 50,
+    maxDevices: 1,
+    syncedLyrics: true,
+    vipBadge: true,
+    customThemes: false,
+    familySharing: false,
+    familyMembers: 1,
+  };
+}
+
+export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): string[] {
+  const bullets: string[] = [];
+
+  if (ent.adPolicy === "NO_ADS") {
+    bullets.push("100% Không quảng cáo vô hạn 24/7");
+  } else if (ent.adPolicy === "DAILY_QUOTA") {
+    bullets.push(`${ent.adFreeDailyLimit} bài hát/ngày không quảng cáo (sau đó 1 QC/${ent.adIntervalAfterLimit} bài)`);
+  } else {
+    bullets.push("Phát kèm quảng cáo tài trợ thông thường");
+  }
+
+  if (ent.skipPolicy === "UNLIMITED") {
+    bullets.push("Chuyển bài không giới hạn (Unlimited Skips)");
+  } else {
+    bullets.push(`${ent.skipDailyLimit} lượt chuyển bài mỗi ngày`);
+  }
+
+  if (ent.audioQuality === "LOSSLESS_FLAC") {
+    bullets.push("Âm thanh Hi-Res FLAC 24-bit/96kHz Studio Master");
+  } else if (ent.audioQuality === "HQ_320") {
+    bullets.push("Chất lượng âm thanh Lossless 320kbps");
+  } else {
+    bullets.push("Âm thanh tiêu chuẩn Standard 128kbps");
+  }
+
+  if (ent.offlineAllowed) {
+    const trackStr = ent.offlineMaxTracks >= 9999 ? "không giới hạn bài hát" : `${ent.offlineMaxTracks} bài hát`;
+    bullets.push(`Tải offline ${trackStr} trên ${ent.maxDevices} thiết bị`);
+  }
+
+  if (ent.syncedLyrics) {
+    bullets.push("Lời bài hát Karaoke đồng bộ thời gian thực");
+  }
+
+  if (ent.familySharing) {
+    bullets.push(`Chia sẻ gói cho ${ent.familyMembers || 6} thành viên gia đình`);
+  }
+
+  if (ent.vipBadge) {
+    bullets.push("Huy hiệu VIP và chủ đề phát nhạc độc quyền");
+  }
+
+  return bullets;
+}
+
 const POPULAR_BENEFITS = [
   "Chất lượng âm thanh Lossless 320kbps",
   "Nghe nhạc không quảng cáo ngắt quãng",
@@ -49,6 +186,282 @@ const POPULAR_BENEFITS = [
   "Âm thanh Hi-Res FLAC 24-bit/96kHz",
   "Huy hiệu VIP thành viên trên hồ sơ",
 ];
+
+function EntitlementsEditor({
+  entitlements,
+  onChange,
+  onSyncToBullets,
+}: {
+  entitlements: PackageEntitlements;
+  onChange: (updated: PackageEntitlements) => void;
+  onSyncToBullets: () => void;
+}) {
+  return (
+    <div className="border-t border-white/10 pt-4 space-y-3.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-xs font-mono uppercase tracking-wider font-semibold text-white flex items-center gap-2">
+            <Sliders className="w-3.5 h-3.5 text-[#ff5500]" />
+            Cấu Hình Chi Tiết Quyền Lợi &amp; Giới Hạn Gói Cước
+          </h4>
+          <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
+            Cấu hình trực tiếp logic quảng cáo, hạn mức skip và chất lượng nhạc
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onSyncToBullets}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#ff5500]/40 bg-[#ff5500]/10 text-[#ff5500] hover:bg-[#ff5500]/20 text-xs font-mono font-semibold transition active:scale-[0.98] cursor-pointer"
+          title="Tự động đồng bộ các quyền này thành danh sách gạch đầu dòng giới thiệu cho người dùng"
+        >
+          <RefreshCcw className="w-3 h-3" /> Tự động tạo gạch đầu dòng
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* 1. Ad Policy */}
+        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
+          <label className="text-[11px] font-mono font-semibold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Radio className="w-3 h-3" /> Quảng Cáo (Ad Engine)
+          </label>
+          <select
+            value={entitlements.adPolicy}
+            onChange={(e) =>
+              onChange({
+                ...entitlements,
+                adPolicy: e.target.value as "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS",
+              })
+            }
+            className="w-full rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500]"
+          >
+            <option value="NO_ADS">100% Không quảng cáo (FULL / Gia Đình)</option>
+            <option value="DAILY_QUOTA">Hạn ngạch ngày (Gói Tiết Kiệm - 15 bài đầu)</option>
+            <option value="FULL_ADS">Quảng cáo tiêu chuẩn (1-3 bài/QC)</option>
+          </select>
+
+          {entitlements.adPolicy === "DAILY_QUOTA" && (
+            <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
+              <div>
+                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Bài/ngày ko QC</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={entitlements.adFreeDailyLimit}
+                  onChange={(e) =>
+                    onChange({
+                      ...entitlements,
+                      adFreeDailyLimit: Math.max(1, Number(e.target.value)),
+                    })
+                  }
+                  className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-amber-300 font-bold focus:border-[#ff5500] outline-none"
+                />
+              </div>
+              <div>
+                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Sau đó 1 QC /</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={1}
+                    value={entitlements.adIntervalAfterLimit}
+                    onChange={(e) =>
+                      onChange({
+                        ...entitlements,
+                        adIntervalAfterLimit: Math.max(1, Number(e.target.value)),
+                      })
+                    }
+                    className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-white focus:border-[#ff5500] outline-none"
+                  />
+                  <span className="text-[10px] text-zinc-400 font-mono">bài</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Skip Policy */}
+        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
+          <label className="text-[11px] font-mono font-semibold text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
+            <SkipForward className="w-3 h-3" /> Lượt Chuyển Bài (Skip)
+          </label>
+          <select
+            value={entitlements.skipPolicy}
+            onChange={(e) =>
+              onChange({
+                ...entitlements,
+                skipPolicy: e.target.value as "UNLIMITED" | "LIMITED",
+              })
+            }
+            className="w-full rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500]"
+          >
+            <option value="UNLIMITED">Chuyển bài vô hạn (Unlimited Skips)</option>
+            <option value="LIMITED">Giới hạn lượt/ngày (Gói Tiết Kiệm: 30 lượt)</option>
+          </select>
+
+          {entitlements.skipPolicy === "LIMITED" && (
+            <div className="pt-1.5 border-t border-white/5">
+              <span className="block text-[10px] font-mono text-zinc-400 mb-1">Số lượt chuyển bài thủ công/ngày</span>
+              <input
+                type="number"
+                min={1}
+                value={entitlements.skipDailyLimit}
+                onChange={(e) =>
+                  onChange({
+                    ...entitlements,
+                    skipDailyLimit: Math.max(1, Number(e.target.value)),
+                  })
+                }
+                className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-sky-300 font-bold focus:border-[#ff5500] outline-none"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 3. Audio Quality */}
+        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
+          <label className="text-[11px] font-mono font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Headphones className="w-3 h-3" /> Chất Lượng Streaming
+          </label>
+          <select
+            value={entitlements.audioQuality}
+            onChange={(e) =>
+              onChange({
+                ...entitlements,
+                audioQuality: e.target.value as "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC",
+              })
+            }
+            className="w-full rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500]"
+          >
+            <option value="STANDARD_128">Standard 128kbps (Tiêu chuẩn)</option>
+            <option value="HQ_320">Lossless 320kbps (Chất lượng cao VIP)</option>
+            <option value="LOSSLESS_FLAC">Hi-Res FLAC 24-bit Studio Master</option>
+          </select>
+        </div>
+
+        {/* 4. Offline Downloads */}
+        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-mono font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Download className="w-3 h-3" /> Tải Nhạc Offline
+            </label>
+            <input
+              type="checkbox"
+              checked={entitlements.offlineAllowed}
+              onChange={(e) =>
+                onChange({
+                  ...entitlements,
+                  offlineAllowed: e.target.checked,
+                })
+              }
+              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-[#ff5500] cursor-pointer"
+            />
+          </div>
+
+          {entitlements.offlineAllowed ? (
+            <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
+              <div>
+                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Số bài tối đa</span>
+                <select
+                  value={entitlements.offlineMaxTracks}
+                  onChange={(e) =>
+                    onChange({
+                      ...entitlements,
+                      offlineMaxTracks: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-white outline-none"
+                >
+                  <option value={50}>50 bài (Tiết Kiệm)</option>
+                  <option value={100}>100 bài</option>
+                  <option value={500}>500 bài</option>
+                  <option value={9999}>Không giới hạn (FULL)</option>
+                </select>
+              </div>
+              <div>
+                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Số thiết bị</span>
+                <select
+                  value={entitlements.maxDevices}
+                  onChange={(e) =>
+                    onChange({
+                      ...entitlements,
+                      maxDevices: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-white outline-none"
+                >
+                  <option value={1}>1 máy (Cá nhân)</option>
+                  <option value={3}>3 máy</option>
+                  <option value={6}>6 máy (Gia đình)</option>
+                </select>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[10px] text-zinc-500 font-mono italic">
+              Không cho phép tải nhạc ngoại tuyến.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 5. Special Perks */}
+      <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432]">
+        <span className="block text-[11px] font-mono font-semibold text-purple-300 uppercase tracking-wider mb-2">
+          Đặc Quyền Bổ Sung &amp; Nhận Diện
+        </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-white/90">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={entitlements.syncedLyrics}
+              onChange={(e) =>
+                onChange({ ...entitlements, syncedLyrics: e.target.checked })
+              }
+              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+            />
+            <span>Karaoke Lyrics</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={entitlements.vipBadge}
+              onChange={(e) =>
+                onChange({ ...entitlements, vipBadge: e.target.checked })
+              }
+              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+            />
+            <span>Huy Hiệu VIP</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={entitlements.customThemes}
+              onChange={(e) =>
+                onChange({ ...entitlements, customThemes: e.target.checked })
+              }
+              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+            />
+            <span>Theme VIP Player</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={entitlements.familySharing}
+              onChange={(e) =>
+                onChange({
+                  ...entitlements,
+                  familySharing: e.target.checked,
+                  maxDevices: e.target.checked ? 6 : entitlements.maxDevices,
+                  familyMembers: e.target.checked ? 6 : 1,
+                })
+              }
+              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+            />
+            <span>Gia Đình (6 tài khoản)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MonetizationTab({
   packages,
@@ -77,6 +490,22 @@ export function MonetizationTab({
     status: "ACTIVE" as "ACTIVE" | "INACTIVE",
     description: "",
     featureItems: [] as string[],
+    entitlements: {
+      adPolicy: "DAILY_QUOTA",
+      adFreeDailyLimit: 15,
+      adIntervalAfterLimit: 7,
+      skipPolicy: "LIMITED",
+      skipDailyLimit: 30,
+      audioQuality: "HQ_320",
+      offlineAllowed: true,
+      offlineMaxTracks: 50,
+      maxDevices: 1,
+      syncedLyrics: true,
+      vipBadge: true,
+      customThemes: false,
+      familySharing: false,
+      familyMembers: 1,
+    } as PackageEntitlements,
   });
 
   const [newFeatureInput, setNewFeatureInput] = useState("");
@@ -128,6 +557,7 @@ export function MonetizationTab({
 
   const handleOpenEdit = (pkg: ServicePackage) => {
     const features = parseDescriptionToFeatures(pkg.description);
+    const ents = getEffectiveEntitlements(pkg);
     setEditingPackage(pkg);
     setFormData({
       name: pkg.name,
@@ -136,25 +566,39 @@ export function MonetizationTab({
       displayOrder: pkg.displayOrder,
       status: pkg.status,
       description: pkg.description,
-      featureItems: features.length > 0 ? features : ["Chất lượng âm thanh Lossless 320kbps", "Nghe nhạc không giới hạn không quảng cáo"],
+      featureItems: features.length > 0 ? features : generateBulletPointsFromEntitlements(ents),
+      entitlements: ents,
     });
     setNewFeatureInput("");
   };
 
   const handleOpenCreate = () => {
     setIsCreateModalOpen(true);
+    const defaultEnts: PackageEntitlements = {
+      adPolicy: "DAILY_QUOTA",
+      adFreeDailyLimit: 15,
+      adIntervalAfterLimit: 7,
+      skipPolicy: "LIMITED",
+      skipDailyLimit: 30,
+      audioQuality: "HQ_320",
+      offlineAllowed: true,
+      offlineMaxTracks: 50,
+      maxDevices: 1,
+      syncedLyrics: true,
+      vipBadge: true,
+      customThemes: false,
+      familySharing: false,
+      familyMembers: 1,
+    };
     setFormData({
-      name: "Moodify VIP",
+      name: "Moodify VIP Mới",
       price: 59000,
       durationDays: 30,
       displayOrder: packages.length + 1,
       status: "ACTIVE",
       description: "Gói dịch vụ âm nhạc nâng cao",
-      featureItems: [
-        "Phát nhạc không giới hạn bài hát",
-        "Tải offline trên 3 thiết bị",
-        "Âm thanh Lossless Hi-Fi",
-      ],
+      featureItems: generateBulletPointsFromEntitlements(defaultEnts),
+      entitlements: defaultEnts,
     });
     setNewFeatureInput("");
   };
@@ -183,6 +627,7 @@ export function MonetizationTab({
     if (!editingPackage) return;
     const serializedDesc = formData.featureItems.join("\n• ");
     const finalDesc = serializedDesc.startsWith("• ") ? serializedDesc : `• ${serializedDesc}`;
+    const featuresJsonStr = JSON.stringify(formData.entitlements);
 
     if (onUpdatePackageDetails) {
       onUpdatePackageDetails(editingPackage.id, {
@@ -192,6 +637,7 @@ export function MonetizationTab({
         displayOrder: formData.displayOrder,
         status: formData.status,
         description: finalDesc,
+        featuresJson: featuresJsonStr,
       });
     } else {
       onUpdatePackagePrice(editingPackage.id, formData.price);
@@ -202,6 +648,7 @@ export function MonetizationTab({
   const handleSaveCreatePackage = () => {
     const serializedDesc = formData.featureItems.join("\n• ");
     const finalDesc = serializedDesc.startsWith("• ") ? serializedDesc : `• ${serializedDesc}`;
+    const featuresJsonStr = JSON.stringify(formData.entitlements);
 
     if (onCreatePackage) {
       onCreatePackage({
@@ -211,6 +658,7 @@ export function MonetizationTab({
         displayOrder: formData.displayOrder,
         status: formData.status,
         description: finalDesc,
+        featuresJson: featuresJsonStr,
       });
     }
     setIsCreateModalOpen(false);
@@ -346,8 +794,62 @@ export function MonetizationTab({
                       <span className="text-xs text-zinc-400">thuê bao đang kích hoạt</span>
                     </div>
 
+                    {/* Technical Entitlements Badges Matrix */}
+                    {(() => {
+                      const ent = getEffectiveEntitlements(pkg);
+                      return (
+                        <div className="mt-3 pt-3 border-t border-[#222432] flex flex-wrap gap-1.5">
+                          {ent.adPolicy === "NO_ADS" ? (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <ShieldCheck className="w-3 h-3" /> 0% QC (24/7)
+                            </span>
+                          ) : ent.adPolicy === "DAILY_QUOTA" ? (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                              <Radio className="w-3 h-3" /> {ent.adFreeDailyLimit} bài ko QC/ngày
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono text-zinc-400 bg-zinc-500/10 border border-zinc-500/20">
+                              QC chuẩn
+                            </span>
+                          )}
+
+                          {ent.skipPolicy === "UNLIMITED" ? (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20">
+                              <SkipForward className="w-3 h-3" /> Skip vô hạn
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                              <SkipForward className="w-3 h-3" /> {ent.skipDailyLimit} skips/ngày
+                            </span>
+                          )}
+
+                          <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                            <Headphones className="w-3 h-3" />
+                            {ent.audioQuality === "LOSSLESS_FLAC"
+                              ? "Hi-Res FLAC"
+                              : ent.audioQuality === "HQ_320"
+                              ? "Lossless 320k"
+                              : "Standard 128k"}
+                          </span>
+
+                          {ent.offlineAllowed && (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20">
+                              <Download className="w-3 h-3" />
+                              Offline ({ent.offlineMaxTracks >= 9999 ? "∞" : `${ent.offlineMaxTracks}`} bài, {ent.maxDevices} máy)
+                            </span>
+                          )}
+
+                          {ent.familySharing && (
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
+                              <Crown className="w-3 h-3" /> Gia đình (6 tài khoản)
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Features list */}
-                    <div className="mt-4 border-t border-[#222432] pt-4 space-y-2">
+                    <div className="mt-3.5 border-t border-[#222432] pt-3.5 space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="font-mono text-xs uppercase tracking-wider text-zinc-400 font-semibold">
                           Quyền Lợi Gói ({features.length})
@@ -669,6 +1171,18 @@ export function MonetizationTab({
               </div>
             </div>
 
+            {/* Granular Entitlements Configuration Matrix */}
+            <EntitlementsEditor
+              entitlements={formData.entitlements}
+              onChange={(ents) => setFormData((prev) => ({ ...prev, entitlements: ents }))}
+              onSyncToBullets={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  featureItems: generateBulletPointsFromEntitlements(prev.entitlements),
+                }))
+              }
+            />
+
             {/* Feature items editor */}
             <div className="border-t border-white/10 pt-4">
               <div className="flex items-center justify-between mb-2">
@@ -891,6 +1405,18 @@ export function MonetizationTab({
                 </div>
               </div>
             </div>
+
+            {/* Granular Entitlements Configuration Matrix */}
+            <EntitlementsEditor
+              entitlements={formData.entitlements}
+              onChange={(ents) => setFormData((prev) => ({ ...prev, entitlements: ents }))}
+              onSyncToBullets={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  featureItems: generateBulletPointsFromEntitlements(prev.entitlements),
+                }))
+              }
+            />
 
             {/* Feature items */}
             <div className="border-t border-[#222432] pt-4">

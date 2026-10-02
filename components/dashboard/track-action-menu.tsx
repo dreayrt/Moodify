@@ -230,6 +230,7 @@ export function TrackInlineActions({
       lyricsPlain: track.lyricsPlain,
       lyricsSynced: track.lyricsSynced,
       localPath: track.localPath,
+      audioUrl: (track as any).audioUrl || (track.localPath ? `http://158.178.247.33/${track.localPath.replace(/^\/+/, "")}` : undefined),
     };
 
     addToQueue(normalizedTrack);
@@ -254,6 +255,7 @@ export function TrackInlineActions({
         lyricsPlain: track.lyricsPlain,
         lyricsSynced: track.lyricsSynced,
         localPath: track.localPath,
+        audioUrl: (track as any).audioUrl || (track.localPath ? `http://158.178.247.33/${track.localPath.replace(/^\/+/, "")}` : undefined),
       };
       playTrack(normalizedTrack);
     }

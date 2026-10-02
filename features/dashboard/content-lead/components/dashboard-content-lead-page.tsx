@@ -178,7 +178,16 @@ function resolveMediaUrl(rawUrl: string | null | undefined) {
     rawUrl.startsWith("blob:") ||
     rawUrl.startsWith("data:")
   ) {
+    if (rawUrl.includes("musiccollector.kandes.io.vn")) {
+      const audioServerUrl = (process.env.NEXT_PUBLIC_AUDIO_SERVER_URL || "http://158.178.247.33").replace(/\/$/, "");
+      return rawUrl.replace("https://musiccollector.kandes.io.vn", audioServerUrl);
+    }
     return rawUrl;
+  }
+
+  if (rawUrl.startsWith("data/audio/") || rawUrl.startsWith("/data/audio/")) {
+    const audioServerUrl = (process.env.NEXT_PUBLIC_AUDIO_SERVER_URL || "http://158.178.247.33").replace(/\/$/, "");
+    return `${audioServerUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
   }
 
   const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");

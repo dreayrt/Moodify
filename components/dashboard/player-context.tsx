@@ -1,7 +1,20 @@
 "use client";
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
-import { getTrackStreamUrl, fetchTrackById, fetchMySubscription } from "@/lib/api-client";
+import Image from "next/image";
+import { Crown } from "lucide-react";
+import {
+  getTrackStreamUrl,
+  getBackendFileUrl,
+  fetchTrackById,
+  fetchMySubscription,
+  fetchActiveAdCampaigns,
+  recordAdImpression,
+  FREE_ENTITLEMENTS,
+  type ActiveAd,
+  resolveTrackAudioUrl,
+  type PackageEntitlements,
+} from "@/lib/api-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -13,9 +26,14 @@ export type PlayerTrack = {
   durationMs?: number;
   lyricsPlain?: string | null;
   lyricsSynced?: string | null;
+  audioUrl?: string | null;
+  localPath?: string | null;
 };
 
 export type RepeatMode = "off" | "all" | "one";
+
+export type SubTier = "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE";
+export type AdReason = "FREE_REGULAR" | "BASIC_DAILY_LIMIT_EXCEEDED" | "SKIP_PENALTY" | null;
 
 interface PlayerContextType {
   currentTrack: PlayerTrack | null;
@@ -31,9 +49,16 @@ interface PlayerContextType {
   queueIndex: number;
   isAdPlaying: boolean;
   adSecondsRemaining: number;
+  adTotalDuration: number;
   isPremiumUser: boolean;
+  subTier: SubTier;
+  adReason: AdReason;
+  dailyTracksCount: number;
+  dailySkipsCount: number;
+  skipLimitNotice: { show: boolean; message: string; tier: SubTier } | null;
+  clearSkipLimitNotice: () => void;
   skipAd: () => void;
-  triggerAd: (force?: boolean) => void;
+  triggerAd: (force?: boolean, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[], reason?: AdReason) => void;
   playTrack: (track: PlayerTrack, playlist?: PlayerTrack[]) => void;
   addToQueue: (track: PlayerTrack) => void;
   togglePlay: () => void;
@@ -50,6 +75,41 @@ interface PlayerContextType {
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
+
+// ── Daily Quota Storage Helpers ──────────────────────────────
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function getDailyStats(): { tracks: number; skips: number } {
+  if (typeof window === "undefined") return { tracks: 0, skips: 0 };
+  try {
+    const raw = localStorage.getItem(`moodify_daily_${getTodayKey()}`);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { tracks: 0, skips: 0 };
+}
+
+function recordDailyTrackPlayed(): number {
+  if (typeof window === "undefined") return 1;
+  const stats = getDailyStats();
+  stats.tracks += 1;
+  try {
+    localStorage.setItem(`moodify_daily_${getTodayKey()}`, JSON.stringify(stats));
+  } catch (_) {}
+  return stats.tracks;
+}
+
+function recordDailySkip(): number {
+  if (typeof window === "undefined") return 1;
+  const stats = getDailyStats();
+  stats.skips += 1;
+  try {
+    localStorage.setItem(`moodify_daily_${getTodayKey()}`, JSON.stringify(stats));
+  } catch (_) {}
+  return stats.skips;
+}
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
@@ -87,30 +147,75 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playbackRate, setPlaybackRateState] = useState(1);
   const playbackRateRef = useRef(1);
 
-  // ── Audio Ad Management ──────────────────────────────────────
+  // ── Audio Ad Management & Tiered Quotas ──────────────────────
   const [isPremiumUser, setIsPremiumUser] = useState(false);
+  const [subTier, setSubTier] = useState<SubTier>("FREE");
+  // Quyền hạn theo gói do backend trả về (features_json) — nguồn quyết định
+  // hạn mức quảng cáo/skip thật thay vì số cứng ở client.
+  const [entitlements, setEntitlements] = useState<PackageEntitlements>(FREE_ENTITLEMENTS);
+  const entitlementsRef = useRef<PackageEntitlements>(FREE_ENTITLEMENTS);
+  // Danh sách quảng cáo ACTIVE do admin quản lý (backend); rỗng = fallback mix cứng
+  const [activeAds, setActiveAds] = useState<ActiveAd[]>([]);
+  const activeAdsRef = useRef<ActiveAd[]>([]);
+  useEffect(() => {
+    entitlementsRef.current = entitlements;
+  }, [entitlements]);
+  useEffect(() => {
+    activeAdsRef.current = activeAds;
+  }, [activeAds]);
+  const [adReason, setAdReason] = useState<AdReason>(null);
+  const [dailyTracksCount, setDailyTracksCount] = useState<number>(0);
+  const [dailySkipsCount, setDailySkipsCount] = useState<number>(0);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
-  const [adSecondsRemaining, setAdSecondsRemaining] = useState(5);
+  const [adSecondsRemaining, setAdSecondsRemaining] = useState(0);
+  const [adTotalDuration, setAdTotalDuration] = useState(0);
+  const [skipLimitNotice, setSkipLimitNotice] = useState<{ show: boolean; message: string; tier: SubTier } | null>(null);
+  const clearSkipLimitNotice = useCallback(() => setSkipLimitNotice(null), []);
   const tracksPlayedRef = useRef(0);
+  const freeTracksSinceLastAdRef = useRef(0);
+  // Random threshold between 1 and 3 songs before next ad
+  const freeNextAdThresholdRef = useRef(Math.floor(Math.random() * 3) + 1);
   const pendingTrackRef = useRef<{ track: PlayerTrack; playlist?: PlayerTrack[] } | null>(null);
+  const lastAdIndexRef = useRef(-1);
+  const lastAdIdRef = useRef<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const adAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Check user subscription status
+  // Load daily stats on mount
+  useEffect(() => {
+    const s = getDailyStats();
+    setDailyTracksCount(s.tracks);
+    setDailySkipsCount(s.skips);
+  }, []);
+
+  // Check user subscription status + tải quảng cáo ACTIVE từ backend
   useEffect(() => {
     const checkSub = () => {
       fetchMySubscription()
         .then((info) => {
           const isVip = Boolean(info?.isPremium);
           setIsPremiumUser(isVip);
-          if (isVip) {
+          const tier = (info?.tier as SubTier) || "FREE";
+          setSubTier(tier);
+          const ents: PackageEntitlements = info?.entitlements
+            ? { ...info.entitlements }
+            : FREE_ENTITLEMENTS;
+          if (!ents.tier) ents.tier = tier;
+          setEntitlements(ents);
+          if (isVip && ents.adPolicy === "NO_ADS") {
             setIsAdPlaying(false);
-            if (typeof window !== "undefined" && "speechSynthesis" in window) {
-              window.speechSynthesis.cancel();
+            if (adAudioRef.current) {
+              adAudioRef.current.pause();
+              adAudioRef.current.currentTime = 0;
             }
           }
         })
-        .catch(() => setIsPremiumUser(false));
+        .catch(() => {
+          setIsPremiumUser(false);
+          setSubTier("FREE");
+          setEntitlements(FREE_ENTITLEMENTS);
+        });
     };
 
     checkSub();
@@ -120,62 +225,124 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Audio Ad Chime Synthesizer & Vietnamese Voiceover
-  const playAdAudio = useCallback(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const now = ctx.currentTime;
-        const notes = [523.25, 659.25, 783.99, 1046.50];
-        notes.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(freq, now + idx * 0.16);
-          gain.gain.setValueAtTime(0, now + idx * 0.16);
-          gain.gain.linearRampToValueAtTime(0.18, now + idx * 0.16 + 0.03);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.16 + 0.45);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now + idx * 0.16);
-          osc.stop(now + idx * 0.16 + 0.45);
-        });
-      }
-
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(
-          "Bạn đang nghe nhạc trên Moodify. Nâng cấp tài khoản VIP ngay hôm nay để chặn 100% quảng cáo và tải nhạc không giới hạn."
-        );
-        utterance.lang = "vi-VN";
-        utterance.rate = 1.05;
-        utterance.volume = 0.95;
-        window.speechSynthesis.speak(utterance);
-      }
-    } catch (e) {
-      console.warn("Could not play ad chime:", e);
-    }
+  // Lấy danh sách chiến dịch quảng cáo đang hiệu lực do admin cấu hình.
+  // Thất bại hoặc rỗng thì vẫn dùng bộ mix cứng làm dự phòng.
+  useEffect(() => {
+    fetchActiveAdCampaigns()
+      .then((ads) => setActiveAds(Array.isArray(ads) ? ads : []))
+      .catch(() => setActiveAds([]));
   }, []);
 
-  // Ad countdown interval
+  // ── Pre-mixed Ad Audio System ──────────────────────────────────
+  // 8 pre-mixed MP3 files (all prepended with the Moodify brand sonic ident intro)
+  const AD_MIX_COUNT = 8;
+  const AD_SKIP_DELAY = 5; // seconds before skip button is enabled
+
+  // Initialize ad audio element
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    if (isAdPlaying) {
-      timer = setInterval(() => {
-        setAdSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
+    if (typeof window === "undefined") return;
+    const adAudio = new Audio();
+    adAudio.preload = "auto";
+    adAudio.volume = 0.95;
+    adAudioRef.current = adAudio;
+
+    const onAdTimeUpdate = () => {
+      if (adAudio.duration && !isNaN(adAudio.duration)) {
+        const remaining = Math.max(0, Math.ceil(adAudio.duration - adAudio.currentTime));
+        setAdSecondsRemaining(remaining);
+        setAdTotalDuration(Math.ceil(adAudio.duration));
+      }
     };
-  }, [isAdPlaying]);
+
+    const onAdEnded = () => {
+      setIsAdPlaying(false);
+      setAdReason(null);
+      setAdSecondsRemaining(0);
+      const pending = pendingTrackRef.current;
+      pendingTrackRef.current = null;
+      if (pending) {
+        executePlayTrackRef.current(pending.track, pending.playlist);
+      } else if (audioRef.current) {
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      }
+    };
+
+    const onAdError = () => {
+      console.warn("Ad audio failed to play, skipping ad");
+      setIsAdPlaying(false);
+      setAdReason(null);
+      const pending = pendingTrackRef.current;
+      pendingTrackRef.current = null;
+      if (pending) {
+        executePlayTrackRef.current(pending.track, pending.playlist);
+      }
+    };
+
+    adAudio.addEventListener("timeupdate", onAdTimeUpdate);
+    adAudio.addEventListener("ended", onAdEnded);
+    adAudio.addEventListener("error", onAdError);
+
+    return () => {
+      adAudio.pause();
+      adAudio.removeEventListener("timeupdate", onAdTimeUpdate);
+      adAudio.removeEventListener("ended", onAdEnded);
+      adAudio.removeEventListener("error", onAdError);
+      adAudioRef.current = null;
+    };
+  }, []);
+
+  // Play an ad: ưu tiên chiến dịch ACTIVE từ hệ thống quản lý quảng cáo,
+  // fallback về bộ pre-mixed MP3 cứng khi chưa có dữ liệu.
+  const playAdAudio = useCallback(() => {
+    if (typeof window === "undefined" || !adAudioRef.current) return;
+    try {
+      const campaigns = activeAdsRef.current;
+      if (campaigns.length > 0) {
+        // Chọn ngẫu nhiên một chiến dịch (tránh lặp lại ngay lượt trước)
+        let picked: ActiveAd;
+        do {
+          picked = campaigns[Math.floor(Math.random() * campaigns.length)];
+        } while (campaigns.length > 1 && picked.id === lastAdIdRef.current);
+        lastAdIdRef.current = picked.id;
+
+        adAudioRef.current.src = `${getBackendFileUrl(picked.audioUrl)}?t=${Date.now()}`;
+        adAudioRef.current.currentTime = 0;
+        adAudioRef.current.load();
+        adAudioRef.current
+          .play()
+          .then(() => {
+            console.log(`[Ad] Playing campaign "${picked.title}" (${picked.audioUrl})`);
+            void recordAdImpression(picked.id);
+          })
+          .catch((err) => {
+            console.warn("Ad audio autoplay blocked:", err);
+          });
+        return;
+      }
+
+      // Fallback: pre-mixed ad files
+      let idx: number;
+      do {
+        idx = Math.floor(Math.random() * AD_MIX_COUNT) + 1;
+      } while (idx === lastAdIndexRef.current && AD_MIX_COUNT > 1);
+      lastAdIndexRef.current = idx;
+
+      const adUrl = `/ads/ad_mix_${idx}.mp3?t=${Date.now()}`;
+      adAudioRef.current.src = adUrl;
+      adAudioRef.current.currentTime = 0;
+      adAudioRef.current.load();
+      adAudioRef.current
+        .play()
+        .then(() => {
+          console.log(`[Ad] Playing fallback ad_mix_${idx}.mp3`);
+        })
+        .catch((err) => {
+          console.warn("Ad audio autoplay blocked:", err);
+        });
+    } catch (e) {
+      console.warn("Could not play ad audio:", e);
+    }
+  }, []);
 
   // Initialize audio element once in browser
   useEffect(() => {
@@ -279,8 +446,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setDuration(track.durationMs / 1000);
       }
 
-      // 2. Set new stream with cache buster so browser never serves previous song chunks
-      const streamUrl = `${getTrackStreamUrl(track.spotifyId || track.id || "")}?t=${Date.now()}`;
+      // 2. Set new stream: Luôn ưu tiên phát trực tiếp từ máy chủ đám mây trực tuyến trên mạng (Oracle Cloud Music Server)
+      const onlineAudioUrl = resolveTrackAudioUrl(track);
+      const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
       audioRef.current.src = streamUrl;
       audioRef.current.currentTime = 0;
       audioRef.current.playbackRate = playbackRateRef.current;
@@ -296,8 +464,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const triggerAd = useCallback((force = false, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[]) => {
-    if (isPremiumUser && !force) return;
+  // Keep a ref for executePlayTrack so ad audio ended callback can access latest
+  const executePlayTrackRef = useRef(executePlayTrack);
+  useEffect(() => {
+    executePlayTrackRef.current = executePlayTrack;
+  }, [executePlayTrack]);
+
+  const triggerAd = useCallback((force = false, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[], reason: AdReason = "FREE_REGULAR") => {
+    // Gói NO_ADS (Gia Đình / Cá Nhân FULL) không bị chèn quảng cáo
+    if (entitlementsRef.current.adPolicy === "NO_ADS" && !force) return;
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -307,15 +482,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (trackToPlayAfter) {
       pendingTrackRef.current = { track: trackToPlayAfter, playlist: playlistToPlayAfter };
     }
+    setAdReason(reason);
     setIsAdPlaying(true);
-    setAdSecondsRemaining(5);
+    setAdSecondsRemaining(20); // approximate, will be corrected by timeupdate
     playAdAudio();
-  }, [isPremiumUser, playAdAudio]);
+  }, [playAdAudio]);
 
   const skipAd = useCallback(() => {
     setIsAdPlaying(false);
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+    setAdReason(null);
+    // Stop ad audio
+    if (adAudioRef.current) {
+      adAudioRef.current.pause();
+      adAudioRef.current.currentTime = 0;
     }
     const pending = pendingTrackRef.current;
     pendingTrackRef.current = null;
@@ -327,16 +506,50 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [executePlayTrack, currentTrack]);
 
   const playTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
-    if (!isPremiumUser) {
-      tracksPlayedRef.current += 1;
-      // Trigger ad every 3 tracks for free users
-      if (tracksPlayedRef.current % 3 === 0) {
-        triggerAd(false, track, playlist);
+    const todayTracks = recordDailyTrackPlayed();
+    setDailyTracksCount(todayTracks);
+    const ent = entitlementsRef.current;
+
+    // Rule 1: Gói không quảng cáo hoàn toàn (admin cấu hình adPolicy = NO_ADS)
+    if (ent.adPolicy === "NO_ADS") {
+      executePlayTrack(track, playlist);
+      return;
+    }
+
+    // Rule 2: Hạn mức không quảng cáo theo ngày (DAILY_QUOTA — ví dụ Gói Tiết Kiệm)
+    if (ent.adPolicy === "DAILY_QUOTA") {
+      const adFreeLimit = Math.max(0, ent.adFreeDailyLimit);
+      if (todayTracks <= adFreeLimit) {
+        executePlayTrack(track, playlist);
         return;
       }
+      // Sau hạn mức: quảng cáo xuất hiện thưa hơn theo adIntervalAfterLimit
+      const tracksAfter = todayTracks - adFreeLimit;
+      const interval = Math.max(1, ent.adIntervalAfterLimit);
+      if (tracksAfter % interval === 0) {
+        triggerAd(false, track, playlist, "BASIC_DAILY_LIMIT_EXCEEDED");
+        return;
+      }
+      executePlayTrack(track, playlist);
+      return;
     }
+
+    // Rule 3: FULL_ADS — tài khoản FREE (ngẫu nhiên 1..adIntervalAfterLimit bài một quảng cáo)
+    freeTracksSinceLastAdRef.current += 1;
+    console.log(
+      `[Moodify Ad Engine] Gói FREE: Đã phát ${freeTracksSinceLastAdRef.current}/${freeNextAdThresholdRef.current} bài trước quảng cáo tiếp theo.`
+    );
+    if (freeTracksSinceLastAdRef.current >= freeNextAdThresholdRef.current) {
+      freeTracksSinceLastAdRef.current = 0;
+      freeNextAdThresholdRef.current = Math.max(1, ent.adIntervalAfterLimit) > 1
+        ? Math.floor(Math.random() * Math.max(1, ent.adIntervalAfterLimit)) + 1
+        : 1; // Chọn ngưỡng ngẫu nhiên cho chu kỳ sau
+      triggerAd(false, track, playlist, "FREE_REGULAR");
+      return;
+    }
+
     executePlayTrack(track, playlist);
-  }, [isPremiumUser, triggerAd, executePlayTrack]);
+  }, [triggerAd, executePlayTrack]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentTrack) return;
@@ -420,6 +633,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const currentIdx = queueIndexRef.current;
     if (currentQueue.length === 0) return;
 
+    if (!isAutoAdvance) {
+      const ent = entitlementsRef.current;
+      if (ent.skipPolicy === "LIMITED") {
+        const todaySkips = recordDailySkip();
+        setDailySkipsCount(todaySkips);
+        const skipLimit = Math.max(1, ent.skipDailyLimit);
+        if (todaySkips > skipLimit) {
+          setSkipLimitNotice({
+            show: true,
+            tier: subTier,
+            message:
+              subTier === "FREE"
+                ? `Tài khoản Miễn phí chỉ có ${skipLimit} lượt chuyển bài mỗi ngày. Nâng cấp Gói Tiết Kiệm (29K) hoặc Cá Nhân FULL để chuyển bài thoải mái!`
+                : `Bạn đã dùng hết ${skipLimit} lượt chuyển bài hôm nay. Nâng cấp lên Gói Cá Nhân FULL (49K) để chuyển bài không giới hạn!`,
+          });
+          return;
+        }
+      }
+    }
+
     // Single track repeat triggered by natural track end
     if (isAutoAdvance && repeatModeRef.current === "one") {
       if (audioRef.current) {
@@ -477,7 +710,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (nextItem) {
       playTrack(nextItem, currentQueue);
     }
-  }, [playTrack]);
+  }, [playTrack, subTier]);
 
   const prevTrack = useCallback(() => {
     const currentQueue = queueRef.current;
@@ -538,7 +771,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         queueIndex,
         isAdPlaying,
         adSecondsRemaining,
+        adTotalDuration,
         isPremiumUser,
+        subTier,
+        adReason,
+        dailyTracksCount,
+        dailySkipsCount,
+        skipLimitNotice,
+        clearSkipLimitNotice,
         skipAd,
         triggerAd,
         playTrack,
@@ -557,6 +797,49 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      {skipLimitNotice?.show && (
+        <div className="fixed top-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] rounded-2xl p-[1px] bg-gradient-to-b from-white/25 via-white/10 to-transparent shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="rounded-[calc(1rem-1px)] bg-[#0a0b10]/95 p-4 border border-white/5 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="relative w-10 h-10 rounded-xl overflow-hidden ring-1 ring-white/10 shrink-0 bg-neutral-900 shadow-md">
+                <Image
+                  src="/images/ads/moodify_vip_premium_art.jpg"
+                  alt="Moodify VIP"
+                  fill
+                  sizes="40px"
+                  className="object-cover"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-amber-400/90 mb-0.5">
+                  HẠN MỨC CHUYỂN BÀI
+                </div>
+                <p className="text-xs text-white/75 font-light leading-relaxed">
+                  {skipLimitNotice.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => setSkipLimitNotice(null)}
+                className="text-xs text-white/40 hover:text-white/80 transition-colors cursor-pointer px-2 py-1"
+              >
+                Đã hiểu
+              </button>
+              <a
+                href="/dashboard/premium"
+                onClick={() => setSkipLimitNotice(null)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-neutral-950 text-xs font-medium hover:bg-neutral-200 active:scale-[0.98] transition-all shadow-sm"
+              >
+                <span>Nâng cấp VIP</span>
+                <span className="text-[10px]">→</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </PlayerContext.Provider>
   );
 }

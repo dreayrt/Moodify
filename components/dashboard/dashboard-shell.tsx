@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, Suspense } from "react";
+import { useEffect, useMemo, useState, useRef, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   Crown,
   Bell,
   Mail,
+  Shield,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -29,6 +30,9 @@ import {
 import {
   fetchUserPlaylists,
   fetchMySubscription,
+  fetchMyNotifications,
+  markAllNotificationsRead,
+  type MoodifyNotification,
   type Playlist,
   type SubscriptionInfo,
 } from "@/lib/api-client";
@@ -502,6 +506,57 @@ function MascotAccountTrigger({
             <span>{subInfo?.isPremium ? "Quản lý gói VIP" : "Gói Moodify VIP"}</span>
           </Link>
 
+          {/* Admin Console Quick Link */}
+          {user?.role === "ADMIN" && (
+            <Link
+              href="/dashboard/admin"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 transition-all group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Shield className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>Bảng Quản Trị Hệ Thống</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-200">
+                ADMIN
+              </span>
+            </Link>
+          )}
+
+          {/* Content Lead Studio Quick Link */}
+          {(user?.role === "CONTENT_LEAD" || user?.role === "ARTIST") && (
+            <Link
+              href="/dashboard/content-lead"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 transition-all group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Music className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span>Content Lead Studio</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-400/25 text-emerald-200">
+                STUDIO
+              </span>
+            </Link>
+          )}
+
+          {/* Moderator Console Quick Link */}
+          {user?.role === "MODERATOR" && (
+            <Link
+              href="/dashboard/moderator"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/25 transition-all group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Shield className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                <span>Kênh Kiểm Duyệt</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-400/25 text-sky-200">
+                MOD
+              </span>
+            </Link>
+          )}
+
           {/* Logout */}
           <div className="pt-1 border-t border-white/10 mt-1">
             <button
@@ -520,8 +575,26 @@ function MascotAccountTrigger({
 
 function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [hasUnread, setHasUnread] = useState(true);
+  const [items, setItems] = useState<MoodifyNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const loadNotifications = useCallback(async () => {
+    setIsLoading(true);
+    const data = await fetchMyNotifications();
+    setItems(data.items);
+    setUnreadCount(data.unreadCount);
+    setIsLoading(false);
+  }, []);
+
+  // Tải thông báo khi mount + lắng nghe sự kiện cập nhật (admin gửi mới, đổi gói...)
+  useEffect(() => {
+    void loadNotifications();
+    const onUpdated = () => void loadNotifications();
+    window.addEventListener("moodify-notifications-updated", onUpdated);
+    return () => window.removeEventListener("moodify-notifications-updated", onUpdated);
+  }, [loadNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -533,48 +606,68 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const notifications = [
-    {
-      id: 1,
-      title: "Chào mừng đến với Moodify 🎵",
-      desc: "Trải nghiệm 147 bài hát Việt Nam đặc sắc với chất lượng phòng thu Studio.",
-      time: "Vừa xong",
-    },
-    {
-      id: 2,
-      title: "Gợi ý thịnh hành hôm nay",
-      desc: "V-Pop và Indie đang có nhiều bản phối mới được thêm vào danh mục.",
-      time: "2 giờ trước",
-    },
-    {
-      id: 3,
-      title: "Đặc quyền giao diện VIP",
-      desc: "Tùy biến theme cho Sidebar & Thanh phát nhạc ngay trong phần Cài đặt.",
-      time: "1 ngày trước",
-    },
-  ];
+  const handleOpenBell = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && unreadCount > 0) {
+      // Đánh dấu đã đọc toàn bộ khi mở chuông
+      setUnreadCount(0);
+      void markAllNotificationsRead().then(() => {
+        window.dispatchEvent(new Event("moodify-notifications-updated"));
+      });
+    }
+  };
+
+  const formatTime = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const diffMs = Date.now() - d.getTime();
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return "Vừa xong";
+    if (minutes < 60) return `${minutes} phút trước`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} giờ trước`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} ngày trước`;
+    return d.toLocaleDateString("vi-VN");
+  };
+
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case "PROMO": return "Khuyến mãi";
+      case "BILLING": return "Thanh toán";
+      case "MODERATION": return "Kiểm duyệt";
+      case "ANNOUNCEMENT": return "Thông báo";
+      default: return "Hệ thống";
+    }
+  };
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => {
-          setOpen(!open);
-          if (!open) setHasUnread(false);
-        }}
+        onClick={handleOpenBell}
         className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.08] transition-all relative cursor-pointer active:scale-95"
         title="Thông báo"
         aria-label="Thông báo"
       >
         <Bell className="w-[18px] h-[18px]" strokeWidth={1.8} />
-        {hasUnread && (
-          <span
-            className={`absolute top-2 right-2 w-2 h-2 rounded-full transition-all duration-300 animate-pulse ${
-              isPremium
-                ? "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.95)]"
-                : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)]"
-            }`}
-          />
+        {unreadCount > 0 && (
+          <>
+            <span
+              className={`absolute top-2 right-2 w-2 h-2 rounded-full transition-all duration-300 animate-pulse ${
+                isPremium
+                  ? "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.95)]"
+                  : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)]"
+              }`}
+            />
+            {unreadCount > 1 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#ff5500] text-white text-[9px] font-bold flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </>
         )}
       </button>
 
@@ -584,27 +677,49 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
             <span className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
               <Bell className={`w-3.5 h-3.5 ${isPremium ? "text-amber-400" : "text-emerald-400"}`} /> Thông báo
             </span>
-            <span className="text-[10px] text-white/40">3 thông báo mới</span>
+            <span className="text-[10px] text-white/40">
+              {isLoading ? "Đang tải..." : unreadCount > 0 ? `${unreadCount} thông báo mới` : "Không có thông báo mới"}
+            </span>
           </div>
 
-          <div className="space-y-1.5 max-h-72 overflow-y-auto moodify-scroll pr-1">
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer group"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-white group-hover:text-purple-300 transition-colors truncate">
-                    {n.title}
-                  </p>
-                  <span className="text-[10px] font-mono text-white/40 shrink-0">{n.time}</span>
-                </div>
-                <p className="text-[11px] text-white/60 mt-1 leading-relaxed line-clamp-2">
-                  {n.desc}
-                </p>
-              </div>
-            ))}
-          </div>
+          {items.length === 0 ? (
+            <div className="py-8 text-center">
+              <Bell className="w-6 h-6 mx-auto text-white/20 mb-2" />
+              <p className="text-[11px] text-white/40">Chưa có thông báo nào.</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-72 overflow-y-auto moodify-scroll pr-1">
+              {items.map((n) => {
+                const content = (
+                  <div
+                    className={`p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      n.readAt ? "bg-white/[0.03] hover:bg-white/[0.06]" : "bg-purple-500/[0.08] hover:bg-purple-500/[0.14]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-xs font-semibold text-white group-hover:text-purple-300 transition-colors truncate ${n.readAt ? "" : ""}`}>
+                        {n.title}
+                      </p>
+                      <span className="text-[10px] font-mono text-white/40 shrink-0">{formatTime(n.createdAt)}</span>
+                    </div>
+                    <p className="text-[11px] text-white/60 mt-1 leading-relaxed line-clamp-2">
+                      {n.message}
+                    </p>
+                    <span className="inline-block mt-1.5 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40">
+                      {typeLabel(n.type)}
+                    </span>
+                  </div>
+                );
+                return n.linkUrl ? (
+                  <Link key={n.id} href={n.linkUrl} onClick={() => setOpen(false)}>
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={n.id}>{content}</div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1073,6 +1188,58 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </div>
+
+            {/* Management Consoles (for ADMIN / CONTENT_LEAD / MODERATOR) */}
+            {user?.role === "ADMIN" && (
+              <div className="pt-2 border-t border-white/[0.08]">
+                <Link
+                  href="/dashboard/admin"
+                  className="w-full group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/35 transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Shield className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                    <span>Quản Trị Admin</span>
+                  </div>
+                  <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-200">
+                    CONSOLE
+                  </span>
+                </Link>
+              </div>
+            )}
+
+            {(user?.role === "CONTENT_LEAD" || user?.role === "ARTIST") && (
+              <div className="pt-2 border-t border-white/[0.08]">
+                <Link
+                  href="/dashboard/content-lead"
+                  className="w-full group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/35 transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Music className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span>Content Lead Studio</span>
+                  </div>
+                  <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-400/20 text-emerald-200">
+                    STUDIO
+                  </span>
+                </Link>
+              </div>
+            )}
+
+            {user?.role === "MODERATOR" && (
+              <div className="pt-2 border-t border-white/[0.08]">
+                <Link
+                  href="/dashboard/moderator"
+                  className="w-full group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/35 transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Shield className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                    <span>Kênh Kiểm Duyệt</span>
+                  </div>
+                  <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-400/20 text-sky-200">
+                    MOD
+                  </span>
+                </Link>
+              </div>
+            )}
 
             {/* Danh sách phát (Playlists) Section */}
             <div className="pt-3 border-t border-white/[0.08]">

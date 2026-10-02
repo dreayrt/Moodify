@@ -54,6 +54,7 @@ type Track = {
   duration: string;
   cover: string;
   spotifyId?: string;
+  audioUrl?: string | null;
   localPath?: string | null;
   lyricsSynced?: string | null;
   lyricsPlain?: string | null;
@@ -280,7 +281,7 @@ function TrackRow({
 
         {/* Duration & Status */}
         <div className="flex items-center gap-2 text-right justify-end">
-          {!track.raw?.localPath && (
+          {!track.raw?.audioUrl && !track.raw?.localPath && (
             <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-mono font-medium text-amber-300/90 bg-amber-400/10 border border-amber-400/25">
               Sắp ra mắt
             </span>
@@ -507,8 +508,8 @@ function LumenHeroContent() {
   // Map API track → UI Track; sorts playable tracks with audio first
   const mapApiTracks = (items: ApiTrack[]): Track[] => {
     const sorted = [...items].sort((a, b) => {
-      const aHas = Boolean(a.localPath);
-      const bHas = Boolean(b.localPath);
+      const aHas = Boolean(a.audioUrl || a.localPath);
+      const bHas = Boolean(b.audioUrl || b.localPath);
       if (aHas && !bHas) return -1;
       if (!aHas && bHas) return 1;
       return 0;
@@ -519,6 +520,8 @@ function LumenHeroContent() {
       artist: t.artistName,
       duration: formatDuration(t.durationMs),
       spotifyId: t.spotifyId,
+      audioUrl: t.audioUrl,
+      localPath: t.localPath,
       raw: t,
       cover: t.imageUrl
         ? `url(${t.imageUrl}) center/cover no-repeat`
@@ -620,7 +623,7 @@ function LumenHeroContent() {
   }, []);
 
   const handlePlayTrack = (t: Track, index?: number) => {
-    if (!t.raw?.localPath) {
+    if (!t.raw?.audioUrl && !t.raw?.localPath) {
       alert(`Bài hát "${t.title}" hiện chưa có bản thu âm sẵn trên hệ thống. Vui lòng chọn bài hát có sẵn audio.`);
       return;
     }
@@ -639,9 +642,11 @@ function LumenHeroContent() {
           durationMs: t.raw.durationMs,
           lyricsPlain: t.raw.lyricsPlain,
           lyricsSynced: t.raw.lyricsSynced,
+          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `http://158.178.247.33/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
+          localPath: t.raw.localPath,
         },
         tracks
-          .filter((x) => x.raw && x.raw.localPath)
+          .filter((x) => x.raw && (x.raw.audioUrl || x.raw.localPath))
           .map((x) => ({
             spotifyId: x.raw!.spotifyId,
             name: x.raw!.name,
@@ -651,6 +656,8 @@ function LumenHeroContent() {
             durationMs: x.raw!.durationMs,
             lyricsPlain: x.raw!.lyricsPlain,
             lyricsSynced: x.raw!.lyricsSynced,
+            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `http://158.178.247.33/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
+            localPath: x.raw!.localPath,
           }))
       );
     }
@@ -773,9 +780,9 @@ function LumenHeroContent() {
                         togglePlay();
                       } else {
                         const target =
-                          activeSelectedTrack?.raw?.localPath
+                          (activeSelectedTrack?.raw?.audioUrl || activeSelectedTrack?.raw?.localPath)
                             ? activeSelectedTrack
-                            : tracks.find((t) => t.raw?.localPath) || activeSelectedTrack || tracks[0];
+                            : tracks.find((t) => t.raw?.audioUrl || t.raw?.localPath) || activeSelectedTrack || tracks[0];
                         if (target) handlePlayTrack(target);
                       }
                     }}
@@ -830,7 +837,7 @@ function LumenHeroContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      const playableTracks = tracks.filter((t) => t.raw?.localPath);
+                      const playableTracks = tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath);
                       if (playableTracks.length > 0) {
                         const randomIndex = Math.floor(Math.random() * playableTracks.length);
                         handlePlayTrack(playableTracks[randomIndex]);

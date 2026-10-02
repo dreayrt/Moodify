@@ -615,8 +615,8 @@ export function SystemSettingsTab({
                   <Megaphone className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-graphik text-base font-bold text-white">Thông Báo Toàn Sàn (Global Banner)</h3>
-                  <p className="text-[11px] text-zinc-400 font-mono">Hiển thị thông điệp sự kiện hoặc thông báo trực tiếp cho toàn bộ người nghe</p>
+                  <h3 className="font-graphik text-base font-bold text-white">Banner Toàn Sàn (Global Banner)</h3>
+                  <p className="text-[11px] text-zinc-400 font-mono">Dải thông điệp hiển thị trên đầu website. Muốn gửi thông báo tới hộp thư từng người dùng, dùng tab "Thông Báo" ở menu bên</p>
                 </div>
               </div>
 

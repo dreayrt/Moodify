@@ -23,6 +23,7 @@ export type Track = {
   lyricsPlain?: string | null;
   lyricsSynced?: string | null;
   localPath?: string | null;
+  audioUrl?: string | null;
 };
 
 export type TrackPageResponse = {
@@ -129,10 +130,48 @@ export async function fetchTrackById(id: string): Promise<Track> {
 }
 
 /**
+ * Máy chủ âm nhạc trực tuyến (Oracle Music Cloud Server) lưu trữ toàn bộ kho nhạc MP3
+ */
+export const ONLINE_AUDIO_SERVER_URL =
+  process.env.NEXT_PUBLIC_AUDIO_SERVER_URL?.replace(/\/+$/, "") || "http://158.178.247.33";
+
+/**
+ * Trả về trực tiếp URL phát nhạc từ máy chủ đám mây trực tuyến trên mạng (Public IP Oracle)
+ * thay vì phụ thuộc vào tệp cục bộ trên máy.
+ */
+export function resolveTrackAudioUrl(track: {
+  audioUrl?: string | null;
+  localPath?: string | null;
+  spotifyId?: string;
+  id?: string;
+}): string {
+  if (track.audioUrl && (track.audioUrl.startsWith("http://") || track.audioUrl.startsWith("https://"))) {
+    return track.audioUrl;
+  }
+  if (track.localPath && !track.localPath.startsWith("http")) {
+    const clean = track.localPath.replace(/^\/+/, "");
+    return `${ONLINE_AUDIO_SERVER_URL}/${clean}`;
+  }
+  if (track.localPath && (track.localPath.startsWith("http://") || track.localPath.startsWith("https://"))) {
+    return track.localPath;
+  }
+  return getTrackStreamUrl(track.spotifyId || track.id || "");
+}
+
+/**
  * Get streaming audio URL for a track
  */
 export function getTrackStreamUrl(trackIdOrSpotifyId: string): string {
   return `${API_BASE}/tracks/${trackIdOrSpotifyId}/stream`;
+}
+
+/**
+ * Resolve đường dẫn tĩnh trên backend (vd: /uploads/ads/xxx.mp3) thành URL đầy đủ.
+ */
+export function getBackendFileUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = API_BASE.endsWith("/api") ? API_BASE.slice(0, -4) : rawBase;
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 /**
@@ -487,13 +526,139 @@ export interface ServicePackage {
 
 export interface SubscriptionInfo {
   isPremium: boolean;
-  tier: "INDIVIDUAL" | "FAMILY" | "FREE";
+  tier: "INDIVIDUAL" | "INDIVIDUAL_BASIC" | "INDIVIDUAL_FULL" | "FAMILY" | "FREE";
   packageName: string;
   price?: number;
   daysRemaining: number;
   startAt?: string;
   expiresAt?: string;
   benefits: string[];
+  entitlements?: PackageEntitlements;
+}
+
+// Quyền hạn theo gói (đồng bộ với PackageEntitlements ở admin types
+// và features_json phía backend). Quyết định hạn mức quảng cáo/skip/offline thật.
+export interface PackageEntitlements {
+  tier?: "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE";
+  adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
+  adFreeDailyLimit: number;
+  adIntervalAfterLimit: number;
+  skipPolicy: "UNLIMITED" | "LIMITED";
+  skipDailyLimit: number;
+  audioQuality?: "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC";
+  offlineAllowed: boolean;
+  offlineMaxTracks: number;
+  maxDevices: number;
+  syncedLyrics?: boolean;
+  vipBadge?: boolean;
+  customThemes?: boolean;
+  familySharing?: boolean;
+  familyMembers?: number;
+}
+
+export const FREE_ENTITLEMENTS: PackageEntitlements = {
+  tier: "FREE",
+  adPolicy: "FULL_ADS",
+  adFreeDailyLimit: 0,
+  adIntervalAfterLimit: 2,
+  skipPolicy: "LIMITED",
+  skipDailyLimit: 6,
+  audioQuality: "STANDARD_128",
+  offlineAllowed: false,
+  offlineMaxTracks: 0,
+  maxDevices: 1,
+  syncedLyrics: false,
+  vipBadge: false,
+  customThemes: false,
+  familySharing: false,
+};
+
+// ============================================================================
+// Thông báo (notification) — hộp thư người dùng
+// ============================================================================
+
+export type MoodifyNotification = {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  linkUrl: string | null;
+  readAt: string | null;
+  createdAt: string | null;
+};
+
+export async function fetchMyNotifications(): Promise<{
+  items: MoodifyNotification[];
+  unreadCount: number;
+}> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) return { items: [], unreadCount: 0 };
+
+  try {
+    const res = await fetch(`${API_BASE}/notifications/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { items: [], unreadCount: 0 };
+    return res.json();
+  } catch {
+    return { items: [], unreadCount: 0 };
+  }
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE}/notifications/${id}/read`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE}/notifications/read-all`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+// ============================================================================
+// Quảng cáo public — player lấy danh sách chiến dịch đang hiệu lực
+// ============================================================================
+
+export type ActiveAd = {
+  id: string;
+  title: string;
+  advertiser: string | null;
+  audioUrl: string;
+  durationSeconds: number | null;
+};
+
+export async function fetchActiveAdCampaigns(): Promise<ActiveAd[]> {
+  try {
+    const res = await fetch(`${API_BASE}/ads/active`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function recordAdImpression(adId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/ads/${adId}/impression`, { method: "POST" });
+  } catch {
+    // impression là best-effort, không chặn phát quảng cáo
+  }
 }
 
 export async function fetchServicePackages(): Promise<ServicePackage[]> {
@@ -540,8 +705,9 @@ export async function subscribePackage(
 
 export async function devTogglePremium(
   enable: boolean,
-  days: number = 30
-): Promise<{ success: boolean; message: string; isPremium: boolean }> {
+  days: number = 30,
+  packageId?: number
+): Promise<{ success: boolean; message: string; isPremium: boolean; tier?: string }> {
   const token = await getValidAccessToken();
   const res = await fetch(`${API_BASE}/subscriptions/dev-toggle`, {
     method: "POST",
@@ -549,7 +715,7 @@ export async function devTogglePremium(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ enable, days }),
+    body: JSON.stringify({ enable, days, packageId }),
   });
   if (!res.ok) throw new Error("Chuyển trạng thái thất bại");
   return res.json();

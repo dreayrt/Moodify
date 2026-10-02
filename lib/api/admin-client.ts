@@ -1,11 +1,15 @@
 import { getValidAccessToken } from "../auth/auth-client";
 import {
   AdminUser,
+  AdCampaign,
+  AdCampaignPayload,
+  AdCategory,
   CatalogTrack,
   DistributionContract,
   Distributor,
   FavoriteLeaderboardItem,
   FavoriteRecord,
+  NotificationBroadcast,
   PaymentTransaction,
   ReviewRequest,
   ServicePackage,
@@ -390,5 +394,147 @@ export async function deleteAdminFavorite(
     {
       method: "DELETE",
     }
+  );
+}
+
+// 9. Notifications (Gửi thông báo tới người dùng)
+export async function broadcastAdminNotification(data: {
+  title: string;
+  message: string;
+  type?: string;
+  targetRole?: string;
+  linkUrl?: string;
+}): Promise<{ success: boolean; message: string; recipients: number }> {
+  return adminRequest<{ success: boolean; message: string; recipients: number }>(
+    "/api/admin/notifications/broadcast",
+    { method: "POST", body: data }
+  );
+}
+
+export async function fetchAdminNotificationHistory(): Promise<NotificationBroadcast[]> {
+  return adminRequest<NotificationBroadcast[]>("/api/admin/notifications");
+}
+
+// 10. Audit logs (Nhật ký hành chính từ backend)
+export type AdminAuditLogResponse = {
+  id: string;
+  operatorName: string;
+  operatorRole: string;
+  targetEntity: string | null;
+  targetId: string | null;
+  action: string;
+  details: string | null;
+  createdAt: string | null;
+};
+
+export async function fetchAdminAuditLogs(): Promise<AdminAuditLogResponse[]> {
+  return adminRequest<AdminAuditLogResponse[]>("/api/admin/audit-logs");
+}
+
+// 11. Ad Management (Quản lý quảng cáo & danh mục)
+export async function fetchAdminAds(params?: {
+  status?: string;
+  categoryId?: string;
+}): Promise<AdCampaign[]> {
+  const q = new URLSearchParams();
+  if (params?.status && params.status !== "ALL") q.set("status", params.status);
+  if (params?.categoryId && params.categoryId !== "ALL") q.set("categoryId", params.categoryId);
+  const qs = q.toString();
+  return adminRequest<AdCampaign[]>(`/api/admin/ads${qs ? `?${qs}` : ""}`);
+}
+
+export async function createAdminAd(
+  data: AdCampaignPayload
+): Promise<{ success: boolean; id: string }> {
+  return adminRequest<{ success: boolean; id: string }>("/api/admin/ads", {
+    method: "POST",
+    body: data,
+  });
+}
+
+export async function updateAdminAd(
+  id: string,
+  data: Partial<AdCampaignPayload>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(`/api/admin/ads/${id}`, {
+    method: "PUT",
+    body: data,
+  });
+}
+
+export async function toggleAdminAdStatus(
+  id: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/ads/${id}/status`,
+    { method: "PATCH" }
+  );
+}
+
+export async function deleteAdminAd(
+  id: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(`/api/admin/ads/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function uploadAdminAdAudio(
+  file: File
+): Promise<{ success: boolean; url: string }> {
+  const token = await getValidAccessToken();
+  if (!token) {
+    throw new Error("Phiên đăng nhập quản trị viên đã hết hạn.");
+  }
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/api/admin/ads/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    let errorMsg = `Tải tệp thất bại với mã ${response.status}`;
+    try {
+      const errPayload = await response.json();
+      errorMsg = errPayload.message || errPayload.error || errorMsg;
+    } catch {
+      // fallback
+    }
+    throw new Error(errorMsg);
+  }
+  return (await response.json()) as { success: boolean; url: string };
+}
+
+export async function fetchAdminAdCategories(): Promise<AdCategory[]> {
+  return adminRequest<AdCategory[]>("/api/admin/ads/categories");
+}
+
+export async function createAdminAdCategory(data: {
+  name: string;
+  description?: string;
+}): Promise<{ success: boolean; id: string; message: string }> {
+  return adminRequest<{ success: boolean; id: string; message: string }>(
+    "/api/admin/ads/categories",
+    { method: "POST", body: data }
+  );
+}
+
+export async function updateAdminAdCategory(
+  id: string,
+  data: { name?: string; description?: string; status?: "ACTIVE" | "INACTIVE" }
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/ads/categories/${id}`,
+    { method: "PUT", body: data }
+  );
+}
+
+export async function deleteAdminAdCategory(
+  id: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/ads/categories/${id}`,
+    { method: "DELETE" }
   );
 }
