@@ -16,7 +16,7 @@ export function resolveMediaUrl(url?: string): string {
   const apiBase =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.NEXT_PUBLIC_API_BASE_URL ||
-    "http://localhost:8080";
+    "http://localhost:8088";
   return `${apiBase.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 

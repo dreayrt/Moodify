@@ -29,6 +29,7 @@ import {
 import { AdminUser, AdminUserRole, AdminUserStatus, UserDevice } from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
+import { fetchAdminUserDevices } from "@/lib/api/admin-client";
 
 type UsersManagementTabProps = {
   users: AdminUser[];
@@ -229,9 +230,38 @@ export function UsersManagementTab({
     setIsEditProfileMode(false);
   };
 
-  const userDevices = selectedUserForDevices
-    ? devices.filter((d) => d.userId === selectedUserForDevices.id)
-    : [];
+  const [activeUserDevices, setActiveUserDevices] = useState<UserDevice[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  useEffect(() => {
+    if (!selectedUserForDevices) {
+      setActiveUserDevices([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingDevices(true);
+    fetchAdminUserDevices(selectedUserForDevices.id)
+      .then((data) => {
+        if (!cancelled) setActiveUserDevices(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load user devices:", err);
+        if (!cancelled) setActiveUserDevices([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDevices(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUserForDevices]);
+
+  const handleRevokeDevice = (deviceId: number) => {
+    onRevokeDevice(deviceId);
+    setActiveUserDevices((prev) =>
+      prev.map((d) => (d.id === deviceId ? { ...d, status: "REVOKED" } : d))
+    );
+  };
 
   return (
     <div className="space-y-6 anim-fade-in">
@@ -928,12 +958,17 @@ export function UsersManagementTab({
             </p>
 
             <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-              {userDevices.length === 0 ? (
+              {isLoadingDevices ? (
+                <div className="flex items-center justify-center py-8 gap-2 text-white/50 text-xs font-mono">
+                  <RefreshCw className="h-4 w-4 animate-spin text-[#ff5500]" />
+                  <span>Đang tải danh sách thiết bị từ cơ sở dữ liệu...</span>
+                </div>
+              ) : activeUserDevices.length === 0 ? (
                 <p className="text-center py-6 text-white/30 text-[12px] font-mono">
-                  Chưa có thiết bị nào được đăng ký offline.
+                  Chưa có thiết bị nào được đăng ký offline trong cơ sở dữ liệu.
                 </p>
               ) : (
-                userDevices.map((dev) => (
+                activeUserDevices.map((dev) => (
                   <div
                     key={dev.id}
                     className="flex items-center justify-between p-3 rounded-[14px] border border-white/8 bg-black/40 text-[12px]"
@@ -946,8 +981,8 @@ export function UsersManagementTab({
                     {dev.status === "ACTIVE" ? (
                       <button
                         type="button"
-                        onClick={() => onRevokeDevice(dev.id)}
-                        className="font-mono text-[10px] font-semibold text-rose-300 bg-rose-500/15 border border-rose-500/20 px-2.5 py-1 rounded-full hover:bg-rose-500/25"
+                        onClick={() => handleRevokeDevice(dev.id)}
+                        className="font-mono text-[10px] font-semibold text-rose-300 bg-rose-500/15 border border-rose-500/20 px-2.5 py-1 rounded-full hover:bg-rose-500/25 transition cursor-pointer"
                       >
                         Thu hồi
                       </button>

@@ -53,6 +53,8 @@ import {
   refundAdminTransaction,
   takedownAdminTrack,
   restoreAdminTrack,
+  updateAdminTrackGenre,
+  deleteAdminTrack,
   updateAdminPackagePrice,
   updateAdminUserRole,
   updateAdminUserStatus,
@@ -66,22 +68,18 @@ import {
   updateAdminUserProfile,
   revokeAdminDevice,
   fetchAdminModerationQueue,
+  fetchAdminReviewActions,
   submitAdminReviewDecision,
   fetchAdminLicensing,
+  createAdminDistributor,
+  updateAdminDistributor,
+  toggleAdminDistributorStatus,
+  createAdminContract,
+  updateAdminContract,
+  updateAdminContractStatus,
+  fetchAdminSystemConfig,
+  saveAdminSystemConfig,
 } from "@/lib/api/admin-client";
-
-import {
-  INITIAL_CONTRACTS,
-  INITIAL_DEVICES,
-  INITIAL_DISTRIBUTORS,
-  INITIAL_LICENSES,
-  INITIAL_PACKAGES,
-  INITIAL_REVIEWS,
-  INITIAL_REVIEW_ACTIONS,
-  INITIAL_TRACKS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_USERS,
-} from "../mock-data";
 import {
   AdminTab,
   AdminToast,
@@ -129,17 +127,18 @@ export default function AdminDashboardPage() {
   // Active Core Tab
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
-  // Domain States (Initialized with seed fallback, updated dynamically from DB)
-  const [users, setUsers] = useState<AdminUser[]>(INITIAL_USERS);
-  const [devices, setDevices] = useState<UserDevice[]>(INITIAL_DEVICES);
-  const [tracks, setTracks] = useState<CatalogTrack[]>(INITIAL_TRACKS);
-  const [packages, setPackages] = useState<ServicePackage[]>(INITIAL_PACKAGES);
-  const [transactions, setTransactions] = useState<PaymentTransaction[]>(INITIAL_TRANSACTIONS);
-  const [reviews, setReviews] = useState<ReviewRequest[]>(INITIAL_REVIEWS);
-  const [reviewActions, setReviewActions] = useState<ReviewAction[]>(INITIAL_REVIEW_ACTIONS);
-  const [distributors, setDistributors] = useState<Distributor[]>(INITIAL_DISTRIBUTORS);
-  const [contracts, setContracts] = useState<DistributionContract[]>(INITIAL_CONTRACTS);
-  const [licenses, setLicenses] = useState<SongLicense[]>(INITIAL_LICENSES);
+  // Domain States (100% Real Database, khởi tạo mảng rỗng thay vì mock data)
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [devices, setDevices] = useState<UserDevice[]>([]);
+  const [tracks, setTracks] = useState<CatalogTrack[]>([]);
+  const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
+  const [reviews, setReviews] = useState<ReviewRequest[]>([]);
+  const [reviewActions, setReviewActions] = useState<ReviewAction[]>([]);
+  const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [contracts, setContracts] = useState<DistributionContract[]>([]);
+  const [licenses, setLicenses] = useState<SongLicense[]>([]);
+  const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null);
   // Nhật ký hành chính: bản ghi thật từ backend + bản ghi của phiên làm việc hiện tại
   const [backendAuditLogs, setBackendAuditLogs] = useState<SystemAuditLog[]>([]);
   const [sessionAuditLogs, setSessionAuditLogs] = useState<SystemAuditLog[]>([]);
@@ -239,15 +238,28 @@ export default function AdminDashboardPage() {
     setIsLoadingData(true);
     setDbStatus("connecting");
     try {
-      const [usersRes, catalogRes, packagesRes, transactionsRes, moderationRes, licensingRes, overviewRes, auditRes] = await Promise.allSettled([
+      const [
+        usersRes,
+        catalogRes,
+        packagesRes,
+        transactionsRes,
+        moderationRes,
+        actionsRes,
+        licensingRes,
+        overviewRes,
+        auditRes,
+        configRes,
+      ] = await Promise.allSettled([
         fetchAdminUsers(),
         fetchAdminCatalog(),
         fetchAdminPackages(),
         fetchAdminTransactions(),
         fetchAdminModerationQueue(),
+        fetchAdminReviewActions(),
         fetchAdminLicensing(),
         fetchAdminOverview(),
         fetchAdminAuditLogs(),
+        fetchAdminSystemConfig<SystemConfig>(),
       ]);
 
       let successCount = 0;
@@ -271,6 +283,13 @@ export default function AdminDashboardPage() {
       if (moderationRes.status === "fulfilled" && Array.isArray(moderationRes.value)) {
         setReviews(moderationRes.value);
         successCount++;
+      }
+      if (actionsRes.status === "fulfilled" && Array.isArray(actionsRes.value)) {
+        setReviewActions(actionsRes.value);
+        successCount++;
+      }
+      if (configRes.status === "fulfilled" && configRes.value && Object.keys(configRes.value).length > 0) {
+        setSystemConfig(configRes.value);
       }
       if (overviewRes.status === "fulfilled" && overviewRes.value) {
         setOverviewData(overviewRes.value);
@@ -524,20 +543,32 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleDeleteTrack = (trackId: string) => {
+  const handleDeleteTrack = async (trackId: string) => {
     const target = tracks.find((t) => t.id === trackId);
-    setTracks((prev) => prev.filter((t) => t.id !== trackId));
-    recordAudit("DELETE_TRACK", target?.title || trackId, "Xóa vĩnh viễn bài hát khỏi danh mục hệ thống", "CATALOG", "critical");
-    addToast(`Đã xóa bài hát "${target?.title || trackId}" khỏi hệ thống thành công.`, "warning");
+    try {
+      await deleteAdminTrack(trackId);
+      setTracks((prev) => prev.filter((t) => t.id !== trackId));
+      recordAudit("DELETE_TRACK", target?.title || trackId, "Xóa vĩnh viễn bài hát khỏi danh mục hệ thống và MongoDB", "CATALOG", "critical");
+      addToast(`Đã xóa vĩnh viễn bài hát "${target?.title || trackId}" khỏi hệ thống thành công.`, "warning");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi xóa bài hát";
+      addToast(msg, "error");
+    }
   };
 
-  const handleChangeTrackGenre = (trackId: string, newGenre: string) => {
+  const handleChangeTrackGenre = async (trackId: string, newGenre: string) => {
     const target = tracks.find((t) => t.id === trackId);
-    setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, genre: newGenre } : t))
-    );
-    recordAudit("UPDATE_TRACK_GENRE", target?.title || trackId, `Cập nhật thể loại bài hát thành ${newGenre}`, "CATALOG", "info");
-    addToast(`Đã cập nhật thể loại bài hát "${target?.title || trackId}" thành "${newGenre}".`, "success");
+    try {
+      await updateAdminTrackGenre(trackId, newGenre);
+      setTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, genre: newGenre } : t))
+      );
+      recordAudit("UPDATE_TRACK_GENRE", target?.title || trackId, `Cập nhật thể loại bài hát thành ${newGenre} trong MongoDB`, "CATALOG", "info");
+      addToast(`Đã cập nhật thể loại bài hát "${target?.title || trackId}" thành "${newGenre}".`, "success");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi đổi thể loại";
+      addToast(msg, "error");
+    }
   };
 
   const handleTogglePackageStatus = async (packageId: number) => {
@@ -729,20 +760,77 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 4. System Settings Actions
-  const handleSaveSettings = (settings: SystemConfig) => {
-    recordAudit(
-      "UPDATE_SYSTEM_CONFIG",
-      "Cấu hình Hệ thống Moodify",
-      `Bảo trì: ${settings.maintenanceMode ? "BẬT" : "TẮT"}, Đăng ký: ${
-        settings.allowRegistration ? "MỞ" : "ĐÓNG"
-      }, Kiểm duyệt: ${
-        settings.moderationMode === "PRE_MODERATION" ? "Tiền kiểm" : "Hậu kiểm"
-      }, Banner: ${settings.announcementEnabled ? "BẬT" : "TẮT"}`,
-      "SYSTEM",
-      "info"
-    );
-    addToast("Đã lưu và áp dụng toàn bộ cấu hình hệ thống thành công.", "success");
+  // 4. System Settings & Licensing Real Actions
+  const handleSaveSettings = async (settings: SystemConfig) => {
+    try {
+      await saveAdminSystemConfig(settings as unknown as Record<string, unknown>);
+      setSystemConfig(settings);
+      recordAudit(
+        "UPDATE_SYSTEM_CONFIG",
+        "Cấu hình Hệ thống Moodify",
+        `Bảo trì: ${settings.maintenanceMode ? "BẬT" : "TẮT"}, Đăng ký: ${
+          settings.allowRegistration ? "MỞ" : "ĐÓNG"
+        }, Kiểm duyệt: ${
+          settings.moderationMode === "PRE_MODERATION" ? "Tiền kiểm" : "Hậu kiểm"
+        }, Banner: ${settings.announcementEnabled ? "BẬT" : "TẮT"}`,
+        "SYSTEM",
+        "info"
+      );
+      addToast("Đã lưu và đồng bộ toàn bộ cấu hình hệ thống vào máy chủ cơ sở dữ liệu!", "success");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi lưu cấu hình";
+      addToast(msg, "error");
+    }
+  };
+
+  const handleCreateDistributor = async (data: Partial<Distributor>) => {
+    try {
+      await createAdminDistributor(data);
+      const licRes = await fetchAdminLicensing();
+      if (licRes?.distributors) setDistributors(licRes.distributors);
+      addToast("Đã thêm nhà phân phối đối tác mới thành công.", "success");
+      recordAudit("CREATE_DISTRIBUTOR", data.companyName || "Đối tác", "Tạo đối tác phân phối mới", "SYSTEM", "info");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi thêm nhà phân phối";
+      addToast(msg, "error");
+    }
+  };
+
+  const handleToggleDistributorStatus = async (distributorId: number) => {
+    try {
+      await toggleAdminDistributorStatus(distributorId);
+      const licRes = await fetchAdminLicensing();
+      if (licRes?.distributors) setDistributors(licRes.distributors);
+      addToast("Đã cập nhật trạng thái nhà phân phối thành công.", "success");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi cập nhật trạng thái";
+      addToast(msg, "error");
+    }
+  };
+
+  const handleCreateContract = async (data: Partial<DistributionContract>) => {
+    try {
+      await createAdminContract(data);
+      const licRes = await fetchAdminLicensing();
+      if (licRes?.contracts) setContracts(licRes.contracts);
+      addToast("Đã ký hợp đồng phân phối mới thành công.", "success");
+      recordAudit("CREATE_CONTRACT", data.contractCode || "Hợp đồng", "Lập hợp đồng phân phối mới", "SYSTEM", "info");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi tạo hợp đồng";
+      addToast(msg, "error");
+    }
+  };
+
+  const handleToggleContractStatus = async (contractId: number, status: string) => {
+    try {
+      await updateAdminContractStatus(contractId, status);
+      const licRes = await fetchAdminLicensing();
+      if (licRes?.contracts) setContracts(licRes.contracts);
+      addToast("Đã cập nhật trạng thái hợp đồng thành công.", "success");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi cập nhật hợp đồng";
+      addToast(msg, "error");
+    }
   };
 
   // 5. Moderation Actions
@@ -752,6 +840,10 @@ export default function AdminDashboardPage() {
       setReviews((prev) =>
         prev.map((r) => (r.id === requestId ? { ...r, status: "APPROVED" } : r))
       );
+      try {
+        const freshActions = await fetchAdminReviewActions();
+        if (Array.isArray(freshActions)) setReviewActions(freshActions);
+      } catch {}
       recordAudit("APPROVE_TRACK", `Yêu cầu #${requestId}`, "Phê duyệt phát hành bài hát/album mới", "MODERATION", "info");
       addToast("Đã phê duyệt xuất bản tác phẩm thành công.", "success");
     } catch (err: unknown) {
@@ -766,6 +858,10 @@ export default function AdminDashboardPage() {
       setReviews((prev) =>
         prev.map((r) => (r.id === requestId ? { ...r, status: "REJECTED" } : r))
       );
+      try {
+        const freshActions = await fetchAdminReviewActions();
+        if (Array.isArray(freshActions)) setReviewActions(freshActions);
+      } catch {}
       recordAudit("REJECT_TRACK", `Yêu cầu #${requestId}`, `Từ chối phát hành: ${reason}`, "MODERATION", "warning");
       addToast("Đã từ chối tác phẩm.", "warning");
     } catch (err: unknown) {
@@ -780,6 +876,10 @@ export default function AdminDashboardPage() {
       setReviews((prev) =>
         prev.map((r) => (r.id === requestId ? { ...r, status: "IN_REVIEW" } : r))
       );
+      try {
+        const freshActions = await fetchAdminReviewActions();
+        if (Array.isArray(freshActions)) setReviewActions(freshActions);
+      } catch {}
       recordAudit("RETURN_TRACK", `Yêu cầu #${requestId}`, `Yêu cầu chỉnh sửa: ${reason}`, "MODERATION", "info");
       addToast("Đã gửi yêu cầu chỉnh sửa cho nghệ sĩ.", "info");
     } catch (err: unknown) {
@@ -1033,6 +1133,10 @@ export default function AdminDashboardPage() {
               distributors={distributors}
               contracts={contracts}
               licenses={licenses}
+              onCreateDistributor={handleCreateDistributor}
+              onToggleDistributorStatus={handleToggleDistributorStatus}
+              onCreateContract={handleCreateContract}
+              onToggleContractStatus={handleToggleContractStatus}
             />
           )}
 
@@ -1043,6 +1147,7 @@ export default function AdminDashboardPage() {
           {activeTab === "settings" && (
             <SystemSettingsTab
               auditLogs={auditLogs}
+              serverConfig={systemConfig}
               onSaveSettings={handleSaveSettings}
               onRecordAudit={recordAudit}
               onAddToast={addToast}

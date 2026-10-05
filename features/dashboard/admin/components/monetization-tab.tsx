@@ -31,10 +31,12 @@ import {
   SkipForward,
   Sliders,
   Smartphone,
+  Layers,
 } from "lucide-react";
-import { PaymentTransaction, ServicePackage, PackageEntitlements } from "../types";
+import { PaymentTransaction, ServicePackage, PackageEntitlements, SubscriptionTier } from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
+import { fetchAdminSubscriptionTiers, updateAdminSubscriptionTier } from "@/lib/api/admin-client";
 
 type MonetizationTabProps = {
   packages: ServicePackage[];
@@ -48,24 +50,29 @@ type MonetizationTabProps = {
 };
 
 export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlements {
+  if (pkg.entitlements && pkg.entitlements.adPolicy) {
+    return {
+      tier: (pkg.tierId as any) || pkg.entitlements.tier,
+      ...pkg.entitlements,
+    };
+  }
+
   if (pkg.featuresJson) {
     try {
       const parsed = JSON.parse(pkg.featuresJson);
       if (parsed && typeof parsed === "object") {
         return {
-          tier: parsed.tier,
+          tier: (pkg.tierId as any) || parsed.tier,
           adPolicy: parsed.adPolicy || "DAILY_QUOTA",
           adFreeDailyLimit: parsed.adFreeDailyLimit ?? 15,
           adIntervalAfterLimit: parsed.adIntervalAfterLimit ?? 7,
           skipPolicy: parsed.skipPolicy || "LIMITED",
           skipDailyLimit: parsed.skipDailyLimit ?? 30,
-          audioQuality: parsed.audioQuality || "HQ_320",
           offlineAllowed: parsed.offlineAllowed ?? true,
           offlineMaxTracks: parsed.offlineMaxTracks ?? 50,
           maxDevices: parsed.maxDevices ?? 1,
           syncedLyrics: parsed.syncedLyrics ?? true,
           vipBadge: parsed.vipBadge ?? true,
-          customThemes: parsed.customThemes ?? false,
           familySharing: parsed.familySharing ?? false,
           familyMembers: parsed.familyMembers ?? 1,
         };
@@ -82,13 +89,11 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
       adIntervalAfterLimit: 0,
       skipPolicy: "UNLIMITED",
       skipDailyLimit: 9999,
-      audioQuality: "LOSSLESS_FLAC",
       offlineAllowed: true,
       offlineMaxTracks: 9999,
       maxDevices: 6,
       syncedLyrics: true,
       vipBadge: true,
-      customThemes: true,
       familySharing: true,
       familyMembers: 6,
     };
@@ -101,13 +106,11 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
       adIntervalAfterLimit: 0,
       skipPolicy: "UNLIMITED",
       skipDailyLimit: 9999,
-      audioQuality: "LOSSLESS_FLAC",
       offlineAllowed: true,
       offlineMaxTracks: 9999,
       maxDevices: 1,
       syncedLyrics: true,
       vipBadge: true,
-      customThemes: true,
       familySharing: false,
       familyMembers: 1,
     };
@@ -119,13 +122,11 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
     adIntervalAfterLimit: 7,
     skipPolicy: "LIMITED",
     skipDailyLimit: 30,
-    audioQuality: "HQ_320",
     offlineAllowed: true,
     offlineMaxTracks: 50,
     maxDevices: 1,
     syncedLyrics: true,
     vipBadge: true,
-    customThemes: false,
     familySharing: false,
     familyMembers: 1,
   };
@@ -148,14 +149,6 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
     bullets.push(`${ent.skipDailyLimit} lượt chuyển bài mỗi ngày`);
   }
 
-  if (ent.audioQuality === "LOSSLESS_FLAC") {
-    bullets.push("Âm thanh Hi-Res FLAC 24-bit/96kHz Studio Master");
-  } else if (ent.audioQuality === "HQ_320") {
-    bullets.push("Chất lượng âm thanh Lossless 320kbps");
-  } else {
-    bullets.push("Âm thanh tiêu chuẩn Standard 128kbps");
-  }
-
   if (ent.offlineAllowed) {
     const trackStr = ent.offlineMaxTracks >= 9999 ? "không giới hạn bài hát" : `${ent.offlineMaxTracks} bài hát`;
     bullets.push(`Tải offline ${trackStr} trên ${ent.maxDevices} thiết bị`);
@@ -170,21 +163,19 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
   }
 
   if (ent.vipBadge) {
-    bullets.push("Huy hiệu VIP và chủ đề phát nhạc độc quyền");
+    bullets.push("Huy hiệu VIP vương miện vàng trên hồ sơ");
   }
 
   return bullets;
 }
 
 const POPULAR_BENEFITS = [
-  "Chất lượng âm thanh Lossless 320kbps",
   "Nghe nhạc không quảng cáo ngắt quãng",
-  "Tải offline không giới hạn trên 3 thiết bị",
+  "Tải offline lưu trữ trên máy",
   "Chuyển bài không giới hạn (Unlimited Skips)",
-  "Âm thanh chuẩn phòng thu Studio Master (Lossless)",
   "Lời bài hát Karaoke đồng bộ thời gian thực",
-  "Âm thanh Hi-Res FLAC 24-bit/96kHz",
-  "Huy hiệu VIP thành viên trên hồ sơ",
+  "Huy hiệu VIP vương miện trên hồ sơ",
+  "Chia sẻ nhiều thiết bị đồng thời",
 ];
 
 function EntitlementsEditor({
@@ -316,26 +307,6 @@ function EntitlementsEditor({
           )}
         </div>
 
-        {/* 3. Audio Quality */}
-        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
-          <label className="text-[11px] font-mono font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Headphones className="w-3 h-3" /> Chất Lượng Streaming
-          </label>
-          <select
-            value={entitlements.audioQuality}
-            onChange={(e) =>
-              onChange({
-                ...entitlements,
-                audioQuality: e.target.value as "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC",
-              })
-            }
-            className="w-full rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500]"
-          >
-            <option value="STANDARD_128">Standard 128kbps (Tiêu chuẩn)</option>
-            <option value="HQ_320">Lossless 320kbps (Chất lượng cao VIP)</option>
-            <option value="LOSSLESS_FLAC">Hi-Res FLAC 24-bit Studio Master</option>
-          </select>
-        </div>
 
         {/* 4. Offline Downloads */}
         <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
@@ -433,17 +404,6 @@ function EntitlementsEditor({
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
-              checked={entitlements.customThemes}
-              onChange={(e) =>
-                onChange({ ...entitlements, customThemes: e.target.checked })
-              }
-              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
-            />
-            <span>Theme VIP Player</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
               checked={entitlements.familySharing}
               onChange={(e) =>
                 onChange({
@@ -473,9 +433,22 @@ export function MonetizationTab({
   onDeletePackage,
   onRefundTransaction,
 }: MonetizationTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"packages" | "transactions">("packages");
+  const [activeSubTab, setActiveSubTab] = useState<"packages" | "transactions" | "tiers">("packages");
   const [transactionSearch, setTransactionSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
+  // Normalized Subscription Tiers
+  const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
+  const [editingTier, setEditingTier] = useState<SubscriptionTier | null>(null);
+  const [tierSaving, setTierSaving] = useState(false);
+
+  useEffect(() => {
+    fetchAdminSubscriptionTiers()
+      .then((data) => {
+        if (Array.isArray(data)) setTiers(data);
+      })
+      .catch((err) => console.error("Failed to fetch subscription tiers:", err));
+  }, []);
 
   // Modals state
   const [editingPackage, setEditingPackage] = useState<ServicePackage | null>(null);
@@ -488,6 +461,7 @@ export function MonetizationTab({
     durationDays: 30,
     displayOrder: 1,
     status: "ACTIVE" as "ACTIVE" | "INACTIVE",
+    tierId: "INDIVIDUAL_BASIC",
     description: "",
     featureItems: [] as string[],
     entitlements: {
@@ -496,13 +470,11 @@ export function MonetizationTab({
       adIntervalAfterLimit: 7,
       skipPolicy: "LIMITED",
       skipDailyLimit: 30,
-      audioQuality: "HQ_320",
       offlineAllowed: true,
       offlineMaxTracks: 50,
       maxDevices: 1,
       syncedLyrics: true,
       vipBadge: true,
-      customThemes: false,
       familySharing: false,
       familyMembers: 1,
     } as PackageEntitlements,
@@ -558,6 +530,7 @@ export function MonetizationTab({
   const handleOpenEdit = (pkg: ServicePackage) => {
     const features = parseDescriptionToFeatures(pkg.description);
     const ents = getEffectiveEntitlements(pkg);
+    const tierId = pkg.tierId || ents.tier || "INDIVIDUAL_BASIC";
     setEditingPackage(pkg);
     setFormData({
       name: pkg.name,
@@ -565,9 +538,10 @@ export function MonetizationTab({
       durationDays: pkg.durationDays,
       displayOrder: pkg.displayOrder,
       status: pkg.status,
+      tierId: tierId,
       description: pkg.description,
       featureItems: features.length > 0 ? features : generateBulletPointsFromEntitlements(ents),
-      entitlements: ents,
+      entitlements: { ...ents, tier: tierId as any },
     });
     setNewFeatureInput("");
   };
@@ -580,13 +554,11 @@ export function MonetizationTab({
       adIntervalAfterLimit: 7,
       skipPolicy: "LIMITED",
       skipDailyLimit: 30,
-      audioQuality: "HQ_320",
       offlineAllowed: true,
       offlineMaxTracks: 50,
       maxDevices: 1,
       syncedLyrics: true,
       vipBadge: true,
-      customThemes: false,
       familySharing: false,
       familyMembers: 1,
     };
@@ -596,6 +568,7 @@ export function MonetizationTab({
       durationDays: 30,
       displayOrder: packages.length + 1,
       status: "ACTIVE",
+      tierId: "INDIVIDUAL_BASIC",
       description: "Gói dịch vụ âm nhạc nâng cao",
       featureItems: generateBulletPointsFromEntitlements(defaultEnts),
       entitlements: defaultEnts,
@@ -636,6 +609,7 @@ export function MonetizationTab({
         durationDays: formData.durationDays,
         displayOrder: formData.displayOrder,
         status: formData.status,
+        tierId: formData.tierId,
         description: finalDesc,
         featuresJson: featuresJsonStr,
       });
@@ -657,6 +631,7 @@ export function MonetizationTab({
         durationDays: formData.durationDays,
         displayOrder: formData.displayOrder,
         status: formData.status,
+        tierId: formData.tierId,
         description: finalDesc,
         featuresJson: featuresJsonStr,
       });
@@ -716,6 +691,17 @@ export function MonetizationTab({
             </button>
             <button
               type="button"
+              onClick={() => setActiveSubTab("tiers")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                activeSubTab === "tiers"
+                  ? "bg-[#ff5500] text-white shadow"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" /> Tầng Quyền Lợi ({tiers.length || 4})
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveSubTab("transactions")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 activeSubTab === "transactions"
@@ -753,6 +739,10 @@ export function MonetizationTab({
                         </span>
                         <span className="font-mono text-xs text-zinc-500">
                           #{pkg.displayOrder}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-mono font-semibold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          <Crown className="w-2.5 h-2.5" />
+                          {pkg.tierName || (pkg.tierId === "FAMILY" ? "Gia Đình" : pkg.tierId === "INDIVIDUAL_FULL" ? "VIP FULL" : "Tiết Kiệm")}
                         </span>
                       </div>
 
@@ -823,14 +813,6 @@ export function MonetizationTab({
                             </span>
                           )}
 
-                          <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                            <Headphones className="w-3 h-3" />
-                            {ent.audioQuality === "LOSSLESS_FLAC"
-                              ? "Hi-Res FLAC"
-                              : ent.audioQuality === "HQ_320"
-                              ? "Lossless 320k"
-                              : "Standard 128k"}
-                          </span>
 
                           {ent.offlineAllowed && (
                             <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20">
@@ -1057,6 +1039,298 @@ export function MonetizationTab({
         </div>
       )}
 
+      {/* SUBTAB 3: SUBSCRIPTION TIERS (CHUẨN HÓA 3NF) */}
+      {activeSubTab === "tiers" && (
+        <div className="space-y-6 anim-fade-up">
+          <div className="rounded-2xl border border-white/10 bg-[#12131a] p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="font-graphik text-lg font-bold text-white flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-[#ff5500]" />
+                  Danh Mục Tầng Quyền Lợi Thuê Bao (Subscription Tiers - 3NF Normalized)
+                </h3>
+                <p className="mt-1 text-xs text-zinc-400 font-mono">
+                  Bảng chuẩn hóa <code className="text-[#ff5500]">subscription_tiers</code> lưu trữ độc lập logic quảng cáo, hạn ngạch chuyển bài, chất lượng nhạc và số thiết bị.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-mono text-emerald-400">
+                <ShieldCheck className="w-4 h-4" /> Toàn vẹn tham chiếu 100%
+              </div>
+            </div>
+
+            {/* Grid of Tiers */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {(tiers.length > 0 ? tiers : [
+                { id: "FREE", name: "Tài khoản Miễn Phí", description: "Dành cho người nghe thông thường", adPolicy: "FULL_ADS" as const, adFreeDailyLimit: 0, skipPolicy: "LIMITED" as const, skipDailyLimit: 6, offlineAllowed: false, offlineMaxTracks: 0, maxDevices: 1, syncedLyrics: false, vipBadge: false, familySharing: false, familyMembers: 0 },
+                { id: "INDIVIDUAL_BASIC", name: "VIP Tiết Kiệm", description: "Hạn ngạch ngày tiết kiệm", adPolicy: "DAILY_QUOTA" as const, adFreeDailyLimit: 15, skipPolicy: "LIMITED" as const, skipDailyLimit: 30, offlineAllowed: true, offlineMaxTracks: 50, maxDevices: 1, syncedLyrics: true, vipBadge: true, familySharing: false, familyMembers: 0 },
+                { id: "INDIVIDUAL_FULL", name: "Cá Nhân VIP FULL", description: "Không giới hạn đặc quyền", adPolicy: "NO_ADS" as const, adFreeDailyLimit: 0, skipPolicy: "UNLIMITED" as const, skipDailyLimit: 0, offlineAllowed: true, offlineMaxTracks: 9999, maxDevices: 1, syncedLyrics: true, vipBadge: true, familySharing: false, familyMembers: 0 },
+                { id: "FAMILY", name: "Gói Gia Đình VIP", description: "Trọn bộ đặc quyền cho 6 người", adPolicy: "NO_ADS" as const, adFreeDailyLimit: 0, skipPolicy: "UNLIMITED" as const, skipDailyLimit: 0, offlineAllowed: true, offlineMaxTracks: 9999, maxDevices: 6, syncedLyrics: true, vipBadge: true, familySharing: true, familyMembers: 6 },
+              ]).map((tier) => (
+                <div
+                  key={tier.id}
+                  className="flex flex-col justify-between rounded-2xl border border-[#222432] bg-[#171822] p-5 shadow-lg hover:border-[#ff5500]/40 transition"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+                        {tier.id}
+                      </span>
+                      <span className="text-[11px] font-mono text-zinc-400">
+                        {packages.filter((p) => p.tierId === tier.id).length} gói cước
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-graphik text-lg font-bold text-white tracking-tight">
+                        {tier.name}
+                      </h4>
+                      <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
+                        {tier.description || "Chưa có mô tả chi tiết"}
+                      </p>
+                    </div>
+
+                    {/* Matrix Specs */}
+                    <div className="space-y-2 pt-2 border-t border-white/5 text-xs font-mono">
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Quảng cáo:</span>
+                        <span className={tier.adPolicy === "NO_ADS" ? "text-emerald-400 font-semibold" : tier.adPolicy === "DAILY_QUOTA" ? "text-amber-300 font-semibold" : "text-zinc-400"}>
+                          {tier.adPolicy === "NO_ADS" ? "0% Quảng cáo (24/7)" : tier.adPolicy === "DAILY_QUOTA" ? `${tier.adFreeDailyLimit} bài/ngày ko QC` : "Quảng cáo tiêu chuẩn"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Chuyển bài:</span>
+                        <span className={tier.skipPolicy === "UNLIMITED" ? "text-sky-300 font-semibold" : "text-zinc-400"}>
+                          {tier.skipPolicy === "UNLIMITED" ? "Vô hạn (Unlimited)" : `${tier.skipDailyLimit} lần/ngày`}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Tải offline:</span>
+                        <span className={tier.offlineAllowed ? "text-teal-300" : "text-zinc-500"}>
+                          {tier.offlineAllowed ? `${tier.offlineMaxTracks >= 9999 ? "Vô hạn" : tier.offlineMaxTracks} bài` : "Không hỗ trợ"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Số thiết bị:</span>
+                        <span className="text-white font-bold">{tier.maxDevices} máy</span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Gói gia đình:</span>
+                        <span className={tier.familySharing ? "text-yellow-400 font-bold" : "text-zinc-500"}>
+                          {tier.familySharing ? `Cho phép (${tier.familyMembers || 6} tv)` : "Cá nhân"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingTier(tier)}
+                    className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#222432]/50 hover:bg-[#ff5500]/15 hover:border-[#ff5500]/50 py-2 text-xs font-mono font-semibold text-white transition active:scale-[0.98] cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-[#ff5500]" /> Cấu Hình Quyền Lợi Tầng
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT SUBSCRIPTION TIER */}
+      {editingTier && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-graphik text-xl font-bold text-white flex items-center gap-2">
+                    <Sliders className="w-5 h-5 text-[#ff5500]" />
+                    Chỉnh Sửa Bậc Quyền Lợi: {editingTier.id}
+                  </h3>
+                  <p className="font-mono text-xs text-zinc-400 mt-1">
+                    Cập nhật trực tiếp vào bảng <code className="text-amber-300">subscription_tiers</code>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingTier(null)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs font-mono">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Tên Tầng</label>
+                    <input
+                      type="text"
+                      value={editingTier.name}
+                      onChange={(e) => setEditingTier({ ...editingTier, name: e.target.value })}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Mô Tả Tóm Tắt</label>
+                    <input
+                      type="text"
+                      value={editingTier.description || ""}
+                      onChange={(e) => setEditingTier({ ...editingTier, description: e.target.value })}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    />
+                  </div>
+                </div>
+
+                {/* Ad Policy */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Chính Sách Quảng Cáo</label>
+                    <select
+                      value={editingTier.adPolicy}
+                      onChange={(e) => setEditingTier({ ...editingTier, adPolicy: e.target.value as any })}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    >
+                      <option value="NO_ADS">NO_ADS (100% Không QC)</option>
+                      <option value="DAILY_QUOTA">DAILY_QUOTA (Hạn ngạch bài/ngày)</option>
+                      <option value="FULL_ADS">FULL_ADS (Quảng cáo tiêu chuẩn)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Số bài/ngày không QC</label>
+                    <input
+                      type="number"
+                      value={editingTier.adFreeDailyLimit}
+                      onChange={(e) => setEditingTier({ ...editingTier, adFreeDailyLimit: Number(e.target.value) })}
+                      disabled={editingTier.adPolicy !== "DAILY_QUOTA"}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Skip & Quality */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Chính Sách Chuyển Bài (Skip)</label>
+                    <select
+                      value={editingTier.skipPolicy}
+                      onChange={(e) => setEditingTier({ ...editingTier, skipPolicy: e.target.value as any })}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    >
+                      <option value="UNLIMITED">UNLIMITED (Vô hạn skip)</option>
+                      <option value="LIMITED">LIMITED (Giới hạn lượt/ngày)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Số lượt skip/ngày</label>
+                    <input
+                      type="number"
+                      value={editingTier.skipDailyLimit}
+                      onChange={(e) => setEditingTier({ ...editingTier, skipDailyLimit: Number(e.target.value) })}
+                      disabled={editingTier.skipPolicy !== "LIMITED"}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Devices */}
+                <div>
+                  <label className="block text-zinc-400 mb-1">Số Thiết Bị Tối Đa</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={editingTier.maxDevices}
+                    onChange={(e) => setEditingTier({ ...editingTier, maxDevices: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                  />
+                </div>
+
+                {/* Offline Downloads */}
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 text-white cursor-pointer mt-3">
+                    <input
+                      type="checkbox"
+                      checked={editingTier.offlineAllowed}
+                      onChange={(e) => setEditingTier({ ...editingTier, offlineAllowed: e.target.checked })}
+                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                    />
+                    <span>Cho phép tải nhạc ngoại tuyến</span>
+                  </label>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Số bài offline tối đa</label>
+                    <input
+                      type="number"
+                      value={editingTier.offlineMaxTracks}
+                      onChange={(e) => setEditingTier({ ...editingTier, offlineMaxTracks: Number(e.target.value) })}
+                      disabled={!editingTier.offlineAllowed}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Family Sharing */}
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 text-white cursor-pointer mt-3">
+                    <input
+                      type="checkbox"
+                      checked={editingTier.familySharing}
+                      onChange={(e) => setEditingTier({ ...editingTier, familySharing: e.target.checked })}
+                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                    />
+                    <span>Chia sẻ gói Gia Đình</span>
+                  </label>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Số thành viên gia đình</label>
+                    <input
+                      type="number"
+                      value={editingTier.familyMembers}
+                      onChange={(e) => setEditingTier({ ...editingTier, familyMembers: Number(e.target.value) })}
+                      disabled={!editingTier.familySharing}
+                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingTier(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={tierSaving}
+                  onClick={async () => {
+                    setTierSaving(true);
+                    try {
+                      await updateAdminSubscriptionTier(editingTier.id, editingTier);
+                      const res = await fetchAdminSubscriptionTiers();
+                      if (Array.isArray(res)) setTiers(res);
+                      setEditingTier(null);
+                    } catch (err) {
+                      console.error("Lỗi khi lưu tầng dịch vụ:", err);
+                    } finally {
+                      setTierSaving(false);
+                    }
+                  }}
+                  className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-mono font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] transition cursor-pointer"
+                >
+                  {tierSaving ? "Đang lưu..." : "Lưu Quyền Lợi Bậc"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
       {/* MODAL 1: FULL DETAIL PACKAGE EDITOR */}
       {editingPackage && (
         <ModalPortal>
@@ -1139,9 +1413,68 @@ export function MonetizationTab({
                 </div>
               </div>
 
-              {/* Display Order & Status */}
+              {/* Tier, Display Order & Status */}
               <div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
+                      Tầng Quyền Lợi (Tier)
+                    </label>
+                    <select
+                      value={formData.tierId}
+                      onChange={(e) => {
+                        const selectedTier = e.target.value;
+                        let newEnts = { ...formData.entitlements, tier: selectedTier as any };
+                        if (selectedTier === "INDIVIDUAL_FULL") {
+                          newEnts = {
+                            ...newEnts,
+                            adPolicy: "NO_ADS",
+                            skipPolicy: "UNLIMITED",
+                            offlineAllowed: true,
+                            offlineMaxTracks: 9999,
+                            maxDevices: 1,
+                            familySharing: false,
+                          };
+                        } else if (selectedTier === "FAMILY") {
+                          newEnts = {
+                            ...newEnts,
+                            adPolicy: "NO_ADS",
+                            skipPolicy: "UNLIMITED",
+                            offlineAllowed: true,
+                            offlineMaxTracks: 9999,
+                            maxDevices: 6,
+                            familySharing: true,
+                            familyMembers: 6,
+                          };
+                        } else if (selectedTier === "INDIVIDUAL_BASIC") {
+                          newEnts = {
+                            ...newEnts,
+                            adPolicy: "DAILY_QUOTA",
+                            adFreeDailyLimit: 15,
+                            adIntervalAfterLimit: 7,
+                            skipPolicy: "LIMITED",
+                            skipDailyLimit: 30,
+                            offlineAllowed: true,
+                            offlineMaxTracks: 50,
+                            maxDevices: 1,
+                            familySharing: false,
+                          };
+                        }
+                        setFormData({
+                          ...formData,
+                          tierId: selectedTier,
+                          entitlements: newEnts,
+                          featureItems: generateBulletPointsFromEntitlements(newEnts),
+                        });
+                      }}
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none"
+                    >
+                      <option value="INDIVIDUAL_BASIC">INDIVIDUAL_BASIC (Tiết Kiệm)</option>
+                      <option value="INDIVIDUAL_FULL">INDIVIDUAL_FULL (Cá Nhân FULL)</option>
+                      <option value="FAMILY">FAMILY (Gói Gia Đình)</option>
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
                       Thứ Tự Hiển Thị
@@ -1375,8 +1708,68 @@ export function MonetizationTab({
                 </div>
               </div>
 
+              {/* Tier, Display Order & Status */}
               <div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
+                      Tầng Quyền Lợi (Tier)
+                    </label>
+                    <select
+                      value={formData.tierId}
+                      onChange={(e) => {
+                        const selectedTier = e.target.value;
+                        let newEnts = { ...formData.entitlements, tier: selectedTier as any };
+                        if (selectedTier === "INDIVIDUAL_FULL") {
+                          newEnts = {
+                            ...newEnts,
+                            adPolicy: "NO_ADS",
+                            skipPolicy: "UNLIMITED",
+                            offlineAllowed: true,
+                            offlineMaxTracks: 9999,
+                            maxDevices: 1,
+                            familySharing: false,
+                          };
+                        } else if (selectedTier === "FAMILY") {
+                          newEnts = {
+                            ...newEnts,
+                            adPolicy: "NO_ADS",
+                            skipPolicy: "UNLIMITED",
+                            offlineAllowed: true,
+                            offlineMaxTracks: 9999,
+                            maxDevices: 6,
+                            familySharing: true,
+                            familyMembers: 6,
+                          };
+                        } else if (selectedTier === "INDIVIDUAL_BASIC") {
+                          newEnts = {
+                            ...newEnts,
+                            adPolicy: "DAILY_QUOTA",
+                            adFreeDailyLimit: 15,
+                            adIntervalAfterLimit: 7,
+                            skipPolicy: "LIMITED",
+                            skipDailyLimit: 30,
+                            offlineAllowed: true,
+                            offlineMaxTracks: 50,
+                            maxDevices: 1,
+                            familySharing: false,
+                          };
+                        }
+                        setFormData({
+                          ...formData,
+                          tierId: selectedTier,
+                          entitlements: newEnts,
+                          featureItems: generateBulletPointsFromEntitlements(newEnts),
+                        });
+                      }}
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none"
+                    >
+                      <option value="INDIVIDUAL_BASIC">INDIVIDUAL_BASIC (Tiết Kiệm)</option>
+                      <option value="INDIVIDUAL_FULL">INDIVIDUAL_FULL (Cá Nhân FULL)</option>
+                      <option value="FAMILY">FAMILY (Gói Gia Đình)</option>
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
                       Thứ Tự Hiển Thị
@@ -1399,7 +1792,7 @@ export function MonetizationTab({
                       className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
                     >
                       <option value="ACTIVE">ACTIVE (Kích hoạt)</option>
-                      <option value="INACTIVE">INACTIVE (Tạm dừng)</option>
+                      <option value="INACTIVE">INACTIVE (Tạm ngưng)</option>
                     </select>
                   </div>
                 </div>

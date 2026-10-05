@@ -191,7 +191,7 @@ function resolveMediaUrl(rawUrl: string | null | undefined) {
     return `${audioServerUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
   }
 
-  const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+  const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8088").replace(/\/$/, "");
   return `${baseUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
 }
 

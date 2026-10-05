@@ -1,3 +1,5 @@
+import { getDeviceIdentity, getCurrentDeviceUuid, type DevicePlatform } from "./device-helper";
+
 export type AuthResponse = {
   accessToken: string;
   refreshToken: string;
@@ -149,7 +151,7 @@ export type StoredAuthSession = {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8080";
+  "http://localhost:8088";
 
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
@@ -247,9 +249,65 @@ export function clearAuthSession() {
 
 
 //main auth functions
-export async function login(payload: { identifier: string; password: string }) {
+export async function login(payload: {
+  identifier: string;
+  password: string;
+  deviceUuid?: string;
+  deviceName?: string;
+  platform?: DevicePlatform;
+}) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
+  const fullPayload = {
+    ...payload,
+    deviceUuid: payload.deviceUuid || device?.deviceUuid,
+    deviceName: payload.deviceName || device?.deviceName,
+    platform: payload.platform || device?.platform,
+  };
   return requestJson<AuthResponse>("/api/auth/login", {
-    body: payload,
+    body: fullPayload,
+  });
+}
+
+export interface UserDeviceSummary {
+  devices: {
+    id: number;
+    userId: number;
+    deviceUuid: string;
+    platform: "ANDROID" | "IOS" | "OTHER";
+    deviceName: string;
+    status: "ACTIVE" | "REVOKED";
+    createdAt: string;
+  }[];
+  maxDevices: number;
+  activeCount: number;
+}
+
+export async function fetchMyDevices(): Promise<UserDeviceSummary> {
+  return requestJson<UserDeviceSummary>("/api/auth/devices", {
+    method: "GET",
+  });
+}
+
+export async function registerCurrentDevice(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const device = getDeviceIdentity();
+  await requestJson("/api/auth/devices/register", {
+    method: "POST",
+    body: device,
+  }).catch(() => {});
+}
+
+export async function revokeMyDevice(deviceId: number): Promise<void> {
+  return requestJson<void>(`/api/auth/devices/${deviceId}/revoke`, {
+    method: "PATCH",
+  });
+}
+
+export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
+  const deviceUuid = getCurrentDeviceUuid();
+  return requestJson<{ revokedCount: number }>("/api/auth/devices/revoke-others", {
+    method: "POST",
+    body: { deviceUuid },
   });
 }
 

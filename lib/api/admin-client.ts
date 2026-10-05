@@ -11,8 +11,10 @@ import {
   FavoriteRecord,
   NotificationBroadcast,
   PaymentTransaction,
+  ReviewAction,
   ReviewRequest,
   ServicePackage,
+  SubscriptionTier,
   SongLicense,
   UserDevice,
 } from "../../features/dashboard/admin/types";
@@ -253,9 +255,35 @@ export async function restoreAdminTrack(
   );
 }
 
+export async function updateAdminTrackGenre(
+  trackId: string,
+  genre: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/tracks/${trackId}/genre`,
+    {
+      method: "PATCH",
+      body: { genre },
+    }
+  );
+}
+
+export async function deleteAdminTrack(
+  trackId: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/tracks/${trackId}`,
+    { method: "DELETE" }
+  );
+}
+
 // 4. Content Moderation
 export async function fetchAdminModerationQueue(): Promise<ReviewRequest[]> {
   return adminRequest<ReviewRequest[]>("/api/admin/moderation");
+}
+
+export async function fetchAdminReviewActions(): Promise<ReviewAction[]> {
+  return adminRequest<ReviewAction[]>("/api/admin/moderation/actions");
 }
 
 export async function submitAdminReviewDecision(
@@ -333,6 +361,23 @@ export async function deleteAdminPackage(
   );
 }
 
+export async function fetchAdminSubscriptionTiers(): Promise<SubscriptionTier[]> {
+  return adminRequest<SubscriptionTier[]>("/api/admin/subscription-tiers");
+}
+
+export async function updateAdminSubscriptionTier(
+  tierId: string,
+  data: Partial<SubscriptionTier>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/subscription-tiers/${tierId}`,
+    {
+      method: "PUT",
+      body: data,
+    }
+  );
+}
+
 export async function fetchAdminTransactions(): Promise<PaymentTransaction[]> {
   return adminRequest<PaymentTransaction[]>("/api/admin/transactions");
 }
@@ -355,6 +400,63 @@ export type AdminLicensingResponse = {
 
 export async function fetchAdminLicensing(): Promise<AdminLicensingResponse> {
   return adminRequest<AdminLicensingResponse>("/api/admin/licensing");
+}
+
+export async function createAdminDistributor(
+  data: Partial<Distributor>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    "/api/admin/distributors",
+    { method: "POST", body: data }
+  );
+}
+
+export async function updateAdminDistributor(
+  id: number,
+  data: Partial<Distributor>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/distributors/${id}`,
+    { method: "PUT", body: data }
+  );
+}
+
+export async function toggleAdminDistributorStatus(
+  id: number
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/distributors/${id}/status`,
+    { method: "PATCH" }
+  );
+}
+
+export async function createAdminContract(
+  data: Partial<DistributionContract>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    "/api/admin/contracts",
+    { method: "POST", body: data }
+  );
+}
+
+export async function updateAdminContract(
+  id: number,
+  data: Partial<DistributionContract>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/contracts/${id}`,
+    { method: "PUT", body: data }
+  );
+}
+
+export async function updateAdminContractStatus(
+  id: number,
+  status: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/contracts/${id}/status`,
+    { method: "PATCH", body: { status } }
+  );
 }
 
 
@@ -536,5 +638,22 @@ export async function deleteAdminAdCategory(
   return adminRequest<{ success: boolean; message: string }>(
     `/api/admin/ads/categories/${id}`,
     { method: "DELETE" }
+  );
+}
+
+// 10. System Settings & Global Config
+export async function fetchAdminSystemConfig<T = Record<string, unknown>>(): Promise<T> {
+  return adminRequest<T>("/api/admin/system/config");
+}
+
+export async function saveAdminSystemConfig(
+  config: Record<string, unknown>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    "/api/admin/system/config",
+    {
+      method: "PUT",
+      body: config,
+    }
   );
 }

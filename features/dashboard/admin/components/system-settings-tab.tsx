@@ -84,7 +84,8 @@ const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
 
 type SystemSettingsTabProps = {
   auditLogs: SystemAuditLog[];
-  onSaveSettings?: (config: SystemConfig) => void;
+  serverConfig?: SystemConfig | null;
+  onSaveSettings?: (config: SystemConfig) => void | Promise<void>;
   onRecordAudit?: (
     action: string,
     target: string,
@@ -97,6 +98,7 @@ type SystemSettingsTabProps = {
 
 export function SystemSettingsTab({
   auditLogs,
+  serverConfig,
   onSaveSettings,
   onRecordAudit,
   onAddToast,
@@ -114,10 +116,14 @@ export function SystemSettingsTab({
     return DEFAULT_SYSTEM_CONFIG;
   });
 
+  useEffect(() => {
+    if (serverConfig && Object.keys(serverConfig).length > 0) {
+      setConfig((prev) => ({ ...prev, ...serverConfig }));
+    }
+  }, [serverConfig]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isSavedSuccess, setIsSavedSuccess] = useState(false);
-
-
 
   // Audit Logs Filter & Search State
   const [severityFilter, setSeverityFilter] = useState<string>("ALL");
@@ -131,14 +137,14 @@ export function SystemSettingsTab({
     setAuditPage(1);
   }, [searchAudit, categoryFilter, severityFilter]);
 
-  const handleSaveAllConfig = () => {
+  const handleSaveAllConfig = async () => {
     setIsSaving(true);
     try {
       localStorage.setItem("moodify_system_config", JSON.stringify(config));
     } catch {}
 
     if (onSaveSettings) {
-      onSaveSettings(config);
+      await onSaveSettings(config);
     }
     if (onRecordAudit) {
       onRecordAudit(
@@ -150,7 +156,7 @@ export function SystemSettingsTab({
       );
     }
     if (onAddToast) {
-      onAddToast("Đã lưu và áp dụng toàn bộ cấu hình hệ thống thành công!", "success");
+      onAddToast("Đã lưu và đồng bộ toàn bộ cấu hình hệ thống vào cơ sở dữ liệu!", "success");
     }
 
     setIsSaving(false);

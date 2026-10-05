@@ -58,7 +58,7 @@ interface PlayerContextType {
   dailySkipsCount: number;
   skipLimitNotice: { show: boolean; message: string; tier: SubTier } | null;
   clearSkipLimitNotice: () => void;
-  skipAd: () => void;
+  skipAd: (force?: boolean) => void;
   triggerAd: (force?: boolean, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[], reason?: AdReason) => void;
   playTrack: (track: PlayerTrack, playlist?: PlayerTrack[]) => void;
   addToQueue: (track: PlayerTrack) => void;
@@ -500,7 +500,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     playAdAudio();
   }, [playAdAudio]);
 
-  const skipAd = useCallback(() => {
+  const skipAd = useCallback((force = false) => {
+    // Chỉ người dùng gói VIP Tiết Kiệm (INDIVIDUAL_BASIC) mới có quyền bấm bỏ qua quảng cáo sớm sau đếm ngược.
+    // Người dùng FREE bắt buộc phải nghe trọn vẹn quảng cáo trừ khi chuyển hướng mua gói (force = true) hoặc đã hết thời gian.
+    const isSaverVip = subTier === "INDIVIDUAL_BASIC";
+    if (!force && !isSaverVip && !isPremiumUser && adSecondsRemaining > 0) {
+      return;
+    }
+
     setIsAdPlaying(false);
     setAdReason(null);
     // Stop ad audio
@@ -515,7 +522,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else if (audioRef.current && currentTrack) {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
-  }, [executePlayTrack, currentTrack]);
+  }, [executePlayTrack, currentTrack, subTier, isPremiumUser, adSecondsRemaining]);
 
   const playTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
     const todayTracks = recordDailyTrackPlayed();

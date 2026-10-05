@@ -108,15 +108,33 @@ export type PackageEntitlements = {
   adIntervalAfterLimit: number; // sau hạn mức, bao nhiêu bài có 1 quảng cáo
   skipPolicy: "UNLIMITED" | "LIMITED";
   skipDailyLimit: number; // số lượt chuyển bài mỗi ngày
-  audioQuality: "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC";
   offlineAllowed: boolean;
   offlineMaxTracks: number; // số bài offline tối đa
   maxDevices: number; // số thiết bị cho phép
   syncedLyrics: boolean; // xem lời karaoke đồng bộ
   vipBadge: boolean; // huy hiệu VIP trên profile
-  customThemes: boolean; // tùy biến giao diện player VIP
   familySharing: boolean; // chia sẻ gói gia đình
   familyMembers?: number;
+};
+
+export type SubscriptionTier = {
+  id: "FREE" | "INDIVIDUAL_BASIC" | "INDIVIDUAL_FULL" | "FAMILY" | string;
+  name: string;
+  description: string;
+  adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
+  adFreeDailyLimit: number;
+  skipPolicy: "UNLIMITED" | "LIMITED";
+  skipDailyLimit: number;
+  offlineAllowed: boolean;
+  offlineMaxTracks: number;
+  maxDevices: number;
+  syncedLyrics: boolean;
+  vipBadge: boolean;
+  familySharing: boolean;
+  familyMembers: number;
+  createdAt?: string;
+  updatedAt?: string;
+  entitlements?: PackageEntitlements;
 };
 
 export type ServicePackage = {
@@ -127,6 +145,8 @@ export type ServicePackage = {
   durationDays: number;
   displayOrder: number;
   status: "ACTIVE" | "INACTIVE";
+  tierId?: string;
+  tierName?: string;
   subscribersCount?: number;
   features?: string[];
   featuresJson?: string;

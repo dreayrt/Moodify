@@ -108,7 +108,7 @@ export function ModeratorAudioPlayer({
     ) {
       return track.audioUrl;
     }
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8088";
     return `${baseUrl.replace(/\/$/, "")}${track.audioUrl.startsWith("/") ? "" : "/"}${track.audioUrl}`;
   })();
 

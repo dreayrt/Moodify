@@ -13,13 +13,17 @@ export default function AdInterstitialBanner() {
     return null;
   }
 
-  const isBasicUpsell = subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED";
+  // Phân loại gói: Chỉ gói VIP Tiết Kiệm (INDIVIDUAL_BASIC) mới được hưởng tính năng bỏ qua quảng cáo sau 5 giây đếm ngược.
+  // Gói FREE thông thường không được bỏ qua, bắt buộc phải nghe trọn vẹn quảng cáo.
+  const isSaverVip = subTier === "INDIVIDUAL_BASIC";
+  const isBasicUpsell = isSaverVip || adReason === "BASIC_DAILY_LIMIT_EXCEEDED";
+
   const AD_SKIP_DELAY = 5;
-  const elapsed = adTotalDuration > 0 ? adTotalDuration - adSecondsRemaining : 0;
-  const canSkip = elapsed >= AD_SKIP_DELAY || adSecondsRemaining <= 0;
+  const elapsed = adTotalDuration > 0 ? Math.max(0, adTotalDuration - adSecondsRemaining) : 0;
+  const canSkip = isSaverVip && (elapsed >= AD_SKIP_DELAY || adSecondsRemaining <= 0);
   const skipCountdown = Math.max(0, AD_SKIP_DELAY - elapsed);
 
-  // First 9.5s is dedicated to Moodify's sonic brand identity intro
+  // 9.5s đầu tiên dành cho giai điệu nhận diện thương hiệu Moodify
   const isBrandIdent = elapsed < 9.5;
   const progressPercent = adTotalDuration > 0 ? Math.min(100, Math.max(0, (elapsed / adTotalDuration) * 100)) : 0;
 
@@ -97,33 +101,66 @@ export default function AdInterstitialBanner() {
 
             {/* Tactile Button Actions */}
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={skipAd}
-                disabled={!canSkip}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  canSkip
-                    ? "bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 active:scale-[0.98] cursor-pointer"
-                    : "bg-transparent text-white/30 border border-white/5 cursor-not-allowed"
-                }`}
-              >
-                <SkipForward className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">
-                  {canSkip ? "Bỏ qua" : `Bỏ qua sau ${skipCountdown}s`}
-                </span>
-                <span className="sm:hidden">{canSkip ? "Bỏ qua" : `${skipCountdown}s`}</span>
-              </button>
+              {/* Nút bỏ qua có đếm ngược: CHỈ hiển thị cho tài khoản VIP Tiết Kiệm */}
+              {isSaverVip ? (
+                canSkip ? (
+                  <button
+                    type="button"
+                    onClick={() => skipAd()}
+                    style={{ color: "#ffffff", backgroundColor: "rgba(255, 255, 255, 0.16)" }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold hover:bg-white/25 border border-white/30 active:scale-95 transition-all shadow-md cursor-pointer shrink-0"
+                    title="Bỏ qua quảng cáo"
+                  >
+                    <SkipForward className="w-3.5 h-3.5 text-amber-300" />
+                    <span style={{ color: "#ffffff" }}>Bỏ qua</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    style={{ color: "#ffffff", backgroundColor: "#1e2230" }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-white/20 shadow-sm cursor-not-allowed select-none shrink-0"
+                    title={`Bỏ qua sau ${skipCountdown} giây`}
+                  >
+                    <SkipForward className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="hidden sm:inline" style={{ color: "#e2e8f0" }}>
+                      Bỏ qua sau
+                    </span>
+                    <span style={{ color: "#fbbf24" }} className="font-mono font-bold tabular-nums">
+                      {skipCountdown}s
+                    </span>
+                  </button>
+                )
+              ) : (
+                /* Tài khoản Miễn phí (FREE): Phải nghe trọn vẹn quảng cáo, không có nút bỏ qua */
+                <div
+                  style={{ backgroundColor: "rgba(255, 255, 255, 0.08)", borderColor: "rgba(255, 255, 255, 0.16)" }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border text-slate-200 shadow-sm select-none shrink-0"
+                  title="Tài khoản Miễn phí cần nghe hết thời lượng quảng cáo"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                  <span className="hidden sm:inline" style={{ color: "#cbd5e1" }}>
+                    Nghe hết QC
+                  </span>
+                  <span style={{ color: "#fbbf24" }} className="font-mono font-bold tabular-nums">
+                    ({adSecondsRemaining}s)
+                  </span>
+                </div>
+              )}
 
+              {/* Nút Nâng VIP / Lên FULL: Tương phản cao, chữ màu đen đậm trên nền vàng kim không bao giờ bị trùng màu chữ */}
               <Link
                 href="/dashboard/premium"
-                onClick={skipAd}
-                className="inline-flex items-center gap-2 pl-3.5 pr-1.5 py-1 rounded-full bg-white text-neutral-950 text-xs font-medium hover:bg-neutral-200 active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(255,255,255,0.18)] group cursor-pointer"
+                onClick={() => skipAd(true)}
+                style={{ color: "#090a0f", backgroundColor: "#f59e0b" }}
+                className="inline-flex items-center gap-1.5 pl-3.5 pr-2 py-1.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-xs font-bold active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(245,158,11,0.35)] group cursor-pointer shrink-0"
+                title={isBasicUpsell ? "Nâng cấp lên gói FULL" : "Nâng cấp tài khoản VIP"}
               >
-                <span className="tracking-tight">
+                <span style={{ color: "#090a0f" }} className="font-bold tracking-tight">
                   {isBasicUpsell ? "Lên FULL" : "Nâng VIP"}
                 </span>
-                <span className="w-6 h-6 rounded-full bg-black/5 flex items-center justify-center group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">
-                  <ArrowUpRight className="w-3.5 h-3.5 text-neutral-950" />
+                <span className="w-5 h-5 rounded-full bg-black/10 flex items-center justify-center group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">
+                  <ArrowUpRight className="w-3.5 h-3.5" style={{ color: "#090a0f" }} />
                 </span>
               </Link>
             </div>
@@ -138,12 +175,16 @@ export default function AdInterstitialBanner() {
               />
             </div>
 
-            <div className="flex items-center justify-between text-[10px] font-mono text-white/40 tracking-wider">
+            <div className="flex items-center justify-between text-[11px] font-mono tracking-wider">
               <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-amber-400/80" />
-                {isBrandIdent ? "GIAI ĐIỆU ĐỊNH DANH MOODIFY" : "QUẢNG CÁO TÀI TRỢ"}
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-slate-300 font-medium">
+                  {isBrandIdent ? "GIAI ĐIỆU ĐỊNH DANH MOODIFY" : "QUẢNG CÁO TÀI TRỢ"}
+                </span>
               </span>
-              <span>còn {adSecondsRemaining}s</span>
+              <span style={{ color: "#fbbf24" }} className="font-bold tabular-nums">
+                còn {adSecondsRemaining}s
+              </span>
             </div>
           </div>
         </div>

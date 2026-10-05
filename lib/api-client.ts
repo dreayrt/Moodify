@@ -1,5 +1,5 @@
 // API Base URL - Luôn đảm bảo có tiền tố /api
-const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8088').replace(/\/$/, '');
 const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
 import { getValidAccessToken } from './auth-client';
@@ -600,13 +600,11 @@ export interface PackageEntitlements {
   adIntervalAfterLimit: number;
   skipPolicy: "UNLIMITED" | "LIMITED";
   skipDailyLimit: number;
-  audioQuality?: "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC";
   offlineAllowed: boolean;
   offlineMaxTracks: number;
   maxDevices: number;
   syncedLyrics?: boolean;
   vipBadge?: boolean;
-  customThemes?: boolean;
   familySharing?: boolean;
   familyMembers?: number;
 }
@@ -618,13 +616,11 @@ export const FREE_ENTITLEMENTS: PackageEntitlements = {
   adIntervalAfterLimit: 2,
   skipPolicy: "LIMITED",
   skipDailyLimit: 6,
-  audioQuality: "STANDARD_128",
   offlineAllowed: false,
   offlineMaxTracks: 0,
   maxDevices: 1,
   syncedLyrics: false,
   vipBadge: false,
-  customThemes: false,
   familySharing: false,
 };
 

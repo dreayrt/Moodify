@@ -25,8 +25,9 @@ import {
   clearAuthSession,
   getStoredAuthSession,
   logout,
+  registerCurrentDevice,
   type UserProfileResponse,
-} from "@/lib/auth-client";
+} from "@/lib/auth/auth-client";
 import {
   fetchUserPlaylists,
   fetchMySubscription,
@@ -863,6 +864,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           if (!cancelled) {
             setSubInfo(sub);
           }
+          // Tự động đồng bộ và liên kết thiết bị hiện tại vào hệ thống quản lý thiết bị
+          void registerCurrentDevice();
         } else {
           if (!cancelled) setUserLoading(false);
         }
