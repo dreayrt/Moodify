@@ -50,7 +50,7 @@ export type ArtistTrackResponse = {
   albumName: string | null;
   featuredArtists: string | null;
   duration: string;
-  status: "draft" | "published" | "scheduled";
+  status: "draft" | "published" | "scheduled" | "archived" | "disabled";
   visibility: "public" | "private" | "unlisted";
   plays: number;
   likes: number;
@@ -412,7 +412,7 @@ export async function updateArtistTrack(
     genre: string;
     featuredArtists?: string;
     albumName?: string;
-    status: "draft" | "published" | "scheduled";
+    status: "draft" | "published" | "scheduled" | "archived" | "disabled";
     visibility: "public" | "private" | "unlisted";
     explicit?: boolean;
     lyricsPlain?: string;
@@ -510,6 +510,45 @@ export async function getCurrentArtistCatalog(
 
 export const getCurrentContentLeadCatalog = getCurrentArtistCatalog;
 export const uploadContentLeadTrack = uploadArtistTrack;
+
+export interface OcrExtractLicenseResponse {
+  success: boolean;
+  licenseType?: string;
+  copyrightOwner?: string;
+  distributorId?: number;
+  distributorName?: string;
+  contractId?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  perpetual?: boolean;
+  confidence?: number;
+  message?: string;
+  rawFields?: Record<string, unknown>;
+}
+
+export async function extractLicenseFromDoc(
+  file: File,
+  token?: string
+): Promise<OcrExtractLicenseResponse> {
+  const validToken = token || (await getValidAccessToken());
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const fullUrl = `${API_BASE_URL}/api/content-lead/ocr/extract-license`;
+  const response = await fetch(fullUrl, {
+    method: 'POST',
+    headers: validToken ? { Authorization: `Bearer ${validToken}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorMsg = await extractErrorMessage(response);
+    throw new Error(errorMsg);
+  }
+
+  return (await response.json()) as OcrExtractLicenseResponse;
+}
+
 export const updateContentLeadTrack = updateArtistTrack;
 export const deleteContentLeadTrack = deleteArtistTrack;
 

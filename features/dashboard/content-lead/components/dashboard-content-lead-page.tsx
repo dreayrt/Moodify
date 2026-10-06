@@ -21,7 +21,6 @@ import {
   Play,
   Radio,
   Rewind,
-  Search,
   SkipBack,
   SkipForward,
   Sparkles,
@@ -54,8 +53,7 @@ import { TrackDeleteModal } from "./track-delete-modal";
 import { TrackUploadModal } from "./track-upload-modal";
 import { ToastNotification } from "./toast-notification";
 import { AudienceDistributionCard } from "./audience-distribution-card";
-
-type TabKey = "tracks" | "comments" | "benefits";
+import { RevenueAnalyticsDrawer } from "./revenue-analytics-drawer";
 
 type Stat = {
   key: "plays" | "reposts" | "downloads" | "likes" | "comments";
@@ -133,29 +131,7 @@ const DISTRIBUTION_CHANNELS = [
   { channel: "Đối tác & Nhúng ngoài", share: "10% lưu lượng", note: "Liên kết bên ngoài & chia sẻ mạng xã hội" },
 ];
 
-const COMMENT_PREVIEWS = [
-  {
-    name: "Minh Nhật",
-    excerpt: "Đoạn drop lúc 2:15 nghe cuốn dã man! Rất mong chờ bản master chính thức trên Spotify.",
-    age: "2 giờ trước",
-  },
-  {
-    name: "Alex Chen",
-    excerpt: "Amazing vibes on the acoustic demo. Such an emotional chord progression!",
-    age: "1 ngày trước",
-  },
-  {
-    name: "Thu Hà",
-    excerpt: "Đã nghe đi nghe lại bài này suốt cả buổi tối học bài, giai điệu rất chữa lành.",
-    age: "3 ngày trước",
-  },
-];
 
-const TAB_LABELS: Array<{ key: TabKey; labelKey: string }> = [
-  { key: "tracks", labelKey: "dashboard.artist.tabs.tracks" },
-  { key: "comments", labelKey: "dashboard.artist.tabs.comments" },
-  { key: "benefits", labelKey: "dashboard.artist.tabs.benefits" },
-];
 
 const HOME_ROUTE = "/";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
@@ -411,32 +387,7 @@ function StatCard({ item, delay }: { item: Stat; delay: number }) {
   );
 }
 
-function TabButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative pb-4 text-left text-[14px] transition-colors ${
-        active ? "text-white" : "text-white/48 hover:text-white/76"
-      }`}
-    >
-      <span>{label}</span>
-      <span
-        className={`absolute bottom-0 left-0 h-[3px] rounded-full bg-white transition-all ${
-          active ? "w-full opacity-100" : "w-8 opacity-0"
-        }`}
-      />
-    </button>
-  );
-}
+
 
 
 function TracksPanel({
@@ -605,73 +556,89 @@ function TracksPanel({
 }
 
 
-function CommentsPanel() {
-  const { t } = useTranslation();
-
+function StudioFooterBenefits() {
   return (
-    <div
-      className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-6"
-      style={{ animationDelay: "760ms" }}
-    >
-      <div className="flex items-center justify-between gap-3">
+    <footer className="mt-12 anim-fade-up space-y-6 pt-8 border-t border-white/8" style={{ animationDelay: "600ms" }}>
+      {/* Header: Title & Subtitle */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">
-            {t("dashboard.artist.commentsPanel.eyebrow")}
-          </p>
-          <h3 className="mt-2 font-graphik text-[26px] font-semibold tracking-[-0.02em] text-white">
-            {t("dashboard.artist.commentsPanel.title")}
-          </h3>
-        </div>
-        <button
-          type="button"
-          className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/72 transition hover:bg-white/[0.08]"
-        >
-          {t("dashboard.artist.commentsPanel.moderate")}
-        </button>
-      </div>
-      <div className="mt-6 space-y-4">
-        {COMMENT_PREVIEWS.map((comment) => (
-          <div key={comment.name} className="rounded-[22px] border border-white/8 bg-black/20 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[14px] text-white font-medium">{comment.name}</p>
-              <p className="text-[11px] text-white/44">{comment.age}</p>
-            </div>
-            <p className="mt-3 text-[14px] leading-6 text-white/62">{comment.excerpt}</p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#ff7a2c]/30 bg-[#ff7a2c]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#ffb488]">
+            <Sparkles className="h-3 w-3 text-[#ff7a2c]" />
+            <span>Đặc quyền đối tác nội dung</span>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BenefitsPanel() {
-  return (
-    <div className="grid gap-5 md:grid-cols-3">
-      {[
-        {
-          title: "Doanh thu trực tiếp 85%",
-          body: "Nhận tiền bản quyền trực tiếp từ người nghe với tỉ lệ chi trả cao nhất thị trường.",
-        },
-        {
-          title: "Chứng nhận Content Lead chính thức",
-          body: "Huy hiệu tick xanh độc quyền và trang profile nghệ sĩ tùy biến giao diện.",
-        },
-        {
-          title: "Công cụ phân tích Real-time",
-          body: "Theo dõi nhân khẩu học người nghe, bản đồ lượt phát và xu hướng tương tác 24/7.",
-        },
-      ].map((item, index) => (
-        <div
-          key={`benefit-${index}`}
-          className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-6"
-          style={{ animationDelay: `${760 + index * 80}ms` }}
-        >
-          <Sparkles className="h-5 w-5 text-[#ffb488]" strokeWidth={1.7} />
-          <h3 className="mt-5 font-graphik text-[24px] tracking-[-0.03em] text-white">{item.title}</h3>
-          <p className="mt-3 text-[14px] leading-6 text-white/58">{item.body}</p>
+          <h3 className="mt-2.5 font-graphik text-[22px] font-bold text-white tracking-[-0.02em] sm:text-[26px]">
+            Quyền lợi & Chính sách Phụ trách nội dung
+          </h3>
+          <p className="mt-1 text-[13px] text-white/50 max-w-[680px]">
+            Hệ sinh thái phân phối âm nhạc bản quyền, bảo hộ quyền tác giả và tối ưu hóa doanh thu phát hành trên Moodify.
+          </p>
         </div>
-      ))}
-    </div>
+        <div className="flex items-center gap-2 text-[12px] text-white/40">
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Chính sách áp dụng 2026</span>
+        </div>
+      </div>
+
+      {/* Benefits Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[
+          {
+            icon: CircleDollarSign,
+            title: "Doanh thu trực tiếp 85%",
+            badge: "Chia sẻ cao nhất",
+            body: "Nhận tiền bản quyền trực tiếp từ người nghe với tỉ lệ chi trả lên đến 85%, đối soát định kỳ minh bạch qua cổng thanh toán.",
+          },
+          {
+            icon: Sparkles,
+            title: "Chứng nhận Content Lead & Bản quyền",
+            badge: "Xác thực chính thức",
+            body: "Huy hiệu xác minh độc quyền, ưu tiên phân phối bản phát hành và bảo vệ pháp lý bản quyền tác giả toàn cầu.",
+          },
+          {
+            icon: Activity,
+            title: "Phân tích dữ liệu Real-time & AI",
+            badge: "Insight 24/7",
+            body: "Theo dõi nhân khẩu học thính giả, bản đồ lượt nghe và nhận các phân tích dự đoán từ AI về xu hướng âm nhạc.",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.title}
+              className="group relative overflow-hidden rounded-[26px] border border-white/8 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-5 sm:p-6 transition-all duration-300 hover:border-[#ff7a2c]/30 hover:bg-white/[0.06] hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-[#ffb488] transition group-hover:scale-105 group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/10">
+                  <Icon className="h-5 w-5" strokeWidth={1.8} />
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-medium text-white/60">
+                  {item.badge}
+                </span>
+              </div>
+              <h4 className="mt-4 font-graphik text-[17px] font-semibold text-white tracking-[-0.01em]">
+                {item.title}
+              </h4>
+              <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+                {item.body}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom Legal / Studio Brand Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[22px] border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-white/40">
+        <div className="flex items-center gap-2.5">
+          <LogoMark className="h-5 w-5" />
+          <span className="font-medium text-white/70">Moodify Content Lead Studio</span>
+          <span>•</span>
+          <span>Bảo hộ bản quyền số & Phát hành âm nhạc</span>
+        </div>
+        <p className="text-[11px] text-white/35">
+          © 2026 Moodify Platform. Mọi quyền được bảo lưu.
+        </p>
+      </div>
+    </footer>
   );
 }
 
@@ -748,7 +715,6 @@ function RightRail({
 export default function ContentLeadDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey>("tracks");
   const [authState, setAuthState] = useState<"checking" | "allowed" | "denied">(
     "checking"
   );
@@ -764,6 +730,7 @@ export default function ContentLeadDashboardPage() {
   const [editingTrack, setEditingTrack] = useState<ArtistTrack | null>(null);
   const [deletingTrack, setDeletingTrack] = useState<ArtistTrack | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isRevenueDrawerOpen, setIsRevenueDrawerOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const [previewTrackId, setPreviewTrackId] = useState<string | null>(null);
@@ -1144,7 +1111,6 @@ export default function ContentLeadDashboardPage() {
   const statsList: Stat[] = useMemo(() => {
     const totalPlays = tracks.reduce((sum, tr) => sum + tr.plays, 0);
     const totalLikes = tracks.reduce((sum, tr) => sum + tr.likes, 0);
-    const totalComments = tracks.reduce((sum, tr) => sum + tr.commentsCount, 0);
 
     const formatNum = (num: number) => {
       if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -1157,7 +1123,6 @@ export default function ContentLeadDashboardPage() {
       { key: "reposts", value: "0", icon: Radio },
       { key: "downloads", value: formatNum(downloadedTracks), icon: Download },
       { key: "likes", value: formatNum(totalLikes), icon: Heart },
-      { key: "comments", value: totalComments.toString(), icon: MessageSquare },
     ];
   }, [tracks]);
 
@@ -1169,30 +1134,7 @@ export default function ContentLeadDashboardPage() {
   const artistImageUrl = artistProfile?.imageUrl || currentUser?.avatarUrl;
   const previewTrack = tracks.find((track) => track.id === previewTrackId) ?? null;
 
-  const renderActivePanel = () => {
-    switch (activeTab) {
-      case "comments":
-        return <CommentsPanel />;
-      case "benefits":
-        return <BenefitsPanel />;
-      case "tracks":
-      default:
-        return (
-          <TracksPanel
-            tracks={tracks}
-            onEditTrack={handleEditTrack}
-            onDeleteTrack={handleDeleteTrack}
-            onToggleStatus={handleToggleStatus}
-            onToggleVisibility={handleToggleVisibility}
-            onCopyLink={handleCopyLink}
-            playingTrackId={playingTrackId}
-            onTogglePlayTrack={handleTogglePlayTrack}
-            onOpenUpload={() => setIsUploadModalOpen(true)}
-            onShowHistory={handleShowHistory}
-          />
-        );
-    }
-  };
+
 
   if (authState !== "allowed") {
     return (
@@ -1264,15 +1206,7 @@ export default function ContentLeadDashboardPage() {
             </div>
           </div>
 
-          <div className="anim-slide-right flex flex-1 flex-col gap-3 lg:ml-auto lg:max-w-[620px] lg:flex-row" style={{ animationDelay: "120ms" }}>
-            <label className="flex min-h-[54px] flex-1 items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 backdrop-blur-md transition focus-within:border-white/20 focus-within:bg-white/[0.06]">
-              <Search className="h-4 w-4 text-white/44" strokeWidth={1.7} />
-              <input
-                aria-label={t("dashboard.artist.header.searchLabel")}
-                placeholder={t("dashboard.artist.header.searchPlaceholder")}
-                className="w-full bg-transparent text-[14px] text-white outline-none placeholder:text-white/36"
-              />
-            </label>
+          <div className="anim-slide-right flex items-center gap-3 lg:ml-auto" style={{ animationDelay: "120ms" }}>
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-md">
               <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#ff8b4d,#ffd1b5)] text-black font-semibold">
                 {artistImageUrl && (
@@ -1355,54 +1289,91 @@ export default function ContentLeadDashboardPage() {
               </div>
 
               {/* Dynamic Stats Grid */}
-              <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {statsList.map((item, index) => (
                   <StatCard key={item.key} item={item} delay={340 + index * 70} />
                 ))}
               </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-4">
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {[
-                  { icon: BarChart3, label: t("dashboard.artist.studio.insight"), copy: "Top 5% nội dung thịnh hành" },
-                  { icon: CircleDollarSign, label: t("dashboard.artist.studio.earnings"), copy: "$1,420.80 tháng này" },
-                  { icon: Users, label: t("dashboard.artist.studio.fans"), copy: "+420 người theo dõi mới" },
-                  { icon: Sparkles, label: t("dashboard.artist.studio.benefits"), copy: "Đặc quyền phân phối cấp 2" },
+                  {
+                    icon: CircleDollarSign,
+                    label: t("dashboard.artist.studio.earnings"),
+                    copy: "$1,420.80 tháng này",
+                    clickable: true,
+                    onClick: () => setIsRevenueDrawerOpen(true),
+                    badge: "Xem chi tiết →",
+                  },
+                  {
+                    icon: Users,
+                    label: t("dashboard.artist.studio.fans"),
+                    copy: "+420 người theo dõi mới",
+                    clickable: false,
+                  },
                 ].map((item, index) => {
                   const Icon = item.icon;
                   return (
                     <div
                       key={item.label}
-                      className="anim-fade-up flex items-center gap-4 rounded-[22px] border border-white/8 bg-black/20 p-4 hover:bg-white/[0.04] transition"
+                      onClick={item.onClick}
+                      className={`anim-fade-up flex items-center justify-between rounded-[22px] border border-white/8 bg-black/20 p-4 transition ${
+                        item.clickable
+                          ? "hover:border-[#ff7a2c]/50 hover:bg-white/[0.05] cursor-pointer group shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
+                          : "hover:bg-white/[0.04]"
+                      }`}
                       style={{ animationDelay: `${620 + index * 80}ms` }}
                     >
-                      <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-white/10 bg-white/[0.04]">
-                        <Icon className="h-5 w-5 text-[#ffb488]" strokeWidth={1.7} />
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`grid h-12 w-12 place-items-center rounded-[18px] border transition ${
+                            item.clickable
+                              ? "border-white/10 bg-white/[0.04] group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/10 text-[#ffb488]"
+                              : "border-white/10 bg-white/[0.04] text-[#ffb488]"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" strokeWidth={1.7} />
+                        </div>
+                        <div>
+                          <p className="text-[14px] text-white font-medium">{item.label}</p>
+                          <p className="mt-1 text-[12px] text-white/44">{item.copy}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[14px] text-white font-medium">{item.label}</p>
-                        <p className="mt-1 text-[12px] text-white/44">{item.copy}</p>
-                      </div>
+                      {item.badge && (
+                        <span className="hidden sm:inline-flex items-center text-[11px] font-medium text-[#ffb488] bg-[#ff7a2c]/10 border border-[#ff7a2c]/20 px-2.5 py-1 rounded-full group-hover:bg-[#ff7a2c]/20 group-hover:border-[#ff7a2c]/40 transition">
+                          {item.badge}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Tabs Section */}
+            {/* Catalog Section */}
             <div
-              className="anim-fade-up rounded-[30px] border border-white/8 bg-white/[0.03] px-5 py-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:px-6"
+              className="anim-fade-up rounded-[30px] border border-white/8 bg-white/[0.03] px-5 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:px-6"
               style={{ animationDelay: "520ms" }}
             >
-              <div className="flex flex-wrap items-end gap-x-8 gap-y-4 border-b border-white/8">
-                {TAB_LABELS.map((tab) => (
-                  <TabButton
-                    key={tab.key}
-                    active={tab.key === activeTab}
-                    label={t(tab.labelKey)}
-                    onClick={() => setActiveTab(tab.key)}
-                  />
-                ))}
+              <div className="flex items-center justify-between border-b border-white/8 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-[#ff7a2c]/10 text-[#ff7a2c]">
+                    <Music2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-graphik text-[16px] font-semibold text-white">
+                      {t("dashboard.artist.tabs.tracks")}
+                    </h3>
+                    <p className="text-[12px] text-white/45">
+                      Quản lý kho bài hát, phát hành và chiến dịch phân phối
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-white/60">
+                  {tracks.length} bài hát
+                </span>
               </div>
+
               {catalogState === "loading" && (
                 <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20 px-5 py-4 text-[13px] text-white/58">
                   Đang tải danh sách bài hát...
@@ -1413,14 +1384,28 @@ export default function ContentLeadDashboardPage() {
                   Không thể tải catalog nội dung: {catalogError}
                 </div>
               )}
-              <div className="mt-5">{renderActivePanel()}</div>
+              <div className="mt-5">
+                <TracksPanel
+                  tracks={tracks}
+                  onEditTrack={handleEditTrack}
+                  onDeleteTrack={handleDeleteTrack}
+                  onToggleStatus={handleToggleStatus}
+                  onToggleVisibility={handleToggleVisibility}
+                  onCopyLink={handleCopyLink}
+                  playingTrackId={playingTrackId}
+                  onTogglePlayTrack={handleTogglePlayTrack}
+                  onOpenUpload={() => setIsUploadModalOpen(true)}
+                  onShowHistory={handleShowHistory}
+                />
+              </div>
             </div>
           </div>
 
           <RightRail token={accessToken} tracks={tracks} />
         </div>
 
-        {/* Footer Notes */}
+        {/* Footer: Quyền lợi & Chính sách Phụ trách nội dung */}
+        <StudioFooterBenefits />
     
       </div>
 
@@ -1445,6 +1430,12 @@ export default function ContentLeadDashboardPage() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={handleUploadSuccess}
+      />
+
+      <RevenueAnalyticsDrawer
+        isOpen={isRevenueDrawerOpen}
+        onClose={() => setIsRevenueDrawerOpen(false)}
+        tracks={tracks}
       />
 
       <ToastNotification toasts={toasts} onDismiss={dismissToast} />

@@ -16,6 +16,21 @@ type TrackCardProps = {
   addedAt?: string;
 };
 
+function resolveMediaUrl(rawUrl?: string | null) {
+  if (!rawUrl) return undefined;
+  if (
+    rawUrl.startsWith("http://") ||
+    rawUrl.startsWith("https://") ||
+    rawUrl.startsWith("blob:") ||
+    rawUrl.startsWith("data:")
+  ) {
+    return rawUrl;
+  }
+  const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
+  if (!apiBase) return rawUrl;
+  return `${apiBase}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+}
+
 export default function TrackCard({
   track,
   isLiked = false,
@@ -27,6 +42,8 @@ export default function TrackCard({
 }: TrackCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const resolvedCover = resolveMediaUrl(track.imageUrl);
 
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
@@ -53,11 +70,12 @@ export default function TrackCard({
         {/* Album Art */}
         <div className="relative flex-shrink-0">
           <div className="h-16 w-16 rounded-md bg-slate-800 overflow-hidden">
-            {track.imageUrl ? (
+            {resolvedCover && !imgError ? (
               <img
-                src={track.imageUrl}
-                alt={track.albumName}
+                src={resolvedCover}
+                alt={track.name || track.albumName || "Track cover"}
                 className="h-full w-full object-cover"
+                onError={() => setImgError(true)}
               />
             ) : (
               <div className="h-full w-full flex items-center justify-center text-slate-600">

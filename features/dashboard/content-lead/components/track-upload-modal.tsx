@@ -24,7 +24,7 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
-import { uploadArtistTrack } from "@/lib/auth/auth-client";
+import { uploadArtistTrack, extractLicenseFromDoc } from "@/lib/auth/auth-client";
 import {
   ArtistTrack,
   LicenseStatus,
@@ -62,6 +62,12 @@ const LICENSE_TYPES: Array<{
     badge: "Phổ biến nhất",
   },
   {
+    value: "EXCLUSIVE_LICENSE",
+    label: "Exclusive License",
+    desc: "Bản quyền độc quyền phát hành và phân phối toàn cầu",
+    badge: "Độc quyền",
+  },
+  {
     value: "MASTER_LICENSE",
     label: "Master License",
     desc: "Quyền sở hữu bản ghi âm gốc (Master Recording Rights)",
@@ -72,6 +78,12 @@ const LICENSE_TYPES: Array<{
     label: "Direct License",
     desc: "Cấp phép trực tiếp từ nghệ sĩ độc lập (Independent Creator)",
     badge: "Nghệ sĩ tự do",
+  },
+  {
+    value: "NON_EXCLUSIVE",
+    label: "Non-Exclusive License",
+    desc: "Bản quyền không độc quyền (phát hành tự do trên nhiều nền tảng)",
+    badge: "Tự do",
   },
   {
     value: "STREAMING_PENDING",
@@ -149,7 +161,7 @@ export function TrackUploadModal({
   const [description, setDescription] = useState("");
 
   // Step 2: License Metadata matching MySQL `song_licenses` table
-  const [licenseType, setLicenseType] = useState<LicenseType>("DIGITAL_STREAMING");
+  const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("Independent Artist");
   const [distributorId, setDistributorId] = useState<string>("");
   const [distributionContractId, setDistributionContractId] = useState<string>("");
@@ -164,6 +176,9 @@ export function TrackUploadModal({
   // UI helpers
   const [isDragging, setIsDragging] = useState(false);
   const [isDocDragging, setIsDocDragging] = useState(false);
+  const [isExtractingOcr, setIsExtractingOcr] = useState<boolean>(false);
+  const [ocrExtractedFields, setOcrExtractedFields] = useState<string[]>([]);
+  const [ocrNotification, setOcrNotification] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   if (!isOpen) return null;
@@ -187,6 +202,68 @@ export function TrackUploadModal({
     setCoverUrl(objectUrl);
   };
 
+  const runOcrExtraction = async (file: File) => {
+    // Chỉ kích hoạt OCR cho file PDF hoặc hình ảnh chứng từ
+    const isPdfOrImage = file.type === "application/pdf" || 
+      file.name.toLowerCase().endsWith(".pdf") || 
+      file.type.startsWith("image/");
+    if (!isPdfOrImage) return;
+
+    try {
+      setIsExtractingOcr(true);
+      setOcrNotification(null);
+      setStepError(null);
+      const res = await extractLicenseFromDoc(file);
+      if (res && res.success) {
+        const fields: string[] = [];
+        if (res.licenseType) {
+          setLicenseType(res.licenseType);
+          fields.push("licenseType");
+        }
+        if (res.copyrightOwner) {
+          setCopyrightOwner(res.copyrightOwner);
+          fields.push("copyrightOwner");
+        }
+        if (res.distributorId !== undefined && res.distributorId !== null) {
+          setDistributorId(String(res.distributorId));
+          fields.push("distributorId");
+        }
+        if (res.contractId) {
+          setDistributionContractId(res.contractId);
+          fields.push("contractId");
+        }
+        if (res.issueDate) {
+          setIssueDate(res.issueDate);
+          fields.push("issueDate");
+        }
+        if (res.perpetual) {
+          setIsPerpetual(true);
+          setExpiryDate("");
+          fields.push("expiryDate");
+        } else if (res.expiryDate) {
+          setIsPerpetual(false);
+          setExpiryDate(res.expiryDate);
+          fields.push("expiryDate");
+        }
+
+        setOcrExtractedFields(fields);
+        if (fields.length > 0) {
+          setOcrNotification(`Mô hình OCR đã tự động bóc tách và điền ${fields.length} trường thông tin từ tài liệu!`);
+        } else {
+          setOcrNotification("Tài liệu đã được quét nhưng không phát hiện các trường mẫu hợp đồng bản quyền. Bạn có thể nhập tay các thông tin bên phải.");
+        }
+      } else {
+        const errMsg = res?.message || "Tài liệu PDF không hợp lệ hoặc bị lỗi cấu trúc.";
+        setStepError(`⚠️ OCR cảnh báo: ${errMsg}`);
+      }
+    } catch (err: any) {
+      console.warn("OCR Service extraction warning:", err);
+      setStepError(`⚠️ Không thể bóc tách dữ liệu từ file: ${err.message || "Lỗi kết nối tới OCR Service"}. Bạn có thể tự nhập tay thông tin.`);
+    } finally {
+      setIsExtractingOcr(false);
+    }
+  };
+
   const handleLicenseDocFile = (file: File) => {
     setLicenseDocFile(file);
     setLicenseDocName(file.name);
@@ -194,6 +271,7 @@ export function TrackUploadModal({
     setLicenseDocSize(`${sizeInMB} MB`);
     const objectUrl = URL.createObjectURL(file);
     setLicenseDocUrl(objectUrl);
+    runOcrExtraction(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -387,6 +465,9 @@ export function TrackUploadModal({
     setLicenseDocName("");
     setLicenseDocSize("");
     setLicenseDocUrl("");
+    setIsExtractingOcr(false);
+    setOcrExtractedFields([]);
+    setOcrNotification(null);
   };
 
   const handleModalClose = () => {
@@ -857,7 +938,23 @@ export function TrackUploadModal({
                           : "border-white/12 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.04]"
                       }`}
                     >
-                      {licenseDocName ? (
+                      {isExtractingOcr ? (
+                        <div className="flex flex-col items-center gap-3 py-2 text-[#ff9e64]">
+                          <div className="relative">
+                            <div className="h-12 w-12 rounded-2xl bg-[#ff7a2c]/15 grid place-items-center animate-pulse">
+                              <Sparkles className="h-6 w-6 text-[#ff7a2c] animate-spin" />
+                            </div>
+                          </div>
+                          <div className="text-center px-2">
+                            <p className="text-[13px] font-semibold text-white">
+                              Đang phân tích dữ liệu hợp đồng...
+                            </p>
+                            <p className="text-[11px] text-[#ffb488]/80 mt-0.5">
+                              Mô hình AI OCR đang bóc tách các trường bản quyền
+                            </p>
+                          </div>
+                        </div>
+                      ) : licenseDocName ? (
                         <div className="flex flex-col items-center gap-2 text-emerald-300">
                           <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400">
                             <FileText className="h-5 w-5" />
@@ -889,29 +986,73 @@ export function TrackUploadModal({
                       )}
                     </div>
                   </div>
+
+                  {/* Thông báo kết quả AI OCR */}
+                  {ocrNotification && (
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-[12px] text-emerald-200 animate-in fade-in space-y-1.5">
+                      <div className="flex items-center gap-2 font-medium text-emerald-300">
+                        <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
+                        <span>Tự động điền dữ liệu thành công!</span>
+                      </div>
+                      <p className="text-[11px] text-white/70 leading-relaxed">
+                        {ocrNotification} Bạn có thể kiểm tra và chỉnh sửa lại các thông tin ở khung bên phải nếu cần.
+                      </p>
+                      {licenseDocFile && (
+                        <button
+                          type="button"
+                          disabled={isExtractingOcr}
+                          onClick={() => licenseDocFile && runOcrExtraction(licenseDocFile)}
+                          className="mt-1 text-[11px] text-[#ffb488] hover:text-[#ff9e64] underline flex items-center gap-1 font-medium transition"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          <span>Quét lại tài liệu bằng OCR</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {!ocrNotification && !isExtractingOcr && licenseDocFile && (
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] text-white/40">Tài liệu đã đính kèm</span>
+                      <button
+                        type="button"
+                        onClick={() => runOcrExtraction(licenseDocFile)}
+                        className="text-[11px] text-[#ffb488] hover:text-white flex items-center gap-1 transition"
+                      >
+                        <Sparkles className="h-3 w-3 text-[#ff7a2c]" />
+                        <span>Bóc tách lại bằng AI</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* RIGHT COLUMN: License Metadata Fields (7 cols) */}
                 <div className="lg:col-span-7 space-y-3.5">
                   
-                  {/* License Type Selector (Dropdown) */}
+                  {/* License Type Input with Datalist Suggestions */}
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                      Loại bản quyền / Giấy phép (<span className="text-[#ffb488] font-mono">license_type</span>) <span className="text-[#ff7a2c]">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
+                        Loại bản quyền / Giấy phép (<span className="text-[#ffb488] font-mono">license_type</span>) <span className="text-[#ff7a2c]">*</span>
+                      </label>
+                    </div>
                     <div className="relative">
-                      <select
+                      <input
+                        type="text"
+                        required
+                        list="license-types-suggestions"
                         value={licenseType}
-                        onChange={(e) => setLicenseType(e.target.value as LicenseType)}
-                        className="w-full appearance-none rounded-xl border border-white/10 bg-[#17181f] px-3.5 py-2.5 text-[13px] text-white outline-none focus:border-[#ff8b4d]/50 transition cursor-pointer"
-                      >
+                        onChange={(e) => setLicenseType(e.target.value)}
+                        placeholder="Ví dụ: DIGITAL_STREAMING hoặc EXCLUSIVE - Độc quyền phân phối..."
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50 focus:bg-white/[0.07] transition"
+                      />
+                      <datalist id="license-types-suggestions">
                         {LICENSE_TYPES.map((type) => (
-                          <option key={type.value} value={type.value} className="bg-[#121318] text-white">
-                            {type.value} — {type.label} ({type.badge})
+                          <option key={type.value} value={type.value}>
+                            {type.label} ({type.badge})
                           </option>
                         ))}
-                      </select>
-                      <ChevronDown className="absolute right-3.5 top-3 h-4 w-4 pointer-events-none text-white/40" />
+                      </datalist>
                     </div>
                   </div>
 

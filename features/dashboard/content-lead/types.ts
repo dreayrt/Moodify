@@ -1,4 +1,4 @@
-export type TrackStatus = "draft" | "published" | "scheduled";
+export type TrackStatus = "draft" | "published" | "scheduled" | "archived" | "disabled";
 
 export type TrackVisibility = "public" | "private" | "unlisted";
 
@@ -31,15 +31,14 @@ export type ContentLeadTrack = {
   moderationScore?: number;
   description?: string;
   license?: SongLicense;
+  licenseStatus?: string;
+  licenseExpiryDate?: string;
+  licenseIssueDate?: string;
 };
 
 export type ArtistTrack = ContentLeadTrack;
 
-export type LicenseType =
-  | "DIGITAL_STREAMING"
-  | "MASTER_LICENSE"
-  | "DIRECT_LICENSE"
-  | "STREAMING_PENDING";
+export type LicenseType = string;
 
 export type LicenseStatus = "ACTIVE" | "PENDING" | "EXPIRED" | "REVOKED";
 

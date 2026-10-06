@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Save, Music2, Globe2, Lock, EyeOff } from "lucide-react";
+import { X, Save, Music2, Globe2, Lock, EyeOff, AlertCircle } from "lucide-react";
 import { ArtistTrack, TrackStatus, TrackVisibility } from "../types";
 
 type TrackEditModalProps = {
@@ -115,6 +115,19 @@ function TrackEditForm({
               </div>
             </div>
 
+            {/* License Expiration Warning */}
+            {(track.licenseStatus === "EXPIRED" || track.license?.status === "EXPIRED" || track.status === "archived" || track.status === "disabled") && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-[12px] text-rose-300 flex items-start gap-2.5">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
+                <div>
+                  <p className="font-semibold text-rose-200">Hợp đồng bản quyền đã hết hạn</p>
+                  <p className="text-[11px] text-rose-300/80 mt-0.5 leading-relaxed">
+                    Bài hát này đã hết hiệu lực bản quyền phát hành ({track.licenseExpiryDate || "Quá hạn"}). Không thể chuyển sang trạng thái "Đã phát hành" cho đến khi nộp hợp đồng mới.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Status Selection */}
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
@@ -123,11 +136,14 @@ function TrackEditForm({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
+                  disabled={track.licenseStatus === "EXPIRED" || track.license?.status === "EXPIRED" || track.status === "archived" || track.status === "disabled"}
                   onClick={() => setStatus("published")}
                   className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-[12px] font-medium transition ${
-                    status === "published"
-                      ? "border-white/20 bg-white/[0.08] text-white shadow-sm"
-                      : "border-white/8 bg-white/[0.02] text-white/50 hover:text-white/80"
+                    (track.licenseStatus === "EXPIRED" || track.license?.status === "EXPIRED" || track.status === "archived" || track.status === "disabled")
+                      ? "border-white/5 bg-white/[0.01] text-white/20 cursor-not-allowed opacity-50"
+                      : status === "published"
+                        ? "border-white/20 bg-white/[0.08] text-white shadow-sm"
+                        : "border-white/8 bg-white/[0.02] text-white/50 hover:text-white/80"
                   }`}
                 >
                   <span
