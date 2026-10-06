@@ -48,7 +48,7 @@ export type ArtistTrackResponse = {
   albumName: string | null;
   featuredArtists: string | null;
   duration: string;
-  status: "draft" | "published" | "scheduled";
+  status: "draft" | "published" | "scheduled" | "archived" | "disabled";
   visibility: "public" | "private" | "unlisted";
   plays: number;
   likes: number;
@@ -354,7 +354,7 @@ export async function updateArtistTrack(
     genre: string;
     featuredArtists?: string;
     albumName?: string;
-    status: "draft" | "published" | "scheduled";
+    status: "draft" | "published" | "scheduled" | "archived" | "disabled";
     visibility: "public" | "private" | "unlisted";
     explicit?: boolean;
     lyricsPlain?: string;

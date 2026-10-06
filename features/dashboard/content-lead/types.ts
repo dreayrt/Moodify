@@ -1,4 +1,4 @@
-export type TrackStatus = "draft" | "published" | "scheduled";
+export type TrackStatus = "draft" | "published" | "scheduled" | "archived" | "disabled";
 
 export type TrackVisibility = "public" | "private" | "unlisted";
 
@@ -31,6 +31,9 @@ export type ContentLeadTrack = {
   moderationScore?: number;
   description?: string;
   license?: SongLicense;
+  licenseStatus?: string;
+  licenseExpiryDate?: string;
+  licenseIssueDate?: string;
 };
 
 export type ArtistTrack = ContentLeadTrack;

@@ -20,6 +20,7 @@ import {
   Copy,
   Radio,
   Music,
+  AlertCircle,
   Plus,
 } from "lucide-react";
 import {
@@ -166,7 +167,7 @@ export function TrackCatalogPanel({
       style={{ animationDelay: "940ms" }}
     >
       {/* Top Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
             {t("dashboard.artist.trackCatalog.eyebrow")}
@@ -179,22 +180,22 @@ export function TrackCatalogPanel({
           </p>
         </div>
 
-        {/* Search and Filter Popover Button */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex min-h-[44px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 focus-within:border-[#ff8b4d]/40 focus-within:bg-white/[0.07] transition">
-            <Search className="h-4 w-4 text-white/42" strokeWidth={1.7} />
+        {/* Search, Filter & Upload Action Group */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <label className="flex min-h-[44px] items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 focus-within:border-[#ff8b4d]/40 focus-within:bg-white/[0.07] transition">
+            <Search className="h-4 w-4 text-white/42 shrink-0" strokeWidth={1.7} />
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label={t("dashboard.artist.trackCatalog.searchLabel")}
               placeholder={t("dashboard.artist.trackCatalog.searchPlaceholder")}
-              className="w-full min-w-[220px] bg-transparent text-[13px] text-white outline-none placeholder:text-white/36"
+              className="w-[180px] sm:w-[210px] bg-transparent text-[13px] text-white outline-none placeholder:text-white/36"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm("")}
-                className="rounded-full p-0.5 text-white/40 hover:bg-white/10 hover:text-white transition"
+                className="rounded-full p-0.5 text-white/40 hover:bg-white/10 hover:text-white transition shrink-0"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -202,20 +203,20 @@ export function TrackCatalogPanel({
           </label>
 
           {/* Filter Popover Trigger */}
-          <div className="relative" ref={filterMenuRef}>
+          <div className="relative shrink-0" ref={filterMenuRef}>
             <button
               type="button"
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border px-4 text-[12px] transition ${
+              className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border px-4 text-[12px] font-medium whitespace-nowrap shrink-0 transition ${
                 hasActiveAdvancedFilter
                   ? "border-[#ff8b4d]/50 bg-[#ff8b4d]/15 text-[#ffb488]"
                   : "border-white/10 bg-white/[0.04] text-white/74 hover:bg-white/[0.08]"
               }`}
             >
-              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.7} />
-              <span>{t("dashboard.artist.trackCatalog.filter")}</span>
+              <SlidersHorizontal className="h-4 w-4 shrink-0" strokeWidth={1.7} />
+              <span className="whitespace-nowrap">{t("dashboard.artist.trackCatalog.filter")}</span>
               {hasActiveAdvancedFilter && (
-                <span className="h-2 w-2 rounded-full bg-[#ff7a2c]" />
+                <span className="h-2 w-2 rounded-full bg-[#ff7a2c] shrink-0" />
               )}
             </button>
 
@@ -302,16 +303,16 @@ export function TrackCatalogPanel({
           <button
             type="button"
             onClick={onOpenUpload}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e58] px-5 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(255,122,44,0.25)] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] transition cursor-pointer"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e58] px-5 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(255,122,44,0.25)] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] whitespace-nowrap shrink-0 transition cursor-pointer"
           >
-            <Plus className="h-4 w-4" strokeWidth={2.2} />
-            <span>{t("dashboard.artist.trackCatalog.uploadTrack", "Tải lên bài hát mới")}</span>
+            <Plus className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+            <span className="whitespace-nowrap">{t("dashboard.artist.trackCatalog.uploadTrack", "Tải lên bài hát mới")}</span>
           </button>
         </div>
       </div>
 
       {/* Filter Tabs (All / Draft / Published) */}
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/6 pt-4">
         <div className="flex flex-wrap gap-2">
           {[
             { key: "all" as TrackFilterStatus, labelKey: "all", count: counts.all },
@@ -324,7 +325,7 @@ export function TrackCatalogPanel({
                 key={key}
                 type="button"
                 onClick={() => setStatusFilter(key)}
-                className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium transition active:scale-95 ${
+                className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium whitespace-nowrap transition active:scale-95 ${
                   isActive
                     ? "border-[#ff8b4d]/40 bg-[#ff8b4d]/15 text-[#ffb488] shadow-[0_0_20px_rgba(255,122,44,0.12)]"
                     : "border-white/10 bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white"
@@ -342,16 +343,6 @@ export function TrackCatalogPanel({
             );
           })}
         </div>
-
-        {/* Quick Add track button */}
-        <button
-          type="button"
-          onClick={onOpenUpload}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-4 py-2 text-[12px] text-white hover:bg-white/[0.1] hover:border-white/25 active:scale-95 transition"
-        >
-          <Music className="h-3.5 w-3.5 text-[#ffb488]" />
-          <span>+ Thêm bài hát</span>
-        </button>
       </div>
 
       {/* Tracks Table / Catalog List */}
@@ -469,7 +460,12 @@ export function TrackCatalogPanel({
 
                   {/* Column 2: Status */}
                   <div>
-                    {track.status === "published" || track.moderationStatus === "approved" ? (
+                    {track.licenseStatus === "EXPIRED" || track.license?.status === "EXPIRED" || track.status === "archived" || track.status === "disabled" ? (
+                      <span className="inline-flex items-center gap-2 text-[12px] text-rose-400 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                        Hết hạn bản quyền
+                      </span>
+                    ) : track.status === "published" || track.moderationStatus === "approved" ? (
                       <span className="inline-flex items-center gap-2 text-[12px] text-emerald-400 font-medium">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         {t("dashboard.artist.trackCatalog.filters.published")}
@@ -616,26 +612,33 @@ export function TrackCatalogPanel({
                           </button>
 
                           {/* Toggle Status (Draft <-> Published) */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onToggleStatus(track);
-                              setActiveMenuTrackId(null);
-                            }}
-                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12px] text-white/80 hover:bg-white/10 hover:text-white transition"
-                          >
-                            {track.status === "draft" ? (
-                              <>
-                                <CheckCircle2 className="h-3.5 w-3.5 text-white/50" />
-                                <span>{t("dashboard.artist.trackCatalog.menu.publish")}</span>
-                              </>
-                            ) : (
-                              <>
-                                <Radio className="h-3.5 w-3.5 text-white/50" />
-                                <span>{t("dashboard.artist.trackCatalog.menu.draft")}</span>
-                              </>
-                            )}
-                          </button>
+                          {track.licenseStatus === "EXPIRED" || track.license?.status === "EXPIRED" || track.status === "archived" || track.status === "disabled" ? (
+                            <div className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[11px] text-rose-400/80 bg-rose-500/10 cursor-not-allowed">
+                              <AlertCircle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
+                              <span>Hết hạn bản quyền</span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onToggleStatus(track);
+                                setActiveMenuTrackId(null);
+                              }}
+                              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12px] text-white/80 hover:bg-white/10 hover:text-white transition"
+                            >
+                              {track.status === "draft" ? (
+                                <>
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-white/50" />
+                                  <span>{t("dashboard.artist.trackCatalog.menu.publish")}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Radio className="h-3.5 w-3.5 text-white/50" />
+                                  <span>{t("dashboard.artist.trackCatalog.menu.draft")}</span>
+                                </>
+                              )}
+                            </button>
+                          )}
 
                           {/* Toggle Visibility (Public <-> Private) */}
                           <button

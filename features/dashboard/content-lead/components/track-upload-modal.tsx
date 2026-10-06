@@ -1034,11 +1034,6 @@ export function TrackUploadModal({
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
                         Loại bản quyền / Giấy phép (<span className="text-[#ffb488] font-mono">license_type</span>) <span className="text-[#ff7a2c]">*</span>
-                        {ocrExtractedFields.includes("licenseType") && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-normal text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
-                            <Sparkles className="h-2.5 w-2.5" /> AI điền
-                          </span>
-                        )}
                       </label>
                     </div>
                     <div className="relative">
