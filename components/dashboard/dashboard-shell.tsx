@@ -18,6 +18,7 @@ import {
   Bell,
   Mail,
   Shield,
+  HelpCircle,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -43,6 +44,7 @@ import { useCurrentMascot } from "@/lib/mascots";
 import { BrandLogo } from "@/components/shared/logo-mark";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
+import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
 
 export type Vibe = {
   id: string;
@@ -485,6 +487,19 @@ function MascotAccountTrigger({
           >
             <Settings className="w-4 h-4 text-purple-400 group-hover:rotate-45 transition-transform duration-300" />
             <span>Cài đặt</span>
+          </button>
+
+          {/* Option: Tour Guide */}
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              triggerUserTour();
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors text-left cursor-pointer group"
+          >
+            <HelpCircle className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform duration-200" />
+            <span>Hướng dẫn sử dụng</span>
           </button>
 
           {/* Library & Playlists */}
@@ -1042,7 +1057,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
           {/* Quick Search Bar with Mood Finder (Centered) - Hidden on Search Page */}
           {!isSearch ? (
-            <div className="hidden md:flex items-center justify-center flex-1 max-w-xl mx-auto px-4">
+            <div id="tour-search-bar" className="hidden md:flex items-center justify-center flex-1 max-w-xl mx-auto px-4">
               <MoodSearchBar isPremium={Boolean(subInfo?.isPremium)} />
             </div>
           ) : (
@@ -1050,17 +1065,28 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
+            <button
+              type="button"
+              onClick={() => triggerUserTour()}
+              className="p-2 rounded-xl text-white/60 hover:text-purple-300 hover:bg-white/5 transition-all cursor-pointer relative group"
+              title="Xem hướng dẫn sử dụng"
+            >
+              <HelpCircle className="w-[18px] h-[18px] transition-transform group-hover:scale-110" />
+            </button>
+
             <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
             <HeaderMessages isPremium={Boolean(subInfo?.isPremium)} />
 
             <div className="w-px h-5 bg-white/10 mx-0.5 hidden sm:block" />
 
-            <MascotAccountTrigger
-              user={user}
-              loading={userLoading}
-              subInfo={subInfo}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-            />
+            <div id="tour-mascot-profile">
+              <MascotAccountTrigger
+                user={user}
+                loading={userLoading}
+                subInfo={subInfo}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+              />
+            </div>
           </div>
         </header>
 
@@ -1072,7 +1098,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden moodify-scroll w-full ${isPre ? "rounded-[18.8px]" : "rounded-[20px]"} backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
 
             {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
-            <div className="space-y-1">
+            <div id="tour-sidebar-nav" className="space-y-1">
               {/* 1. Trang chủ */}
               <Link
                 href="/dashboard"
@@ -1227,7 +1253,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             )}
 
             {/* Danh sách phát (Playlists) Section */}
-            <div className="pt-3 border-t border-white/[0.08]">
+            <div id="tour-playlist-section" className="pt-3 border-t border-white/[0.08]">
               <div className="flex items-center justify-between px-1 mb-2">
                 <p className="text-[10px] tracking-[0.08em] text-white/45 uppercase font-bold">
                   DANH SÁCH PHÁT
@@ -1291,6 +1317,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         isPremium={Boolean(subInfo?.isPremium)}
         onProfileUpdated={(updated) => setUser(updated)}
       />
+
+      {/* Onboarding Tutorial Tour for Role = USER */}
+      <UserTourGuide user={user} userLoading={userLoading} />
     </div>
   );
 }
