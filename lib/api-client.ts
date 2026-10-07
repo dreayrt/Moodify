@@ -813,4 +813,134 @@ export async function downloadTrackFile(
   window.URL.revokeObjectURL(blobUrl);
 }
 
+// ============================================================================
+// User Listening History & Activity Trace
+// ============================================================================
+
+export type UserListeningHistoryItem = {
+  id: number;
+  trackId: string;
+  spotifyId?: string;
+  title: string;
+  trackTitle?: string;
+  artist: string;
+  artistName?: string;
+  coverUrl: string;
+  audioUrl?: string;
+  durationMs: number;
+  totalDuration: string;
+  genre: string;
+  startedAt: string;
+  endedAt: string;
+  listenedDurationMs: number;
+  listenedDurationSeconds: number;
+  listenedDurationFormatted: string;
+  lastPositionMs: number;
+  lastPositionSeconds: number;
+  lastPositionFormatted: string;
+  source: string;
+  sourceId?: string;
+  deviceType: string;
+  eventCount: number;
+  completionRatePercent: number;
+  isCompleted: boolean;
+  lyricsSynced?: string;
+  lyricsPlain?: string;
+};
+
+export type UserListeningHistorySummary = {
+  totalListenedTracks: number;
+  totalListenedMinutes: number;
+  totalListenedHours: number;
+  completionRatePercent: number;
+  totalCompletedSessions: number;
+};
+
+export type UserListeningHistoryResponse = {
+  items: UserListeningHistoryItem[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+  summary: UserListeningHistorySummary;
+};
+
+export type UserHistoryTraceEvent = {
+  id: number;
+  listeningHistoryId: number;
+  eventType: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+  positionMs: number;
+  positionFormatted: string;
+  targetPositionMs: number;
+  targetPositionFormatted: string;
+  occurredAt: string;
+};
+
+export async function fetchMyListeningHistory(params: {
+  page?: number;
+  size?: number;
+  search?: string;
+} = {}): Promise<UserListeningHistoryResponse> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const query = new URLSearchParams();
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.size !== undefined) query.set("size", String(params.size));
+  if (params.search) query.set("search", params.search);
+
+  const res = await fetch(`${API_BASE}/analytics/my-history?${query.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể tải lịch sử nghe");
+  return res.json();
+}
+
+export async function fetchMyHistoryTraceEvents(historyId: number): Promise<{
+  historyId: number;
+  items: UserHistoryTraceEvent[];
+  totalEvents: number;
+}> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history/${historyId}/events`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể tải chi tiết sự kiện");
+  return res.json();
+}
+
+export async function deleteMyHistoryItem(historyId: number): Promise<{ success: boolean; message: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history/${historyId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể xóa bài hát khỏi lịch sử");
+  return res.json();
+}
+
+export async function clearMyListeningHistory(): Promise<{ success: boolean; deletedCount: number; message: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể xóa toàn bộ lịch sử nghe");
+  return res.json();
+}
+
 

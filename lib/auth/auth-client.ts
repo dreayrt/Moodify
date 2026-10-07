@@ -283,30 +283,38 @@ export interface UserDeviceSummary {
 }
 
 export async function fetchMyDevices(): Promise<UserDeviceSummary> {
+  const token = await getValidAccessToken();
   return requestJson<UserDeviceSummary>("/api/auth/devices", {
     method: "GET",
+    token: token ?? undefined,
   });
 }
 
 export async function registerCurrentDevice(): Promise<void> {
   if (typeof window === "undefined") return;
+  const token = await getValidAccessToken();
   const device = getDeviceIdentity();
   await requestJson("/api/auth/devices/register", {
     method: "POST",
+    token: token ?? undefined,
     body: device,
   }).catch(() => {});
 }
 
 export async function revokeMyDevice(deviceId: number): Promise<void> {
+  const token = await getValidAccessToken();
   return requestJson<void>(`/api/auth/devices/${deviceId}/revoke`, {
     method: "PATCH",
+    token: token ?? undefined,
   });
 }
 
 export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
+  const token = await getValidAccessToken();
   const deviceUuid = getCurrentDeviceUuid();
   return requestJson<{ revokedCount: number }>("/api/auth/devices/revoke-others", {
     method: "POST",
+    token: token ?? undefined,
     body: { deviceUuid },
   });
 }
@@ -590,6 +598,34 @@ export async function recordPlatformVisit(payload: {
   }
 }
 
+export async function recordListeningSessionTelemetry(payload: {
+  historyId?: number;
+  trackId: string;
+  durationMs: number;
+  positionMs?: number;
+  targetPositionMs?: number;
+  source?: "HOME" | "SEARCH" | "PLAYLIST" | "ALBUM" | "ARTIST" | "LIBRARY" | "FAVORITES" | "EMOTION" | "OTHER" | string;
+  sourceId?: string;
+  deviceType?: "WEB" | "ANDROID" | "IOS" | "OTHER";
+  eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+}) {
+  try {
+    const token = await getValidAccessToken();
+    return await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
+      method: "POST",
+      token: token ?? undefined,
+      body: {
+        deviceType: "WEB",
+        source: "HOME",
+        ...payload,
+      },
+    });
+  } catch {
+    // Non-blocking telemetry
+    return null;
+  }
+}
+
 export async function seedDemoTraffic(count = 150, token?: string) {
   const validToken = token || (await getValidAccessToken());
   return requestJson<{ success: boolean; inserted: number; message: string }>(
@@ -633,8 +669,14 @@ async function requestJson<T>(
   const fullUrl = `${API_BASE_URL}${path}`;
   const requestMethod = method ?? (body ? "POST" : "GET");
 
+  // Auto fallback to getValidAccessToken if token not provided and not a public auth endpoint
+  let authToken = token;
+  if (!authToken && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/register") && !path.startsWith("/api/auth/refresh")) {
+    authToken = (await getValidAccessToken()) ?? undefined;
+  }
+
   console.log(`[RequestJson] 📡 Sending ${requestMethod} ${fullUrl}`, {
-    hasToken: !!token,
+    hasToken: !!authToken,
     hasBody: !!body,
     body,
   });
@@ -644,7 +686,7 @@ async function requestJson<T>(
     method: requestMethod,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -652,7 +694,7 @@ async function requestJson<T>(
   console.log(`[RequestJson] 📥 Response status:`, response.status, response.statusText);
 
   if (!response.ok) {
-    const errorMsg = await extractErrorMessage(response);
+    const errorMsg = await extractErrorMessage(response, path);
     if (response.status >= 500) {
       console.error(`[RequestJson] ❌ Server error (${response.status}):`, errorMsg);
     } else {
@@ -677,12 +719,15 @@ async function requestJson<T>(
   }
 }
 
-async function extractErrorMessage(response: Response) {
+async function extractErrorMessage(response: Response, path?: string) {
   try {
     const text = await response.text();
     if (!text) {
       if (response.status === 401) {
-        return "Tài khoản hoặc mật khẩu không chính xác.";
+        if (path?.includes("/login")) {
+          return "Tài khoản hoặc mật khẩu không chính xác.";
+        }
+        return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
       }
       if (response.status === 403) {
         return "Tài khoản không có quyền truy cập hoặc đã bị vô hiệu hóa.";
@@ -695,7 +740,10 @@ async function extractErrorMessage(response: Response) {
         error?: string;
       };
       if (response.status === 401) {
-        return payload.message || "Tài khoản hoặc mật khẩu không chính xác.";
+        if (path?.includes("/login")) {
+          return payload.message || "Tài khoản hoặc mật khẩu không chính xác.";
+        }
+        return payload.message || "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
       }
       return payload.message || payload.error || text;
     } catch {

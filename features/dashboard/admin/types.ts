@@ -7,9 +7,7 @@ export type AdminTab =
   | "moderation"
   | "monetization"
   | "licensing"
-  | "notifications"
-  | "ads"
-  | "settings";
+  | "notifications";
 
 export type AdminUserRole = "USER" | "CONTENT_LEAD" | "MODERATOR" | "ADMIN" | "ARTIST";
 export type AdminUserStatus = "ACTIVE" | "INACTIVE" | "BANNED";
@@ -165,6 +163,23 @@ export type PaymentTransaction = {
   providerTransactionId: string;
   status: "SUCCESS" | "PENDING" | "FAILED" | "CANCELLED" | "REFUNDED";
   paidAt: string;
+};
+
+export type AdminUserSubscription = {
+  id: number;
+  userId: number;
+  userName?: string;
+  userEmail?: string;
+  servicePackageId: number;
+  packageName: string;
+  tierId: string;
+  tierName: string;
+  price: number;
+  autoRenew: boolean;
+  status: "ACTIVE" | "EXPIRED" | "CANCELLED" | "PENDING";
+  startAt: string;
+  endAt: string;
+  createdAt: string;
 };
 
 export type Distributor = {
@@ -360,4 +375,78 @@ export type PublicAd = {
   audioUrl: string;
   durationSeconds: number | null;
 };
+
+export type ListeningHistoryItem = {
+  id: number;
+  userId: number | null;
+  username: string;
+  fullName: string;
+  email: string;
+  trackId: string;
+  trackTitle: string;
+  artistName: string;
+  coverUrl: string;
+  totalDuration: string;
+  genre?: string;
+  startedAt: string;
+  endedAt: string;
+  listenedDurationMs: number;
+  listenedDurationSeconds: number;
+  lastPositionMs: number;
+  lastPositionSeconds: number;
+  source: string;
+  sourceId: string | null;
+  deviceType: "WEB" | "ANDROID" | "IOS" | "OTHER";
+  eventCount: number;
+};
+
+export type PlaybackEventItem = {
+  id: number;
+  listeningHistoryId: number;
+  eventType: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+  positionMs: number;
+  positionFormatted?: string;
+  positionSeconds: number;
+  targetPositionMs: number;
+  targetPositionFormatted?: string;
+  targetPositionSeconds: number;
+  occurredAt: string;
+  trackId?: string;
+  trackTitle?: string;
+  artistName?: string;
+  coverUrl?: string;
+  userId?: number;
+  username?: string;
+  fullName?: string;
+  deviceType?: string;
+  source?: string;
+};
+
+export type TrackRetentionMetric = {
+  trackId: string;
+  title: string;
+  artist: string;
+  coverUrl: string;
+  duration: string;
+  trackDurationMs: number;
+  streamCount: number;
+  uniqueListeners: number;
+  avgDurationMs: number;
+  avgDurationFormatted: string;
+  completionRatePercent: number;
+  skipRatePercent: number;
+  favoriteCount: number;
+  genre: string;
+  audioUrl?: string;
+};
+
+export type ListeningSummaryMetrics = {
+  totalSessions: number;
+  totalDurationMs: number;
+  totalHours: number;
+  sessionsLast24h: number;
+  completeEvents: number;
+  completionRatePercent: number;
+};
+
 

@@ -3,10 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslation } from "react-i18next";
 import {
   Activity,
-  BadgePercent,
   BarChart3,
   CheckCircle2,
   ChevronRight,
@@ -22,7 +20,6 @@ import {
   Radio,
   Search,
   Server,
-  Settings,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -32,7 +29,6 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
@@ -46,11 +42,12 @@ import {
   fetchAdminCatalog,
   fetchAdminPackages,
   fetchAdminTransactions,
+  fetchAdminSubscriptions,
+  cancelAdminSubscription,
   fetchAdminUsers,
   fetchAdminOverview,
   fetchAdminAuditLogs,
   type AdminOverviewResponse,
-  refundAdminTransaction,
   takedownAdminTrack,
   restoreAdminTrack,
   updateAdminTrackGenre,
@@ -64,7 +61,6 @@ import {
   toggleAdminPackageStatus,
   resetAdminUserPassword,
   createAdminUser,
-  deleteAdminUser,
   updateAdminUserProfile,
   revokeAdminDevice,
   fetchAdminModerationQueue,
@@ -77,8 +73,6 @@ import {
   createAdminContract,
   updateAdminContract,
   updateAdminContractStatus,
-  fetchAdminSystemConfig,
-  saveAdminSystemConfig,
 } from "@/lib/api/admin-client";
 import {
   AdminTab,
@@ -86,6 +80,7 @@ import {
   AdminUser,
   AdminUserRole,
   AdminUserStatus,
+  AdminUserSubscription,
   CatalogTrack,
   DistributionContract,
   Distributor,
@@ -106,8 +101,6 @@ import { ModerationTab } from "./moderation-tab";
 import { MonetizationTab } from "./monetization-tab";
 import { LicensingTab } from "./licensing-tab";
 import { NotificationsTab } from "./notifications-tab";
-import { AdsManagementTab } from "./ads-management-tab";
-import { SystemSettingsTab, type SystemConfig } from "./system-settings-tab";
 import { AdminAudioPlayerDock } from "./shared/admin-audio-player-dock";
 
 const HOME_ROUTE = "/dashboard";
@@ -117,7 +110,6 @@ const ARTIST_DASHBOARD_ROUTE = "/dashboard/content-lead";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { t } = useTranslation();
 
   // Auth & Guard State
   const [authState, setAuthState] = useState<"checking" | "allowed" | "denied">("checking");
@@ -138,7 +130,7 @@ export default function AdminDashboardPage() {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [contracts, setContracts] = useState<DistributionContract[]>([]);
   const [licenses, setLicenses] = useState<SongLicense[]>([]);
-  const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null);
+  const [subscriptions, setSubscriptions] = useState<AdminUserSubscription[]>([]);
   // Nhật ký hành chính: bản ghi thật từ backend + bản ghi của phiên làm việc hiện tại
   const [backendAuditLogs, setBackendAuditLogs] = useState<SystemAuditLog[]>([]);
   const [sessionAuditLogs, setSessionAuditLogs] = useState<SystemAuditLog[]>([]);
@@ -248,7 +240,7 @@ export default function AdminDashboardPage() {
         licensingRes,
         overviewRes,
         auditRes,
-        configRes,
+        subscriptionsRes,
       ] = await Promise.allSettled([
         fetchAdminUsers(),
         fetchAdminCatalog(),
@@ -259,7 +251,7 @@ export default function AdminDashboardPage() {
         fetchAdminLicensing(),
         fetchAdminOverview(),
         fetchAdminAuditLogs(),
-        fetchAdminSystemConfig<SystemConfig>(),
+        fetchAdminSubscriptions(),
       ]);
 
       let successCount = 0;
@@ -280,6 +272,10 @@ export default function AdminDashboardPage() {
         setTransactions(transactionsRes.value);
         successCount++;
       }
+      if (subscriptionsRes.status === "fulfilled" && Array.isArray(subscriptionsRes.value)) {
+        setSubscriptions(subscriptionsRes.value);
+        successCount++;
+      }
       if (moderationRes.status === "fulfilled" && Array.isArray(moderationRes.value)) {
         setReviews(moderationRes.value);
         successCount++;
@@ -287,9 +283,6 @@ export default function AdminDashboardPage() {
       if (actionsRes.status === "fulfilled" && Array.isArray(actionsRes.value)) {
         setReviewActions(actionsRes.value);
         successCount++;
-      }
-      if (configRes.status === "fulfilled" && configRes.value && Object.keys(configRes.value).length > 0) {
-        setSystemConfig(configRes.value);
       }
       if (overviewRes.status === "fulfilled" && overviewRes.value) {
         setOverviewData(overviewRes.value);
@@ -608,19 +601,19 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleRefundTransaction = async (transactionId: number) => {
+  const handleCancelSubscription = async (subscriptionId: number) => {
     try {
-      await refundAdminTransaction(transactionId);
-      setTransactions((prev) =>
-        prev.map((tx) =>
-          tx.id === transactionId ? { ...tx, status: "REFUNDED" } : tx
+      await cancelAdminSubscription(subscriptionId);
+      setSubscriptions((prev) =>
+        prev.map((sub) =>
+          sub.id === subscriptionId ? { ...sub, status: "CANCELLED" } : sub
         )
       );
-      recordAudit("PROCESS_REFUND", `TX-00${transactionId}`, "Thực hiện hoàn tiền cho giao dịch", "BILLING", "warning");
-      addToast("Đã xử lý hoàn tiền cho giao dịch thành công.", "success");
+      recordAudit("CANCEL_SUBSCRIPTION", `SUB-00${subscriptionId}`, "Hủy gói thuê bao người dùng", "BILLING", "warning");
+      addToast(`Đã hủy gói thuê bao #${subscriptionId} thành công.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi hoàn tiền: ${msg}`, "error");
+      addToast(`Lỗi khi hủy gói: ${msg}`, "error");
     }
   };
 
@@ -695,24 +688,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
-    const target = users.find((u) => u.id === userId);
-    try {
-      await deleteAdminUser(userId);
-      const realUsers = await fetchAdminUsers();
-      if (Array.isArray(realUsers)) {
-        setUsers(realUsers.filter((u) => u.id !== userId));
-      } else {
-        setUsers((prev) => prev.filter((u) => u.id !== userId));
-      }
-      recordAudit("DELETE_USER", `@${target?.username || userId}`, "Xóa tài khoản người dùng khỏi hệ thống", "IAM", "warning");
-      addToast(`Đã xóa người dùng "${target?.fullName || target?.username}" thành công.`, "info");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi xóa người dùng: ${msg}`, "error");
-    }
-  };
-
   const handleUpdateUserProfile = async (
     userId: number,
     data: { fullName?: string; email?: string; phone?: string }
@@ -760,28 +735,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 4. System Settings & Licensing Real Actions
-  const handleSaveSettings = async (settings: SystemConfig) => {
-    try {
-      await saveAdminSystemConfig(settings as unknown as Record<string, unknown>);
-      setSystemConfig(settings);
-      recordAudit(
-        "UPDATE_SYSTEM_CONFIG",
-        "Cấu hình Hệ thống Moodify",
-        `Bảo trì: ${settings.maintenanceMode ? "BẬT" : "TẮT"}, Đăng ký: ${
-          settings.allowRegistration ? "MỞ" : "ĐÓNG"
-        }, Kiểm duyệt: ${
-          settings.moderationMode === "PRE_MODERATION" ? "Tiền kiểm" : "Hậu kiểm"
-        }, Banner: ${settings.announcementEnabled ? "BẬT" : "TẮT"}`,
-        "SYSTEM",
-        "info"
-      );
-      addToast("Đã lưu và đồng bộ toàn bộ cấu hình hệ thống vào máy chủ cơ sở dữ liệu!", "success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi lưu cấu hình";
-      addToast(msg, "error");
-    }
-  };
+  // 4. Licensing Real Actions
 
   const handleCreateDistributor = async (data: Partial<Distributor>) => {
     try {
@@ -933,15 +887,13 @@ export default function AdminDashboardPage() {
 
   const CORE_ADMIN_TABS: { key: AdminTab; label: string; count?: number; icon: React.ComponentType<{ className?: string }> }[] = [
     { key: "overview", label: "Tổng Quan", icon: LayoutDashboard },
-    { key: "users", label: "Quản Lý Người Dùng", count: users.length, icon: Users },
-    { key: "catalog", label: "Kho Bài Hát", count: tracks.length, icon: Music2 },
-    { key: "favorites", label: "Lượt Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
-    { key: "moderation", label: "Kiểm Duyệt Phát Hành", count: pendingModerationCount, icon: ShieldCheck },
-    { key: "monetization", label: "Gói Dịch Vụ & Doanh Thu", count: packages.length, icon: DollarSign },
+    { key: "users", label: "Người Dùng", count: users.length, icon: Users },
+    { key: "monetization", label: "Gói Dịch Vụ", count: packages.length, icon: DollarSign },
+    { key: "catalog", label: "Bài Hát", count: tracks.length, icon: Music2 },
+    { key: "favorites", label: "Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
+    { key: "moderation", label: "Kiểm Duyệt", count: pendingModerationCount, icon: ShieldCheck },
+    { key: "licensing", label: "Bản Quyền", count: contracts.length, icon: Key },
     { key: "notifications", label: "Thông Báo", icon: Megaphone },
-    { key: "ads", label: "Quản Lý Quảng Cáo", icon: BadgePercent },
-    { key: "licensing", label: "Bản Quyền & Phân Phối", count: contracts.length, icon: Key },
-    { key: "settings", label: "Cài Đặt & Nhật Ký", icon: Settings },
   ];
 
   return (
@@ -1047,8 +999,6 @@ export default function AdminDashboardPage() {
               <Radio className="h-3.5 w-3.5 text-[#ff5500]" />
               <span>Giao Diện Nghe Nhạc</span>
             </Link>
-
-            <LanguageSwitcher />
           </div>
         </header>
 
@@ -1078,7 +1028,6 @@ export default function AdminDashboardPage() {
               onRevokeDevice={handleRevokeDevice}
               onResetPassword={handleResetUserPassword}
               onCreateUser={handleCreateUser}
-              onDeleteUser={handleDeleteUser}
               onUpdateProfile={handleUpdateUserProfile}
             />
           )}
@@ -1119,12 +1068,13 @@ export default function AdminDashboardPage() {
             <MonetizationTab
               packages={packages}
               transactions={transactions}
+              subscriptions={subscriptions}
               onTogglePackageStatus={handleTogglePackageStatus}
               onUpdatePackagePrice={handleUpdatePackagePrice}
               onCreatePackage={handleCreatePackage}
               onUpdatePackageDetails={handleUpdatePackageDetails}
               onDeletePackage={handleDeletePackage}
-              onRefundTransaction={handleRefundTransaction}
+              onCancelSubscription={handleCancelSubscription}
             />
           )}
 
@@ -1141,18 +1091,6 @@ export default function AdminDashboardPage() {
           )}
 
           {activeTab === "notifications" && <NotificationsTab onToast={addToast} />}
-
-          {activeTab === "ads" && <AdsManagementTab onToast={addToast} />}
-
-          {activeTab === "settings" && (
-            <SystemSettingsTab
-              auditLogs={auditLogs}
-              serverConfig={systemConfig}
-              onSaveSettings={handleSaveSettings}
-              onRecordAudit={recordAudit}
-              onAddToast={addToast}
-            />
-          )}
         </main>
       </div>
 

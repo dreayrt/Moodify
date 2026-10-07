@@ -310,6 +310,14 @@ function LibraryContent() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
             )}
           </button>
+
+          <button
+            onClick={() => router.push("/dashboard/history")}
+            className="pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer text-slate-400 hover:text-cyan-300"
+          >
+            <Clock className="w-4 h-4 text-cyan-400" />
+            Lịch sử nghe nhạc
+          </button>
         </div>
       )}
 

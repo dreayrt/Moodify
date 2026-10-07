@@ -1,6 +1,7 @@
 import { getValidAccessToken } from "../auth/auth-client";
 import {
   AdminUser,
+  AdminUserSubscription,
   AdCampaign,
   AdCampaignPayload,
   AdCategory,
@@ -9,6 +10,10 @@ import {
   Distributor,
   FavoriteLeaderboardItem,
   FavoriteRecord,
+  ListeningHistoryItem,
+  PlaybackEventItem,
+  TrackRetentionMetric,
+  ListeningSummaryMetrics,
   NotificationBroadcast,
   PaymentTransaction,
   ReviewAction,
@@ -105,6 +110,9 @@ export type AdminOverviewResponse = {
     detail: string;
     timestamp: string;
   }[];
+  streamsByPlatform?: Record<string, number>;
+  streamsBySource?: Record<string, number>;
+  trackPerformanceMetrics?: TrackRetentionMetric[];
 };
 
 export async function fetchAdminOverview(): Promise<AdminOverviewResponse> {
@@ -203,10 +211,14 @@ export async function createAdminUser(
 export async function deleteAdminUser(
   userId: number
 ): Promise<{ success: boolean; message: string }> {
-  return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/users/${userId}`,
-    { method: "DELETE" }
-  );
+  // Thay vì xóa cứng trong DB gây mất dữ liệu liên kết, chuyển trạng thái sang BANNED
+  return updateAdminUserStatus(userId, "BANNED");
+}
+
+export async function fetchAdminUserSubscriptions(
+  userId: number
+): Promise<AdminUserSubscription[]> {
+  return adminRequest<AdminUserSubscription[]>(`/api/admin/users/${userId}/subscriptions`);
 }
 
 export async function fetchAdminUserDevices(
@@ -382,11 +394,15 @@ export async function fetchAdminTransactions(): Promise<PaymentTransaction[]> {
   return adminRequest<PaymentTransaction[]>("/api/admin/transactions");
 }
 
-export async function refundAdminTransaction(
-  transactionId: number
+export async function fetchAdminSubscriptions(): Promise<AdminUserSubscription[]> {
+  return adminRequest<AdminUserSubscription[]>("/api/admin/subscriptions");
+}
+
+export async function cancelAdminSubscription(
+  subscriptionId: number
 ): Promise<{ success: boolean; message: string }> {
   return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/transactions/${transactionId}/refund`,
+    `/api/admin/subscriptions/${subscriptionId}/cancel`,
     { method: "POST" }
   );
 }
@@ -657,3 +673,83 @@ export async function saveAdminSystemConfig(
     }
   );
 }
+
+// 11. Listening History & Behavior Telemetry
+export async function fetchAdminListeningHistory(params?: {
+  page?: number;
+  size?: number;
+  search?: string;
+  deviceType?: string;
+  source?: string;
+  userId?: number;
+}): Promise<{
+  items: ListeningHistoryItem[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.search) query.set("search", params.search);
+  if (params?.deviceType && params.deviceType !== "ALL") query.set("deviceType", params.deviceType);
+  if (params?.source && params.source !== "ALL") query.set("source", params.source);
+  if (params?.userId) query.set("userId", String(params.userId));
+
+  const qs = query.toString();
+  return adminRequest<{
+    items: ListeningHistoryItem[];
+    totalElements: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  }>(`/api/admin/listening-history${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchAdminPlaybackEvents(
+  listeningHistoryId: number
+): Promise<PlaybackEventItem[]> {
+  return adminRequest<PlaybackEventItem[]>(
+    `/api/admin/listening-history/${listeningHistoryId}/events`
+  );
+}
+
+export async function fetchAdminListeningSummary(): Promise<ListeningSummaryMetrics> {
+  return adminRequest<ListeningSummaryMetrics>("/api/admin/listening-history/summary");
+}
+
+export async function fetchAdminAllPlaybackEvents(params?: {
+  page?: number;
+  size?: number;
+  eventType?: string;
+  search?: string;
+}): Promise<{
+  items: PlaybackEventItem[];
+  totalElements: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  distribution: Record<string, number>;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.eventType && params.eventType !== "ALL") query.set("eventType", params.eventType);
+  if (params?.search?.trim()) query.set("search", params.search.trim());
+
+  const qs = query.toString();
+  return adminRequest<{
+    items: PlaybackEventItem[];
+    totalElements: number;
+    page: number;
+    size: number;
+    totalPages: number;
+    distribution: Record<string, number>;
+  }>(`/api/admin/playback-events${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchAdminTrackRetentionMetrics(limit = 15): Promise<TrackRetentionMetric[]> {
+  return adminRequest<TrackRetentionMetric[]>(`/api/admin/tracks/retention-metrics?limit=${limit}`);
+}
+
