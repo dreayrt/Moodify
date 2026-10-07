@@ -13,6 +13,8 @@ import {
   type FormEvent,
 } from "react";
 
+import { useGoogleLogin } from '@react-oauth/google';
+import { loginWithFacebookSdk } from '@/lib/auth/facebook';
 import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
@@ -20,6 +22,8 @@ import {
   getStoredAuthSession,
   getValidAccessToken,
   login as loginRequest,
+  loginWithGoogle as loginWithGoogleRequest,
+  loginWithFacebook as loginWithFacebookRequest,
   logout as logoutRequest,
   register as registerRequest,
   saveAuthSession,
@@ -409,6 +413,59 @@ export function HeroCarousel() {
     setSelectedPresetAvatar(url);
   };
 
+    const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const token = tokenResponse.access_token;
+        const auth = await loginWithGoogleRequest(token);
+        saveAuthSession(auth);
+        const currentUser = await getCurrentUser(auth.accessToken);
+        setAuthUser(currentUser);
+        setIsSignInOpen(false);
+        setIsCreateAccountOpen(false);
+        router.push(getDashboardPathForRole(currentUser.role));
+      } catch (error) {
+        console.error("Google sign-in error:", error);
+        const message = error instanceof Error ? error.message : "Đăng nhập Google thất bại";
+        if (isSignInOpen) {
+          setSignInError(message);
+        } else {
+          setCreateAccountError(message);
+        }
+      }
+    },
+    onError: (error) => {
+      console.error("Google popup error:", error);
+      const message = "Đăng nhập Google thất bại hoặc cửa sổ bị đóng";
+      if (isSignInOpen) {
+        setSignInError(message);
+      } else {
+        setCreateAccountError(message);
+      }
+    },
+  });
+
+  const handleFacebookLogin = async () => {
+    try {
+      const token = await loginWithFacebookSdk();
+      const auth = await loginWithFacebookRequest(token);
+      saveAuthSession(auth);
+      const currentUser = await getCurrentUser(auth.accessToken);
+      setAuthUser(currentUser);
+      setIsSignInOpen(false);
+      setIsCreateAccountOpen(false);
+      router.push(getDashboardPathForRole(currentUser.role));
+    } catch (error) {
+      console.error("Facebook sign-in error:", error);
+      const message = error instanceof Error ? error.message : "Đăng nhập Facebook thất bại";
+      if (isSignInOpen) {
+        setSignInError(message);
+      } else {
+        setCreateAccountError(message);
+      }
+    }
+  };
+
   const handleSignInSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSignInError(null);
@@ -747,6 +804,8 @@ export function HeroCarousel() {
           onChange={handleCredentialsChange}
           onClose={closeSignIn}
           onSubmit={handleSignInSubmit}
+          onGoogleLogin={handleGoogleLogin}
+          onFacebookLogin={handleFacebookLogin}
         />
       ) : null}
 
@@ -772,6 +831,8 @@ export function HeroCarousel() {
           onRemoveGenre={handleRemoveGenre}
           onToggleSuggestedGenre={handleToggleSuggestedGenre}
           onOpenSignIn={openSignIn}
+          onGoogleLogin={handleGoogleLogin}
+          onFacebookLogin={handleFacebookLogin}
         />
       ) : null}
     </section>
@@ -786,6 +847,8 @@ type SignInModalProps = {
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onGoogleLogin?: () => void;
+  onFacebookLogin?: () => void;
 };
 
 type CreateAccountModalProps = {
@@ -809,6 +872,8 @@ type CreateAccountModalProps = {
   onRemoveGenre: (genre: string) => void;
   onToggleSuggestedGenre: (genre: string) => void;
   onOpenSignIn: () => void;
+  onGoogleLogin?: () => void;
+  onFacebookLogin?: () => void;
 };
 
 function SignInModal({
@@ -819,6 +884,8 @@ function SignInModal({
   onChange,
   onClose,
   onSubmit,
+  onGoogleLogin,
+  onFacebookLogin,
 }: SignInModalProps) {
   const accountId = useId();
   const passwordId = useId();
@@ -931,6 +998,7 @@ function SignInModal({
               <button
                 className="modal-google-button flex w-full items-center justify-center gap-3 rounded-[1.2rem] border border-white/12 bg-[#121318] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#191b22]"
                 type="button"
+                onClick={() => onGoogleLogin?.()}
               >
                 <GoogleIcon />
                 {"Đăng nhập bằng Google"}
@@ -939,6 +1007,7 @@ function SignInModal({
               <button
                 className="modal-facebook-button flex w-full items-center justify-center gap-3 rounded-[1.2rem] border border-white/12 bg-[linear-gradient(180deg,#1c56d8,#1846af)] px-4 py-3.5 text-sm font-semibold text-white transition hover:brightness-110"
                 type="button"
+                onClick={() => onFacebookLogin?.()}
               >
                 <FacebookIcon />
                 {"Đăng nhập bằng Facebook"}
@@ -987,6 +1056,8 @@ function CreateAccountModal({
   onRemoveGenre,
   onToggleSuggestedGenre,
   onOpenSignIn,
+  onGoogleLogin,
+  onFacebookLogin,
 }: CreateAccountModalProps) {
   const fullNameId = useId();
   const usernameId = useId();
@@ -1161,6 +1232,7 @@ function CreateAccountModal({
                   <button
                     className="modal-google-button flex h-9 items-center justify-center gap-2 rounded-xl border border-white/12 bg-[#121318] px-3 text-xs font-semibold text-white transition hover:bg-[#191b22]"
                     type="button"
+                    onClick={() => onGoogleLogin?.()}
                   >
                     <GoogleIcon />
                     <span>Google</span>
@@ -1168,6 +1240,7 @@ function CreateAccountModal({
                   <button
                     className="modal-facebook-button flex h-9 items-center justify-center gap-2 rounded-xl border border-white/12 bg-[linear-gradient(180deg,#1c56d8,#1846af)] px-3 text-xs font-semibold text-white transition hover:brightness-110"
                     type="button"
+                    onClick={() => onFacebookLogin?.()}
                   >
                     <FacebookIcon />
                     <span>Facebook</span>

@@ -758,6 +758,72 @@ export async function subscribePackage(
   return res.json();
 }
 
+export interface CheckoutResponse {
+  success: boolean;
+  orderCode: string;
+  paymentId: number;
+  subscriptionId: number;
+  packageId: number;
+  packageName: string;
+  amount: number;
+  bankAccount: string;
+  bankName: string;
+  accountName: string;
+  transferContent: string;
+  qrUrl: string;
+  status: string;
+  message: string;
+}
+
+export interface PaymentStatusResponse {
+  orderCode: string;
+  status: 'PENDING' | 'SUCCESS' | 'CANCELLED' | 'EXPIRED';
+  amount?: number;
+  packageName?: string;
+  paidAt?: string;
+  expiresAt?: string;
+  isPremium?: boolean;
+}
+
+export async function createCheckoutPayment(
+  packageId: number,
+  idempotencyKey?: string
+): Promise<CheckoutResponse> {
+  const token = await getValidAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
+  }
+  const res = await fetch(`${API_BASE}/subscriptions/checkout`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ packageId, idempotencyKey }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.message || 'Tạo đơn thanh toán thất bại');
+  }
+  return res.json();
+}
+
+export async function getPaymentStatus(
+  orderCode: string
+): Promise<PaymentStatusResponse> {
+  const res = await fetch(`${API_BASE}/subscriptions/payment-status/${orderCode}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    throw new Error('Không thể kiểm tra trạng thái thanh toán');
+  }
+  return res.json();
+}
+
 export async function devTogglePremium(
   enable: boolean,
   days: number = 30,

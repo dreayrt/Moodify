@@ -247,6 +247,18 @@ export function clearAuthSession() {
 
 
 //main auth functions
+export async function loginWithGoogle(idToken: string) {
+  return requestJson<AuthResponse>("/api/auth/google", {
+    body: { idToken },
+  });
+}
+
+export async function loginWithFacebook(accessToken: string) {
+  return requestJson<AuthResponse>("/api/auth/facebook", {
+    body: { accessToken },
+  });
+}
+
 export async function login(payload: { identifier: string; password: string }) {
   return requestJson<AuthResponse>("/api/auth/login", {
     body: payload,
@@ -629,21 +641,43 @@ async function extractErrorMessage(response: Response) {
       if (response.status === 403) {
         return "Tài khoản không có quyền truy cập hoặc đã bị vô hiệu hóa.";
       }
+      if (response.status === 404) {
+        return "Tài khoản chưa được đăng ký trong hệ thống. Vui lòng đăng ký tài khoản trước.";
+      }
       return `Yêu cầu thất bại với mã trạng thái ${response.status}`;
     }
     try {
       const payload = JSON.parse(text) as {
         message?: string;
         error?: string;
+        detail?: string;
       };
+      if (payload.message && payload.message.trim() && payload.message !== "Not Found") {
+        return payload.message;
+      }
+      if (payload.detail && payload.detail.trim() && payload.detail !== "Not Found") {
+        return payload.detail;
+      }
+      if (payload.error && payload.error.trim() && payload.error !== "Not Found") {
+        return payload.error;
+      }
       if (response.status === 401) {
-        return payload.message || "Tài khoản hoặc mật khẩu không chính xác.";
+        return "Tài khoản hoặc mật khẩu không chính xác.";
+      }
+      if (response.status === 404) {
+        return "Tài khoản chưa được đăng ký trong hệ thống. Vui lòng đăng ký tài khoản trước.";
       }
       return payload.message || payload.error || text;
     } catch {
+      if (response.status === 404) {
+        return "Tài khoản chưa được đăng ký trong hệ thống. Vui lòng đăng ký tài khoản trước.";
+      }
       return text;
     }
   } catch {
+    if (response.status === 404) {
+      return "Tài khoản chưa được đăng ký trong hệ thống. Vui lòng đăng ký tài khoản trước.";
+    }
     return `Yêu cầu thất bại với mã trạng thái ${response.status}`;
   }
 }
