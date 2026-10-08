@@ -31,7 +31,6 @@ import {
   TrackRetentionMetric,
 } from "../types";
 import { AdminOverviewResponse } from "@/lib/api/admin-client";
-import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 import { InteractiveAreaChart } from "@/components/dashboard/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
@@ -245,20 +244,10 @@ export function OverviewTab({
               </span>
               <span className="text-xs text-zinc-500 font-mono">bài hát</span>
             </div>
-            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+            <div className="mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">
                 Đã duyệt: <strong className="text-zinc-200">{publishedTracksCount}</strong>
               </span>
-              <MiniSparkline
-                data={
-                  publishedTracksCount > 0
-                    ? [Math.max(1, publishedTracksCount - 5), publishedTracksCount, totalTracksCount]
-                    : [totalTracksCount, totalTracksCount]
-                }
-                color="#ff5500"
-                width={75}
-                height={24}
-              />
             </div>
           </div>
 
@@ -278,18 +267,10 @@ export function OverviewTab({
               </span>
               <span className="text-xs text-zinc-500 font-mono">lượt</span>
             </div>
-            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
-              <span className="text-[11px] text-zinc-400 font-mono">Xu hướng</span>
-              <MiniSparkline
-                data={
-                  listeningTrend.length >= 2
-                    ? listeningTrend.map((t) => Number(t.streams) || 0)
-                    : [0, totalStreamsCount]
-                }
-                color="#38bdf8"
-                width={75}
-                height={24}
-              />
+            <div className="mt-2 pt-1 border-t border-white/5">
+              <span className="text-[11px] text-zinc-400 font-mono">
+                Tổng lượt phát hệ thống
+              </span>
             </div>
           </div>
 
@@ -308,18 +289,10 @@ export function OverviewTab({
                 {avgCompletionRate}%
               </span>
             </div>
-            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
-              <span className="text-[11px] text-zinc-400 font-mono">Trung bình</span>
-              <MiniSparkline
-                data={
-                  trackMetrics.length >= 2
-                    ? trackMetrics.slice(0, 7).map((m) => Math.round(m.completionRatePercent))
-                    : [avgCompletionRate, avgCompletionRate]
-                }
-                color="#10b981"
-                width={75}
-                height={24}
-              />
+            <div className="mt-2 pt-1 border-t border-white/5">
+              <span className="text-[11px] text-zinc-400 font-mono">
+                Mức độ giữ chân người nghe
+              </span>
             </div>
           </div>
 
@@ -339,16 +312,10 @@ export function OverviewTab({
               </span>
               <span className="text-xs text-zinc-500 font-mono">tài khoản</span>
             </div>
-            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+            <div className="mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">
                 Nghệ sĩ: <strong className="text-amber-300">{contentLeadsCount}</strong>
               </span>
-              <MiniSparkline
-                data={[contentLeadsCount, totalUsersCount]}
-                color="#f59e0b"
-                width={75}
-                height={24}
-              />
             </div>
           </div>
 
@@ -367,23 +334,10 @@ export function OverviewTab({
                 {formatCurrency(totalRevenue)}
               </span>
             </div>
-            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+            <div className="mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">
                 Thuê bao: <strong className="text-purple-300">{overviewData?.activeSubscriptions ?? 0}</strong>
               </span>
-              <MiniSparkline
-                data={
-                  transactions.filter((t) => t.status === "SUCCESS").length >= 2
-                    ? transactions
-                        .filter((t) => t.status === "SUCCESS")
-                        .slice(-7)
-                        .map((t) => Math.round(t.amount / 1000))
-                    : [0, Math.round(totalRevenue / 1000)]
-                }
-                color="#a855f7"
-                width={75}
-                height={24}
-              />
             </div>
           </div>
         </div>

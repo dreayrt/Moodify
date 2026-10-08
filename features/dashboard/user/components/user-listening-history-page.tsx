@@ -29,7 +29,6 @@ import {
 } from "@/lib/api-client";
 import { usePlayer, type PlayerTrack } from "@/components/dashboard/player-context";
 import TrackActionMenu from "@/components/dashboard/track-action-menu";
-import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 import { InteractiveBarChart } from "@/components/dashboard/charts/interactive-bar-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
@@ -44,7 +43,7 @@ function formatRelativeTime(dateStr?: string): string {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Vừa xong";
+    if (diffMins < 1) return "Vừa phát";
     if (diffMins < 60) return `${diffMins} phút trước`;
     if (diffHours < 24 && d.getDate() === now.getDate()) {
       return `${diffHours} giờ trước`;
@@ -348,14 +347,11 @@ export default function UserListeningHistoryPage() {
             <Clock className="w-6 h-6 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Lịch Sử Nghe Nhạc
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-normal bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                {historyItems.length} bài đã lưu
-              </span>
             </h1>
             <p className="text-xs sm:text-sm text-white/50 mt-0.5">
-              Những bài hát bạn đã thưởng thức gần đây trên Moodify.
+              Danh sách các bài hát đã phát gần đây.
             </p>
           </div>
         </div>
@@ -395,97 +391,61 @@ export default function UserListeningHistoryPage() {
         </div>
       </div>
 
-      {/* ── Thống kê âm nhạc thân thiện & trực quan hóa ───────────────────────── */}
+      {/* ── Thống kê trực quan ───────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-white/50 text-xs mb-1">
-              <span>Tổng bài đã nghe</span>
-              <Music2 className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-bold text-white tracking-tight">
-              {summary ? summary.totalListenedTracks.toLocaleString() : historyItems.length}
-            </div>
-            <p className="text-[11px] text-white/40 mt-0.5">Lượt nghe tích lũy</p>
+        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-white/50 text-xs mb-1">
+            <span>Tổng Bài Đã Nghe</span>
+            <Music2 className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={activityData.map((d) => d.value)}
-              color="#22d3ee"
-              height={24}
-            />
+          <div className="text-2xl font-bold text-white tracking-tight">
+            {summary ? summary.totalListenedTracks.toLocaleString() : historyItems.length}
           </div>
+          <p className="text-[11px] text-white/40 mt-0.5">Tổng số lượt phát</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-white/50 text-xs mb-1">
-              <span>Thời gian nghe</span>
-              <Clock className="w-4 h-4 text-purple-400" />
-            </div>
-            <div className="text-2xl font-bold text-purple-300 tracking-tight">
-              {summary ? `${summary.totalListenedHours}h` : "0h"}
-            </div>
-            <p className="text-[11px] text-white/40 mt-0.5">
-              {summary ? `≈ ${summary.totalListenedMinutes} phút thưởng thức` : "0 phút"}
-            </p>
+        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-white/50 text-xs mb-1">
+            <span>Thời Lượng Nghe</span>
+            <Clock className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={activityData.map((d) => d.value * 3)}
-              color="#c084fc"
-              height={24}
-            />
+          <div className="text-2xl font-bold text-purple-300 tracking-tight">
+            {summary ? `${summary.totalListenedHours}h` : "0h"}
           </div>
+          <p className="text-[11px] text-white/40 mt-0.5">
+            {summary ? `Khoảng ${summary.totalListenedMinutes} phút phát` : "0 phút"}
+          </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-white/50 text-xs mb-1">
-              <span>Nghệ sĩ nghe nhiều</span>
-              <Mic2 className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-base sm:text-lg font-bold text-white truncate tracking-tight">
-              {topArtist}
-            </div>
-            <p className="text-[11px] text-white/40 mt-0.5">Thường xuyên phát gần đây</p>
+        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-white/50 text-xs mb-1">
+            <span>Nghệ Sĩ Phổ Biến</span>
+            <Mic2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={activityData.map((d) => d.value)}
-              color="#10b981"
-              height={24}
-            />
+          <div className="text-base sm:text-lg font-bold text-white truncate tracking-tight">
+            {topArtist}
           </div>
+          <p className="text-[11px] text-white/40 mt-0.5">Lượt phát cao nhất</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-white/50 text-xs mb-1">
-              <span>Thể loại yêu thích</span>
-              <Disc3 className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="text-base sm:text-lg font-bold text-white truncate tracking-tight">
-              {topGenre}
-            </div>
-            <p className="text-[11px] text-white/40 mt-0.5">Gu âm nhạc của bạn</p>
+        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-white/50 text-xs mb-1">
+            <span>Thể Loại Phổ Biến</span>
+            <Disc3 className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={genreDonutData.length > 0 ? genreDonutData.map((d) => d.value) : [0, 0]}
-              color="#f59e0b"
-              height={24}
-            />
+          <div className="text-base sm:text-lg font-bold text-white truncate tracking-tight">
+            {topGenre}
           </div>
+          <p className="text-[11px] text-white/40 mt-0.5">Tần suất nghe cao nhất</p>
         </div>
       </div>
 
-      {/* ── Biểu đồ trực quan: Nhịp điệu hoạt động & Phân bổ thể loại ── */}
+      {/* ── Biểu đồ trực quan ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-1">
         <div className="lg:col-span-7">
           <InteractiveBarChart
-            title="Nhịp Điệu Hoạt Động Theo Ngày"
-            subtitle="Số bài hát được bạn thưởng thức phân bổ theo các ngày trong tuần"
+            title="Lượt Nghe Theo Ngày Trong Tuần"
+            subtitle="Số lượng bài hát phát theo từng ngày trong tuần."
             data={activityData}
             valueSuffix=" bài"
             defaultColor="#22d3ee"
@@ -494,10 +454,10 @@ export default function UserListeningHistoryPage() {
         </div>
         <div className="lg:col-span-5">
           <InteractiveDonutChart
-            title="Gu Âm Nhạc & Thể Loại"
-            subtitle="Tỷ lệ phân bổ các dòng nhạc trong lịch sử nghe của bạn"
+            title="Phân Bổ Thể Loại Nhạc"
+            subtitle="Tỷ lệ các thể loại bài hát đã phát."
             data={genreDonutData}
-            centerLabel="Gu Âm Nhạc"
+            centerLabel="Thể Loại"
             size={180}
             strokeWidth={22}
           />
@@ -511,7 +471,7 @@ export default function UserListeningHistoryPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             type="text"
-            placeholder="Tìm kiếm bài hát hoặc nghệ sĩ trong lịch sử..."
+            placeholder="Tìm kiếm bài hát, nghệ sĩ..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm bg-white/[0.04] border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 focus:bg-white/[0.06] transition-all"
@@ -553,7 +513,7 @@ export default function UserListeningHistoryPage() {
       {loading ? (
         <div className="py-24 flex flex-col items-center justify-center text-white/40 gap-3">
           <RefreshCw className="w-7 h-7 animate-spin text-cyan-400" />
-          <span className="text-xs sm:text-sm">Đang tải lịch sử nghe nhạc...</span>
+          <span className="text-xs sm:text-sm">Đang tải dữ liệu lịch sử...</span>
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="py-20 flex flex-col items-center justify-center text-center p-6 rounded-2xl bg-white/[0.02] border border-dashed border-white/10">
@@ -561,12 +521,12 @@ export default function UserListeningHistoryPage() {
             <Music2 className="w-7 h-7 text-white/30" />
           </div>
           <h3 className="text-sm sm:text-base font-semibold text-white">
-            {searchQuery ? "Không tìm thấy bài hát nào" : "Chưa có bài hát nào trong lịch sử"}
+            {searchQuery ? "Không tìm thấy bài hát phù hợp" : "Chưa có dữ liệu lịch sử nghe"}
           </h3>
           <p className="text-xs text-white/40 max-w-md mt-1">
             {searchQuery
-              ? "Hãy thử tìm kiếm với tên bài hát hoặc nghệ sĩ khác."
-              : "Bật phát một bài hát bất kỳ trên Moodify, hệ thống sẽ tự động lưu lại vào lịch sử để bạn nghe lại bất cứ lúc nào."}
+              ? "Vui lòng thử lại với từ khóa tìm kiếm khác."
+              : "Hệ thống sẽ tự động ghi nhận khi bạn phát nhạc trên ứng dụng."}
           </p>
         </div>
       ) : (
@@ -669,14 +629,12 @@ export default function UserListeningHistoryPage() {
 
                       {/* Cột 2: Thể loại (Genre) */}
                       {item.genre && (
-                        <div className="hidden md:flex items-center px-4 shrink-0 w-28">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-white/60 border border-white/5 truncate">
-                            {item.genre}
-                          </span>
+                        <div className="hidden md:flex items-center px-4 shrink-0 w-28 text-xs text-white/50 truncate font-sans">
+                          {item.genre}
                         </div>
                       )}
 
-                      {/* Cột 3: Thời điểm nghe (Friendly relative time) */}
+                      {/* Cột 3: Thời điểm nghe */}
                       <div className="hidden sm:flex flex-col items-end px-4 shrink-0 text-right w-36">
                         <span className="text-[11px] text-white/60 font-mono">
                           {formatRelativeTime(item.startedAt)}
@@ -756,10 +714,10 @@ export default function UserListeningHistoryPage() {
             </div>
             <div>
               <h3 className="text-base font-bold text-white">
-                Xóa toàn bộ lịch sử nghe nhạc?
+                Xác nhận xóa toàn bộ lịch sử nghe
               </h3>
               <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                Hành động này sẽ xóa sạch danh sách tất cả các bài hát bạn đã nghe khỏi lịch sử cá nhân. Thao tác này không thể hoàn tác.
+                Toàn bộ dữ liệu lịch sử nghe nhạc của tài khoản sẽ bị xóa khỏi hệ thống. Thao tác này không thể hoàn tác.
               </p>
             </div>
             <div className="flex items-center justify-end gap-2.5 pt-2">

@@ -30,7 +30,6 @@ import { AdminUser, AdminUserRole, AdminUserStatus, UserDevice } from "../types"
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
 import { fetchAdminUserDevices } from "@/lib/api/admin-client";
-import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 
 type UsersManagementTabProps = {
   users: AdminUser[];
@@ -286,88 +285,52 @@ export function UsersManagementTab({
         </div>
       </div>
 
-      {/* 4 User Statistics Cards with MiniSparkline */}
+      {/* 4 User Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Tổng Người Dùng</span>
-              <Users className="w-4 h-4 text-sky-400" />
-            </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
-              {users.length}
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Toàn bộ tài khoản</p>
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+            <span>Tổng Người Dùng</span>
+            <Users className="w-4 h-4 text-sky-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={[users.filter((u) => u.status !== "ACTIVE").length, users.length]}
-              color="#38bdf8"
-              height={22}
-            />
+          <div className="font-display text-2xl font-bold text-white tracking-tight">
+            {users.length}
           </div>
+          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Toàn bộ tài khoản</p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Nghệ Sĩ</span>
-              <UserCheck className="w-4 h-4 text-purple-400" />
-            </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
-              {users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length}
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Tài khoản nghệ sĩ</p>
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+            <span>Nghệ Sĩ</span>
+            <UserCheck className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={[0, users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length]}
-              color="#c084fc"
-              height={22}
-            />
+          <div className="font-display text-2xl font-bold text-white tracking-tight">
+            {users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length}
           </div>
+          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Tài khoản nghệ sĩ</p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Kiểm Duyệt Viên</span>
-              <Shield className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
-              {users.filter((u) => u.role === "MODERATOR").length}
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Đội ngũ kiểm duyệt</p>
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+            <span>Kiểm Duyệt Viên</span>
+            <Shield className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={[0, users.filter((u) => u.role === "MODERATOR").length]}
-              color="#f59e0b"
-              height={22}
-            />
+          <div className="font-display text-2xl font-bold text-white tracking-tight">
+            {users.filter((u) => u.role === "MODERATOR").length}
           </div>
+          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Đội ngũ kiểm duyệt</p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Đang Hoạt Động</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
-              {users.filter((u) => u.status === "ACTIVE").length}
-            </div>
-            <p className="text-[11px] text-emerald-400 mt-0.5 font-mono">
-              Tài khoản hoạt động
-            </p>
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+            <span>Đang Hoạt Động</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="pt-2">
-            <MiniSparkline
-              data={[users.filter((u) => u.status === "BANNED").length, users.filter((u) => u.status === "ACTIVE").length]}
-              color="#10b981"
-              height={22}
-            />
+          <div className="font-display text-2xl font-bold text-white tracking-tight">
+            {users.filter((u) => u.status === "ACTIVE").length}
           </div>
+          <p className="text-[11px] text-emerald-400 mt-0.5 font-mono">
+            Tài khoản hoạt động
+          </p>
         </div>
       </div>
 

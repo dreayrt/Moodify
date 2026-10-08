@@ -37,7 +37,6 @@ import { PaymentTransaction, ServicePackage, PackageEntitlements, SubscriptionTi
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
 import { fetchAdminSubscriptionTiers, updateAdminSubscriptionTier } from "@/lib/api/admin-client";
-import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 import { InteractiveAreaChart } from "@/components/dashboard/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
@@ -802,100 +801,56 @@ export function MonetizationTab({
       <div className="space-y-5">
         {/* 4 Executive KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden flex flex-col justify-between group hover:border-[#ff5500]/40 transition">
-            <div>
-              <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-                <span>Doanh Thu</span>
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="font-display text-2xl font-bold text-white tracking-tight">
-                {formatVND(totalRevenue)}
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
-                Giao dịch thành công
-              </p>
+          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Doanh Thu</span>
+              <DollarSign className="w-4 h-4 text-emerald-400" />
             </div>
-            <div className="pt-2">
-              <MiniSparkline
-                data={
-                  revenueChartData.length >= 2
-                    ? revenueChartData.map((d) => d.completed || d.streams)
-                    : [0, Math.round(totalRevenue / 1000)]
-                }
-                color="#10b981"
-                height={26}
-              />
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {formatVND(totalRevenue)}
             </div>
+            <p className="text-[11px] text-zinc-500 mt-1 font-mono">
+              Giao dịch thành công
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden flex flex-col justify-between group hover:border-[#ff5500]/40 transition">
-            <div>
-              <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-                <span>Số Giao Dịch</span>
-                <Receipt className="w-4 h-4 text-sky-400" />
-              </div>
-              <div className="font-display text-2xl font-bold text-white tracking-tight">
-                {transactions.length} GD
-              </div>
-              <p className="text-[11px] text-sky-400 mt-0.5 font-mono">
-                Tỷ lệ thành công: {successRate}%
-              </p>
+          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Số Giao Dịch</span>
+              <Receipt className="w-4 h-4 text-sky-400" />
             </div>
-            <div className="pt-2">
-              <MiniSparkline
-                data={
-                  revenueChartData.length >= 2
-                    ? revenueChartData.map((d) => d.streams)
-                    : [0, transactions.length]
-                }
-                color="#38bdf8"
-                height={26}
-              />
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {transactions.length} GD
             </div>
+            <p className="text-[11px] text-sky-400 mt-1 font-mono">
+              Tỷ lệ thành công: {successRate}%
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden flex flex-col justify-between group hover:border-[#ff5500]/40 transition">
-            <div>
-              <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-                <span>Thuê Bao Hoạt Động</span>
-                <Users className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="font-display text-2xl font-bold text-white tracking-tight">
-                {activeSubsCount} người
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
-                Đang kích hoạt
-              </p>
+          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Thuê Bao Hoạt Động</span>
+              <Users className="w-4 h-4 text-amber-400" />
             </div>
-            <div className="pt-2">
-              <MiniSparkline
-                data={[subscriptions.filter((s) => s.status !== "ACTIVE").length, activeSubsCount]}
-                color="#f59e0b"
-                height={26}
-              />
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {activeSubsCount} người
             </div>
+            <p className="text-[11px] text-zinc-500 mt-1 font-mono">
+              Đang kích hoạt
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden flex flex-col justify-between group hover:border-[#ff5500]/40 transition">
-            <div>
-              <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-                <span>Gói Hoạt Động</span>
-                <CreditCard className="w-4 h-4 text-purple-400" />
-              </div>
-              <div className="font-display text-2xl font-bold text-white tracking-tight">
-                {activePackagesCount} / {packages.length} gói
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
-                Tổng số {packages.length} gói dịch vụ
-              </p>
+          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Gói Hoạt Động</span>
+              <CreditCard className="w-4 h-4 text-purple-400" />
             </div>
-            <div className="pt-2">
-              <MiniSparkline
-                data={[packages.length - activePackagesCount, packages.length]}
-                color="#a855f7"
-                height={26}
-              />
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {activePackagesCount} / {packages.length} gói
             </div>
+            <p className="text-[11px] text-zinc-500 mt-1 font-mono">
+              Tổng số {packages.length} gói dịch vụ
+            </p>
           </div>
         </div>
 
