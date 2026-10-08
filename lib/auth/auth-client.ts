@@ -1,3 +1,5 @@
+import { getDeviceIdentity, getCurrentDeviceUuid, type DevicePlatform } from "./device-helper";
+
 export type AuthResponse = {
   accessToken: string;
   refreshToken: string;
@@ -149,7 +151,7 @@ export type StoredAuthSession = {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8080";
+  "http://localhost:8088";
 
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
@@ -259,9 +261,73 @@ export async function loginWithFacebook(accessToken: string) {
   });
 }
 
-export async function login(payload: { identifier: string; password: string }) {
+export async function login(payload: {
+  identifier: string;
+  password: string;
+  deviceUuid?: string;
+  deviceName?: string;
+  platform?: DevicePlatform;
+}) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
+  const fullPayload = {
+    ...payload,
+    deviceUuid: payload.deviceUuid || device?.deviceUuid,
+    deviceName: payload.deviceName || device?.deviceName,
+    platform: payload.platform || device?.platform,
+  };
   return requestJson<AuthResponse>("/api/auth/login", {
-    body: payload,
+    body: fullPayload,
+  });
+}
+
+export interface UserDeviceSummary {
+  devices: {
+    id: number;
+    userId: number;
+    deviceUuid: string;
+    platform: "ANDROID" | "IOS" | "OTHER";
+    deviceName: string;
+    status: "ACTIVE" | "REVOKED";
+    createdAt: string;
+  }[];
+  maxDevices: number;
+  activeCount: number;
+}
+
+export async function fetchMyDevices(): Promise<UserDeviceSummary> {
+  const token = await getValidAccessToken();
+  return requestJson<UserDeviceSummary>("/api/auth/devices", {
+    method: "GET",
+    token: token ?? undefined,
+  });
+}
+
+export async function registerCurrentDevice(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const token = await getValidAccessToken();
+  const device = getDeviceIdentity();
+  await requestJson("/api/auth/devices/register", {
+    method: "POST",
+    token: token ?? undefined,
+    body: device,
+  }).catch(() => {});
+}
+
+export async function revokeMyDevice(deviceId: number): Promise<void> {
+  const token = await getValidAccessToken();
+  return requestJson<void>(`/api/auth/devices/${deviceId}/revoke`, {
+    method: "PATCH",
+    token: token ?? undefined,
+  });
+}
+
+export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
+  const token = await getValidAccessToken();
+  const deviceUuid = getCurrentDeviceUuid();
+  return requestJson<{ revokedCount: number }>("/api/auth/devices/revoke-others", {
+    method: "POST",
+    token: token ?? undefined,
+    body: { deviceUuid },
   });
 }
 
@@ -544,6 +610,34 @@ export async function recordPlatformVisit(payload: {
   }
 }
 
+export async function recordListeningSessionTelemetry(payload: {
+  historyId?: number;
+  trackId: string;
+  durationMs: number;
+  positionMs?: number;
+  targetPositionMs?: number;
+  source?: "HOME" | "SEARCH" | "PLAYLIST" | "ALBUM" | "ARTIST" | "LIBRARY" | "FAVORITES" | "EMOTION" | "OTHER" | string;
+  sourceId?: string;
+  deviceType?: "WEB" | "ANDROID" | "IOS" | "OTHER";
+  eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+}) {
+  try {
+    const token = await getValidAccessToken();
+    return await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
+      method: "POST",
+      token: token ?? undefined,
+      body: {
+        deviceType: "WEB",
+        source: "HOME",
+        ...payload,
+      },
+    });
+  } catch {
+    // Non-blocking telemetry
+    return null;
+  }
+}
+
 export async function seedDemoTraffic(count = 150, token?: string) {
   const validToken = token || (await getValidAccessToken());
   return requestJson<{ success: boolean; inserted: number; message: string }>(
@@ -587,8 +681,14 @@ async function requestJson<T>(
   const fullUrl = `${API_BASE_URL}${path}`;
   const requestMethod = method ?? (body ? "POST" : "GET");
 
+  // Auto fallback to getValidAccessToken if token not provided and not a public auth endpoint
+  let authToken = token;
+  if (!authToken && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/register") && !path.startsWith("/api/auth/refresh")) {
+    authToken = (await getValidAccessToken()) ?? undefined;
+  }
+
   console.log(`[RequestJson] 📡 Sending ${requestMethod} ${fullUrl}`, {
-    hasToken: !!token,
+    hasToken: !!authToken,
     hasBody: !!body,
     body,
   });
@@ -598,7 +698,7 @@ async function requestJson<T>(
     method: requestMethod,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -606,7 +706,7 @@ async function requestJson<T>(
   console.log(`[RequestJson] 📥 Response status:`, response.status, response.statusText);
 
   if (!response.ok) {
-    const errorMsg = await extractErrorMessage(response);
+    const errorMsg = await extractErrorMessage(response, path);
     if (response.status >= 500) {
       console.error(`[RequestJson] ❌ Server error (${response.status}):`, errorMsg);
     } else {
@@ -631,12 +731,15 @@ async function requestJson<T>(
   }
 }
 
-async function extractErrorMessage(response: Response) {
+async function extractErrorMessage(response: Response, path?: string) {
   try {
     const text = await response.text();
     if (!text) {
       if (response.status === 401) {
-        return "Tài khoản hoặc mật khẩu không chính xác.";
+        if (path?.includes("/login")) {
+          return "Tài khoản hoặc mật khẩu không chính xác.";
+        }
+        return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
       }
       if (response.status === 403) {
         return "Tài khoản không có quyền truy cập hoặc đã bị vô hiệu hóa.";
@@ -662,7 +765,10 @@ async function extractErrorMessage(response: Response) {
         return payload.error;
       }
       if (response.status === 401) {
-        return "Tài khoản hoặc mật khẩu không chính xác.";
+if (path?.includes("/login")) {
+          return payload.message || "Tài khoản hoặc mật khẩu không chính xác.";
+        }
+        return payload.message || "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
       }
       if (response.status === 404) {
         return "Tài khoản chưa được đăng ký trong hệ thống. Vui lòng đăng ký tài khoản trước.";

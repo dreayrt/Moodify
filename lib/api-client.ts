@@ -1,5 +1,5 @@
 // API Base URL - Luôn đảm bảo có tiền tố /api
-const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8088').replace(/\/$/, '');
 const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
 import { getValidAccessToken } from './auth-client';
@@ -600,13 +600,11 @@ export interface PackageEntitlements {
   adIntervalAfterLimit: number;
   skipPolicy: "UNLIMITED" | "LIMITED";
   skipDailyLimit: number;
-  audioQuality?: "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC";
   offlineAllowed: boolean;
   offlineMaxTracks: number;
   maxDevices: number;
   syncedLyrics?: boolean;
   vipBadge?: boolean;
-  customThemes?: boolean;
   familySharing?: boolean;
   familyMembers?: number;
 }
@@ -618,13 +616,11 @@ export const FREE_ENTITLEMENTS: PackageEntitlements = {
   adIntervalAfterLimit: 2,
   skipPolicy: "LIMITED",
   skipDailyLimit: 6,
-  audioQuality: "STANDARD_128",
   offlineAllowed: false,
   offlineMaxTracks: 0,
   maxDevices: 1,
   syncedLyrics: false,
   vipBadge: false,
-  customThemes: false,
   familySharing: false,
 };
 
@@ -881,6 +877,136 @@ export async function downloadTrackFile(
   anchor.click();
   anchor.remove();
   window.URL.revokeObjectURL(blobUrl);
+}
+
+// ============================================================================
+// User Listening History & Activity Trace
+// ============================================================================
+
+export type UserListeningHistoryItem = {
+  id: number;
+  trackId: string;
+  spotifyId?: string;
+  title: string;
+  trackTitle?: string;
+  artist: string;
+  artistName?: string;
+  coverUrl: string;
+  audioUrl?: string;
+  durationMs: number;
+  totalDuration: string;
+  genre: string;
+  startedAt: string;
+  endedAt: string;
+  listenedDurationMs: number;
+  listenedDurationSeconds: number;
+  listenedDurationFormatted: string;
+  lastPositionMs: number;
+  lastPositionSeconds: number;
+  lastPositionFormatted: string;
+  source: string;
+  sourceId?: string;
+  deviceType: string;
+  eventCount: number;
+  completionRatePercent: number;
+  isCompleted: boolean;
+  lyricsSynced?: string;
+  lyricsPlain?: string;
+};
+
+export type UserListeningHistorySummary = {
+  totalListenedTracks: number;
+  totalListenedMinutes: number;
+  totalListenedHours: number;
+  completionRatePercent: number;
+  totalCompletedSessions: number;
+};
+
+export type UserListeningHistoryResponse = {
+  items: UserListeningHistoryItem[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+  summary: UserListeningHistorySummary;
+};
+
+export type UserHistoryTraceEvent = {
+  id: number;
+  listeningHistoryId: number;
+  eventType: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+  positionMs: number;
+  positionFormatted: string;
+  targetPositionMs: number;
+  targetPositionFormatted: string;
+  occurredAt: string;
+};
+
+export async function fetchMyListeningHistory(params: {
+  page?: number;
+  size?: number;
+  search?: string;
+} = {}): Promise<UserListeningHistoryResponse> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const query = new URLSearchParams();
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.size !== undefined) query.set("size", String(params.size));
+  if (params.search) query.set("search", params.search);
+
+  const res = await fetch(`${API_BASE}/analytics/my-history?${query.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể tải lịch sử nghe");
+  return res.json();
+}
+
+export async function fetchMyHistoryTraceEvents(historyId: number): Promise<{
+  historyId: number;
+  items: UserHistoryTraceEvent[];
+  totalEvents: number;
+}> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history/${historyId}/events`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể tải chi tiết sự kiện");
+  return res.json();
+}
+
+export async function deleteMyHistoryItem(historyId: number): Promise<{ success: boolean; message: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history/${historyId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể xóa bài hát khỏi lịch sử");
+  return res.json();
+}
+
+export async function clearMyListeningHistory(): Promise<{ success: boolean; deletedCount: number; message: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể xóa toàn bộ lịch sử nghe");
+  return res.json();
 }
 
 

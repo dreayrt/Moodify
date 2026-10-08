@@ -1,6 +1,7 @@
 import { getValidAccessToken } from "../auth/auth-client";
 import {
   AdminUser,
+  AdminUserSubscription,
   AdCampaign,
   AdCampaignPayload,
   AdCategory,
@@ -9,10 +10,16 @@ import {
   Distributor,
   FavoriteLeaderboardItem,
   FavoriteRecord,
+  ListeningHistoryItem,
+  PlaybackEventItem,
+  TrackRetentionMetric,
+  ListeningSummaryMetrics,
   NotificationBroadcast,
   PaymentTransaction,
+  ReviewAction,
   ReviewRequest,
   ServicePackage,
+  SubscriptionTier,
   SongLicense,
   UserDevice,
 } from "../../features/dashboard/admin/types";
@@ -103,6 +110,9 @@ export type AdminOverviewResponse = {
     detail: string;
     timestamp: string;
   }[];
+  streamsByPlatform?: Record<string, number>;
+  streamsBySource?: Record<string, number>;
+  trackPerformanceMetrics?: TrackRetentionMetric[];
 };
 
 export async function fetchAdminOverview(): Promise<AdminOverviewResponse> {
@@ -201,10 +211,14 @@ export async function createAdminUser(
 export async function deleteAdminUser(
   userId: number
 ): Promise<{ success: boolean; message: string }> {
-  return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/users/${userId}`,
-    { method: "DELETE" }
-  );
+  // Thay vì xóa cứng trong DB gây mất dữ liệu liên kết, chuyển trạng thái sang BANNED
+  return updateAdminUserStatus(userId, "BANNED");
+}
+
+export async function fetchAdminUserSubscriptions(
+  userId: number
+): Promise<AdminUserSubscription[]> {
+  return adminRequest<AdminUserSubscription[]>(`/api/admin/users/${userId}/subscriptions`);
 }
 
 export async function fetchAdminUserDevices(
@@ -253,9 +267,35 @@ export async function restoreAdminTrack(
   );
 }
 
+export async function updateAdminTrackGenre(
+  trackId: string,
+  genre: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/tracks/${trackId}/genre`,
+    {
+      method: "PATCH",
+      body: { genre },
+    }
+  );
+}
+
+export async function deleteAdminTrack(
+  trackId: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/tracks/${trackId}`,
+    { method: "DELETE" }
+  );
+}
+
 // 4. Content Moderation
 export async function fetchAdminModerationQueue(): Promise<ReviewRequest[]> {
   return adminRequest<ReviewRequest[]>("/api/admin/moderation");
+}
+
+export async function fetchAdminReviewActions(): Promise<ReviewAction[]> {
+  return adminRequest<ReviewAction[]>("/api/admin/moderation/actions");
 }
 
 export async function submitAdminReviewDecision(
@@ -333,15 +373,36 @@ export async function deleteAdminPackage(
   );
 }
 
+export async function fetchAdminSubscriptionTiers(): Promise<SubscriptionTier[]> {
+  return adminRequest<SubscriptionTier[]>("/api/admin/subscription-tiers");
+}
+
+export async function updateAdminSubscriptionTier(
+  tierId: string,
+  data: Partial<SubscriptionTier>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/subscription-tiers/${tierId}`,
+    {
+      method: "PUT",
+      body: data,
+    }
+  );
+}
+
 export async function fetchAdminTransactions(): Promise<PaymentTransaction[]> {
   return adminRequest<PaymentTransaction[]>("/api/admin/transactions");
 }
 
-export async function refundAdminTransaction(
-  transactionId: number
+export async function fetchAdminSubscriptions(): Promise<AdminUserSubscription[]> {
+  return adminRequest<AdminUserSubscription[]>("/api/admin/subscriptions");
+}
+
+export async function cancelAdminSubscription(
+  subscriptionId: number
 ): Promise<{ success: boolean; message: string }> {
   return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/transactions/${transactionId}/refund`,
+    `/api/admin/subscriptions/${subscriptionId}/cancel`,
     { method: "POST" }
   );
 }
@@ -355,6 +416,63 @@ export type AdminLicensingResponse = {
 
 export async function fetchAdminLicensing(): Promise<AdminLicensingResponse> {
   return adminRequest<AdminLicensingResponse>("/api/admin/licensing");
+}
+
+export async function createAdminDistributor(
+  data: Partial<Distributor>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    "/api/admin/distributors",
+    { method: "POST", body: data }
+  );
+}
+
+export async function updateAdminDistributor(
+  id: number,
+  data: Partial<Distributor>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/distributors/${id}`,
+    { method: "PUT", body: data }
+  );
+}
+
+export async function toggleAdminDistributorStatus(
+  id: number
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/distributors/${id}/status`,
+    { method: "PATCH" }
+  );
+}
+
+export async function createAdminContract(
+  data: Partial<DistributionContract>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    "/api/admin/contracts",
+    { method: "POST", body: data }
+  );
+}
+
+export async function updateAdminContract(
+  id: number,
+  data: Partial<DistributionContract>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/contracts/${id}`,
+    { method: "PUT", body: data }
+  );
+}
+
+export async function updateAdminContractStatus(
+  id: number,
+  status: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/contracts/${id}/status`,
+    { method: "PATCH", body: { status } }
+  );
 }
 
 
@@ -538,3 +656,100 @@ export async function deleteAdminAdCategory(
     { method: "DELETE" }
   );
 }
+
+// 10. System Settings & Global Config
+export async function fetchAdminSystemConfig<T = Record<string, unknown>>(): Promise<T> {
+  return adminRequest<T>("/api/admin/system/config");
+}
+
+export async function saveAdminSystemConfig(
+  config: Record<string, unknown>
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    "/api/admin/system/config",
+    {
+      method: "PUT",
+      body: config,
+    }
+  );
+}
+
+// 11. Listening History & Behavior Telemetry
+export async function fetchAdminListeningHistory(params?: {
+  page?: number;
+  size?: number;
+  search?: string;
+  deviceType?: string;
+  source?: string;
+  userId?: number;
+}): Promise<{
+  items: ListeningHistoryItem[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.search) query.set("search", params.search);
+  if (params?.deviceType && params.deviceType !== "ALL") query.set("deviceType", params.deviceType);
+  if (params?.source && params.source !== "ALL") query.set("source", params.source);
+  if (params?.userId) query.set("userId", String(params.userId));
+
+  const qs = query.toString();
+  return adminRequest<{
+    items: ListeningHistoryItem[];
+    totalElements: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  }>(`/api/admin/listening-history${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchAdminPlaybackEvents(
+  listeningHistoryId: number
+): Promise<PlaybackEventItem[]> {
+  return adminRequest<PlaybackEventItem[]>(
+    `/api/admin/listening-history/${listeningHistoryId}/events`
+  );
+}
+
+export async function fetchAdminListeningSummary(): Promise<ListeningSummaryMetrics> {
+  return adminRequest<ListeningSummaryMetrics>("/api/admin/listening-history/summary");
+}
+
+export async function fetchAdminAllPlaybackEvents(params?: {
+  page?: number;
+  size?: number;
+  eventType?: string;
+  search?: string;
+}): Promise<{
+  items: PlaybackEventItem[];
+  totalElements: number;
+  page: number;
+  size: number;
+  totalPages: number;
+  distribution: Record<string, number>;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.size !== undefined) query.set("size", String(params.size));
+  if (params?.eventType && params.eventType !== "ALL") query.set("eventType", params.eventType);
+  if (params?.search?.trim()) query.set("search", params.search.trim());
+
+  const qs = query.toString();
+  return adminRequest<{
+    items: PlaybackEventItem[];
+    totalElements: number;
+    page: number;
+    size: number;
+    totalPages: number;
+    distribution: Record<string, number>;
+  }>(`/api/admin/playback-events${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchAdminTrackRetentionMetrics(limit = 15): Promise<TrackRetentionMetric[]> {
+  return adminRequest<TrackRetentionMetric[]>(`/api/admin/tracks/retention-metrics?limit=${limit}`);
+}
+

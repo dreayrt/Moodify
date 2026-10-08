@@ -18,6 +18,7 @@ import {
   Bell,
   Mail,
   Shield,
+  Clock,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -25,8 +26,9 @@ import {
   clearAuthSession,
   getStoredAuthSession,
   logout,
+  registerCurrentDevice,
   type UserProfileResponse,
-} from "@/lib/auth-client";
+} from "@/lib/auth/auth-client";
 import {
   fetchUserPlaylists,
   fetchMySubscription,
@@ -863,6 +865,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           if (!cancelled) {
             setSubInfo(sub);
           }
+          // Tự động đồng bộ và liên kết thiết bị hiện tại vào hệ thống quản lý thiết bị
+          void registerCurrentDevice();
         } else {
           if (!cancelled) setUserLoading(false);
         }
@@ -935,6 +939,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/dashboard" || pathname === "/dashboard/user";
   const isSearch = pathname === "/dashboard/search" || pathname.startsWith("/dashboard/search");
   const isLibrary = pathname.startsWith("/dashboard/library");
+  const isHistory = pathname.startsWith("/dashboard/history");
 
   const { goldThemeEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
   const isVipShellActive = Boolean(subInfo?.isPremium) && vipShellEnabled;
@@ -1037,6 +1042,16 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               >
                 Thư viện
               </Link>
+              <Link
+                href="/dashboard/history"
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  isHistory
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Lịch sử
+              </Link>
             </nav>
           </div>
 
@@ -1071,7 +1086,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
               <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden moodify-scroll w-full ${isPre ? "rounded-[18.8px]" : "rounded-[20px]"} backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
 
-            {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Thể loại */}
+            {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Lịch sử -> Thể loại */}
             <div className="space-y-1">
               {/* 1. Trang chủ */}
               <Link
@@ -1124,6 +1139,24 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     strokeWidth={isLibrary ? 2.2 : 1.7}
                   />
                   <span>Thư viện</span>
+                </div>
+              </Link>
+
+              {/* 3.1. Lịch sử nghe & Truy vết */}
+              <Link
+                href="/dashboard/history"
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                  isHistory
+                    ? navActiveItemClass
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Clock
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
+                    strokeWidth={isHistory ? 2.2 : 1.7}
+                  />
+                  <span>Lịch sử nghe</span>
                 </div>
               </Link>
 

@@ -21,6 +21,11 @@ import {
   Play,
   LayoutGrid,
   ArrowRight,
+  Smartphone,
+  Laptop,
+  LogOut,
+  ShieldCheck,
+  AlertCircle,
 } from "lucide-react";
 import {
   MASCOTS,
@@ -29,7 +34,8 @@ import {
   type MascotCategory,
   type MascotItem,
 } from "@/lib/mascots";
-import { type UserProfileResponse } from "@/lib/auth-client";
+import { type UserProfileResponse, fetchMyDevices, revokeMyDevice, revokeOtherDevices, type UserDeviceSummary } from "@/lib/auth/auth-client";
+import { getCurrentDeviceUuid } from "@/lib/auth/device-helper";
 import { useVipTheme, VIP_BUTTON_THEMES, type VipButtonStyle } from "@/lib/theme";
 
 // Dynamic import of page-mascot with ssr: false
@@ -84,6 +90,60 @@ export default function UserSettingsModal({
   const [phone, setPhone] = useState(user?.phone || "");
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // User Devices State
+  const [deviceSummary, setDeviceSummary] = useState<UserDeviceSummary | null>(null);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [deviceActionMsg, setDeviceActionMsg] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const currentDeviceUuid = getCurrentDeviceUuid();
+
+  const loadDevices = async () => {
+    try {
+      setLoadingDevices(true);
+      const data = await fetchMyDevices();
+      setDeviceSummary(data);
+    } catch (err) {
+      console.error("Could not fetch devices:", err);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadDevices();
+    }
+  }, [isOpen]);
+
+  const handleRevokeSingle = async (deviceId: number) => {
+    try {
+      setRevokingId(deviceId);
+      await revokeMyDevice(deviceId);
+      setDeviceActionMsg("Đã thu hồi quyền thiết bị thành công.");
+      await loadDevices();
+      setTimeout(() => setDeviceActionMsg(null), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const handleRevokeOthers = async () => {
+    if (!confirm("Bạn có chắc chắn muốn đăng xuất tài khoản khỏi tất cả các thiết bị khác không?")) return;
+    try {
+      setLoadingDevices(true);
+      const res = await revokeOtherDevices();
+      setDeviceActionMsg(`Đã đăng xuất ${res.revokedCount} thiết bị khác thành công.`);
+      await loadDevices();
+      setTimeout(() => setDeviceActionMsg(null), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -800,6 +860,156 @@ export default function UserSettingsModal({
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════
+              SECTION 4: QUẢN LÝ THIẾT BỊ ĐĂNG NHẬP & PHIÊN HOẠT ĐỘNG
+             ══════════════════════════════════════════════════════════════ */}
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Laptop className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-bold text-white/90 uppercase tracking-wider">
+                    Thiết bị đăng nhập &amp; Hạn mức
+                  </h3>
+                </div>
+                <p className="text-[11px] text-white/50 mt-0.5">
+                  Quản lý các máy tính và điện thoại đang duy trì phiên đăng nhập tài khoản của bạn.
+                </p>
+              </div>
+
+              {/* Quota Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-xs font-semibold shrink-0">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>
+                  {deviceSummary?.activeCount ?? 1} / {deviceSummary?.maxDevices ?? 1} thiết bị tối đa
+                </span>
+              </div>
+            </div>
+
+            {/* Notification / Action Message */}
+            {deviceActionMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in">
+                <Check className="w-4 h-4 shrink-0" />
+                <span>{deviceActionMsg}</span>
+              </div>
+            )}
+
+            {/* Device List Container */}
+            <div className="space-y-2.5">
+              {loadingDevices && !deviceSummary ? (
+                <div className="p-6 rounded-2xl border border-white/10 bg-white/[0.02] text-center text-xs text-white/50 animate-pulse">
+                  Đang tải danh sách thiết bị liên kết...
+                </div>
+              ) : !deviceSummary?.devices || deviceSummary.devices.length === 0 ? (
+                <div className="p-6 rounded-2xl border border-white/10 bg-white/[0.02] text-center text-xs text-white/50">
+                  Chưa ghi nhận thiết bị nào khác.
+                </div>
+              ) : (
+                deviceSummary.devices.map((dev) => {
+                  const isCurrent = dev.deviceUuid === currentDeviceUuid;
+                  const isActive = dev.status === "ACTIVE";
+                  const isRevoking = revokingId === dev.id;
+
+                  return (
+                    <div
+                      key={dev.id}
+                      className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isCurrent
+                          ? "bg-gradient-to-r from-cyan-500/10 via-slate-900 to-transparent border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
+                          : isActive
+                          ? "bg-white/[0.03] hover:bg-white/[0.05] border-white/10"
+                          : "bg-white/[0.01] border-white/5 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                            dev.platform === "IOS"
+                              ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
+                              : dev.platform === "ANDROID"
+                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                              : "bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
+                          }`}
+                        >
+                          {dev.platform === "IOS" || dev.platform === "ANDROID" ? (
+                            <Smartphone className="w-5 h-5" />
+                          ) : (
+                            <Laptop className="w-5 h-5" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-white truncate">
+                              {dev.deviceName || "Thiết bị không xác định"}
+                            </p>
+                            {isCurrent && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Thiết bị này
+                              </span>
+                            )}
+                            {!isCurrent && isActive && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
+                                Đang hoạt động
+                              </span>
+                            )}
+                            {!isActive && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 text-white/40 border border-white/10">
+                                Đã thu hồi
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-white/45 mt-0.5 font-mono">
+                            <span>Nền tảng: {dev.platform}</span>
+                            <span>•</span>
+                            <span>Đăng nhập: {dev.createdAt || "Gần đây"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                        {!isCurrent && isActive && (
+                          <button
+                            type="button"
+                            disabled={isRevoking}
+                            onClick={() => handleRevokeSingle(dev.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/25 text-xs font-semibold transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                            title="Đăng xuất khỏi thiết bị này"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>{isRevoking ? "Đang xử lý..." : "Đăng xuất"}</span>
+                          </button>
+                        )}
+                        {isCurrent && (
+                          <span className="text-[11px] text-emerald-400/90 font-medium px-2 py-1">
+                            Phiên hiện tại
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Bulk Revoke Button */}
+            {deviceSummary && deviceSummary.devices.filter((d) => d.status === "ACTIVE" && d.deviceUuid !== currentDeviceUuid).length > 0 && (
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleRevokeOthers}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 text-white/80 hover:text-red-300 text-xs font-semibold transition-all cursor-pointer active:scale-95"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-red-400" />
+                  <span>Đăng xuất khỏi tất cả thiết bị khác</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

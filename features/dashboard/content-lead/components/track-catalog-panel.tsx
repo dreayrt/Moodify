@@ -409,7 +409,7 @@ export function TrackCatalogPanel({
                             track.coverUrl.startsWith("blob:") ||
                             track.coverUrl.startsWith("data:")
                               ? track.coverUrl
-                              : `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"}${
+                              : `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8088"}${
                                   track.coverUrl.startsWith("/") ? "" : "/"
                                 }${track.coverUrl}`
                           }

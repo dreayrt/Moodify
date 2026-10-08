@@ -16,7 +16,6 @@ import {
   Music2,
   Crown,
   ShieldCheck,
-  Radio,
   Share2,
   Gauge,
 } from "lucide-react";
@@ -52,7 +51,6 @@ export function GlobalPlayerBar() {
     playbackRate,
     isShuffle,
     repeatMode,
-    triggerAd,
     togglePlay,
     seek,
     setVolume,
@@ -447,7 +445,7 @@ export function GlobalPlayerBar() {
               </button>
             )}
 
-            {isPremiumUser ? (
+            {isPremiumUser && (
               <div
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm transition-all"
                 style={{
@@ -460,16 +458,6 @@ export function GlobalPlayerBar() {
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>VIP</span>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => triggerAd(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-[11px] font-mono tracking-wider transition-all cursor-pointer active:scale-95"
-                title="Kích hoạt quảng cáo ngay để kiểm thử trải nghiệm"
-              >
-                <Radio className="w-3 h-3 text-amber-300" />
-                <span>Test QC</span>
-              </button>
             )}
 
             {/* Volume controls */}
