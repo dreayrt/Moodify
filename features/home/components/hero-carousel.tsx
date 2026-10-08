@@ -699,6 +699,7 @@ export function HeroCarousel() {
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
                 <button
+                  data-auth-trigger="login"
                   className="inline-flex h-11 items-center justify-center rounded-full border border-white/14 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md transition duration-300 hover:border-white/28 hover:bg-white/16 cursor-pointer"
                   onClick={openSignIn}
                   type="button"

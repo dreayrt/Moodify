@@ -749,6 +749,7 @@ function LumenHeroContent() {
           </div>
         ) : (
           <div
+            id="tour-hero-player"
             className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-slate-950/90 via-[#0d101e]/85 to-slate-950/90 backdrop-blur-2xl p-6 sm:p-8 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.7)] anim-fade-up"
             style={{ animationDelay: "300ms" }}
           >
@@ -857,7 +858,7 @@ function LumenHeroContent() {
                 </div>
 
                 {/* Genre Vibe Chips */}
-                <div className="flex flex-wrap items-center gap-2 mt-3 pt-4 border-t border-white/10">
+                <div id="tour-vibe-filter" className="flex flex-wrap items-center gap-2 mt-3 pt-4 border-t border-white/10">
                   {VIBES.map((v) => (
                     <MoodChip
                       key={v.id}
