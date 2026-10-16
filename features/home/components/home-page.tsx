@@ -1,17 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import {
-  ArrowRight,
   Headphones,
   Laptop,
-  Music,
+  Play,
   Radio,
-  Search,
-  Smile,
-  Sparkles,
-  Zap,
 } from "lucide-react";
 
 import { BrandLogo } from "@/components/shared/logo-mark";
@@ -19,31 +14,53 @@ import { HeroCarousel } from "@/features/home/components/hero-carousel";
 
 const HOME_ROUTE = "/";
 
-interface FunMood {
+interface MoodCard {
   id: string;
-  emoji: string;
-  label: string;
-  vibeText: string;
-  color: string;
+  title: string;
+  genre: string;
+  cover: string;
 }
 
-const FUN_MOODS: FunMood[] = [
-  { id: "chill", emoji: "☕", label: "Cày deadline", vibeText: "Bật chút lo-fi nhẹ nhàng để giữ tỉnh táo và chạy deadline xuyên màn đêm.", color: "from-amber-500/20 to-orange-500/10" },
-  { id: "sad", emoji: "🌧️", label: "Tự nhiên buồn", vibeText: "Một góc yên tĩnh, mưa rơi ngoài cửa sổ và vài bài nhạc indie thì thầm.", color: "from-blue-500/20 to-cyan-500/10" },
-  { id: "hype", emoji: "⚡", label: "Bật nóc nhà", vibeText: "Bass dồn dập, kéo năng lượng lên 200% để quẩy hết mình.", color: "from-pink-500/20 to-purple-500/10" },
-  { id: "lazy", emoji: "🛋️", label: "Lười biếng", vibeText: "Nằm dài trên sofa, không nghĩ ngợi gì, thả trôi theo giai điệu êm ái.", color: "from-emerald-500/20 to-teal-500/10" },
-  { id: "drive", emoji: "🌙", label: "Đi dạo đêm", vibeText: "Gió mát rười rượi, phố vắng đèn vàng và những thanh âm city pop.", color: "from-violet-500/20 to-indigo-500/10" },
+const MOOD_CARDS: MoodCard[] = [
+  {
+    id: "focus",
+    title: "Tập trung",
+    genre: "Lo-Fi Beats",
+    cover: "/covers/focus-flow.jpg",
+  },
+  {
+    id: "melancholy",
+    title: "Mưa & Suy tư",
+    genre: "Indie Ballad",
+    cover: "/covers/saigon-rain.jpg",
+  },
+  {
+    id: "energy",
+    title: "Bùng nổ",
+    genre: "Electronic",
+    cover: "/covers/neon-pulse.jpg",
+  },
+  {
+    id: "chill",
+    title: "Thư giãn",
+    genre: "Neo-Soul",
+    cover: "/covers/echoes-soul.jpg",
+  },
+  {
+    id: "midnight",
+    title: "Đêm muộn",
+    genre: "City Pop",
+    cover: "/covers/midnight-mirage.jpg",
+  },
 ];
 
 export default function Home() {
-  const [selectedMood, setSelectedMood] = useState<FunMood>(FUN_MOODS[0]);
-
-  const handleOpenRegister = () => {
-    const regBtn = document.querySelector<HTMLButtonElement>(
-      'button[data-auth-trigger="register"]',
+  const handleOpenLogin = () => {
+    const loginBtn = document.querySelector<HTMLButtonElement>(
+      'button[data-auth-trigger="login"]',
     );
-    if (regBtn) {
-      regBtn.click();
+    if (loginBtn) {
+      loginBtn.click();
     } else {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -51,102 +68,94 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)]">
-      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-12 px-4 pb-14 pt-4 sm:px-6 sm:gap-14 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-10 px-4 pb-14 pt-4 sm:px-6 sm:gap-12 lg:px-8">
         {/* Hero Carousel */}
         <HeroCarousel />
 
-        {/* Fun Mood Picker Interactive Section */}
-        <section className="relative flex flex-col items-center gap-6 rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-7 sm:p-10 text-center shadow-xl backdrop-blur-md">
-          {/* Subtle Ambient Glow */}
-          <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-amber-500/10 blur-2xl opacity-60" />
-
-          <div className="relative z-10 space-y-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80">
-              <Sparkles className="h-3.5 w-3.5 text-[#FF7A2C]" />
-              <span>Hôm nay bạn đang thấy thế nào?</span>
-            </span>
-            <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white">
-              Chọn tâm trạng, Moodify lo phần nhạc
+        {/* Mood Discovery - Clean & Minimal */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white">
+              Giai điệu theo tâm trạng
             </h2>
+            <p className="text-xs sm:text-sm text-white/50">
+              Chọn cảm xúc của bạn để bắt đầu nghe
+            </p>
           </div>
 
-          {/* Emojis selection */}
-          <div className="relative z-10 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
-            {FUN_MOODS.map((item) => {
-              const isSelected = selectedMood.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setSelectedMood(item)}
-                  className={`group flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                    isSelected
-                      ? "border border-white/40 bg-white text-[#101010] shadow-[0_0_25px_rgba(255,255,255,0.35)] scale-105"
-                      : "border border-white/10 bg-white/[0.04] text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-                  }`}
-                >
-                  <span className="text-xl sm:text-2xl">{item.emoji}</span>
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            {MOOD_CARDS.map((item) => (
+              <button
+                key={item.id}
+                onClick={handleOpenLogin}
+                className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] text-left transition-all duration-300 hover:border-white/30 hover:scale-[1.02] cursor-pointer"
+              >
+                <Image
+                  src={item.cover}
+                  alt={item.title}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
 
-          {/* Interactive Mood Bubble */}
-          <div className="relative z-10 max-w-lg rounded-2xl border border-white/12 bg-black/40 px-5 py-4 text-xs sm:text-sm text-white/80 backdrop-blur-md transition-all">
-            <span className="text-base mr-2">{selectedMood.emoji}</span>
-            <span>{selectedMood.vibeText}</span>
-          </div>
+                {/* Floating Play Icon on hover */}
+                <div className="absolute right-3 top-3 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white text-black opacity-0 shadow-lg transition duration-200 group-hover:opacity-100 group-hover:translate-y-0 translate-y-1">
+                  <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current ml-0.5" />
+                </div>
 
-          {/* Direct CTA Button */}
-          <div className="relative z-10 pt-2">
-            <button
-              onClick={handleOpenRegister}
-              className="flex items-center gap-2 rounded-full bg-white px-7 py-3 text-sm font-bold text-[#101010] shadow-lg transition hover:scale-105 hover:bg-white/90 active:scale-95 cursor-pointer"
-            >
-              <span>Vào trải nghiệm ngay</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
+                {/* Card Title & Genre */}
+                <div className="absolute bottom-0 inset-x-0 p-3.5 sm:p-4">
+                  <span className="block text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[#FF7A2C]">
+                    {item.genre}
+                  </span>
+                  <h3 className="font-display font-bold text-sm sm:text-base text-white mt-0.5 leading-snug">
+                    {item.title}
+                  </h3>
+                </div>
+              </button>
+            ))}
           </div>
         </section>
 
-        {/* 3 Quick Fun Highlights - Super minimal, low text */}
+        {/* Feature Highlights - 3 Asymmetric Editorial Cards */}
         <section className="grid gap-5 md:grid-cols-3">
           {/* Card 1 */}
-          <div className="flex flex-col items-center text-center gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-500/20 to-pink-500/20 text-[#A855F7]">
-              <Headphones className="h-6 w-6" />
+          <div className="flex flex-col gap-3.5 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/20">
+              <Headphones className="h-5 w-5" />
             </div>
-            <h3 className="font-display text-lg font-bold text-white">
-              Đúng mood, đúng lúc
+            <h3 className="font-display text-base sm:text-lg font-bold text-white">
+              Bắt trọn nhịp cảm xúc
             </h3>
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Không cần lục tìm playlist cả tiếng đồng hồ. Chỉ cần chọn cảm xúc là nhạc tự phát.
+              Nhận diện và phân tích tâm trạng theo thời gian thực để gợi ý danh sách nhạc tương thích, không mất thời gian tìm kiếm.
             </p>
           </div>
 
           {/* Card 2 */}
-          <div className="flex flex-col items-center text-center gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 text-[#00F0FF]">
-              <Laptop className="h-6 w-6" />
+          <div className="flex flex-col gap-3.5 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">
+              <Laptop className="h-5 w-5" />
             </div>
             <h3 className="font-display text-lg font-bold text-white">
-              Nghe đâu cũng tiện
+              Đồng bộ đa thiết bị
             </h3>
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Mở trên laptop khi làm việc, hoặc lướt app điện thoại khi ra đường. Luôn đồng bộ mượt mà.
+              Trải nghiệm liền mạch từ không gian làm việc trên máy tính tới tai nghe di động khi di chuyển ngoài đường.
             </p>
           </div>
 
           {/* Card 3 */}
-          <div className="flex flex-col items-center text-center gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500/20 to-rose-500/20 text-[#FF7A2C]">
-              <Radio className="h-6 w-6" />
+          <div className="flex flex-col gap-3.5 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20">
+              <Radio className="h-5 w-5" />
             </div>
             <h3 className="font-display text-lg font-bold text-white">
-              Góc cho nghệ sĩ
+              Không gian nghệ sĩ độc lập
             </h3>
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Bạn tự làm nhạc? Tải lên Creator Studio và đưa tác phẩm đến đúng những ai cần nghe.
+              Creator Studio hỗ trợ nghệ sĩ tải lên bài hát, tiếp cận cộng đồng thính giả có cùng rung cảm âm nhạc.
             </p>
           </div>
         </section>
