@@ -116,7 +116,12 @@ function SearchContent() {
 
   // Perform search or catalog fetch
   const loadData = useCallback(
-    async (searchQuery: string, genre: string, isMood: boolean, signal: AbortSignal) => {
+    async (
+      searchQuery: string,
+      genre: string,
+      isMood: boolean,
+      signal: AbortSignal = new AbortController().signal
+    ) => {
       setLoading(true);
       setMoodError(null);
       setHistorySaveError(null);
