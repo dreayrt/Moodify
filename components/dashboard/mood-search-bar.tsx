@@ -2,8 +2,27 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, HeartPulse } from "lucide-react";
+import {
+  ArrowRight,
+  HeartPulse,
+  LoaderCircle,
+  Music2,
+  Search,
+  X,
+} from "lucide-react";
 import { useOptionalPlayer } from "./player-context";
+import {
+  fetchTracks,
+  recordMySearchHistory,
+  type Track,
+} from "@/lib/api-client";
+import { queueEmotionSearchHistory } from "@/lib/mood-search-history";
+
+type QuickSearchSuggestion = { kind: "TRACK"; title: string };
+
+const EMPTY_QUICK_RESULTS = { tracks: [] as Track[] };
+const QUICK_SEARCH_DEBOUNCE_MS = 350;
+const QUICK_SEARCH_MIN_LENGTH = 2;
 
 export interface MoodSearchBarProps {
   className?: string;
@@ -59,6 +78,49 @@ export default function MoodSearchBar({
   const effectiveIsMood = isVip && (isControlledMood ? controlledMoodMode : internalMoodMode);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const [quickResults, setQuickResults] = useState(EMPTY_QUICK_RESULTS);
+  const [quickSearchStatus, setQuickSearchStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [isQuickResultsOpen, setIsQuickResultsOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+
+  useEffect(() => {
+    if (isControlledValue || effectiveIsMood) return;
+
+    const query = internalSearchValue.trim();
+    if (query.length < QUICK_SEARCH_MIN_LENGTH) return;
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      setQuickSearchStatus("loading");
+
+      void fetchTracks({ query, size: 5, signal: controller.signal })
+        .then((trackPage) => {
+          if (controller.signal.aborted) return;
+          setQuickResults({
+            tracks: trackPage.content.slice(0, 5),
+          });
+          setActiveSuggestionIndex(-1);
+          setQuickSearchStatus("ready");
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setQuickResults(EMPTY_QUICK_RESULTS);
+          setQuickSearchStatus("error");
+        });
+    }, QUICK_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [effectiveIsMood, internalSearchValue, isControlledValue]);
+
+  const quickSuggestions: QuickSearchSuggestion[] = quickResults.tracks.map((track) => ({
+    kind: "TRACK",
+    title: track.name,
+  }));
 
   useEffect(() => {
     if (autoFocus && inputRef.current) {
@@ -71,7 +133,11 @@ export default function MoodSearchBar({
       onChange?.(newVal);
     } else {
       setInternalSearchValue(newVal);
+      setQuickResults(EMPTY_QUICK_RESULTS);
+      setQuickSearchStatus(newVal.trim().length >= QUICK_SEARCH_MIN_LENGTH && !effectiveIsMood ? "loading" : "idle");
+      setIsQuickResultsOpen(newVal.trim().length >= QUICK_SEARCH_MIN_LENGTH && !effectiveIsMood);
     }
+    setActiveSuggestionIndex(-1);
   };
 
   const handleClear = () => {
@@ -82,6 +148,9 @@ export default function MoodSearchBar({
   const handleToggleMood = () => {
     if (!isVip) return;
     const nextMood = !effectiveIsMood;
+    setQuickResults(EMPTY_QUICK_RESULTS);
+    setQuickSearchStatus("idle");
+    setIsQuickResultsOpen(false);
     if (isControlledMood) {
       onToggleMood?.(nextMood);
     } else {
@@ -93,10 +162,19 @@ export default function MoodSearchBar({
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = effectiveSearchValue.trim();
+    setIsQuickResultsOpen(false);
 
     if (onSubmit) {
       onSubmit(query, effectiveIsMood);
       return;
+    }
+
+    if (query) {
+      if (effectiveIsMood) {
+        queueEmotionSearchHistory(query);
+      } else {
+        void recordMySearchHistory({ keyword: query, searchType: "ALL" }).catch(() => undefined);
+      }
     }
 
     if (!query) {
@@ -108,6 +186,34 @@ export default function MoodSearchBar({
       router.push(`/dashboard/search?q=${encodeURIComponent(query)}&mode=mood`);
     } else {
       router.push(`/dashboard/search?q=${encodeURIComponent(query)}`);
+    }
+  };
+
+  const handleSuggestionSelect = (suggestion: QuickSearchSuggestion) => {
+    setIsQuickResultsOpen(false);
+    void recordMySearchHistory({ keyword: suggestion.title, searchType: suggestion.kind }).catch(() => undefined);
+    const params = new URLSearchParams({ q: suggestion.title, type: suggestion.kind });
+    router.push(`/dashboard/search?${params.toString()}`);
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      setIsQuickResultsOpen(false);
+      setActiveSuggestionIndex(-1);
+      return;
+    }
+
+    if (!isQuickResultsOpen || quickSuggestions.length === 0) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveSuggestionIndex((current) => (current + 1) % quickSuggestions.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveSuggestionIndex((current) => (current <= 0 ? quickSuggestions.length - 1 : current - 1));
+    } else if (event.key === "Enter" && activeSuggestionIndex >= 0) {
+      event.preventDefault();
+      handleSuggestionSelect(quickSuggestions[activeSuggestionIndex]);
     }
   };
 
@@ -156,6 +262,26 @@ export default function MoodSearchBar({
           type="text"
           value={effectiveSearchValue}
           onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={() => {
+            if (!isControlledValue && effectiveSearchValue.trim().length >= QUICK_SEARCH_MIN_LENGTH && !effectiveIsMood) {
+              setIsQuickResultsOpen(true);
+            }
+          }}
+          onBlur={() => window.setTimeout(() => {
+            setIsQuickResultsOpen(false);
+            setActiveSuggestionIndex(-1);
+          }, 120)}
+          onKeyDown={handleInputKeyDown}
+          role={!isControlledValue ? "combobox" : undefined}
+          aria-label={!isControlledValue ? placeholder || defaultPlaceholder : undefined}
+          aria-autocomplete={!isControlledValue ? "list" : undefined}
+          aria-expanded={!isControlledValue ? isQuickResultsOpen : undefined}
+          aria-controls={!isControlledValue ? "mood-search-quick-results" : undefined}
+          aria-activedescendant={
+            !isControlledValue && activeSuggestionIndex >= 0
+              ? `mood-search-suggestion-${activeSuggestionIndex}`
+              : undefined
+          }
           placeholder={placeholder || defaultPlaceholder}
           className={`w-full bg-transparent rounded-full text-white placeholder:text-white/40 outline-none transition-all ${
             isLg
@@ -177,6 +303,65 @@ export default function MoodSearchBar({
           >
             <X className={isLg ? "w-4 h-4" : "w-3.5 h-3.5"} />
           </button>
+        )}
+
+        {!isControlledValue && isQuickResultsOpen && !effectiveIsMood && effectiveSearchValue.trim().length >= QUICK_SEARCH_MIN_LENGTH && (
+          <div className="absolute left-0 right-0 top-full z-[80] mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#10111d] shadow-[0_20px_55px_rgba(0,0,0,0.55)]">
+            <div id="mood-search-quick-results" role="listbox" aria-label="Gợi ý tìm kiếm" className="max-h-[min(60vh,420px)] overflow-y-auto p-2">
+              {quickSearchStatus === "loading" && (
+                <div className="flex items-center gap-2 px-3 py-4 text-sm text-white/55">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Đang tìm gợi ý...
+                </div>
+              )}
+
+              {quickSearchStatus === "error" && (
+                <p className="px-3 py-4 text-sm text-white/50">Chưa tải được gợi ý. Bạn vẫn có thể nhấn Enter để xem kết quả.</p>
+              )}
+
+              {quickSearchStatus === "ready" && quickSuggestions.length === 0 && (
+                <p className="px-3 py-4 text-sm text-white/50">Không tìm thấy gợi ý phù hợp.</p>
+              )}
+
+              {quickResults.tracks.length > 0 && (
+                <div role="group" aria-label="Bài hát">
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Bài hát</p>
+                  {quickResults.tracks.map((track, index) => (
+                    <button
+                      id={`mood-search-suggestion-${index}`}
+                      key={`track-${track.spotifyId || track.id}`}
+                      type="button"
+                      role="option"
+                      aria-selected={activeSuggestionIndex === index}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSuggestionSelect({
+                        kind: "TRACK",
+                        title: track.name,
+                      })}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${activeSuggestionIndex === index ? "bg-purple-500/20" : "hover:bg-white/[0.06]"}`}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-purple-200"><Music2 className="h-4 w-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-white">{track.name}</span>
+                        <span className="block truncate text-xs text-white/45">{track.artistName}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+            </div>
+
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => handleSubmit()}
+              className="flex w-full items-center justify-between border-t border-white/[0.08] px-4 py-3 text-left text-xs font-semibold text-purple-200 transition hover:bg-white/[0.04]"
+            >
+              <span>Xem tất cả kết quả cho “{effectiveSearchValue.trim()}”</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </form>
 
