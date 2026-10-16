@@ -14,8 +14,10 @@ COPY . .
 # Build-time environment variables for Next.js public client
 ARG NEXT_PUBLIC_API_BASE_URL=https://api.moodify.click
 ARG NEXT_PUBLIC_AUDIO_SERVER_URL=https://moodify.click
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=1234567890-placeholder.apps.googleusercontent.com
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_AUDIO_SERVER_URL=$NEXT_PUBLIC_AUDIO_SERVER_URL
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
@@ -31,10 +33,12 @@ ENV HOSTNAME="0.0.0.0"
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+RUN mkdir -p /app/.next/cache/images && chown -R nextjs:nodejs /app
 
 USER nextjs
 EXPOSE 3000
