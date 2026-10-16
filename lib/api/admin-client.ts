@@ -382,8 +382,10 @@ export async function fetchAdminFavorites(params?: {
   return adminRequest<AdminFavoritesResponse>(`/api/admin/favorites${qs ? `?${qs}` : ""}`);
 }
 
-export async function fetchAdminFavoritesLeaderboard(): Promise<FavoriteLeaderboardItem[]> {
-  return adminRequest<FavoriteLeaderboardItem[]>("/api/admin/favorites/leaderboard");
+export async function fetchAdminFavoritesLeaderboard(
+  type: "SONG" | "ARTIST" | "ALBUM" = "SONG"
+): Promise<FavoriteLeaderboardItem[]> {
+  return adminRequest<FavoriteLeaderboardItem[]>(`/api/admin/favorites/leaderboard?type=${type}`);
 }
 
 export async function deleteAdminFavorite(

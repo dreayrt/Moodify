@@ -440,6 +440,45 @@ export async function fetchUserPlaylists(): Promise<Playlist[]> {
 }
 
 /**
+ * Search public playlists
+ */
+export async function fetchPublicPlaylists(query?: string): Promise<Playlist[]> {
+  const token = await getValidAccessToken().catch(() => null);
+  const params = new URLSearchParams();
+  if (query && query.trim()) params.set('q', query.trim());
+
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/playlists?${params.toString()}`, { headers });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch public playlists: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Update playlist visibility (Public / Private)
+ */
+export async function updatePlaylistVisibility(
+  playlistId: string,
+  isPublic: boolean
+): Promise<Playlist> {
+  const token = await getValidAccessToken();
+  const response = await fetch(
+    `${API_BASE}/playlists/${playlistId}/visibility?isPublic=${isPublic}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to update playlist visibility: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
  * Fetch a playlist by ID (with its tracks)
  */
 export async function fetchPlaylistById(id: string): Promise<Playlist> {
@@ -816,5 +855,178 @@ export async function downloadTrackFile(
   anchor.remove();
   window.URL.revokeObjectURL(blobUrl);
 }
+
+// ============================================================================
+// Album APIs (MySQL Hybrid Architecture)
+// ============================================================================
+
+export type Album = {
+  id: number;
+  title: string;
+  description: string | null;
+  coverUrl: string;
+  releaseDate: string | null;
+  isPublic: boolean;
+  status: string;
+  userId: number | null;
+  authorName: string;
+  authorAvatar: string | null;
+  trackCount: number;
+  isFavorited?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AlbumDetail = Album & {
+  tracks: Track[];
+};
+
+export type AlbumPageResponse = {
+  content: Album[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export async function fetchPublicAlbums(
+  q?: string,
+  page: number = 0,
+  size: number = 20
+): Promise<AlbumPageResponse> {
+  const token = await getValidAccessToken().catch(() => null);
+  const params = new URLSearchParams();
+  if (q && q.trim()) params.set("q", q.trim());
+  params.set("page", page.toString());
+  params.set("size", size.toString());
+
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/albums?${params.toString()}`, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch albums: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAlbumDetail(id: number | string): Promise<AlbumDetail> {
+  const token = await getValidAccessToken().catch(() => null);
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/albums/${id}`, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch album detail: ${res.status}`);
+  return res.json();
+}
+
+export async function createAlbum(data: {
+  title: string;
+  description?: string;
+  coverUrl?: string;
+  isPublic?: boolean;
+}): Promise<Album> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to create album: ${res.status}`);
+  return res.json();
+}
+
+export async function updateAlbum(
+  id: number | string,
+  data: {
+    title?: string;
+    description?: string;
+    coverUrl?: string;
+    isPublic?: boolean;
+  }
+): Promise<Album> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to update album: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteAlbum(id: number | string): Promise<void> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to delete album: ${res.status}`);
+}
+
+export async function addTrackToAlbum(
+  albumId: number | string,
+  trackId: string
+): Promise<AlbumDetail> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${albumId}/tracks`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ trackId }),
+  });
+  if (!res.ok) throw new Error(`Failed to add track to album: ${res.status}`);
+  return res.json();
+}
+
+export async function removeTrackFromAlbum(
+  albumId: number | string,
+  trackId: string
+): Promise<AlbumDetail> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${albumId}/tracks/${encodeURIComponent(trackId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to remove track from album: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchUserAlbums(): Promise<Album[]> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch user albums: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLikedAlbums(): Promise<Album[]> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/favorites/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch liked albums: ${res.status}`);
+  return res.json();
+}
+
+export async function toggleFavoriteAlbum(
+  albumId: number | string
+): Promise<{ favorited: boolean; albumId: string }> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${albumId}/favorite`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to toggle favorite album: ${res.status}`);
+  return res.json();
+}
+
 
 

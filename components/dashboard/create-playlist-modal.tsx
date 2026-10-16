@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Music2, Sparkles, Image as ImageIcon, Loader2 } from "lucide-react";
+import { X, Music2, Sparkles, Image as ImageIcon, Loader2, Globe, Lock } from "lucide-react";
 import { createPlaylist, type Playlist } from "@/lib/api-client";
 
 interface CreatePlaylistModalProps {
@@ -42,6 +42,7 @@ export default function CreatePlaylistModal({
   const [description, setDescription] = useState("");
   const [coverUrl, setCoverUrl] = useState(PRESET_COVERS[0].url);
   const [customCover, setCustomCover] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +63,7 @@ export default function CreatePlaylistModal({
         name: name.trim(),
         description: description.trim() || undefined,
         coverUrl: coverUrl.trim() || undefined,
+        isPublic,
       });
 
       // Reset form
@@ -69,6 +71,7 @@ export default function CreatePlaylistModal({
       setDescription("");
       setCoverUrl(PRESET_COVERS[0].url);
       setCustomCover(false);
+      setIsPublic(true);
 
       onCreated(newPlaylist);
       onClose();
@@ -145,6 +148,46 @@ export default function CreatePlaylistModal({
               disabled={loading}
               className="w-full px-3.5 py-2 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all resize-none"
             />
+          </div>
+
+          {/* Visibility toggle */}
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              Chế độ hiển thị
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPublic(true)}
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                  isPublic
+                    ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-300"
+                    : "bg-slate-800/60 border-white/5 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold">Công khai</div>
+                  <div className="text-[10px] text-slate-400">Mọi người đều có thể tìm và nghe</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPublic(false)}
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                  !isPublic
+                    ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-300"
+                    : "bg-slate-800/60 border-white/5 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold">Riêng tư</div>
+                  <div className="text-[10px] text-slate-400">Chỉ mình bạn thấy</div>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Cover Art Selection */}

@@ -1,26 +1,36 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Music, Sparkles, AudioLines, HeartPulse } from "lucide-react";
+import { X, Music, Sparkles, AudioLines, HeartPulse, Disc, ListMusic } from "lucide-react";
 import {
   fetchTracks,
   fetchArtists,
+  fetchPublicAlbums,
+  fetchPublicPlaylists,
+  fetchPlaylistById,
+  fetchAlbumDetail,
+  toggleFavoriteAlbum,
   fetchMoodRecommendation,
   addToLibrary,
   removeFromLibrary,
   fetchLikedTrackIds,
   type Track,
   type Artist,
+  type Album,
+  type Playlist,
   type EmotionInfo,
 } from "@/lib/api-client";
 import TrackCard from "@/components/dashboard/track-card";
 import ArtistCard from "@/components/dashboard/artist-card";
+import AlbumCard from "@/components/dashboard/album-card";
+import PlaylistCard from "@/components/dashboard/playlist-card";
+import AlbumDetailModal from "@/components/dashboard/album-detail-modal";
 import { usePlayer } from "@/components/dashboard/player-context";
 import MoodSearchBar from "@/components/dashboard/mood-search-bar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-type Tab = "tracks" | "artists";
+type Tab = "tracks" | "artists" | "albums" | "playlists";
 
 const GENRE_FILTERS = [
   { id: "all", label: "Tất cả" },
@@ -50,6 +60,9 @@ function SearchContent() {
 
   const [tracks, setTracks] = useState<Track[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [moodInfo, setMoodInfo] = useState<EmotionInfo | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,11 +108,21 @@ function SearchContent() {
           // Fast single query for all liked track IDs
           const likedIds = await fetchLikedTrackIds().catch(() => []);
           setLikedTracks(new Set(likedIds));
-        } else {
+        } else if (activeTab === "artists") {
           setMoodInfo(null);
           const artistsData = await fetchArtists(searchQuery);
           setArtists(artistsData);
           setTotalFound(artistsData.length);
+        } else if (activeTab === "albums") {
+          setMoodInfo(null);
+          const albumsData = await fetchPublicAlbums(searchQuery);
+          setAlbums(albumsData.content || []);
+          setTotalFound(albumsData.totalElements || 0);
+        } else if (activeTab === "playlists") {
+          setMoodInfo(null);
+          const playlistsData = await fetchPublicPlaylists(searchQuery);
+          setPlaylists(playlistsData || []);
+          setTotalFound(playlistsData ? playlistsData.length : 0);
         }
       } catch (error) {
         console.error("Search failed:", error);
@@ -224,6 +247,66 @@ function SearchContent() {
         localPath: t.localPath,
       }))
     );
+  };
+
+  const handlePlayAlbum = async (alb: Album) => {
+    try {
+      const detail = await fetchAlbumDetail(alb.id);
+      if (detail.tracks && detail.tracks.length > 0) {
+        const playlistTracks = detail.tracks.map((t) => ({
+          spotifyId: t.spotifyId,
+          name: t.name,
+          artistName: t.artistName,
+          albumName: alb.title,
+          imageUrl: t.imageUrl || alb.coverUrl,
+          durationMs: t.durationMs,
+          lyricsPlain: t.lyricsPlain,
+          lyricsSynced: t.lyricsSynced,
+          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          localPath: t.localPath,
+        }));
+        playTrack(playlistTracks[0], playlistTracks);
+      }
+    } catch (e) {
+      console.error("Play album error:", e);
+    }
+  };
+
+  const handleToggleAlbumFav = async (alb: Album) => {
+    try {
+      await toggleFavoriteAlbum(alb.id);
+      setAlbums((prev) =>
+        prev.map((a) => (a.id === alb.id ? { ...a, isFavorited: !a.isFavorited } : a))
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handlePlayPlaylist = async (pl: Playlist) => {
+    try {
+      let fullPlaylist = pl;
+      if (!fullPlaylist.tracks || fullPlaylist.tracks.length === 0) {
+        fullPlaylist = await fetchPlaylistById(pl.id);
+      }
+      if (fullPlaylist.tracks && fullPlaylist.tracks.length > 0) {
+        const playlistTracks = fullPlaylist.tracks.map((t) => ({
+          spotifyId: t.spotifyId,
+          name: t.name,
+          artistName: t.artistName,
+          albumName: t.albumName || pl.name,
+          imageUrl: t.imageUrl || pl.coverUrl,
+          durationMs: t.durationMs,
+          lyricsPlain: t.lyricsPlain,
+          lyricsSynced: t.lyricsSynced,
+          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          localPath: t.localPath,
+        }));
+        playTrack(playlistTracks[0], playlistTracks);
+      }
+    } catch (e) {
+      console.error("Play playlist error:", e);
+    }
   };
 
   return (
@@ -383,12 +466,44 @@ function SearchContent() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
             </button>
+            <button
+              onClick={() => handleTabChange("albums")}
+              className={`px-4 py-3 text-sm font-medium transition-all relative ${
+                activeTab === "albums"
+                  ? "text-cyan-400"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Album ({albums.length})
+              {activeTab === "albums" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
+              )}
+            </button>
+            <button
+              onClick={() => handleTabChange("playlists")}
+              className={`px-4 py-3 text-sm font-medium transition-all relative ${
+                activeTab === "playlists"
+                  ? "text-cyan-400"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Danh sách phát ({playlists.length})
+              {activeTab === "playlists" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
+              )}
+            </button>
           </div>
 
           {totalFound !== null && (
             <span className="text-xs text-slate-400 hidden sm:block">
               {query
                 ? `Tìm thấy ${totalFound} kết quả cho "${query}"`
+                : activeTab === "albums"
+                ? `Hiển thị ${albums.length} album`
+                : activeTab === "playlists"
+                ? `Hiển thị ${playlists.length} danh sách phát`
+                : activeTab === "artists"
+                ? `Hiển thị ${artists.length} nghệ sĩ`
                 : `Hiển thị ${tracks.length} bài hát`}
             </span>
           )}
@@ -398,7 +513,7 @@ function SearchContent() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24">
             <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-sm text-slate-400">Đang tìm kiếm bài hát...</p>
+            <p className="text-sm text-slate-400">Đang tìm kiếm...</p>
           </div>
         ) : activeTab === "tracks" ? (
           tracks.length === 0 ? (
@@ -411,9 +526,9 @@ function SearchContent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {tracks.map((track) => (
+              {tracks.map((track, idx) => (
                 <TrackCard
-                  key={track.spotifyId}
+                  key={track.spotifyId || track.id || `track-${idx}`}
                   track={track}
                   isLiked={likedTracks.has(track.spotifyId)}
                   onLike={() => handleTrackLike(track.spotifyId)}
@@ -422,23 +537,75 @@ function SearchContent() {
               ))}
             </div>
           )
-        ) : artists.length === 0 ? (
+        ) : activeTab === "artists" ? (
+          artists.length === 0 ? (
+            <div className="text-center py-24">
+              <p className="text-slate-400">Không tìm thấy nghệ sĩ phù hợp</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {artists.map((artist) => (
+                <ArtistCard
+                  key={artist.spotifyId}
+                  artist={artist}
+                  onClick={() => {
+                    router.push(`/dashboard/artists/${artist.spotifyId}`);
+                  }}
+                />
+              ))}
+            </div>
+          )
+        ) : activeTab === "albums" ? (
+          albums.length === 0 ? (
+            <div className="text-center py-24">
+              <Disc className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-300 font-medium text-lg">Không tìm thấy album phù hợp</p>
+              <p className="text-slate-500 text-sm mt-1">
+                Thử tìm tên album hoặc nghệ sĩ tạo album khác
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {albums.map((alb) => (
+                <AlbumCard
+                  key={alb.id}
+                  album={alb}
+                  isFavorited={alb.isFavorited}
+                  onClick={() => setSelectedAlbumIdForModal(alb.id)}
+                  onPlay={() => handlePlayAlbum(alb)}
+                  onFavoriteToggle={() => handleToggleAlbumFav(alb)}
+                />
+              ))}
+            </div>
+          )
+        ) : playlists.length === 0 ? (
           <div className="text-center py-24">
-            <p className="text-slate-400">Không tìm thấy nghệ sĩ phù hợp</p>
+            <ListMusic className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-300 font-medium text-lg">Không tìm thấy danh sách phát phù hợp</p>
+            <p className="text-slate-500 text-sm mt-1">
+              Thử tìm tên danh sách phát hoặc người tạo (chỉ hiển thị playlist công khai)
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {artists.map((artist) => (
-              <ArtistCard
-                key={artist.spotifyId}
-                artist={artist}
-                onClick={() => {
-                  router.push(`/dashboard/artists/${artist.spotifyId}`);
-                }}
+            {playlists.map((pl) => (
+              <PlaylistCard
+                key={pl.id}
+                playlist={pl}
+                onClick={() => router.push(`/dashboard/library?playlistId=${pl.id}`)}
+                onPlay={() => handlePlayPlaylist(pl)}
               />
             ))}
           </div>
         )}
+
+        {/* Album Detail Modal */}
+        <AlbumDetailModal
+          isOpen={Boolean(selectedAlbumIdForModal)}
+          albumId={selectedAlbumIdForModal}
+          onClose={() => setSelectedAlbumIdForModal(null)}
+          onAlbumUpdated={() => loadData(query, selectedGenre, isMoodMode)}
+        />
     </div>
   );
 }

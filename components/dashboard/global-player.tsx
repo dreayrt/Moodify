@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Play,
@@ -145,10 +146,25 @@ export function GlobalPlayerBar() {
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Track info */}
           <div className="flex items-center gap-3 w-[220px] md:w-[280px] min-w-0">
-            <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden shrink-0 shadow-lg bg-slate-900 border border-white/10">
+            <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden shrink-0 shadow-lg bg-slate-900 border border-white/10 ring-1 ring-white/5">
               {isAdPlaying ? (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-yellow-600/30 border border-amber-400/40">
-                  <Crown className="w-6 h-6 text-amber-300 animate-bounce" />
+                <div className="relative w-full h-full group">
+                  <Image
+                    src={
+                      subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
+                        ? "/images/ads/moodify_brand_ident_art.jpg"
+                        : "/images/ads/moodify_vip_premium_art.jpg"
+                    }
+                    alt="Sponsor Artwork"
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
+                  <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/80 backdrop-blur-md border border-amber-400/30 text-[8px] font-mono font-bold tracking-wider text-amber-300 uppercase leading-none shadow-sm">
+                    AD
+                  </div>
                 </div>
               ) : currentTrack.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -187,20 +203,27 @@ export function GlobalPlayerBar() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
-                {isAdPlaying
-                  ? (subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
-                    ? "📢 Nâng Hạn Mức • Moodify"
-                    : "📢 Moodify VIP Sponsor")
-                  : currentTrack.name}
-              </h4>
-              <p className="text-xs text-slate-400 leading-tight truncate mt-0.5">
-                {isAdPlaying
-                  ? (subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
-                    ? "Đang phát thông điệp nâng hạn mức gói..."
-                    : "Quảng cáo âm thanh đang phát...")
-                  : currentTrack.artistName}
-              </p>
+              {isAdPlaying ? (
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-amber-400/15 text-amber-300 border border-amber-400/30">
+                    TÀI TRỢ
+                  </span>
+                  <h4 className="font-display font-semibold text-white text-sm md:text-base leading-snug tracking-tight truncate">
+                    {subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
+                      ? "Moodify Premium"
+                      : "Moodify Studio Sponsor"}
+                  </h4>
+                </div>
+              ) : (
+                <div>
+                  <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
+                    {currentTrack.name}
+                  </h4>
+                  <p className="text-xs text-slate-400 leading-tight truncate mt-0.5">
+                    {currentTrack.artistName}
+                  </p>
+                </div>
+              )}
             </div>
 
             {!isAdPlaying && (

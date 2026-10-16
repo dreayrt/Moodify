@@ -225,13 +225,6 @@ export function HeroCarousel() {
 
   const router = useRouter();
 
-  useEffect(() => {
-    router.prefetch(USER_DASHBOARD_ROUTE);
-    router.prefetch(ARTIST_DASHBOARD_ROUTE);
-    router.prefetch(MODERATOR_DASHBOARD_ROUTE);
-    router.prefetch(ADMIN_DASHBOARD_ROUTE);
-  }, [router]);
-
   const [isHovered, setIsHovered] = useState(false);
 
   const prevSlide = () => {
@@ -432,7 +425,8 @@ export function HeroCarousel() {
         });
         setIsSignInOpen(false);
 
-        router.push(getDashboardPathForRole(currentUser.role));
+        const targetPath = getDashboardPathForRole(currentUser.role);
+        window.location.href = targetPath;
       } catch (error) {
         setSignInError(
           error instanceof Error ? error.message : "Đăng nhập thất bại",
@@ -531,7 +525,8 @@ export function HeroCarousel() {
 
       closeCreateAccount();
 
-      router.push(getDashboardPathForRole(currentUser.role));
+      const targetPath = getDashboardPathForRole(currentUser.role);
+      window.location.href = targetPath;
     } catch (error) {
       setCreateAccountError(
         error instanceof Error ? error.message : "Tạo tài khoản thất bại",
