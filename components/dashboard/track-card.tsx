@@ -26,18 +26,24 @@ type TrackCardProps = {
 };
 
 function resolveMediaUrl(rawUrl?: string | null) {
-  if (!rawUrl) return undefined;
-  if (
-    rawUrl.startsWith("http://") ||
-    rawUrl.startsWith("https://") ||
-    rawUrl.startsWith("blob:") ||
-    rawUrl.startsWith("data:")
-  ) {
-    return rawUrl;
+  if (!rawUrl || typeof rawUrl !== "string") return undefined;
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed === "test" || trimmed === "test3" || trimmed === "null" || trimmed === "undefined") {
+    return undefined;
   }
-  const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
-  if (!apiBase) return rawUrl;
-  return `${apiBase}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("data:")
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/")) {
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+    return `${apiBase}${trimmed}`;
+  }
+  return undefined;
 }
 
 export default function TrackCard({
