@@ -113,6 +113,61 @@ function recordDailySkip(): number {
   return stats.skips;
 }
 
+// ── Playback State Persistence Helpers ───────────────────────
+const PLAYBACK_STATE_KEY = "moodify_playback_state";
+
+export interface PersistedPlaybackState {
+  currentTrack: PlayerTrack | null;
+  currentTime: number;
+  duration: number;
+  queue: PlayerTrack[];
+  queueIndex: number;
+  volume: number;
+  isMuted: boolean;
+  repeatMode: RepeatMode;
+  isShuffle: boolean;
+  playbackRate: number;
+  savedAt: number;
+}
+
+function loadPersistedPlaybackState(): PersistedPlaybackState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PLAYBACK_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return parsed as PersistedPlaybackState;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function savePersistedPlaybackState(state: Partial<PersistedPlaybackState>) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = loadPersistedPlaybackState() || {
+      currentTrack: null,
+      currentTime: 0,
+      duration: 0,
+      queue: [],
+      queueIndex: 0,
+      volume: 0.8,
+      isMuted: false,
+      repeatMode: "off" as RepeatMode,
+      isShuffle: false,
+      playbackRate: 1,
+      savedAt: Date.now(),
+    };
+    const updated = {
+      ...existing,
+      ...state,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(PLAYBACK_STATE_KEY, JSON.stringify(updated));
+  } catch (_) {}
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -124,6 +179,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [queue, setQueue] = useState<PlayerTrack[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+
+  // ── Playback Speed ───────────────────────────────────────────
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const playbackRateRef = useRef(1);
+
+  // ── Persistence State Tracking ───────────────────────────────
+  const [hasRestoredState, setHasRestoredState] = useState(false);
+  const currentTimeRef = useRef(0);
+  const lastTimeSaveRef = useRef(0);
+  const volumeRef = useRef(0.8);
+  const isMutedRef = useRef(false);
+  const durationRef = useRef(0);
 
   // ── Shuffle & Repeat Mode ────────────────────────────────────
   const [isShuffle, setIsShuffle] = useState(false);
@@ -152,9 +219,102 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     currentTrackRef.current = currentTrack;
   }, [currentTrack]);
 
-  // ── Playback Speed ───────────────────────────────────────────
-  const [playbackRate, setPlaybackRateState] = useState(1);
-  const playbackRateRef = useRef(1);
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  // ── Restore Persisted Playback State on Client Mount ───────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = loadPersistedPlaybackState();
+      if (saved && saved.currentTrack) {
+        setCurrentTrack(saved.currentTrack);
+        currentTrackRef.current = saved.currentTrack;
+
+        if (typeof saved.currentTime === "number" && !isNaN(saved.currentTime) && saved.currentTime >= 0) {
+          setCurrentTime(saved.currentTime);
+          currentTimeRef.current = saved.currentTime;
+        }
+
+        if (typeof saved.duration === "number" && !isNaN(saved.duration) && saved.duration > 0) {
+          setDuration(saved.duration);
+          durationRef.current = saved.duration;
+        } else if (saved.currentTrack.durationMs) {
+          const d = saved.currentTrack.durationMs / 1000;
+          setDuration(d);
+          durationRef.current = d;
+        }
+
+        if (Array.isArray(saved.queue) && saved.queue.length > 0) {
+          setQueue(saved.queue);
+          queueRef.current = saved.queue;
+        } else {
+          setQueue([saved.currentTrack]);
+          queueRef.current = [saved.currentTrack];
+        }
+
+        if (typeof saved.queueIndex === "number" && saved.queueIndex >= 0) {
+          setQueueIndex(saved.queueIndex);
+          queueIndexRef.current = saved.queueIndex;
+        }
+
+        if (typeof saved.volume === "number") {
+          setVolumeState(saved.volume);
+          volumeRef.current = saved.volume;
+        }
+
+        if (typeof saved.isMuted === "boolean") {
+          setIsMuted(saved.isMuted);
+          isMutedRef.current = saved.isMuted;
+        }
+
+        if (saved.repeatMode) {
+          setRepeatMode(saved.repeatMode);
+          repeatModeRef.current = saved.repeatMode;
+        }
+
+        if (typeof saved.isShuffle === "boolean") {
+          setIsShuffle(saved.isShuffle);
+          isShuffleRef.current = saved.isShuffle;
+        }
+
+        if (typeof saved.playbackRate === "number") {
+          setPlaybackRateState(saved.playbackRate);
+          playbackRateRef.current = saved.playbackRate;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to restore playback state from localStorage:", e);
+    } finally {
+      setHasRestoredState(true);
+    }
+  }, []);
+
+  // ── Continuous Playback State Persistence ────────────────────
+  useEffect(() => {
+    if (!hasRestoredState || !currentTrack) return;
+    savePersistedPlaybackState({
+      currentTrack,
+      queue,
+      queueIndex,
+      volume,
+      isMuted,
+      repeatMode,
+      isShuffle,
+      playbackRate,
+      currentTime: currentTimeRef.current,
+      duration: durationRef.current || (currentTrack.durationMs ? currentTrack.durationMs / 1000 : 0),
+    });
+  }, [hasRestoredState, currentTrack, queue, queueIndex, volume, isMuted, repeatMode, isShuffle, playbackRate]);
 
   // ── Audio Ad Management & Tiered Quotas ──────────────────────
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -481,17 +641,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     const audio = new Audio();
     audio.preload = "auto";
-    audio.volume = volume;
+    audio.volume = isMutedRef.current ? 0 : volumeRef.current;
     audio.playbackRate = playbackRateRef.current;
     audioRef.current = audio;
 
+    // Pre-wire restored audio source if present
+    const saved = loadPersistedPlaybackState();
+    if (saved?.currentTrack) {
+      const onlineAudioUrl = resolveTrackAudioUrl(saved.currentTrack);
+      audio.src = onlineAudioUrl;
+      if (typeof saved.currentTime === "number" && !isNaN(saved.currentTime) && saved.currentTime > 0) {
+        try {
+          audio.currentTime = saved.currentTime;
+        } catch (_) {}
+      }
+    }
+
     const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      const cur = audio.currentTime;
+      setCurrentTime(cur);
+      currentTimeRef.current = cur;
+
+      // Throttle saving playback progress to localStorage every 2 seconds
+      const now = Date.now();
+      if (now - lastTimeSaveRef.current > 2000) {
+        lastTimeSaveRef.current = now;
+        savePersistedPlaybackState({
+          currentTime: cur,
+          duration: audio.duration && !isNaN(audio.duration) ? audio.duration : undefined,
+        });
+      }
     };
 
     const onLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration)) {
         setDuration(audio.duration);
+        durationRef.current = audio.duration;
+      }
+      if (currentTimeRef.current > 0 && Math.abs(audio.currentTime - currentTimeRef.current) > 1) {
+        try {
+          audio.currentTime = currentTimeRef.current;
+        } catch (_) {}
       }
     };
 
@@ -533,6 +723,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
       }
       setIsPlaying(false);
+      savePersistedPlaybackState({
+        currentTime: audio.currentTime,
+      });
     };
 
     const onEnded = () => {
@@ -613,7 +806,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener("playing", onPlaying);
     audio.addEventListener("error", onError);
 
+    // Persist latest state on page reload / tab close / navigation
+    const handleBeforeUnload = () => {
+      if (currentTrackRef.current) {
+        savePersistedPlaybackState({
+          currentTrack: currentTrackRef.current,
+          currentTime: audioRef.current?.currentTime ?? currentTimeRef.current,
+          duration: audioRef.current?.duration ?? durationRef.current,
+          queue: queueRef.current,
+          queueIndex: queueIndexRef.current,
+          volume: volumeRef.current,
+          isMuted: isMutedRef.current,
+          repeatMode: repeatModeRef.current,
+          isShuffle: isShuffleRef.current,
+          playbackRate: playbackRateRef.current,
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
+
     return () => {
+      handleBeforeUnload();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
       flushListeningSession("PLAYBACK_STOPPED");
       audio.pause();
       audio.removeEventListener("timeupdate", onTimeUpdate);
@@ -841,12 +1058,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      const currentSrc = audioRef.current.src;
+      if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
+        const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
+        const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        audioRef.current.src = streamUrl;
+        audioRef.current.currentTime = currentTimeRef.current || currentTime || 0;
+        audioRef.current.playbackRate = playbackRateRef.current;
+        audioRef.current.load();
+      }
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => console.warn("Could not resume audio:", err));
     }
-  }, [isPlaying, currentTrack]);
+  }, [isPlaying, currentTrack, currentTime]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
@@ -857,19 +1083,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const resume = useCallback(() => {
     if (audioRef.current && currentTrack) {
+      const currentSrc = audioRef.current.src;
+      if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
+        const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
+        const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        audioRef.current.src = streamUrl;
+        audioRef.current.currentTime = currentTimeRef.current || currentTime || 0;
+        audioRef.current.playbackRate = playbackRateRef.current;
+        audioRef.current.load();
+      }
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => console.warn("Could not resume:", err));
     }
-  }, [currentTrack]);
+  }, [currentTrack, currentTime]);
 
   const seek = useCallback((timeSeconds: number) => {
     if (audioRef.current) {
+      if (currentTrack && (!audioRef.current.src || audioRef.current.src === "" || audioRef.current.src === window.location.href || audioRef.current.src.endsWith("/"))) {
+        const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
+        audioRef.current.src = onlineAudioUrl;
+        audioRef.current.load();
+      }
       const oldPosMs = Math.round(audioRef.current.currentTime * 1000);
       const targetPosMs = Math.round(timeSeconds * 1000);
-      audioRef.current.currentTime = timeSeconds;
+      try {
+        audioRef.current.currentTime = timeSeconds;
+      } catch (_) {}
       setCurrentTime(timeSeconds);
+      currentTimeRef.current = timeSeconds;
+      savePersistedPlaybackState({ currentTime: timeSeconds });
 
       const session = listeningSessionRef.current;
       if (session && session.trackId) {
@@ -886,7 +1130,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
       }
     }
-  }, []);
+  }, [currentTrack]);
 
   const setVolume = useCallback((vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
