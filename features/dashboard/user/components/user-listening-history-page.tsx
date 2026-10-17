@@ -32,49 +32,62 @@ import TrackActionMenu from "@/components/dashboard/track-action-menu";
 import { InteractiveBarChart } from "@/components/dashboard/charts/interactive-bar-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
-function formatRelativeTime(dateStr?: string): string {
-  if (!dateStr) return "--";
-  try {
-    const d = new Date(dateStr.replace(" ", "T"));
-    if (isNaN(d.getTime())) return dateStr;
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Vừa phát";
-    if (diffMins < 60) return `${diffMins} phút trước`;
-    if (diffHours < 24 && d.getDate() === now.getDate()) {
-      return `${diffHours} giờ trước`;
-    }
-    if (diffDays === 1 || (diffDays < 2 && d.getDate() === now.getDate() - 1)) {
-      return `Hôm qua, ${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
-    }
-    return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-  } catch {
-    return dateStr;
+function parseDate(dateStr?: string): Date | null {
+  if (!dateStr) return null;
+  const trimmed = dateStr.trim();
+  // Match "YYYY-MM-DD HH:mm:ss" or "YYYY-MM-DDTHH:mm:ss"
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [, y, m, d, h, min, s] = match;
+    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
   }
+  const fallback = new Date(trimmed);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function formatRelativeTime(dateStr?: string): string {
+  const d = parseDate(dateStr);
+  if (!d) return dateStr || "--";
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+
+  // Normalize both dates to beginning of calendar day (00:00:00) in local time
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const itemDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.floor((todayStart - itemDayStart) / 86400000);
+
+  // Tracks played today (same calendar day or slight future clock drift)
+  if (dayDiff <= 0) {
+    if (diffMins < 1) return "Vừa phát";
+    if (diffMins < 60) return `${Math.max(1, diffMins)} phút trước`;
+    return `${Math.max(1, diffHours)} giờ trước`;
+  }
+
+  // Tracks played yesterday
+  if (dayDiff === 1) {
+    return `Hôm qua, ${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+
+  // Tracks played earlier
+  return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function getTimeGroup(dateStr?: string): "Hôm nay" | "Hôm qua" | "Tuần này" | "Trước đó" {
-  if (!dateStr) return "Trước đó";
-  try {
-    const d = new Date(dateStr.replace(" ", "T"));
-    if (isNaN(d.getTime())) return "Trước đó";
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
+  const d = parseDate(dateStr);
+  if (!d) return "Trước đó";
 
-    if (d.toDateString() === now.toDateString()) return "Hôm nay";
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return "Hôm qua";
-    if (diffDays < 7) return "Tuần này";
-    return "Trước đó";
-  } catch {
-    return "Trước đó";
-  }
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const itemDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.floor((todayStart - itemDayStart) / 86400000);
+
+  if (dayDiff <= 0) return "Hôm nay";
+  if (dayDiff === 1) return "Hôm qua";
+  if (dayDiff < 7) return "Tuần này";
+  return "Trước đó";
 }
 
 export default function UserListeningHistoryPage() {
