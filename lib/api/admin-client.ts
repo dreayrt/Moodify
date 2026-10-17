@@ -103,9 +103,14 @@ export type AdminOverviewResponse = {
     label: string;
     streams: number;
   }[];
+  userTrend?: {
+    date: string;
+    label: string;
+    count: number;
+  }[];
   recentActivities: {
     id: string;
-    type: "PAYMENT" | "FAVORITE";
+    type: "PAYMENT" | "FAVORITE" | "STREAM";
     title: string;
     detail: string;
     timestamp: string;

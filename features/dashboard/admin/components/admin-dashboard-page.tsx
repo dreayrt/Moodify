@@ -10,6 +10,7 @@ import {
   ChevronRight,
   DollarSign,
   Heart,
+  Headphones,
   HelpCircle,
   Key,
   Layers,
@@ -97,6 +98,7 @@ import { OverviewTab } from "./overview-tab";
 import { UsersManagementTab } from "./users-management-tab";
 import { CatalogManagementTab } from "./catalog-management-tab";
 import { FavoritesManagementTab } from "./favorites-management-tab";
+import { ListeningHistoryTab } from "./listening-history-tab";
 import { ModerationTab } from "./moderation-tab";
 import { MonetizationTab } from "./monetization-tab";
 import { LicensingTab } from "./licensing-tab";
@@ -891,6 +893,7 @@ export default function AdminDashboardPage() {
     { key: "monetization", label: "Gói Dịch Vụ", count: packages.length, icon: DollarSign },
     { key: "catalog", label: "Bài Hát", count: tracks.length, icon: Music2 },
     { key: "favorites", label: "Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
+    { key: "history", label: "Lịch Sử Nghe", icon: Headphones },
     { key: "moderation", label: "Kiểm Duyệt", count: pendingModerationCount, icon: ShieldCheck },
     { key: "licensing", label: "Bản Quyền", count: contracts.length, icon: Key },
     { key: "notifications", label: "Thông Báo", icon: Megaphone },
@@ -1054,13 +1057,15 @@ export default function AdminDashboardPage() {
             />
           )}
 
+          {activeTab === "history" && (
+            <ListeningHistoryTab onToast={addToast} />
+          )}
+
           {activeTab === "moderation" && (
             <ModerationTab
               reviews={reviews}
               reviewActions={reviewActions}
-              onApproveReview={handleApproveReview}
-              onRejectReview={handleRejectReview}
-              onReturnReview={handleReturnReview}
+              isReadOnly={true}
             />
           )}
 
@@ -1083,10 +1088,7 @@ export default function AdminDashboardPage() {
               distributors={distributors}
               contracts={contracts}
               licenses={licenses}
-              onCreateDistributor={handleCreateDistributor}
-              onToggleDistributorStatus={handleToggleDistributorStatus}
-              onCreateContract={handleCreateContract}
-              onToggleContractStatus={handleToggleContractStatus}
+              isReadOnly={true}
             />
           )}
 

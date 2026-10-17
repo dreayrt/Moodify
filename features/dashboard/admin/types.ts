@@ -3,6 +3,7 @@ export type AdminTab =
   | "analytics"
   | "catalog"
   | "favorites"
+  | "history"
   | "users"
   | "moderation"
   | "monetization"
