@@ -343,6 +343,15 @@ export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
   });
 }
 
+export async function pingDeviceStatus(): Promise<{ active: boolean } | null> {
+  const token = await getValidAccessToken();
+  if (!token) return null;
+  return requestJson<{ active: boolean }>("/api/auth/devices/ping", {
+    method: "GET",
+    token,
+  }).catch(() => null);
+}
+
 export async function register(payload: {
   fullName: string;
   phone: string;

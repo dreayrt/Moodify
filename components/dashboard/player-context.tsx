@@ -15,7 +15,7 @@ import {
   resolveTrackAudioUrl,
   type PackageEntitlements,
 } from "@/lib/api-client";
-import { recordPlatformVisit, recordListeningSessionTelemetry, revokeOtherDevices } from "@/lib/auth/auth-client";
+import { recordPlatformVisit, recordListeningSessionTelemetry, revokeOtherDevices, pingDeviceStatus } from "@/lib/auth/auth-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -225,6 +225,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsReclaimingDevice(false);
     }
   }, [currentTrack]);
+
+  // Periodic device status heartbeat while playing or when tab gains focus
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    const checkStatus = async () => {
+      if (typeof window === "undefined" || !isPlaying) return;
+      try {
+        await pingDeviceStatus();
+      } catch (_) {
+        // Handled automatically via requestJson 403 DEVICE_REVOKED
+      }
+    };
+
+    if (isPlaying) {
+      // Check every 6 seconds while music is actively playing
+      timer = setInterval(checkStatus, 6000);
+    }
+
+    const handleFocusOrVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void pingDeviceStatus();
+      }
+    };
+
+    window.addEventListener("visibilitychange", handleFocusOrVisible);
+    window.addEventListener("focus", handleFocusOrVisible);
+
+    return () => {
+      if (timer) clearInterval(timer);
+      window.removeEventListener("visibilitychange", handleFocusOrVisible);
+      window.removeEventListener("focus", handleFocusOrVisible);
+    };
+  }, [isPlaying]);
   const tracksPlayedRef = useRef(0);
   const freeTracksSinceLastAdRef = useRef(0);
   // Random threshold between 1 and 3 songs before next ad
