@@ -250,14 +250,26 @@ export function clearAuthSession() {
 
 //main auth functions
 export async function loginWithGoogle(idToken: string) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
   return requestJson<AuthResponse>("/api/auth/google", {
-    body: { idToken },
+    body: {
+      idToken,
+      deviceUuid: device?.deviceUuid,
+      deviceName: device?.deviceName,
+      platform: device?.platform,
+    },
   });
 }
 
 export async function loginWithFacebook(accessToken: string) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
   return requestJson<AuthResponse>("/api/auth/facebook", {
-    body: { accessToken },
+    body: {
+      accessToken,
+      deviceUuid: device?.deviceUuid,
+      deviceName: device?.deviceName,
+      platform: device?.platform,
+    },
   });
 }
 
@@ -623,12 +635,14 @@ export async function recordListeningSessionTelemetry(payload: {
 }) {
   try {
     const token = await getValidAccessToken();
+    const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : undefined;
     return await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
       method: "POST",
       token: token ?? undefined,
       body: {
         deviceType: "WEB",
         source: "HOME",
+        deviceUuid,
         ...payload,
       },
     });
@@ -687,9 +701,12 @@ async function requestJson<T>(
     authToken = (await getValidAccessToken()) ?? undefined;
   }
 
+  const currentDeviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : "";
+
   console.log(`[RequestJson] 📡 Sending ${requestMethod} ${fullUrl}`, {
     hasToken: !!authToken,
     hasBody: !!body,
+    deviceUuid: currentDeviceUuid,
     body,
   });
 
@@ -699,6 +716,7 @@ async function requestJson<T>(
     headers: {
       "Content-Type": "application/json",
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(currentDeviceUuid ? { "X-Device-Uuid": currentDeviceUuid } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -755,6 +773,19 @@ async function extractErrorMessage(response: Response, path?: string) {
         error?: string;
         detail?: string;
       };
+
+      if (response.status === 403) {
+        if (payload.error === "DEVICE_REVOKED" || payload.message?.includes("thiết bị") || payload.detail?.includes("thiết bị")) {
+          const alertMsg = payload.message || payload.detail || "Thiết bị này đã bị thu hồi quyền truy cập do tài khoản đã đăng nhập trên thiết bị khác vượt quá hạn mức thiết bị.";
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("moodify:device-revoked", {
+              detail: { message: alertMsg }
+            }));
+          }
+          return alertMsg;
+        }
+      }
+
       if (payload.message && payload.message.trim() && payload.message !== "Not Found") {
         return payload.message;
       }

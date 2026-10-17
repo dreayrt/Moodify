@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Crown } from "lucide-react";
+import { Crown, Laptop } from "lucide-react";
 import {
   getTrackStreamUrl,
   getBackendFileUrl,
@@ -15,7 +15,7 @@ import {
   resolveTrackAudioUrl,
   type PackageEntitlements,
 } from "@/lib/api-client";
-import { recordPlatformVisit, recordListeningSessionTelemetry } from "@/lib/auth/auth-client";
+import { recordPlatformVisit, recordListeningSessionTelemetry, revokeOtherDevices } from "@/lib/auth/auth-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -172,6 +172,59 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [adTotalDuration, setAdTotalDuration] = useState(0);
   const [skipLimitNotice, setSkipLimitNotice] = useState<{ show: boolean; message: string; tier: SubTier } | null>(null);
   const clearSkipLimitNotice = useCallback(() => setSkipLimitNotice(null), []);
+
+  const [deviceRevokedNotice, setDeviceRevokedNotice] = useState<{ show: boolean; message: string } | null>(null);
+  const [isReclaimingDevice, setIsReclaimingDevice] = useState(false);
+
+  useEffect(() => {
+    const handleDeviceRevoked = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message?: string }>;
+      const msg =
+        customEvent.detail?.message ||
+        "Thiết bị này đã bị thu hồi quyền truy cập do tài khoản đã đăng nhập trên thiết bị khác vượt quá hạn mức thiết bị của gói cước.";
+
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+        } catch (_) {}
+      }
+      if (adAudioRef.current) {
+        try {
+          adAudioRef.current.pause();
+        } catch (_) {}
+      }
+      setIsPlaying(false);
+      setIsAdPlaying(false);
+
+      setDeviceRevokedNotice({
+        show: true,
+        message: msg,
+      });
+    };
+
+    window.addEventListener("moodify:device-revoked", handleDeviceRevoked);
+    return () => {
+      window.removeEventListener("moodify:device-revoked", handleDeviceRevoked);
+    };
+  }, []);
+
+  const handleReclaimDevice = useCallback(async () => {
+    try {
+      setIsReclaimingDevice(true);
+      await revokeOtherDevices();
+      setDeviceRevokedNotice(null);
+      if (audioRef.current && currentTrack) {
+        audioRef.current
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
+      }
+    } catch (err) {
+      console.error("Could not reclaim device:", err);
+    } finally {
+      setIsReclaimingDevice(false);
+    }
+  }, [currentTrack]);
   const tracksPlayedRef = useRef(0);
   const freeTracksSinceLastAdRef = useRef(0);
   // Random threshold between 1 and 3 songs before next ad
@@ -993,6 +1046,59 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                 <span>Nâng cấp VIP</span>
                 <span className="text-[10px]">→</span>
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deviceRevokedNotice?.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-md w-full rounded-3xl p-[1px] bg-gradient-to-b from-amber-400/40 via-white/10 to-transparent shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-200">
+            <div className="rounded-[calc(1.5rem-1px)] bg-[#0d0e15] p-6 border border-white/10 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10">
+                <Laptop className="w-7 h-7" />
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-400 block mb-1">
+                  RÀNG BUỘC THIẾT BỊ
+                </span>
+                <h3 className="text-lg font-bold text-white">
+                  Giới Hạn Thiết Bị Đã Vượt Quá
+                </h3>
+                <p className="text-xs text-white/70 mt-2 leading-relaxed">
+                  {deviceRevokedNotice.message}
+                </p>
+              </div>
+
+              <div className="w-full h-px bg-white/10 my-1" />
+
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+                <button
+                  type="button"
+                  disabled={isReclaimingDevice}
+                  onClick={handleReclaimDevice}
+                  className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isReclaimingDevice ? "Đang kích hoạt..." : "Sử dụng trên thiết bị này"}
+                </button>
+
+                <a
+                  href="/dashboard/premium"
+                  onClick={() => setDeviceRevokedNotice(null)}
+                  className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold shadow-lg shadow-amber-400/20 active:scale-95 transition-all text-center"
+                >
+                  Nâng cấp gói VIP
+                </a>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDeviceRevokedNotice(null)}
+                className="text-xs text-white/40 hover:text-white/80 transition-colors cursor-pointer pt-1"
+              >
+                Đóng thông báo
+              </button>
             </div>
           </div>
         </div>
