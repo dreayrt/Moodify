@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Play,
   Pause,
+  Loader2,
   SkipBack,
   SkipForward,
   Volume2,
@@ -41,6 +42,7 @@ export function GlobalPlayerBar() {
   const {
     currentTrack,
     isPlaying,
+    isBuffering,
     currentTime,
     duration,
     volume,
@@ -302,7 +304,9 @@ export function GlobalPlayerBar() {
                 }`}
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
-                {isPlaying ? (
+                {isBuffering ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isPlaying ? (
                   <Pause className="w-5 h-5 fill-current" />
                 ) : (
                   <Play className="w-5 h-5 fill-current ml-0.5" />

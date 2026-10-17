@@ -39,6 +39,7 @@ export type AdReason = "FREE_REGULAR" | "BASIC_DAILY_LIMIT_EXCEEDED" | "SKIP_PEN
 interface PlayerContextType {
   currentTrack: PlayerTrack | null;
   isPlaying: boolean;
+  isBuffering: boolean;
   currentTime: number;
   duration: number;
   volume: number;
@@ -115,6 +116,8 @@ function recordDailySkip(): number {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const retryCountRef = useRef(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
@@ -143,6 +146,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     queueRef.current = queue;
     queueIndexRef.current = queueIndex;
   }, [queue, queueIndex]);
+
+  const currentTrackRef = useRef<PlayerTrack | null>(null);
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
 
   // ── Playback Speed ───────────────────────────────────────────
   const [playbackRate, setPlaybackRateState] = useState(1);
@@ -542,9 +550,57 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const onWaiting = () => {
+      setIsBuffering(true);
+    };
+
+    const onCanPlay = () => {
+      setIsBuffering(false);
+      retryCountRef.current = 0;
+    };
+
+    const onPlaying = () => {
+      setIsBuffering(false);
+      setIsPlaying(true);
+      retryCountRef.current = 0;
+    };
+
     const onError = (e: Event) => {
       console.warn("Audio playback issue:", e);
-      setIsPlaying(false);
+      setIsBuffering(false);
+
+      // Tự động khôi phục luồng stream khi mạng yếu/chập chờn với Exponential Backoff & Server Fallback
+      if (retryCountRef.current < 3) {
+        retryCountRef.current += 1;
+        const savedPos = audio.currentTime;
+        console.log(`[AudioStream] Network hiccup detected. Auto-retrying playback (${retryCountRef.current}/3) at ${savedPos.toFixed(1)}s...`);
+        setIsBuffering(true);
+
+        setTimeout(() => {
+          if (!audioRef.current) return;
+          const currentTrk = currentTrackRef.current;
+          if (!currentTrk) return;
+
+          let targetUrl = resolveTrackAudioUrl(currentTrk);
+          // Lần thử thứ 2: fallback sang endpoint streaming của backend gateway
+          if (retryCountRef.current >= 2) {
+            targetUrl = getTrackStreamUrl(currentTrk.spotifyId || currentTrk.id || "");
+          }
+          const streamUrl = `${targetUrl}${targetUrl.includes("?") ? "&" : "?"}retry=${Date.now()}`;
+          audioRef.current.src = streamUrl;
+          audioRef.current.currentTime = savedPos;
+          audioRef.current.load();
+          audioRef.current
+            .play()
+            .then(() => {
+              setIsPlaying(true);
+              setIsBuffering(false);
+            })
+            .catch(() => {});
+        }, retryCountRef.current * 1500);
+      } else {
+        setIsPlaying(false);
+      }
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -552,6 +608,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("error", onError);
 
     return () => {
@@ -562,6 +621,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("error", onError);
       audioRef.current = null;
     };
@@ -650,6 +712,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audioRef.current.pause();
       } catch (_) {}
       
+      retryCountRef.current = 0;
+      setIsBuffering(true);
       setCurrentTime(0);
       if (track.durationMs) {
         setDuration(track.durationMs / 1000);
@@ -665,10 +729,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          setIsBuffering(false);
+        })
         .catch((err) => {
           console.warn("Autoplay was prevented or audio stream not available:", err);
           setIsPlaying(false);
+          setIsBuffering(false);
         });
     }
   }, [flushListeningSession]);
@@ -1004,6 +1072,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       value={{
         currentTrack,
         isPlaying,
+        isBuffering,
         currentTime,
         duration,
         volume: isMuted ? 0 : volume,
