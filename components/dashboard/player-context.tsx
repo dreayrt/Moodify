@@ -478,7 +478,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("error", onError);
       audioRef.current = null;
     };
-  }, [flushListeningSession, volume]);
+  }, [flushListeningSession]);
+
+  // Synchronize audio volume without re-initializing or interrupting the Audio element
+  useEffect(() => {
+    const effectiveVol = isMuted ? 0 : volume;
+    if (audioRef.current) {
+      audioRef.current.volume = effectiveVol;
+    }
+    if (adAudioRef.current) {
+      adAudioRef.current.volume = effectiveVol;
+    }
+  }, [volume, isMuted]);
 
   const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
     setCurrentTrack(track);
@@ -729,18 +740,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) {
       audioRef.current.volume = clamped;
     }
+    if (adAudioRef.current) {
+      adAudioRef.current.volume = clamped;
+    }
   }, []);
 
   const toggleMute = useCallback(() => {
-    if (!audioRef.current) return;
-    if (isMuted) {
-      audioRef.current.volume = volume > 0 ? volume : 0.8;
-      setIsMuted(false);
-    } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-    }
-  }, [isMuted, volume]);
+    setIsMuted((prev) => {
+      const nextMuted = !prev;
+      const targetVol = nextMuted ? 0 : (volume > 0 ? volume : 0.8);
+      if (nextMuted) {
+        if (audioRef.current) audioRef.current.volume = 0;
+        if (adAudioRef.current) adAudioRef.current.volume = 0;
+      } else {
+        setVolumeState(targetVol);
+        if (audioRef.current) audioRef.current.volume = targetVol;
+        if (adAudioRef.current) adAudioRef.current.volume = targetVol;
+      }
+      return nextMuted;
+    });
+  }, [volume]);
 
   const setPlaybackRate = useCallback((rate: number) => {
     const validRate = Math.max(0.25, Math.min(3, rate));
