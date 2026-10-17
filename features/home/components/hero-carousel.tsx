@@ -741,9 +741,9 @@ export function HeroCarousel() {
                 className="object-cover object-center"
                 fill
                 priority={index === 0}
-                quality={95}
                 sizes="(max-width: 768px) 100vw, 1280px"
                 src={slide.image}
+                unoptimized
               />
             </article>
           );
