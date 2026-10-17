@@ -98,10 +98,16 @@ export type AdminOverviewResponse = {
     audioUrl?: string;
     favoriteCount: number;
   }[];
+  totalListenedHours?: number;
+  totalListenedDurationMs?: number;
+  totalListenedFormatted?: string;
+  avgCompletionRate?: number;
+  completedSessions?: number;
   listeningTrend: {
     date: string;
     label: string;
     streams: number;
+    completed?: number;
   }[];
   userTrend?: {
     date: string;

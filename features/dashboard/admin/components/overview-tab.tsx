@@ -145,7 +145,9 @@ export function OverviewTab({
 
   // Platform Avg Completion Rate
   const avgCompletionRate =
-    trackMetrics.length > 0
+    overviewData?.avgCompletionRate !== undefined
+      ? Number(overviewData.avgCompletionRate)
+      : trackMetrics.length > 0
       ? Math.round(
           trackMetrics.reduce((sum, item) => sum + item.completionRatePercent, 0) /
             trackMetrics.length
@@ -159,7 +161,7 @@ export function OverviewTab({
         label: t.label || t.date,
         date: t.date || t.label,
         streams: Number(t.streams) || 0,
-        completed: Math.round((Number(t.streams) || 0) * (avgCompletionRate / 100)),
+        completed: t.completed !== undefined ? Number(t.completed) : Math.round((Number(t.streams) || 0) * (avgCompletionRate / 100)),
       }));
     }
     return [];
@@ -284,7 +286,9 @@ export function OverviewTab({
               <span className="text-xs text-zinc-500 font-mono">lượt</span>
             </div>
             <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
-              <span className="text-[11px] text-zinc-400 font-mono">Xu hướng</span>
+              <span className="text-[11px] text-zinc-400 font-mono" title={`Tổng thời lượng tích lũy: ${overviewData?.totalListenedHours || 0} giờ`}>
+                {overviewData?.totalListenedFormatted || `${overviewData?.totalListenedHours || 0} giờ`}
+              </span>
               <MiniSparkline
                 data={
                   listeningTrend.length >= 2
