@@ -264,16 +264,17 @@ export function ListeningHistoryTab({
 
         <div className="p-4 rounded-xl border border-[#222432] bg-[#12131a] flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="font-mono text-[10px] uppercase font-semibold">Tổng Giờ Nghe Thực Tế</span>
+            <span className="font-mono text-[10px] uppercase font-semibold">Tổng Thời Lượng Nghe</span>
             <Clock className="h-4 w-4 text-emerald-400" />
           </div>
           <div className="mt-2.5">
             <span className="font-graphik text-2xl font-bold text-emerald-400 tracking-tight">
-              {summary?.totalHours?.toLocaleString("vi-VN") || 0}
+              {summary?.totalDurationFormatted || `${summary?.totalHours || 0} giờ`}
             </span>
-            <span className="font-mono text-xs text-zinc-400 ml-1.5">giờ phát</span>
           </div>
-          <p className="mt-1 text-[11px] text-zinc-500 font-mono">Thời lượng nghe tích lũy</p>
+          <p className="mt-1 text-[11px] text-zinc-500 font-mono">
+            {summary?.totalHours !== undefined ? `≈ ${summary.totalHours} giờ phát tích lũy` : "Thời lượng nghe tích lũy"}
+          </p>
         </div>
 
         <div className="p-4 rounded-xl border border-[#222432] bg-[#12131a] flex flex-col justify-between">

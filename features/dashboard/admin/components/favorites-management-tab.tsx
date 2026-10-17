@@ -69,12 +69,12 @@ export function FavoritesManagementTab({
 
   // Load Leaderboard
   useEffect(() => {
-    fetchAdminFavoritesLeaderboard()
+    fetchAdminFavoritesLeaderboard(activeType)
       .then(setLeaderboard)
       .catch((err) => {
         console.error("Fetch leaderboard error:", err);
       });
-  }, []);
+  }, [activeType]);
 
   // Load Favorites Data
   const loadFavoritesData = useCallback(async () => {
@@ -111,7 +111,7 @@ export function FavoritesManagementTab({
       onToast(`Đã xóa lượt yêu thích của ${deletingFavorite.userName}`, "success");
       setDeletingFavorite(null);
       // refresh leaderboard
-      fetchAdminFavoritesLeaderboard().then(setLeaderboard).catch(() => {});
+      fetchAdminFavoritesLeaderboard(activeType).then(setLeaderboard).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Thao tác xóa thất bại.";
       onToast(msg, "error");
@@ -128,9 +128,23 @@ export function FavoritesManagementTab({
 
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
 
+  const leaderboardTitle =
+    activeType === "ALBUM"
+      ? "Bảng Xếp Hạng Album Được Yêu Thích Nhất"
+      : activeType === "ARTIST"
+      ? "Bảng Xếp Hạng Nghệ Sĩ Được Yêu Thích Nhất"
+      : "Bảng Xếp Hạng Bài Hát Được Yêu Thích Nhất";
+
+  const leaderboardSubtitle =
+    activeType === "ALBUM"
+      ? "Các album tuyển tập được cộng đồng thính giả Moodify tương tác và thả tim nhiều nhất"
+      : activeType === "ARTIST"
+      ? "Các nghệ sĩ tài năng được cộng đồng người nghe theo dõi và yêu mến nhất"
+      : "Các tác phẩm âm nhạc được cộng đồng thính giả Moodify tương tác và thả tim nhiều nhất";
+
   return (
     <div className="space-y-6 anim-fade-up">
-      {/* 1. Header Leaderboard: Most Liked Tracks (SoundCloud Top Charts style) */}
+      {/* 1. Header Leaderboard: Most Liked Tracks / Albums / Artists */}
       <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
@@ -139,96 +153,104 @@ export function FavoritesManagementTab({
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                Bảng Xếp Hạng Bài Hát Được Yêu Thích Nhất
+                {leaderboardTitle}
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Các tác phẩm âm nhạc được cộng đồng thính giả Moodify tương tác và thả tim nhiều nhất
+                {leaderboardSubtitle}
               </p>
             </div>
           </div>
         </div>
 
         {/* Horizontal Scroll Leaderboard Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          {leaderboard.slice(0, 5).map((item, idx) => {
-            const isPlayingThis =
-              isPlayingPreview && previewTrack?.id === item.targetId;
+        {leaderboard.length === 0 ? (
+          <div className="py-6 text-center text-xs text-zinc-500 font-mono">
+            Chưa có bảng xếp hạng cho mục này
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            {leaderboard.slice(0, 5).map((item, idx) => {
+              const isPlayingThis =
+                isPlayingPreview && previewTrack?.id === item.targetId;
 
-            return (
-              <div
-                key={item.targetId}
-                className="group relative rounded-xl border border-[#222432] bg-[#171822] hover:border-[#ff5500]/50 p-3 transition-all flex flex-col justify-between"
-              >
-                <div className="relative aspect-square rounded-lg overflow-hidden bg-black/40 mb-3">
-                  <img
-                    src={item.targetCoverUrl}
-                    alt={item.targetTitle}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute top-2 left-2 flex items-center gap-1 rounded bg-black/70 backdrop-blur-sm px-1.5 py-0.5 text-[11px] font-mono font-bold text-white">
-                    #{idx + 1}
+              return (
+                <div
+                  key={item.targetId}
+                  className="group relative rounded-xl border border-[#222432] bg-[#171822] hover:border-[#ff5500]/50 p-3 transition-all flex flex-col justify-between"
+                >
+                  <div className="relative aspect-square rounded-lg overflow-hidden bg-black/40 mb-3">
+                    <img
+                      src={item.targetCoverUrl}
+                      alt={item.targetTitle}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    />
+                    <div className="absolute top-2 left-2 flex items-center gap-1 rounded bg-black/70 backdrop-blur-sm px-1.5 py-0.5 text-[11px] font-mono font-bold text-white">
+                      #{idx + 1}
+                    </div>
+
+                    {/* Play Button Overlay (Only for Tracks with audio) */}
+                    {item.audioUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onTogglePreview({
+                            id: item.targetId,
+                            spotifyId: item.targetId,
+                            title: item.targetTitle,
+                            artist: item.targetSubtitle || "Moodify Artist",
+                            album: "Single",
+                            genre: "V-Pop",
+                            duration: "3:30",
+                            coverUrl: item.targetCoverUrl,
+                            audioUrl: item.audioUrl,
+                            plays: 5000,
+                            likes: Number(item.favoriteCount),
+                            status: "published",
+                            moderationScore: 90,
+                            bpm: 120,
+                            energy: 0.7,
+                            danceability: 0.6,
+                            valence: 0.5,
+                            acousticness: 0.2,
+                            keySignature: "C Major",
+                            vibeCategory: "Chill",
+                            createdAt: "2026-09-01",
+                          })
+                        }
+                        className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <div className="grid h-10 w-10 place-items-center rounded-full bg-[#ff5500] text-white shadow-lg shadow-[#ff5500]/40 transform group-hover:scale-110 transition">
+                          {isPlayingThis ? (
+                            <Pause className="h-5 w-5 fill-white" />
+                          ) : (
+                            <Play className="h-5 w-5 fill-white ml-0.5" />
+                          )}
+                        </div>
+                      </button>
+                    )}
                   </div>
 
-                  {/* Play Button Overlay */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onTogglePreview({
-                        id: item.targetId,
-                        spotifyId: item.targetId,
-                        title: item.targetTitle,
-                        artist: item.targetSubtitle || "Moodify Artist",
-                        album: "Single",
-                        genre: "V-Pop",
-                        duration: "3:30",
-                        coverUrl: item.targetCoverUrl,
-                        audioUrl: item.audioUrl,
-                        plays: 5000,
-                        likes: Number(item.favoriteCount),
-                        status: "published",
-                        moderationScore: 90,
-                        bpm: 120,
-                        energy: 0.7,
-                        danceability: 0.6,
-                        valence: 0.5,
-                        acousticness: 0.2,
-                        keySignature: "C Major",
-                        vibeCategory: "Chill",
-                        createdAt: "2026-09-01",
-                      })
-                    }
-                    className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition"
-                  >
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-[#ff5500] text-white shadow-lg shadow-[#ff5500]/40 transform group-hover:scale-110 transition">
-                      {isPlayingThis ? (
-                        <Pause className="h-5 w-5 fill-white" />
-                      ) : (
-                        <Play className="h-5 w-5 fill-white ml-0.5" />
-                      )}
-                    </div>
-                  </button>
-                </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white truncate" title={item.targetTitle}>
+                      {item.targetTitle}
+                    </h4>
+                    <p className="text-xs text-zinc-400 truncate mt-0.5">
+                      {item.targetSubtitle}
+                    </p>
+                  </div>
 
-                <div>
-                  <h4 className="font-bold text-sm text-white truncate" title={item.targetTitle}>
-                    {item.targetTitle}
-                  </h4>
-                  <p className="text-xs text-zinc-400 truncate mt-0.5">
-                    {item.targetSubtitle}
-                  </p>
+                  <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1 text-rose-400 font-mono font-bold">
+                      <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
+                      {item.favoriteCount}
+                    </span>
+                    <span className="text-[11px] font-mono text-zinc-500">lượt thích</span>
+                  </div>
                 </div>
-
-                <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1 text-rose-400 font-mono font-bold">
-                    <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
-                    {item.favoriteCount}
-                  </span>
-                  <span className="text-[11px] font-mono text-zinc-500">lượt thích</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 2. Type Selector Tabs (SONG / ARTIST / ALBUM) */}
@@ -293,7 +315,13 @@ export function FavoritesManagementTab({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={`Tìm theo tên người dùng, email thính giả...`}
+            placeholder={
+              activeType === "ALBUM"
+                ? "Tìm theo tên album, tên người dùng, email..."
+                : activeType === "ARTIST"
+                ? "Tìm theo tên nghệ sĩ, tên người dùng, email..."
+                : "Tìm theo tên bài hát, người dùng, email..."
+            }
             className="w-full rounded-lg border border-[#222432] bg-[#171822] pl-10 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:border-[#ff5500] focus:outline-none transition"
           />
           {searchQuery && (

@@ -8,14 +8,25 @@ import {
   fetchPlaylistById,
   removeTrackFromPlaylist,
   deletePlaylist,
+  updatePlaylistVisibility,
   removeFromLibrary,
+  fetchUserAlbums,
+  fetchLikedAlbums,
+  deleteAlbum,
+  toggleFavoriteAlbum,
+  fetchAlbumDetail,
   type LibraryTrack,
   type Playlist,
   type Track,
+  type Album,
 } from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
+import { useAuth } from "@/hooks/use-auth";
 import TrackCard from "@/components/dashboard/track-card";
 import CreatePlaylistModal from "@/components/dashboard/create-playlist-modal";
+import CreateAlbumModal from "@/components/dashboard/create-album-modal";
+import AlbumCard from "@/components/dashboard/album-card";
+import AlbumDetailModal from "@/components/dashboard/album-detail-modal";
 import TrackActionMenu from "@/components/dashboard/track-action-menu";
 import {
   Plus,
@@ -32,6 +43,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Disc,
+  Globe,
+  Lock,
 } from "lucide-react";
 
 function LibraryContent() {
@@ -40,15 +53,24 @@ function LibraryContent() {
   const playlistIdFromUrl = searchParams.get("playlistId");
 
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const { user } = useAuth();
+  const canCreateAlbum = user?.role === "CONTENT_LEAD" || user?.role === "ARTIST" || user?.role === "ADMIN";
 
-  // Active tab: "playlists" | "liked"
-  const [activeTab, setActiveTab] = useState<"playlists" | "liked">("playlists");
+  // Active tab: "playlists" | "liked" | "albums"
+  const [activeTab, setActiveTab] = useState<"playlists" | "liked" | "albums">("playlists");
 
   // Playlists state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [loadingSelectedPlaylist, setLoadingSelectedPlaylist] = useState(false);
+
+  // Albums state
+  const [myAlbums, setMyAlbums] = useState<Album[]>([]);
+  const [likedAlbums, setLikedAlbums] = useState<Album[]>([]);
+  const [loadingAlbums, setLoadingAlbums] = useState(false);
+  const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
+  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
 
   // Liked tracks state
   const [likedTracks, setLikedTracks] = useState<LibraryTrack[]>([]);
@@ -63,11 +85,18 @@ function LibraryContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [removingTrackId, setRemovingTrackId] = useState<string | null>(null);
 
-  // Load playlists and liked count on mount
+  // Load playlists, albums and liked count on mount
   useEffect(() => {
     loadUserPlaylists();
     loadLikedCount();
+    loadAlbums();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "albums") {
+      loadAlbums();
+    }
+  }, [activeTab]);
 
   // Listen for global library and playlist changes from other components
   useEffect(() => {
@@ -246,6 +275,77 @@ function LibraryContent() {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
+  const loadAlbums = async () => {
+    setLoadingAlbums(true);
+    try {
+      const [mine, liked] = await Promise.all([
+        fetchUserAlbums().catch(() => []),
+        fetchLikedAlbums().catch(() => []),
+      ]);
+      setMyAlbums(mine);
+      setLikedAlbums(liked);
+    } catch (err) {
+      console.error("Failed to load albums:", err);
+    } finally {
+      setLoadingAlbums(false);
+    }
+  };
+
+  const handlePlayAlbum = async (alb: Album) => {
+    try {
+      const detail = await fetchAlbumDetail(alb.id);
+      if (detail.tracks && detail.tracks.length > 0) {
+        const playlistTracks = detail.tracks.map((t) => ({
+          spotifyId: t.spotifyId,
+          name: t.name,
+          artistName: t.artistName,
+          albumName: alb.title,
+          imageUrl: t.imageUrl || alb.coverUrl,
+          durationMs: t.durationMs,
+          lyricsPlain: t.lyricsPlain,
+          lyricsSynced: t.lyricsSynced,
+          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          localPath: t.localPath,
+        }));
+        playTrack(playlistTracks[0], playlistTracks);
+      }
+    } catch (e) {
+      console.error("Play album error:", e);
+    }
+  };
+
+  const handleToggleAlbumFav = async (alb: Album) => {
+    try {
+      await toggleFavoriteAlbum(alb.id);
+      loadAlbums();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteAlbum = async (albumId: number) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa album này không?")) return;
+    try {
+      await deleteAlbum(albumId);
+      setMyAlbums((prev) => prev.filter((a) => a.id !== albumId));
+      if (selectedAlbumIdForModal === albumId) setSelectedAlbumIdForModal(null);
+    } catch (err) {
+      console.error("Failed to delete album:", err);
+    }
+  };
+
+  const handleToggleVisibility = async (playlistId: string, currentPublic: boolean) => {
+    try {
+      const updated = await updatePlaylistVisibility(playlistId, !currentPublic);
+      setSelectedPlaylist((prev) => (prev ? { ...prev, isPublic: updated.isPublic } : null));
+      setPlaylists((prev) =>
+        prev.map((p) => (p.id === playlistId ? { ...p, isPublic: updated.isPublic } : p))
+      );
+    } catch (err) {
+      console.error("Failed to update visibility:", err);
+    }
+  };
+
   const calculateTotalDuration = (tracks?: Track[]) => {
     if (!tracks || tracks.length === 0) return "0 phút";
     const totalMs = tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
@@ -263,11 +363,20 @@ function LibraryContent() {
             Thư viện của bạn
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Quản lý danh sách phát và các bài hát bạn đã lưu
+            Quản lý danh sách phát, album và các bài hát bạn đã lưu
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          {activeTab === "albums" && canCreateAlbum && (
+            <button
+              onClick={() => setIsCreateAlbumModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-black bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 shadow-lg shadow-cyan-500/20 transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Tạo Album
+            </button>
+          )}
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/20 transition-all active:scale-95 cursor-pointer"
@@ -311,6 +420,22 @@ function LibraryContent() {
             )}
           </button>
 
+          <button
+            onClick={() => setActiveTab("albums")}
+            className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer ${
+              activeTab === "albums"
+                ? "text-cyan-400 font-semibold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Disc className="w-4 h-4 text-cyan-400" />
+            {canCreateAlbum
+              ? `Album (${myAlbums.length + likedAlbums.length})`
+              : `Album đã lưu (${likedAlbums.length})`}
+            {activeTab === "albums" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
+            )}
+          </button>
           <button
             onClick={() => router.push("/dashboard/history")}
             className="pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer text-slate-400 hover:text-cyan-300"
@@ -385,7 +510,7 @@ function LibraryContent() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-4 pt-3">
+                    <div className="flex items-center gap-3 pt-3 flex-wrap">
                       <button
                         onClick={() => handlePlayPlaylist(selectedPlaylist, 0)}
                         disabled={!selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0}
@@ -396,9 +521,31 @@ function LibraryContent() {
                       </button>
 
                       <button
+                        onClick={() => handleToggleVisibility(selectedPlaylist.id, Boolean(selectedPlaylist.isPublic))}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                          selectedPlaylist.isPublic
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
+                            : "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
+                        }`}
+                        title="Bấm để thay đổi chế độ Công khai / Riêng tư"
+                      >
+                        {selectedPlaylist.isPublic ? (
+                          <>
+                            <Globe className="w-4 h-4 text-emerald-400" />
+                            <span>Công khai (Mọi người có thể thấy)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4 text-amber-400" />
+                            <span>Riêng tư (Chỉ mình bạn)</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
                         onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
                         disabled={deletingId === selectedPlaylist.id}
-                        className="p-3 rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition-colors"
+                        className="p-3 rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition-colors cursor-pointer"
                         title="Xóa danh sách phát"
                       >
                         {deletingId === selectedPlaylist.id ? (
@@ -614,6 +761,21 @@ function LibraryContent() {
                         </div>
                       )}
 
+                      {/* Visibility indicator */}
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] flex items-center gap-1 shadow-md">
+                        {playlist.isPublic ? (
+                          <>
+                            <Globe className="w-3 h-3 text-emerald-400" />
+                            <span className="text-emerald-300 font-medium">Công khai</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-3 h-3 text-amber-400" />
+                            <span className="text-amber-300 font-medium">Riêng tư</span>
+                          </>
+                        )}
+                      </div>
+
                       {/* Play overlay button */}
                       {playlist.trackCount > 0 && (
                         <button
@@ -740,11 +902,187 @@ function LibraryContent() {
           </div>
         )}
 
+        {/* VIEW 3: ALBUMS TAB VIEW */}
+        {!selectedPlaylist && activeTab === "albums" && (
+          <div className="space-y-10 animate-in fade-in duration-200">
+            {loadingAlbums ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <Loader2 className="w-10 h-10 animate-spin text-cyan-400 mb-3" />
+                <p className="text-xs text-slate-400">Đang tải danh sách album...</p>
+              </div>
+            ) : canCreateAlbum ? (
+              <>
+                {/* 1. My Created Albums (Chỉ dành cho Nghệ sĩ / Content Lead / Admin) */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Disc className="w-5 h-5 text-cyan-400" />
+                        Album Của Tôi ({myAlbums.length})
+                      </h2>
+                      <p className="text-xs text-slate-400">Các album do bạn tự biên tập và phát hành</p>
+                    </div>
+                    <button
+                      onClick={() => setIsCreateAlbumModalOpen(true)}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Thêm album mới
+                    </button>
+                  </div>
+
+                  {myAlbums.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center bg-slate-900/20">
+                      <Disc className="w-10 h-10 text-slate-600 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm font-medium text-slate-300">Bạn chưa tạo album nào</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        Tạo album để tuyển chọn các bài hát và phát hành tới người nghe trên toàn hệ thống
+                      </p>
+                      <button
+                        onClick={() => setIsCreateAlbumModalOpen(true)}
+                        className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-black bg-cyan-400 hover:bg-cyan-300 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Tạo Album Đầu Tiên
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {myAlbums.map((alb) => (
+                        <div key={alb.id} className="relative group">
+                          <AlbumCard
+                            album={alb}
+                            isFavorited={alb.isFavorited}
+                            onClick={() => setSelectedAlbumIdForModal(alb.id)}
+                            onPlay={() => handlePlayAlbum(alb)}
+                            onFavoriteToggle={() => handleToggleAlbumFav(alb)}
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAlbum(alb.id);
+                            }}
+                            className="absolute top-6 left-6 p-1.5 rounded-full bg-red-500/80 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer"
+                            title="Xóa album"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Liked Albums */}
+                <div>
+                  <div className="mb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
+                      Album Đã Thích ({likedAlbums.length})
+                    </h2>
+                    <p className="text-xs text-slate-400">Các album từ nghệ sĩ khác mà bạn đã lưu vào danh sách yêu thích</p>
+                  </div>
+
+                  {likedAlbums.length === 0 ? (
+                    <div className="rounded-2xl border border-white/5 p-8 text-center bg-slate-900/20">
+                      <p className="text-xs text-slate-500">Chưa có album yêu thích nào. Hãy tìm kiếm và thả tim các album bạn thích!</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {likedAlbums.map((alb) => (
+                        <AlbumCard
+                          key={alb.id}
+                          album={alb}
+                          isFavorited={true}
+                          onClick={() => setSelectedAlbumIdForModal(alb.id)}
+                          onPlay={() => handlePlayAlbum(alb)}
+                          onFavoriteToggle={() => handleToggleAlbumFav(alb)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* Dành cho Người dùng (USER) thông thường: Chỉ hiển thị Album Đã Lưu / Yêu Thích */
+              <div>
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Disc className="w-5 h-5 text-cyan-400" />
+                      Album Đã Lưu ({likedAlbums.length})
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Tuyển tập các đĩa nhạc chính thức từ nghệ sĩ bạn đã bấm yêu thích
+                    </p>
+                  </div>
+                  {likedAlbums.length > 0 && (
+                    <button
+                      onClick={() => router.push("/dashboard/search")}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 font-medium inline-flex items-center gap-1 cursor-pointer w-fit"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Khám phá thêm album
+                    </button>
+                  )}
+                </div>
+
+                {likedAlbums.length === 0 ? (
+                  <div className="rounded-3xl border border-white/5 p-12 text-center bg-slate-900/30">
+                    <Disc className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-white mb-1">
+                      Bạn chưa lưu album nào
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto mb-5 leading-relaxed">
+                      Album là các sản phẩm âm nhạc chính thức do nghệ sĩ phát hành. Hãy tìm kiếm và bấm vào biểu tượng trái tim ở album bạn yêu thích để lưu vào đây!
+                    </p>
+                    <button
+                      onClick={() => router.push("/dashboard/search")}
+                      className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-cyan-400 hover:bg-cyan-300 text-black shadow-lg shadow-cyan-400/20 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Khám phá Album Nghệ sĩ
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {likedAlbums.map((alb) => (
+                      <AlbumCard
+                        key={alb.id}
+                        album={alb}
+                        isFavorited={true}
+                        onClick={() => setSelectedAlbumIdForModal(alb.id)}
+                        onPlay={() => handlePlayAlbum(alb)}
+                        onFavoriteToggle={() => handleToggleAlbumFav(alb)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       {/* Create Playlist Modal */}
       <CreatePlaylistModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={handlePlaylistCreated}
+      />
+
+      {/* Create Album Modal */}
+      <CreateAlbumModal
+        isOpen={isCreateAlbumModalOpen}
+        onClose={() => setIsCreateAlbumModalOpen(false)}
+        onCreated={(newAlb) => {
+          setMyAlbums((prev) => [newAlb, ...prev]);
+          setSelectedAlbumIdForModal(newAlb.id);
+        }}
+      />
+
+      {/* Album Detail Modal */}
+      <AlbumDetailModal
+        isOpen={Boolean(selectedAlbumIdForModal)}
+        albumId={selectedAlbumIdForModal}
+        onClose={() => setSelectedAlbumIdForModal(null)}
+        onAlbumUpdated={loadAlbums}
       />
     </div>
   );

@@ -24,6 +24,27 @@ export type Track = {
   lyricsSynced?: string | null;
   localPath?: string | null;
   audioUrl?: string | null;
+  moodMatchDistance?: number | null;
+  moodFeatureCoverage?: number | null;
+  moodMatchedTags?: string[] | null;
+  moodFeatureDistances?: Record<string, MoodFeatureDistance> | null;
+};
+
+export type MoodFeatureDistance = {
+  weight: number;
+  targetValue: number | null;
+  actualValue: number | null;
+  normalizedDistance: number | null;
+  weightedSquaredError: number | null;
+  insideRecommendedRange: boolean | null;
+};
+
+export type MoodCatalogDiagnostics = {
+  tracksWithAudioFeatures: number;
+  tracksWithCompleteAudioFeatures: number;
+  tracksWithGenreTags: number;
+  tracksWithMoodTags: number;
+  averageFeatureCoverage: number;
 };
 
 export type TrackPageResponse = {
@@ -94,6 +115,10 @@ export type EmotionInfo = {
     mood_analysis?: string;
     target_valence?: number;
     target_energy?: number;
+    target_danceability?: number;
+    target_acousticness?: number;
+    target_tempo?: string;
+    target_mode?: string;
     seed_genres?: string[];
   };
 };
@@ -102,6 +127,34 @@ export type MoodRecommendationResponse = {
   emotion: EmotionInfo;
   tracks: Track[];
   totalMatched: number;
+  candidateCount?: number;
+  matchStatus?: "MATCHED" | "LIMITED" | "NO_CANDIDATES" | string;
+  rankingVersion?: string;
+  maxMatchDistance?: number;
+  catalogDiagnostics?: MoodCatalogDiagnostics | null;
+};
+
+export type SearchHistoryType = "ALL" | "TRACK" | "ARTIST" | "ALBUM" | "PLAYLIST" | "EMOTION";
+
+export type SearchHistoryItem = {
+  id: number;
+  keyword: string;
+  searchType: SearchHistoryType;
+  detectedEmotion: string | null;
+  emotionConfidence: number | null;
+  selectedTargetType: string | null;
+  selectedTargetId: string | null;
+  searchedAt: string;
+};
+
+export type SearchHistoryPage = {
+  content: SearchHistoryItem[];
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
 };
 
 /**
@@ -110,7 +163,8 @@ export type MoodRecommendationResponse = {
 export async function fetchMoodRecommendation(
   text: string,
   strategy: string = 'empathy',
-  limit: number = 50
+  limit: number = 50,
+  signal?: AbortSignal
 ): Promise<MoodRecommendationResponse> {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   try {
@@ -124,12 +178,102 @@ export async function fetchMoodRecommendation(
     method: 'POST',
     headers,
     body: JSON.stringify({ text, strategy, limit }),
+    signal,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to recommend tracks by mood: ${response.status}`);
+    const errorBody = await response.json().catch(() => null) as { detail?: string; message?: string; title?: string } | null;
+    throw new Error(errorBody?.detail || errorBody?.message || errorBody?.title || `Không thể tìm nhạc theo cảm xúc (${response.status})`);
   }
 
+  return response.json();
+}
+
+export async function recordMySearchHistory(input: {
+  keyword: string;
+  searchType: SearchHistoryType;
+  detectedEmotion?: string;
+  emotionConfidence?: number;
+}): Promise<SearchHistoryItem> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) throw new Error("Vui lòng đăng nhập để lưu lịch sử tìm kiếm");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error("Không thể lưu lịch sử tìm kiếm");
+  return response.json();
+}
+
+export async function selectMySearchHistoryResult(
+  historyId: number,
+  targetType: "TRACK" | "ARTIST" | "ALBUM" | "PLAYLIST",
+  targetId: string
+): Promise<SearchHistoryItem> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để lưu kết quả đã chọn");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history/${historyId}/selection`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ targetType, targetId }),
+  });
+  if (!response.ok) throw new Error("Không thể lưu kết quả tìm kiếm đã chọn");
+  return response.json();
+}
+
+export async function fetchMySearchHistory(params: {
+  page?: number;
+  size?: number;
+  type?: SearchHistoryType | "";
+  query?: string;
+} = {}): Promise<SearchHistoryPage> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xem lịch sử tìm kiếm");
+
+  const query = new URLSearchParams({
+    page: String(params.page ?? 0),
+    size: String(params.size ?? 20),
+  });
+  if (params.type) query.set("type", params.type);
+  if (params.query?.trim()) query.set("q", params.query.trim());
+
+  const response = await fetch(`${API_BASE}/users/me/search-history?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new Error("Vui lòng đăng nhập để xem lịch sử tìm kiếm");
+  if (!response.ok) throw new Error("Không thể tải lịch sử tìm kiếm");
+  return response.json();
+}
+
+export async function deleteMySearchHistoryItem(historyId: number): Promise<void> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xóa lịch sử tìm kiếm");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history/${historyId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Không thể xóa mục lịch sử tìm kiếm");
+}
+
+export async function clearMySearchHistory(): Promise<{ deletedCount: number }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xóa lịch sử tìm kiếm");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Không thể xóa lịch sử tìm kiếm");
   return response.json();
 }
 
@@ -142,6 +286,7 @@ export async function fetchTracks(options?: {
   query?: string;
   genre?: string;
   mode?: string;
+  signal?: AbortSignal;
 }): Promise<TrackPageResponse> {
   const params = new URLSearchParams();
   
@@ -159,7 +304,10 @@ export async function fetchTracks(options?: {
     }
   } catch {}
 
-  const response = await fetch(`${API_BASE}/tracks?${params.toString()}`, { headers });
+  const response = await fetch(`${API_BASE}/tracks?${params.toString()}`, {
+    headers,
+    signal: options?.signal,
+  });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch tracks: ${response.status}`);
@@ -342,7 +490,7 @@ export async function fetchUserLibrary(
 /**
  * Fetch all liked track Spotify IDs for current user
  */
-export async function fetchLikedTrackIds(): Promise<string[]> {
+export async function fetchLikedTrackIds(signal?: AbortSignal): Promise<string[]> {
   const token = await getValidAccessToken().catch(() => null);
   if (!token) return [];
 
@@ -350,6 +498,7 @@ export async function fetchLikedTrackIds(): Promise<string[]> {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal,
   });
 
   if (!response.ok) {
@@ -396,7 +545,7 @@ export async function isTrackInLibrary(trackSpotifyId: string): Promise<boolean>
 /**
  * Search for artists
  */
-export async function fetchArtists(query: string): Promise<Artist[]> {
+export async function fetchArtists(query: string, signal?: AbortSignal): Promise<Artist[]> {
   if (!query || query.trim() === '') {
     return [];
   }
@@ -404,7 +553,7 @@ export async function fetchArtists(query: string): Promise<Artist[]> {
   const params = new URLSearchParams();
   params.set('query', query.trim());
 
-  const response = await fetch(`${API_BASE}/artists?${params.toString()}`);
+  const response = await fetch(`${API_BASE}/artists?${params.toString()}`, { signal });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch artists: ${response.status}`);
@@ -436,6 +585,45 @@ export async function fetchUserPlaylists(): Promise<Playlist[]> {
     throw new Error('Failed to fetch playlists');
   }
 
+  return response.json();
+}
+
+/**
+ * Search public playlists
+ */
+export async function fetchPublicPlaylists(query?: string): Promise<Playlist[]> {
+  const token = await getValidAccessToken().catch(() => null);
+  const params = new URLSearchParams();
+  if (query && query.trim()) params.set('q', query.trim());
+
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/playlists?${params.toString()}`, { headers });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch public playlists: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Update playlist visibility (Public / Private)
+ */
+export async function updatePlaylistVisibility(
+  playlistId: string,
+  isPublic: boolean
+): Promise<Playlist> {
+  const token = await getValidAccessToken();
+  const response = await fetch(
+    `${API_BASE}/playlists/${playlistId}/visibility?isPublic=${isPublic}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to update playlist visibility: ${response.status}`);
+  }
   return response.json();
 }
 
@@ -1006,6 +1194,177 @@ export async function clearMyListeningHistory(): Promise<{ success: boolean; del
     },
   });
   if (!res.ok) throw new Error("Không thể xóa toàn bộ lịch sử nghe");
+  return res.json();
+}
+
+// Album APIs (MySQL Hybrid Architecture)
+// ============================================================================
+
+export type Album = {
+  id: number;
+  title: string;
+  description: string | null;
+  coverUrl: string;
+  releaseDate: string | null;
+  isPublic: boolean;
+  status: string;
+  userId: number | null;
+  authorName: string;
+  authorAvatar: string | null;
+  trackCount: number;
+  isFavorited?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AlbumDetail = Album & {
+  tracks: Track[];
+};
+
+export type AlbumPageResponse = {
+  content: Album[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export async function fetchPublicAlbums(
+  q?: string,
+  page: number = 0,
+  size: number = 20
+): Promise<AlbumPageResponse> {
+  const token = await getValidAccessToken().catch(() => null);
+  const params = new URLSearchParams();
+  if (q && q.trim()) params.set("q", q.trim());
+  params.set("page", page.toString());
+  params.set("size", size.toString());
+
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/albums?${params.toString()}`, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch albums: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAlbumDetail(id: number | string): Promise<AlbumDetail> {
+  const token = await getValidAccessToken().catch(() => null);
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/albums/${id}`, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch album detail: ${res.status}`);
+  return res.json();
+}
+
+export async function createAlbum(data: {
+  title: string;
+  description?: string;
+  coverUrl?: string;
+  isPublic?: boolean;
+}): Promise<Album> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to create album: ${res.status}`);
+  return res.json();
+}
+
+export async function updateAlbum(
+  id: number | string,
+  data: {
+    title?: string;
+    description?: string;
+    coverUrl?: string;
+    isPublic?: boolean;
+  }
+): Promise<Album> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to update album: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteAlbum(id: number | string): Promise<void> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to delete album: ${res.status}`);
+}
+
+export async function addTrackToAlbum(
+  albumId: number | string,
+  trackId: string
+): Promise<AlbumDetail> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${albumId}/tracks`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ trackId }),
+  });
+  if (!res.ok) throw new Error(`Failed to add track to album: ${res.status}`);
+  return res.json();
+}
+
+export async function removeTrackFromAlbum(
+  albumId: number | string,
+  trackId: string
+): Promise<AlbumDetail> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${albumId}/tracks/${encodeURIComponent(trackId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to remove track from album: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchUserAlbums(): Promise<Album[]> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch user albums: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLikedAlbums(): Promise<Album[]> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/favorites/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch liked albums: ${res.status}`);
+  return res.json();
+}
+
+export async function toggleFavoriteAlbum(
+  albumId: number | string
+): Promise<{ favorited: boolean; albumId: string }> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/albums/${albumId}/favorite`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to toggle favorite album: ${res.status}`);
   return res.json();
 }
 

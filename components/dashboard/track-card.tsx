@@ -6,6 +6,15 @@ import { useState } from "react";
 import AddToPlaylistModal from "./add-to-playlist-modal";
 import TrackActionMenu from "./track-action-menu";
 
+const MOOD_FEATURE_LABELS: Record<string, string> = {
+  valence: "Độ tích cực",
+  energy: "Năng lượng",
+  danceability: "Độ nhún",
+  acousticness: "Độ mộc",
+  tempo: "Nhịp độ",
+  mode: "Gam",
+};
+
 type TrackCardProps = {
   track: Track;
   isLiked?: boolean;
@@ -17,18 +26,24 @@ type TrackCardProps = {
 };
 
 function resolveMediaUrl(rawUrl?: string | null) {
-  if (!rawUrl) return undefined;
-  if (
-    rawUrl.startsWith("http://") ||
-    rawUrl.startsWith("https://") ||
-    rawUrl.startsWith("blob:") ||
-    rawUrl.startsWith("data:")
-  ) {
-    return rawUrl;
+  if (!rawUrl || typeof rawUrl !== "string") return undefined;
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed === "test" || trimmed === "test3" || trimmed === "null" || trimmed === "undefined") {
+    return undefined;
   }
-  const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
-  if (!apiBase) return rawUrl;
-  return `${apiBase}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("data:")
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/")) {
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+    return `${apiBase}${trimmed}`;
+  }
+  return undefined;
 }
 
 export default function TrackCard({
@@ -127,6 +142,36 @@ export default function TrackCard({
                 </span>
               ))}
             </div>
+          )}
+
+          {track.moodMatchDistance != null && (
+            <details className="mt-2 text-[10px] text-purple-200/80">
+              <summary
+                className="w-fit cursor-pointer rounded-full border border-purple-400/20 bg-purple-500/10 px-2 py-0.5 hover:bg-purple-500/20"
+                title="Khoảng cách càng thấp thì các đặc trưng âm thanh càng gần hồ sơ mục tiêu; đây không phải xác suất bài hát phù hợp."
+              >
+                Độ lệch {track.moodMatchDistance.toFixed(3)} · dữ liệu {Math.round((track.moodFeatureCoverage ?? 0) * 100)}%
+              </summary>
+              <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded-md border border-slate-800 bg-slate-950/60 p-2">
+                {Object.entries(track.moodFeatureDistances ?? {}).map(([feature, detail]) => (
+                  <span key={feature}>
+                    {MOOD_FEATURE_LABELS[feature] ?? feature}: {detail.actualValue == null
+                      ? "thiếu dữ liệu"
+                      : `${detail.actualValue} / mục tiêu ${detail.targetValue} · lệch ${detail.normalizedDistance?.toFixed(2) ?? "—"}`}
+                    {detail.insideRecommendedRange === true
+                      ? " · trong khoảng"
+                      : detail.insideRecommendedRange === false
+                        ? " · ngoài khoảng"
+                        : ""}
+                  </span>
+                ))}
+                {track.moodMatchedTags?.length ? (
+                  <span className="col-span-2">Thẻ khớp: {track.moodMatchedTags.join(", ")}</span>
+                ) : (
+                  <span className="col-span-2">Không có thẻ thể loại/tâm trạng khớp.</span>
+                )}
+              </div>
+            </details>
           )}
         </div>
 

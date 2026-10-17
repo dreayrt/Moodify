@@ -98,14 +98,25 @@ export type AdminOverviewResponse = {
     audioUrl?: string;
     favoriteCount: number;
   }[];
+  totalListenedHours?: number;
+  totalListenedDurationMs?: number;
+  totalListenedFormatted?: string;
+  avgCompletionRate?: number;
+  completedSessions?: number;
   listeningTrend: {
     date: string;
     label: string;
     streams: number;
+    completed?: number;
+  }[];
+  userTrend?: {
+    date: string;
+    label: string;
+    count: number;
   }[];
   recentActivities: {
     id: string;
-    type: "PAYMENT" | "FAVORITE";
+    type: "PAYMENT" | "FAVORITE" | "STREAM";
     title: string;
     detail: string;
     timestamp: string;
@@ -500,8 +511,10 @@ export async function fetchAdminFavorites(params?: {
   return adminRequest<AdminFavoritesResponse>(`/api/admin/favorites${qs ? `?${qs}` : ""}`);
 }
 
-export async function fetchAdminFavoritesLeaderboard(): Promise<FavoriteLeaderboardItem[]> {
-  return adminRequest<FavoriteLeaderboardItem[]>("/api/admin/favorites/leaderboard");
+export async function fetchAdminFavoritesLeaderboard(
+  type: "SONG" | "ARTIST" | "ALBUM" = "SONG"
+): Promise<FavoriteLeaderboardItem[]> {
+  return adminRequest<FavoriteLeaderboardItem[]>(`/api/admin/favorites/leaderboard?type=${type}`);
 }
 
 export async function deleteAdminFavorite(

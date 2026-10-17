@@ -1,14 +1,41 @@
-name: Deploy Frontend to Oracle VPS
+name: CI/CD Frontend (Main Branch)
 
 on:
   push:
     branches:
       - main
-      - Hai_Branch
   workflow_dispatch:
 
 jobs:
+  # Quality Gate (CI)
+  build:
+    name: Build & Verify Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Next.js Production Build
+        run: npx next build --webpack
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.moodify.click
+          NEXT_PUBLIC_AUDIO_SERVER_URL: https://moodify.click
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: '711124485487-2qb1s0uqa7e1uja1qio1kjggqgqdka7i.apps.googleusercontent.com'
+
+  # Automated Deployment (CD)
   deploy:
+    name: Deploy Frontend to Production VPS
+    needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Oracle Cloud VPS via SSH
@@ -18,13 +45,18 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
+          script_stop: true
+          command_timeout: 15m
           script: |
-            echo "🚀 Deploying Frontend on branch: ${{ github.ref_name }}"
+            echo "🚀 Starting Frontend CI/CD deployment on main..."
             cd /opt/moodify/frontend
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git reset --hard origin/${{ github.ref_name }}
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
             cd /opt/moodify
             docker compose build moodify-frontend
-            docker compose up -d moodify-frontend
+            docker compose up -d --no-deps moodify-frontend
+            echo "🩺 Verifying Frontend container status..."
+            sleep 5
+            docker ps --filter "name=moodify-frontend" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo "✅ Frontend deployment completed successfully!"

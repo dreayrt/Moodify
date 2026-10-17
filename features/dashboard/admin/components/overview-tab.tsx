@@ -31,6 +31,7 @@ import {
   TrackRetentionMetric,
 } from "../types";
 import { AdminOverviewResponse } from "@/lib/api/admin-client";
+import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 import { InteractiveAreaChart } from "@/components/dashboard/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
@@ -77,27 +78,29 @@ export function OverviewTab({
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
   };
 
-  // Performance metrics per track
-  const trackMetrics: TrackRetentionMetric[] =
-    overviewData?.trackPerformanceMetrics && overviewData.trackPerformanceMetrics.length > 0
-      ? overviewData.trackPerformanceMetrics
-      : (overviewData?.topListenedTracks || []).map((t, idx) => ({
-          trackId: t.trackId,
-          title: t.title,
-          artist: t.artist,
-          coverUrl: t.coverUrl,
-          duration: t.duration,
-          trackDurationMs: 210000,
-          streamCount: t.streamCount,
-          uniqueListeners: Math.max(1, Math.round(t.streamCount * 0.7)),
-          avgDurationMs: 165000,
-          avgDurationFormatted: "2:45",
-          completionRatePercent: 78.5 - idx * 4,
-          skipRatePercent: 12.0 + idx * 3,
-          favoriteCount: 15 - idx * 2,
-          genre: t.genre,
-          audioUrl: t.audioUrl,
-        }));
+  // Performance metrics per track (100% from backend trackPerformanceMetrics)
+  const trackMetrics: TrackRetentionMetric[] = React.useMemo(() => {
+    if (overviewData?.trackPerformanceMetrics && overviewData.trackPerformanceMetrics.length > 0) {
+      return overviewData.trackPerformanceMetrics;
+    }
+    return (overviewData?.topListenedTracks || []).map((t) => ({
+      trackId: t.trackId,
+      title: t.title,
+      artist: t.artist,
+      coverUrl: t.coverUrl,
+      duration: t.duration,
+      trackDurationMs: 0,
+      streamCount: t.streamCount,
+      uniqueListeners: 0,
+      avgDurationMs: 0,
+      avgDurationFormatted: "0:00",
+      completionRatePercent: 0,
+      skipRatePercent: 0,
+      favoriteCount: 0,
+      genre: t.genre,
+      audioUrl: t.audioUrl,
+    }));
+  }, [overviewData?.trackPerformanceMetrics, overviewData?.topListenedTracks]);
 
   // Real Platform and Source distributions from DB
   const realPlatformCounts = React.useMemo(() => {
@@ -142,7 +145,9 @@ export function OverviewTab({
 
   // Platform Avg Completion Rate
   const avgCompletionRate =
-    trackMetrics.length > 0
+    overviewData?.avgCompletionRate !== undefined
+      ? Number(overviewData.avgCompletionRate)
+      : trackMetrics.length > 0
       ? Math.round(
           trackMetrics.reduce((sum, item) => sum + item.completionRatePercent, 0) /
             trackMetrics.length
@@ -156,7 +161,7 @@ export function OverviewTab({
         label: t.label || t.date,
         date: t.date || t.label,
         streams: Number(t.streams) || 0,
-        completed: Math.round((Number(t.streams) || 0) * (avgCompletionRate / 100)),
+        completed: t.completed !== undefined ? Number(t.completed) : Math.round((Number(t.streams) || 0) * (avgCompletionRate / 100)),
       }));
     }
     return [];
@@ -244,10 +249,23 @@ export function OverviewTab({
               </span>
               <span className="text-xs text-zinc-500 font-mono">bài hát</span>
             </div>
-            <div className="mt-2 pt-1 border-t border-white/5">
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">
                 Đã duyệt: <strong className="text-zinc-200">{publishedTracksCount}</strong>
               </span>
+              <div className="flex items-center gap-1.5" title={`${publishedTracksCount}/${totalTracksCount} bài hát đã duyệt`}>
+                <div className="w-[54px] h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#ff5500] rounded-full transition-all duration-500"
+                    style={{
+                      width: `${totalTracksCount > 0 ? Math.min(100, Math.round((publishedTracksCount / totalTracksCount) * 100)) : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] font-mono text-zinc-400">
+                  {totalTracksCount > 0 ? Math.round((publishedTracksCount / totalTracksCount) * 100) : 0}%
+                </span>
+              </div>
             </div>
           </div>
 
@@ -267,10 +285,20 @@ export function OverviewTab({
               </span>
               <span className="text-xs text-zinc-500 font-mono">lượt</span>
             </div>
-            <div className="mt-2 pt-1 border-t border-white/5">
-              <span className="text-[11px] text-zinc-400 font-mono">
-                Tổng lượt phát hệ thống
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+              <span className="text-[11px] text-zinc-400 font-mono" title={`Tổng thời lượng tích lũy: ${overviewData?.totalListenedHours || 0} giờ`}>
+                {overviewData?.totalListenedFormatted || `${overviewData?.totalListenedHours || 0} giờ`}
               </span>
+              <MiniSparkline
+                data={
+                  listeningTrend.length >= 2
+                    ? listeningTrend.map((t) => Number(t.streams) || 0)
+                    : [0, totalStreamsCount]
+                }
+                color="#38bdf8"
+                width={75}
+                height={24}
+              />
             </div>
           </div>
 
@@ -289,10 +317,18 @@ export function OverviewTab({
                 {avgCompletionRate}%
               </span>
             </div>
-            <div className="mt-2 pt-1 border-t border-white/5">
-              <span className="text-[11px] text-zinc-400 font-mono">
-                Mức độ giữ chân người nghe
-              </span>
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+              <span className="text-[11px] text-zinc-400 font-mono">Trung bình</span>
+              <MiniSparkline
+                data={
+                  trackMetrics.length >= 2
+                    ? trackMetrics.slice(0, 7).map((m) => Math.round(m.completionRatePercent))
+                    : [avgCompletionRate, avgCompletionRate]
+                }
+                color="#10b981"
+                width={75}
+                height={24}
+              />
             </div>
           </div>
 
@@ -312,10 +348,32 @@ export function OverviewTab({
               </span>
               <span className="text-xs text-zinc-500 font-mono">tài khoản</span>
             </div>
-            <div className="mt-2 pt-1 border-t border-white/5">
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">
                 Nghệ sĩ: <strong className="text-amber-300">{contentLeadsCount}</strong>
               </span>
+              {overviewData?.userTrend && overviewData.userTrend.length >= 2 ? (
+                <MiniSparkline
+                  data={overviewData.userTrend.map((u) => u.count)}
+                  color="#f59e0b"
+                  width={75}
+                  height={24}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5" title={`${contentLeadsCount}/${totalUsersCount} nghệ sĩ/nhà sáng tạo`}>
+                  <div className="w-[54px] h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${totalUsersCount > 0 ? Math.min(100, Math.round((contentLeadsCount / totalUsersCount) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400">
+                    {totalUsersCount > 0 ? Math.round((contentLeadsCount / totalUsersCount) * 100) : 0}%
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -334,10 +392,23 @@ export function OverviewTab({
                 {formatCurrency(totalRevenue)}
               </span>
             </div>
-            <div className="mt-2 pt-1 border-t border-white/5">
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">
                 Thuê bao: <strong className="text-purple-300">{overviewData?.activeSubscriptions ?? 0}</strong>
               </span>
+              <MiniSparkline
+                data={
+                  transactions.filter((t) => t.status === "SUCCESS").length >= 2
+                    ? transactions
+                        .filter((t) => t.status === "SUCCESS")
+                        .slice(-7)
+                        .map((t) => Math.round(t.amount / 1000))
+                    : [0, Math.round(totalRevenue / 1000)]
+                }
+                color="#a855f7"
+                width={75}
+                height={24}
+              />
             </div>
           </div>
         </div>
@@ -421,29 +492,34 @@ export function OverviewTab({
                               type="button"
                               onClick={() => {
                                 if (onTogglePreview) {
-                                  onTogglePreview({
-                                    id: track.trackId,
-                                    title: track.title,
-                                    artist: track.artist,
-                                    album: "Single",
-                                    coverUrl: track.coverUrl,
-                                    audioUrl: track.audioUrl,
-                                    duration: track.duration,
-                                    genre: track.genre,
-                                    status: "published",
-                                    plays: track.streamCount,
-                                    likes: track.favoriteCount,
-                                    bpm: 120,
-                                    keySignature: "C",
-                                    energy: 0.8,
-                                    valence: 0.7,
-                                    danceability: 0.75,
-                                    acousticness: 0.2,
-                                    vibeCategory: "Energetic",
-                                    moderationScore: 100,
-                                    createdAt: "2026-09-01",
-                                    spotifyId: track.trackId,
-                                  });
+                                  const existing = tracks.find((tr) => tr.id === track.trackId);
+                                  if (existing) {
+                                    onTogglePreview(existing);
+                                  } else {
+                                    onTogglePreview({
+                                      id: track.trackId,
+                                      title: track.title,
+                                      artist: track.artist,
+                                      album: "Single",
+                                      coverUrl: track.coverUrl,
+                                      audioUrl: track.audioUrl,
+                                      duration: track.duration,
+                                      genre: track.genre,
+                                      status: "published",
+                                      plays: track.streamCount,
+                                      likes: track.favoriteCount,
+                                      bpm: 0,
+                                      keySignature: "",
+                                      energy: 0,
+                                      valence: 0,
+                                      danceability: 0,
+                                      acousticness: 0,
+                                      vibeCategory: "Chill",
+                                      moderationScore: 100,
+                                      createdAt: "",
+                                      spotifyId: track.trackId,
+                                    });
+                                  }
                                 }
                               }}
                               className={`absolute inset-0 grid place-items-center transition-all ${
@@ -490,7 +566,7 @@ export function OverviewTab({
 
                       {/* Avg Listened Duration */}
                       <td className="px-4 py-3.5 font-mono text-emerald-400 font-bold">
-                        {track.avgDurationFormatted || "2:30"}
+                        {track.avgDurationFormatted || "0:00"}
                       </td>
 
                       {/* Completion Rate with Progress Bar - No fluff chips */}

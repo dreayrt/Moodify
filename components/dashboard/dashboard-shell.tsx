@@ -19,6 +19,7 @@ import {
   Mail,
   Shield,
   Clock,
+  History,
   HelpCircle,
 } from "lucide-react";
 import {
@@ -955,6 +956,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isSearch = pathname === "/dashboard/search" || pathname.startsWith("/dashboard/search");
   const isLibrary = pathname.startsWith("/dashboard/library");
   const isHistory = pathname.startsWith("/dashboard/history");
+  const isSearchHistory = pathname.startsWith("/dashboard/search-history");
 
   const { goldThemeEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
   const isVipShellActive = Boolean(subInfo?.isPremium) && vipShellEnabled;
@@ -1026,10 +1028,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             </Link>
 
             {/* Mobile / Tablet nav pills (visible when sidebar is hidden on <lg) */}
-            <nav className="flex lg:hidden items-center gap-1.5">
+            <nav className="flex min-w-0 max-w-[45vw] items-center gap-1.5 overflow-x-auto lg:hidden">
               <Link
                 href="/dashboard"
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHome
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
@@ -1039,7 +1041,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/search"
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isSearch
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
@@ -1049,7 +1051,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/library"
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isLibrary
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
@@ -1059,13 +1061,25 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/history"
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHistory
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
                     : "text-white/60 hover:text-white"
                 }`}
               >
                 Lịch sử
+              </Link>
+              <Link
+                href="/dashboard/search-history"
+                aria-label="Lịch sử tìm kiếm"
+                title="Lịch sử tìm kiếm"
+                className={`shrink-0 px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                  isSearchHistory
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Đã tìm
               </Link>
             </nav>
           </div>
@@ -1183,6 +1197,24 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     strokeWidth={isHistory ? 2.2 : 1.7}
                   />
                   <span>Lịch sử nghe</span>
+                </div>
+              </Link>
+
+              {/* 3.2. Lịch sử tìm kiếm */}
+              <Link
+                href="/dashboard/search-history"
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                  isSearchHistory
+                    ? navActiveItemClass
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <History
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
+                    strokeWidth={isSearchHistory ? 2.2 : 1.7}
+                  />
+                  <span>Lịch sử tìm kiếm</span>
                 </div>
               </Link>
 

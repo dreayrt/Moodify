@@ -203,11 +203,13 @@ export function TrackUploadModal({
   };
 
   const runOcrExtraction = async (file: File) => {
-    // Chỉ kích hoạt OCR cho file PDF hoặc hình ảnh chứng từ
-    const isPdfOrImage = file.type === "application/pdf" || 
-      file.name.toLowerCase().endsWith(".pdf") || 
-      file.type.startsWith("image/");
-    if (!isPdfOrImage) return;
+    const extension = file.name.toLowerCase().split(".").pop();
+    const isSupported = ["pdf", "png", "jpg", "jpeg"].includes(extension || "");
+    if (!isSupported) {
+      setOcrNotification(null);
+      setStepError("OCR chỉ hỗ trợ PDF, PNG và JPG. Vui lòng chọn một trong các định dạng này để bóc tách tự động.");
+      return;
+    }
 
     try {
       setIsExtractingOcr(true);
@@ -253,7 +255,7 @@ export function TrackUploadModal({
           setOcrNotification("Tài liệu đã được quét nhưng không phát hiện các trường mẫu hợp đồng bản quyền. Bạn có thể nhập tay các thông tin bên phải.");
         }
       } else {
-        const errMsg = res?.message || "Tài liệu PDF không hợp lệ hoặc bị lỗi cấu trúc.";
+        const errMsg = res?.message || "Tài liệu không hợp lệ hoặc không đọc được.";
         setStepError(`⚠️ OCR cảnh báo: ${errMsg}`);
       }
     } catch (err: any) {
@@ -328,6 +330,32 @@ export function TrackUploadModal({
     if (!audioFile && !selectedFileName) {
       setStepError("Vui lòng chọn tệp âm thanh trước khi gửi yêu cầu.");
       setCurrentStep(1);
+      return;
+    }
+
+    const today = getTodayDateString();
+    if (!licenseDocFile) {
+      setStepError("Vui lòng tải lên hợp đồng hoặc giấy phép bản quyền trước khi gửi kiểm duyệt.");
+      return;
+    }
+    if (!licenseType.trim()) {
+      setStepError("Vui lòng nhập loại bản quyền / giấy phép.");
+      return;
+    }
+    if (!copyrightOwner.trim()) {
+      setStepError("Vui lòng nhập chủ sở hữu quyền tác giả.");
+      return;
+    }
+    if (!issueDate || issueDate > today) {
+      setStepError("Ngày cấp / bắt đầu phải hợp lệ và không được nằm trong tương lai.");
+      return;
+    }
+    if (!isPerpetual && (!expiryDate || expiryDate < today || expiryDate < issueDate)) {
+      setStepError("Ngày hết hạn phải từ hôm nay trở đi và không được trước ngày cấp. Nếu giấy phép vô thời hạn, hãy chọn “Vô thời hạn”.");
+      return;
+    }
+    if (distributorId && !distributionContractId.trim()) {
+      setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
       return;
     }
 
@@ -587,7 +615,7 @@ export function TrackUploadModal({
           type="file"
           ref={licenseDocInputRef}
           onChange={handleLicenseDocChange}
-          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+          accept=".pdf,.png,.jpg,.jpeg"
           className="hidden"
         />
 
@@ -920,7 +948,7 @@ export function TrackUploadModal({
                   {/* License Document Upload */}
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-2">
-                      Tài liệu / Hợp đồng đính kèm
+                      Tài liệu / Hợp đồng đính kèm <span className="text-[#ff7a2c]">*</span>
                     </label>
                     <div
                       onDragOver={(e) => {
@@ -980,7 +1008,7 @@ export function TrackUploadModal({
                             Tải lên giấy phép / hợp đồng bản quyền
                           </p>
                           <p className="mt-1 text-[10px] text-white/40">
-                            Hỗ trợ PDF, Scan, PNG, JPG tối đa 15MB
+                          Bắt buộc có hợp đồng. OCR hỗ trợ PDF, PNG, JPG
                           </p>
                         </>
                       )}
@@ -1119,6 +1147,7 @@ export function TrackUploadModal({
                       <input
                         type="date"
                         value={issueDate}
+                        max={getTodayDateString()}
                         onChange={(e) => setIssueDate(e.target.value)}
                         className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[13px] text-white outline-none focus:border-[#ff8b4d]/50 transition [color-scheme:dark]"
                       />
@@ -1143,6 +1172,7 @@ export function TrackUploadModal({
                       <input
                         type="date"
                         disabled={isPerpetual}
+                        min={getTodayDateString()}
                         value={isPerpetual ? "" : expiryDate}
                         onChange={(e) => setExpiryDate(e.target.value)}
                         className={`w-full rounded-xl border border-white/10 px-3 py-1.5 text-[13px] outline-none transition [color-scheme:dark] ${

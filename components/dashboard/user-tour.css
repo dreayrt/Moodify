@@ -1,7 +1,12 @@
 /* Moodify Cyberpunk/Neon Dark Theme for Driver.js Tour */
 @import "driver.js/dist/driver.css";
 
+.driver-overlay {
+  z-index: 9999990 !important;
+}
+
 .driver-popover.moodify-tour-popover {
+  z-index: 9999999 !important;
   background: linear-gradient(135deg, rgba(15, 17, 30, 0.98) 0%, rgba(8, 10, 18, 0.98) 100%) !important;
   border: 1px solid rgba(168, 85, 247, 0.4) !important;
   border-radius: 20px !important;
@@ -66,22 +71,10 @@
 }
 
 .driver-popover.moodify-tour-popover .driver-popover-close-btn {
-  color: rgba(255, 255, 255, 0.5) !important;
-  font-size: 20px !important;
-  width: 30px !important;
-  height: 30px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  top: 10px !important;
-  right: 10px !important;
-  border-radius: 8px !important;
-  transition: all 0.2s ease !important;
-}
-
-.driver-popover.moodify-tour-popover .driver-popover-close-btn:hover {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 
 .driver-popover.moodify-tour-popover .driver-popover-prev-btn {
