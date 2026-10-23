@@ -765,6 +765,23 @@ export interface ServicePackage {
   price: number;
   duration_days: number;
   display_order: number;
+  tier_id?: "INDIVIDUAL_BASIC" | "INDIVIDUAL_FULL" | "FAMILY" | string;
+  tierId?: "INDIVIDUAL_BASIC" | "INDIVIDUAL_FULL" | "FAMILY" | string;
+}
+
+export interface PackageQuote extends ServicePackage {
+  baseAmount: number;
+  discountAmount: number;
+  discountPercent: number;
+  discountApplied: boolean;
+  amount: number;
+  action: "NEW" | "RENEWAL" | "UPGRADE" | "DOWNGRADE" | "AFTER_SCHEDULED";
+  actionLabel: string;
+  actionDescription: string;
+  startAt: string;
+  expiresAt: string;
+  bonusDays: number;
+  isCurrentPackage: boolean;
 }
 
 export interface SubscriptionInfo {
@@ -777,6 +794,39 @@ export interface SubscriptionInfo {
   expiresAt?: string;
   benefits: string[];
   entitlements?: PackageEntitlements;
+}
+
+export interface SubscriptionManagementPayment {
+  id: number;
+  amount: number;
+  paymentMethod: string | null;
+  provider: string | null;
+  orderCode: string | null;
+  providerReference: string | null;
+  status: "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED" | "REFUNDED" | string;
+  paidAt: string | null;
+  createdAt: string | null;
+}
+
+export interface ManagedSubscription {
+  id: number;
+  packageId: number;
+  packageName: string;
+  packageDescription: string | null;
+  catalogPrice: number;
+  durationDays: number;
+  tierId: string | null;
+  tierName: string | null;
+  startAt: string | null;
+  endAt: string | null;
+  createdAt: string | null;
+  autoRenew: boolean;
+  status: "PENDING" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "SUSPENDED" | string;
+  isCurrent: boolean;
+  isScheduled: boolean;
+  canCancel: boolean;
+  cancelKind: "PENDING_ORDER" | "SCHEDULED_PAID" | null;
+  payments: SubscriptionManagementPayment[];
 }
 
 // Quyền hạn theo gói (đồng bộ với PackageEntitlements ở admin types
@@ -906,6 +956,15 @@ export async function fetchServicePackages(): Promise<ServicePackage[]> {
   return res.json();
 }
 
+export async function fetchPackageQuotes(): Promise<PackageQuote[]> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/subscriptions/package-quotes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Không thể tải báo giá gói dịch vụ");
+  return res.json();
+}
+
 export async function fetchMySubscription(): Promise<SubscriptionInfo> {
   const token = await getValidAccessToken();
   const res = await fetch(`${API_BASE}/subscriptions/me`, {
@@ -921,6 +980,31 @@ export async function fetchMySubscription(): Promise<SubscriptionInfo> {
       daysRemaining: 0,
       benefits: [],
     };
+  }
+  return res.json();
+}
+
+export async function fetchMySubscriptionManagement(): Promise<ManagedSubscription[]> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/subscriptions/me/management`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Không thể tải danh sách gói dịch vụ");
+  return res.json();
+}
+
+export async function cancelMyManagedSubscription(
+  subscriptionId: number
+): Promise<{ success: boolean; subscriptionId: number; message: string; refundIssued: boolean }> {
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/subscriptions/me/${subscriptionId}/cancel`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.message || "Không thể hủy gói dịch vụ này");
   }
   return res.json();
 }
@@ -949,7 +1033,17 @@ export interface CheckoutResponse {
   subscriptionId: number;
   packageId: number;
   packageName: string;
+  baseAmount: number;
+  discountAmount: number;
+  discountPercent: number;
+  discountApplied: boolean;
   amount: number;
+  action: PackageQuote["action"];
+  actionLabel: string;
+  actionDescription: string;
+  startAt: string;
+  expiresAt: string;
+  bonusDays: number;
   bankAccount: string;
   bankName: string;
   accountName: string;
@@ -961,30 +1055,28 @@ export interface CheckoutResponse {
 
 export interface PaymentStatusResponse {
   orderCode: string;
-  status: 'PENDING' | 'SUCCESS' | 'CANCELLED' | 'EXPIRED';
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
   amount?: number;
   packageName?: string;
   paidAt?: string;
+  startAt?: string;
   expiresAt?: string;
   isPremium?: boolean;
+  isEffectiveNow?: boolean;
 }
 
 export async function createCheckoutPayment(
-  packageId: number,
-  idempotencyKey?: string
+  packageId: number
 ): Promise<CheckoutResponse> {
   const token = await getValidAccessToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   };
-  if (idempotencyKey) {
-    headers['Idempotency-Key'] = idempotencyKey;
-  }
   const res = await fetch(`${API_BASE}/subscriptions/checkout`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ packageId, idempotencyKey }),
+    body: JSON.stringify({ packageId }),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);

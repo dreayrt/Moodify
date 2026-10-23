@@ -805,7 +805,7 @@ function SearchContent() {
           isOpen={Boolean(selectedAlbumIdForModal)}
           albumId={selectedAlbumIdForModal}
           onClose={() => setSelectedAlbumIdForModal(null)}
-          onAlbumUpdated={() => loadData(query, selectedGenre, isMoodMode)}
+          onAlbumUpdated={() => loadData(query, selectedGenre, isMoodMode, new AbortController().signal)}
         />
     </div>
   );

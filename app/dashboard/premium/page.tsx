@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Crown,
   Check,
   Sparkles,
   Download,
-  Volume2,
   Users,
   ShieldCheck,
   Zap,
@@ -21,22 +20,29 @@ import {
   Loader2,
   X,
 } from "lucide-react";
+import successStyles from "./payment-success.module.css";
+import SubscriptionManagement from "@/components/dashboard/subscription-management";
 import {
   fetchServicePackages,
+  fetchPackageQuotes,
   fetchMySubscription,
   subscribePackage,
   devTogglePremium,
   createCheckoutPayment,
   getPaymentStatus,
   type ServicePackage,
+  type PackageQuote,
   type SubscriptionInfo,
   type CheckoutResponse,
+  type PaymentStatusResponse,
 } from "@/lib/api-client";
 
 export default function PremiumPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [packageQuotes, setPackageQuotes] = useState<PackageQuote[]>([]);
   const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<"1month" | "3months" | "1year">("1month");
@@ -51,6 +57,7 @@ export default function PremiumPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(15 * 60);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successIsScheduled, setSuccessIsScheduled] = useState(false);
 
   const loadData = async () => {
     try {
@@ -58,8 +65,10 @@ export default function PremiumPage() {
         fetchServicePackages().catch(() => []),
         fetchMySubscription().catch(() => null),
       ]);
+      const quotes = await fetchPackageQuotes().catch(() => []);
       setPackages(pkgs);
       setSubInfo(sub);
+      setPackageQuotes(quotes);
     } catch (e) {
       console.error(e);
     } finally {
@@ -90,15 +99,17 @@ export default function PremiumPage() {
     setIsModalOpen(true);
     setCheckoutData(null);
     setSuccessMessage(null);
+    setSuccessIsScheduled(false);
     setPollingStatus("IDLE");
     setCountdownSeconds(15 * 60);
     setIsCheckingOut(true);
 
     try {
-      const idempotencyKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `key-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const res = await createCheckoutPayment(pkg.id, idempotencyKey);
+      const res = await createCheckoutPayment(pkg.id);
       setCheckoutData(res);
       setPollingStatus("POLLING");
+      // Starting a new checkout may have cancelled an older pending order.
+      window.dispatchEvent(new Event("moodify-notifications-updated"));
     } catch (err: any) {
       console.error("Lỗi tạo đơn thanh toán SePay:", err);
       alert(err.message || "Không thể tạo đơn thanh toán SePay. Vui lòng thử lại!");
@@ -116,12 +127,10 @@ export default function PremiumPage() {
       try {
         const res = await getPaymentStatus(checkoutData.orderCode);
         if (res.status === "SUCCESS") {
-          setPollingStatus("SUCCESS");
-          setSuccessMessage("Thanh toán thành công! Gói VIP đã được kích hoạt.");
-          await loadData();
-          window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
-        } else if (res.status === "CANCELLED" || res.status === "EXPIRED") {
+          await handlePaymentSuccess(res);
+        } else if (res.status === "CANCELLED" || res.status === "EXPIRED" || res.status === "FAILED") {
           setPollingStatus("EXPIRED");
+          window.dispatchEvent(new Event("moodify-notifications-updated"));
         }
       } catch (e) {
         console.warn("Lỗi kiểm tra trạng thái thanh toán:", e);
@@ -134,17 +143,13 @@ export default function PremiumPage() {
   // Đếm ngược 15 phút
   useEffect(() => {
     if (!isModalOpen || pollingStatus !== "POLLING") return;
-    if (countdownSeconds <= 0) {
-      setPollingStatus("EXPIRED");
-      return;
-    }
+    // Keep polling at 00:00 until the backend finalizes the order and records
+    // the expiry notification. The backend scheduler also expires abandoned QR orders.
+    if (countdownSeconds <= 0) return;
 
     const timer = setInterval(() => {
       setCountdownSeconds((prev) => {
-        if (prev <= 1) {
-          setPollingStatus("EXPIRED");
-          return 0;
-        }
+        if (prev <= 1) return 0;
         return prev - 1;
       });
     }, 1000);
@@ -166,11 +171,52 @@ export default function PremiumPage() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const getPackageQuote = (pkg: ServicePackage | undefined) =>
+    pkg ? packageQuotes.find((quote) => quote.id === pkg.id) : undefined;
+
+  const formatPlanDate = (value?: string) => {
+    if (!value) return "";
+    const date = new Date(value.replace(" ", "T"));
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" });
+  };
+
+  async function handlePaymentSuccess(status: PaymentStatusResponse) {
+    const isScheduled = status.isEffectiveNow === false
+      || (status.isEffectiveNow === undefined
+        && !["NEW", "UPGRADE"].includes(checkoutData?.action || ""));
+    const startAt = status.startAt || checkoutData?.startAt;
+    const expiresAt = status.expiresAt || checkoutData?.expiresAt;
+    setPollingStatus("SUCCESS");
+    setSuccessIsScheduled(isScheduled);
+    setSuccessMessage(isScheduled
+      ? `Thanh toán thành công. Gói sẽ bắt đầu vào ${formatPlanDate(startAt)}${expiresAt ? ` và có hiệu lực đến ${formatPlanDate(expiresAt)}` : ""}.`
+      : `Thanh toán thành công. Gói đã có hiệu lực${expiresAt ? ` đến ${formatPlanDate(expiresAt)}` : ""}.`);
+    await loadData();
+    window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
+    window.dispatchEvent(new Event("moodify-notifications-updated"));
+  }
+
+  const getActionLabel = (pkg: ServicePackage | undefined, fallback: string) => {
+    const quote = getPackageQuote(pkg);
+    if (!quote) return fallback;
+    if (quote.isCurrentPackage) return "Gia hạn gói đang dùng";
+    return quote.actionLabel;
+  };
+
+  const getDisplayedPrice = (pkg: ServicePackage | undefined) => {
+    if (!pkg) return null;
+    const quote = getPackageQuote(pkg);
+    return quote?.amount ?? Number(pkg.price);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCheckoutData(null);
     setPollingStatus("IDLE");
     setSuccessMessage(null);
+    setSuccessIsScheduled(false);
   };
 
   const handleManualCheck = async () => {
@@ -178,11 +224,12 @@ export default function PremiumPage() {
     try {
       const res = await getPaymentStatus(checkoutData.orderCode);
       if (res.status === "SUCCESS") {
-        setPollingStatus("SUCCESS");
-        setSuccessMessage("Thanh toán thành công! Gói VIP đã được kích hoạt.");
-        await loadData();
-        window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
+          await handlePaymentSuccess(res);
+      } else if (res.status === "CANCELLED" || res.status === "EXPIRED" || res.status === "FAILED") {
+        setPollingStatus("EXPIRED");
+        window.dispatchEvent(new Event("moodify-notifications-updated"));
       } else {
+        window.dispatchEvent(new Event("moodify-notifications-updated"));
         alert("Hệ thống chưa nhận được thanh toán. Vui lòng đảm bảo bạn đã chuyển đúng số tiền và nội dung!");
       }
     } catch (err: any) {
@@ -190,26 +237,39 @@ export default function PremiumPage() {
     }
   };
 
-  // Find packages based on selected duration
+  // Find the package matching the selected tier and duration.
   const getPackageForTier = (type: "full" | "family") => {
+    const tierId = type === "full" ? "INDIVIDUAL_FULL" : "FAMILY";
+    const inTier = packages.filter((pkg) => (pkg.tier_id || pkg.tierId) === tierId);
+    if (inTier.length > 0) {
+      const wantedDuration = cycle === "1year" ? 365 : cycle === "3months" ? 90 : 30;
+      return inTier.find((pkg) => pkg.duration_days === wantedDuration)
+        || inTier.find((pkg) => Math.abs(pkg.duration_days - wantedDuration) < 20)
+        || inTier[0];
+    }
+
     if (type === "full") {
       if (cycle === "3months") {
-        return packages.find((p) => p.name.includes("FULL") && p.duration_days === 90) || packages.find((p) => p.id === 4);
+        return packages.find((pkg) => pkg.name.includes("FULL") && pkg.duration_days === 90) || packages.find((pkg) => pkg.id === 4);
       }
       if (cycle === "1year") {
-        return packages.find((p) => p.name.includes("FULL") && p.duration_days > 100) || packages.find((p) => p.id === 5);
+        return packages.find((pkg) => pkg.name.includes("FULL") && pkg.duration_days > 100) || packages.find((pkg) => pkg.id === 5);
       }
-      return packages.find((p) => p.name.includes("FULL") && p.duration_days <= 31) || packages.find((p) => p.id === 3);
-    } else {
-      if (cycle === "1year") {
-        return packages.find((p) => p.name.includes("Gia Đình") && p.duration_days > 100) || packages.find((p) => p.id === 7);
-      }
-      return packages.find((p) => p.name.includes("Gia Đình") && p.duration_days <= 31) || packages.find((p) => p.id === 6);
+      return packages.find((pkg) => pkg.name.includes("FULL") && pkg.duration_days <= 31) || packages.find((pkg) => pkg.id === 3);
     }
+
+    if (cycle === "1year") {
+      return packages.find((pkg) => pkg.duration_days > 100 && (pkg.tier_id || pkg.tierId) === "FAMILY") || packages.find((pkg) => pkg.id === 7);
+    }
+    return packages.find((pkg) => pkg.duration_days <= 31 && (pkg.tier_id || pkg.tierId) === "FAMILY") || packages.find((pkg) => pkg.id === 6);
   };
 
   const fullPkg = getPackageForTier("full");
   const famPkg = getPackageForTier("family");
+
+  if (searchParams.get("tab") === "manage") {
+    return <SubscriptionManagement />;
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-6 md:py-10 space-y-10">
@@ -379,7 +439,7 @@ export default function PremiumPage() {
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-4xl font-extrabold text-white">
-                  {fullPkg ? (fullPkg.price).toLocaleString("vi-VN") : cycle === "1year" ? "279.000" : cycle === "3months" ? "79.000" : "29.000"} đ
+                  {(getDisplayedPrice(fullPkg) ?? (cycle === "1year" ? 279000 : cycle === "3months" ? 79000 : 29000)).toLocaleString("vi-VN")} đ
                 </span>
                 <span className="text-xs text-white/50 font-medium">
                   / {cycle === "1year" ? "năm" : cycle === "3months" ? "3 tháng" : "tháng"}
@@ -388,6 +448,19 @@ export default function PremiumPage() {
               <p className="text-[11.5px] text-purple-300 mt-1.5 font-medium">
                 {cycle === "1year" ? "Tương đương ~23.250 đ/tháng (Tiết kiệm 69.000 đ)" : cycle === "3months" ? "Tương đương ~26.300 đ/tháng (Tiết kiệm 8.000 đ)" : "Chỉ 29.000 đ/tháng - Trọn vẹn đặc quyền không giới hạn"}
               </p>
+              {getPackageQuote(fullPkg)?.discountApplied && (
+                <p className="mt-1 text-[10px] font-semibold text-emerald-300">
+                  <span className="mr-1 text-white/35 line-through">
+                    {getPackageQuote(fullPkg)?.baseAmount.toLocaleString("vi-VN")} đ
+                  </span>
+                  Gia hạn cùng nhóm quyền lợi: giảm 20%
+                </p>
+              )}
+              {getPackageQuote(fullPkg)?.actionDescription && (
+                <p className="mt-1 text-[10px] leading-4 text-white/45">
+                  {getPackageQuote(fullPkg)?.actionDescription}
+                </p>
+              )}
             </div>
 
             {/* Benefits */}
@@ -428,8 +501,8 @@ export default function PremiumPage() {
             onClick={() => fullPkg && handleOpenCheckout(fullPkg)}
             className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Nâng Cấp VIP Cá Nhân</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>{getActionLabel(fullPkg, "Nâng Cấp Cá Nhân FULL")}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -456,7 +529,7 @@ export default function PremiumPage() {
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-4xl font-extrabold text-white">
-                  {famPkg ? (famPkg.price).toLocaleString("vi-VN") : cycle === "1year" ? "590.000" : "59.000"} đ
+                  {(getDisplayedPrice(famPkg) ?? (cycle === "1year" ? 590000 : 59000)).toLocaleString("vi-VN")} đ
                 </span>
                 <span className="text-xs text-white/50 font-medium">
                   / {cycle === "1year" ? "năm" : "tháng"}
@@ -465,6 +538,19 @@ export default function PremiumPage() {
               <p className="text-[11.5px] text-amber-300 font-medium mt-1.5">
                 {cycle === "1year" ? "Chỉ ~8.200 đ / người / tháng khi chia 6 người (Tặng 2 tháng)" : "Chỉ ~9.800 đ / người / tháng khi chia 6 người"}
               </p>
+              {getPackageQuote(famPkg)?.discountApplied && (
+                <p className="mt-1 text-[10px] font-semibold text-emerald-300">
+                  <span className="mr-1 text-white/35 line-through">
+                    {getPackageQuote(famPkg)?.baseAmount.toLocaleString("vi-VN")} đ
+                  </span>
+                  Gia hạn cùng nhóm quyền lợi: giảm 20%
+                </p>
+              )}
+              {getPackageQuote(famPkg)?.actionDescription && (
+                <p className="mt-1 text-[10px] leading-4 text-white/45">
+                  {getPackageQuote(famPkg)?.actionDescription}
+                </p>
+              )}
             </div>
 
             {/* Benefits */}
@@ -505,8 +591,8 @@ export default function PremiumPage() {
             onClick={() => famPkg && handleOpenCheckout(famPkg)}
             className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Nâng Cấp Gia Đình (6 Người)</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>{getActionLabel(famPkg, "Nâng Cấp Gia Đình (6 Người)")}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -615,8 +701,14 @@ export default function PremiumPage() {
                   <Crown className="w-5 h-5 text-slate-950 font-bold" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Thanh Toán VietQR (SePay)</h3>
-                  <p className="text-[11px] text-white/50">Tự động kích hoạt VIP trong 3-5 giây</p>
+                  <h3 className="text-base font-bold text-white">
+                    {pollingStatus === "SUCCESS" ? "Thanh toán đã hoàn tất" : "Thanh toán VietQR (SePay)"}
+                  </h3>
+                  <p className="text-[11px] text-white/50">
+                    {pollingStatus === "SUCCESS"
+                      ? successIsScheduled ? "Lịch áp dụng gói đã được xác nhận" : "Gói thành viên của bạn đã có hiệu lực"
+                      : "SePay xác nhận thanh toán; gói được áp dụng theo chính sách hiển thị bên dưới"}
+                  </p>
                 </div>
               </div>
               <button
@@ -637,22 +729,55 @@ export default function PremiumPage() {
               </div>
             ) : pollingStatus === "SUCCESS" ? (
               /* Khi thanh toán thành công */
-              <div className="text-center py-8 space-y-4 animate-in zoom-in-95 duration-300">
-                <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center shadow-xl shadow-emerald-500/30">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-400 animate-bounce" />
+              <div className={`${successStyles.successState} text-center`} role="status" aria-live="polite">
+                <div className={successStyles.successVisual} aria-hidden="true">
+                  <div className={`${successStyles.orbit} ${successStyles.orbitGold}`} />
+                  <div className={`${successStyles.orbit} ${successStyles.orbitTeal}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleOne}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleTwo}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleThree}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleFour}`} />
+                  <div className={successStyles.successCore}>
+                    <Check className="w-8 h-8 text-emerald-300" strokeWidth={2.5} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-xl font-black text-white">Thanh Toán Thành Công! 🎉</h4>
-                  <p className="text-sm text-emerald-400 font-semibold">{successMessage}</p>
-                  <p className="text-xs text-white/50 pt-1">
-                    Đặc quyền VIP của bạn đã được kích hoạt ngay lập tức trên toàn hệ thống.
+
+                <div className={successStyles.activatedBadge}>
+                  <span className={successStyles.statusDot} />
+                  {successIsScheduled ? "GÓI ĐÃ ĐƯỢC XẾP LỊCH" : "QUYỀN LỢI VIP ĐÃ MỞ KHÓA"}
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-2xl font-bold tracking-tight text-white">
+                    {successIsScheduled ? "Đã ghi nhận lịch gia hạn" : "Chào mừng đến với Moodify VIP"}
+                  </h4>
+                  <p className="mx-auto max-w-sm text-sm leading-6 text-white/60">
+                    {successMessage || "Gói thành viên của bạn đã được kích hoạt."}
                   </p>
                 </div>
+
+                <div className={successStyles.packageSummary}>
+                  <div className={successStyles.packageIcon} aria-hidden="true">
+                    <Crown className="h-4 w-4 text-amber-300" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <span className={successStyles.packageLabel}>GÓI ĐĂNG KÝ</span>
+                    <p className={successStyles.packageName}>
+                      {selectedPkg?.name || checkoutData?.packageName || "Moodify VIP"}
+                    </p>
+                  </div>
+                  <span className={successStyles.activeMark}>
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    {successIsScheduled ? "Đã xếp lịch" : "Đã áp dụng"}
+                  </span>
+                </div>
+
                 <button
                   onClick={handleCloseModal}
-                  className="w-full py-3.5 px-5 rounded-2xl font-bold text-sm text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/30 transition-all cursor-pointer mt-4"
+                  className={`${successStyles.successButton} mt-5 w-full rounded-2xl px-5 py-3.5 text-sm font-semibold text-slate-950 cursor-pointer`}
                 >
-                  Bắt Đầu Trải Nghiệm VIP Ngay 🚀
+                  <span>Tiếp tục khám phá</span>
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             ) : pollingStatus === "EXPIRED" ? (
@@ -683,6 +808,17 @@ export default function PremiumPage() {
                   <div>
                     <span className="text-[11px] text-white/50 uppercase tracking-wider block">Gói đăng ký</span>
                     <span className="font-bold text-sm text-white">{checkoutData.packageName}</span>
+                    {checkoutData.discountApplied && (
+                      <span className="mt-1 block text-[10px] font-semibold text-emerald-300">
+                        Ưu đãi cùng nhóm quyền lợi: giảm {checkoutData.discountPercent}% trên giá biến thể này
+                      </span>
+                    )}
+                    <span className="mt-1 block max-w-[19rem] text-[10px] leading-4 text-white/50">
+                      {checkoutData.actionDescription}
+                    </span>
+                    <span className="mt-1 block text-[10px] text-white/35">
+                      Dự kiến: {formatPlanDate(checkoutData.startAt)} – {formatPlanDate(checkoutData.expiresAt)}
+                    </span>
                   </div>
                   <div className="text-right">
                     <span className="text-[11px] text-white/50 uppercase tracking-wider block">Tổng tiền</span>
@@ -690,6 +826,18 @@ export default function PremiumPage() {
                       {checkoutData.amount.toLocaleString("vi-VN")} đ
                     </span>
                   </div>
+                </div>
+                <div className="-mt-2 px-3.5 pb-1 text-xs space-y-1">
+                  <div className="flex justify-between text-white/45">
+                    <span>Giá gốc</span>
+                    <span>{checkoutData.baseAmount.toLocaleString("vi-VN")} đ</span>
+                  </div>
+                  {checkoutData.discountApplied && (
+                    <div className="flex justify-between text-emerald-300">
+                      <span>Ưu đãi cùng tier</span>
+                      <span>-{checkoutData.discountAmount.toLocaleString("vi-VN")} đ</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Khung Mã QR VietQR SePay */}
