@@ -296,6 +296,7 @@ function LibraryContent() {
       const detail = await fetchAlbumDetail(alb.id);
       if (detail.tracks && detail.tracks.length > 0) {
         const playlistTracks = detail.tracks.map((t) => ({
+          id: t.id,
           spotifyId: t.spotifyId,
           name: t.name,
           artistName: t.artistName,

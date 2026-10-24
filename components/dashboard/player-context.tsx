@@ -718,6 +718,35 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             source: "HOME",
           });
         }
+      } else {
+        // Playback restored from persisted state or resumed via togglePlay has no
+        // listening session yet — create one so heartbeats and revenue qualification keep working.
+        const track = currentTrackRef.current;
+        const targetTrackId = track ? (track.id || track.spotifyId) : undefined;
+        if (targetTrackId) {
+          const newSession = {
+            sessionKey: crypto.randomUUID(),
+            historyId: null as number | null,
+            trackId: targetTrackId,
+            startedAt: Date.now(),
+            lastPlayTimestamp: Date.now(),
+            accumulatedDurationMs: 0,
+          };
+          listeningSessionRef.current = newSession;
+          void recordListeningSessionTelemetry({
+            sessionKey: newSession.sessionKey,
+            trackId: targetTrackId,
+            durationMs: 0,
+            positionMs: Math.round(audio.currentTime * 1000),
+            eventType: "PLAY",
+            deviceType: "WEB",
+            source: "HOME",
+          }).then((res) => {
+            if (res?.success && res.historyId && listeningSessionRef.current?.trackId === targetTrackId) {
+              listeningSessionRef.current.historyId = res.historyId;
+            }
+          });
+        }
       }
       setIsPlaying(true);
     };

@@ -634,6 +634,7 @@ function LumenHeroContent() {
     if (t.raw) {
       playTrack(
         {
+          id: t.raw.id,
           spotifyId: t.raw.spotifyId,
           name: t.raw.name,
           artistName: t.raw.artistName,
@@ -648,6 +649,7 @@ function LumenHeroContent() {
         tracks
           .filter((x) => x.raw && (x.raw.audioUrl || x.raw.localPath))
           .map((x) => ({
+            id: x.raw!.id,
             spotifyId: x.raw!.spotifyId,
             name: x.raw!.name,
             artistName: x.raw!.artistName,

@@ -342,6 +342,7 @@ function SearchContent() {
     recordSelectedResult("TRACK", track.spotifyId);
     playTrack(
       {
+        id: track.id,
         spotifyId: track.spotifyId,
         name: track.name,
         artistName: track.artistName,
@@ -354,6 +355,7 @@ function SearchContent() {
         localPath: track.localPath,
       },
       tracks.map((t) => ({
+        id: t.id,
         spotifyId: t.spotifyId,
         name: t.name,
         artistName: t.artistName,
@@ -373,6 +375,7 @@ function SearchContent() {
       const detail = await fetchAlbumDetail(alb.id);
       if (detail.tracks && detail.tracks.length > 0) {
         const playlistTracks = detail.tracks.map((t) => ({
+          id: t.id,
           spotifyId: t.spotifyId,
           name: t.name,
           artistName: t.artistName,
@@ -410,6 +413,7 @@ function SearchContent() {
       }
       if (fullPlaylist.tracks && fullPlaylist.tracks.length > 0) {
         const playlistTracks = fullPlaylist.tracks.map((t) => ({
+          id: t.id,
           spotifyId: t.spotifyId,
           name: t.name,
           artistName: t.artistName,
