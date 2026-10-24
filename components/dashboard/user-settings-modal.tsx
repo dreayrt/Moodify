@@ -945,10 +945,16 @@ export default function UserSettingsModal({
                             <p className="text-xs font-bold text-white truncate">
                               {dev.deviceName || "Thiết bị không xác định"}
                             </p>
-                            {isCurrent && (
+                            {isCurrent && isActive && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                Thiết bị này
+                                Thiết bị này (Đang hoạt động)
+                              </span>
+                            )}
+                            {isCurrent && !isActive && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                                Thiết bị này (Bị thu hồi)
                               </span>
                             )}
                             {!isCurrent && isActive && (
@@ -956,7 +962,7 @@ export default function UserSettingsModal({
                                 Đang hoạt động
                               </span>
                             )}
-                            {!isActive && (
+                            {!isCurrent && !isActive && (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 text-white/40 border border-white/10">
                                 Đã thu hồi
                               </span>
@@ -985,10 +991,21 @@ export default function UserSettingsModal({
                             <span>{isRevoking ? "Đang xử lý..." : "Đăng xuất"}</span>
                           </button>
                         )}
-                        {isCurrent && (
+                        {isCurrent && isActive && (
                           <span className="text-[11px] text-emerald-400/90 font-medium px-2 py-1">
                             Phiên hiện tại
                           </span>
+                        )}
+                        {isCurrent && !isActive && (
+                          <button
+                            type="button"
+                            onClick={handleRevokeOthers}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-sm"
+                            title="Kích hoạt lại thiết bị này"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Kích hoạt thiết bị này</span>
+                          </button>
                         )}
                       </div>
                     </div>

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Crown } from "lucide-react";
+import { Crown, Laptop } from "lucide-react";
 import {
   getTrackStreamUrl,
   getBackendFileUrl,
@@ -15,7 +15,7 @@ import {
   resolveTrackAudioUrl,
   type PackageEntitlements,
 } from "@/lib/api-client";
-import { recordPlatformVisit, recordListeningSessionTelemetry } from "@/lib/auth/auth-client";
+import { recordPlatformVisit, recordListeningSessionTelemetry, revokeOtherDevices, pingDeviceStatus } from "@/lib/auth/auth-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -39,6 +39,7 @@ export type AdReason = "FREE_REGULAR" | "BASIC_DAILY_LIMIT_EXCEEDED" | "SKIP_PEN
 interface PlayerContextType {
   currentTrack: PlayerTrack | null;
   isPlaying: boolean;
+  isBuffering: boolean;
   currentTime: number;
   duration: number;
   volume: number;
@@ -112,15 +113,84 @@ function recordDailySkip(): number {
   return stats.skips;
 }
 
+// ── Playback State Persistence Helpers ───────────────────────
+const PLAYBACK_STATE_KEY = "moodify_playback_state";
+
+export interface PersistedPlaybackState {
+  currentTrack: PlayerTrack | null;
+  currentTime: number;
+  duration: number;
+  queue: PlayerTrack[];
+  queueIndex: number;
+  volume: number;
+  isMuted: boolean;
+  repeatMode: RepeatMode;
+  isShuffle: boolean;
+  playbackRate: number;
+  savedAt: number;
+}
+
+function loadPersistedPlaybackState(): PersistedPlaybackState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PLAYBACK_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return parsed as PersistedPlaybackState;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function savePersistedPlaybackState(state: Partial<PersistedPlaybackState>) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = loadPersistedPlaybackState() || {
+      currentTrack: null,
+      currentTime: 0,
+      duration: 0,
+      queue: [],
+      queueIndex: 0,
+      volume: 0.8,
+      isMuted: false,
+      repeatMode: "off" as RepeatMode,
+      isShuffle: false,
+      playbackRate: 1,
+      savedAt: Date.now(),
+    };
+    const updated = {
+      ...existing,
+      ...state,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(PLAYBACK_STATE_KEY, JSON.stringify(updated));
+  } catch (_) {}
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const retryCountRef = useRef(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [queue, setQueue] = useState<PlayerTrack[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+
+  // ── Playback Speed ───────────────────────────────────────────
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const playbackRateRef = useRef(1);
+
+  // ── Persistence State Tracking ───────────────────────────────
+  const [hasRestoredState, setHasRestoredState] = useState(false);
+  const currentTimeRef = useRef(0);
+  const lastTimeSaveRef = useRef(0);
+  const volumeRef = useRef(0.8);
+  const isMutedRef = useRef(false);
+  const durationRef = useRef(0);
 
   // ── Shuffle & Repeat Mode ────────────────────────────────────
   const [isShuffle, setIsShuffle] = useState(false);
@@ -144,9 +214,107 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     queueIndexRef.current = queueIndex;
   }, [queue, queueIndex]);
 
-  // ── Playback Speed ───────────────────────────────────────────
-  const [playbackRate, setPlaybackRateState] = useState(1);
-  const playbackRateRef = useRef(1);
+  const currentTrackRef = useRef<PlayerTrack | null>(null);
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  // ── Restore Persisted Playback State on Client Mount ───────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = loadPersistedPlaybackState();
+      if (saved && saved.currentTrack) {
+        setCurrentTrack(saved.currentTrack);
+        currentTrackRef.current = saved.currentTrack;
+
+        if (typeof saved.currentTime === "number" && !isNaN(saved.currentTime) && saved.currentTime >= 0) {
+          setCurrentTime(saved.currentTime);
+          currentTimeRef.current = saved.currentTime;
+        }
+
+        if (typeof saved.duration === "number" && !isNaN(saved.duration) && saved.duration > 0) {
+          setDuration(saved.duration);
+          durationRef.current = saved.duration;
+        } else if (saved.currentTrack.durationMs) {
+          const d = saved.currentTrack.durationMs / 1000;
+          setDuration(d);
+          durationRef.current = d;
+        }
+
+        if (Array.isArray(saved.queue) && saved.queue.length > 0) {
+          setQueue(saved.queue);
+          queueRef.current = saved.queue;
+        } else {
+          setQueue([saved.currentTrack]);
+          queueRef.current = [saved.currentTrack];
+        }
+
+        if (typeof saved.queueIndex === "number" && saved.queueIndex >= 0) {
+          setQueueIndex(saved.queueIndex);
+          queueIndexRef.current = saved.queueIndex;
+        }
+
+        if (typeof saved.volume === "number") {
+          setVolumeState(saved.volume);
+          volumeRef.current = saved.volume;
+        }
+
+        if (typeof saved.isMuted === "boolean") {
+          setIsMuted(saved.isMuted);
+          isMutedRef.current = saved.isMuted;
+        }
+
+        if (saved.repeatMode) {
+          setRepeatMode(saved.repeatMode);
+          repeatModeRef.current = saved.repeatMode;
+        }
+
+        if (typeof saved.isShuffle === "boolean") {
+          setIsShuffle(saved.isShuffle);
+          isShuffleRef.current = saved.isShuffle;
+        }
+
+        if (typeof saved.playbackRate === "number") {
+          setPlaybackRateState(saved.playbackRate);
+          playbackRateRef.current = saved.playbackRate;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to restore playback state from localStorage:", e);
+    } finally {
+      setHasRestoredState(true);
+    }
+  }, []);
+
+  // ── Continuous Playback State Persistence ────────────────────
+  useEffect(() => {
+    if (!hasRestoredState || !currentTrack) return;
+    savePersistedPlaybackState({
+      currentTrack,
+      queue,
+      queueIndex,
+      volume,
+      isMuted,
+      repeatMode,
+      isShuffle,
+      playbackRate,
+      currentTime: currentTimeRef.current,
+      duration: durationRef.current || (currentTrack.durationMs ? currentTrack.durationMs / 1000 : 0),
+    });
+  }, [hasRestoredState, currentTrack, queue, queueIndex, volume, isMuted, repeatMode, isShuffle, playbackRate]);
 
   // ── Audio Ad Management & Tiered Quotas ──────────────────────
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -172,6 +340,93 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [adTotalDuration, setAdTotalDuration] = useState(0);
   const [skipLimitNotice, setSkipLimitNotice] = useState<{ show: boolean; message: string; tier: SubTier } | null>(null);
   const clearSkipLimitNotice = useCallback(() => setSkipLimitNotice(null), []);
+
+  const [deviceRevokedNotice, setDeviceRevokedNotice] = useState<{ show: boolean; message: string } | null>(null);
+  const [isReclaimingDevice, setIsReclaimingDevice] = useState(false);
+
+  useEffect(() => {
+    const handleDeviceRevoked = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message?: string }>;
+      const msg =
+        customEvent.detail?.message ||
+        "Thiết bị này đã bị thu hồi quyền truy cập do tài khoản đã đăng nhập trên thiết bị khác vượt quá hạn mức thiết bị của gói cước.";
+
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+        } catch (_) {}
+      }
+      if (adAudioRef.current) {
+        try {
+          adAudioRef.current.pause();
+        } catch (_) {}
+      }
+      setIsPlaying(false);
+      setIsAdPlaying(false);
+
+      setDeviceRevokedNotice({
+        show: true,
+        message: msg,
+      });
+    };
+
+    window.addEventListener("moodify:device-revoked", handleDeviceRevoked);
+    return () => {
+      window.removeEventListener("moodify:device-revoked", handleDeviceRevoked);
+    };
+  }, []);
+
+  const handleReclaimDevice = useCallback(async () => {
+    try {
+      setIsReclaimingDevice(true);
+      await revokeOtherDevices();
+      setDeviceRevokedNotice(null);
+      if (audioRef.current && currentTrack) {
+        audioRef.current
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
+      }
+    } catch (err) {
+      console.error("Could not reclaim device:", err);
+    } finally {
+      setIsReclaimingDevice(false);
+    }
+  }, [currentTrack]);
+
+  // Periodic device status heartbeat while playing or when tab gains focus
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    const checkStatus = async () => {
+      if (typeof window === "undefined" || !isPlaying) return;
+      try {
+        await pingDeviceStatus();
+      } catch (_) {
+        // Handled automatically via requestJson 403 DEVICE_REVOKED
+      }
+    };
+
+    if (isPlaying) {
+      // Check every 6 seconds while music is actively playing
+      timer = setInterval(checkStatus, 6000);
+    }
+
+    const handleFocusOrVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void pingDeviceStatus();
+      }
+    };
+
+    window.addEventListener("visibilitychange", handleFocusOrVisible);
+    window.addEventListener("focus", handleFocusOrVisible);
+
+    return () => {
+      if (timer) clearInterval(timer);
+      window.removeEventListener("visibilitychange", handleFocusOrVisible);
+      window.removeEventListener("focus", handleFocusOrVisible);
+    };
+  }, [isPlaying]);
   const tracksPlayedRef = useRef(0);
   const freeTracksSinceLastAdRef = useRef(0);
   // Random threshold between 1 and 3 songs before next ad
@@ -388,12 +643,36 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     const audio = new Audio();
     audio.preload = "auto";
-    audio.volume = 0.8;
+    audio.volume = isMutedRef.current ? 0 : volumeRef.current;
     audio.playbackRate = playbackRateRef.current;
     audioRef.current = audio;
 
+    // Pre-wire restored audio source if present
+    const saved = loadPersistedPlaybackState();
+    if (saved?.currentTrack) {
+      const onlineAudioUrl = resolveTrackAudioUrl(saved.currentTrack);
+      audio.src = onlineAudioUrl;
+      if (typeof saved.currentTime === "number" && !isNaN(saved.currentTime) && saved.currentTime > 0) {
+        try {
+          audio.currentTime = saved.currentTime;
+        } catch (_) {}
+      }
+    }
+
     const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      const cur = audio.currentTime;
+      setCurrentTime(cur);
+      currentTimeRef.current = cur;
+
+      // Throttle saving playback progress to localStorage every 2 seconds
+      const now = Date.now();
+      if (now - lastTimeSaveRef.current > 2000) {
+        lastTimeSaveRef.current = now;
+        savePersistedPlaybackState({
+          currentTime: cur,
+          duration: audio.duration && !isNaN(audio.duration) ? audio.duration : undefined,
+        });
+      }
     };
 
     const heartbeat = window.setInterval(() => {
@@ -412,6 +691,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration)) {
         setDuration(audio.duration);
+        durationRef.current = audio.duration;
+      }
+      if (currentTimeRef.current > 0 && Math.abs(audio.currentTime - currentTimeRef.current) > 1) {
+        try {
+          audio.currentTime = currentTimeRef.current;
+        } catch (_) {}
       }
     };
 
@@ -455,6 +740,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
       }
       setIsPlaying(false);
+      savePersistedPlaybackState({
+        currentTime: audio.currentTime,
+      });
     };
 
     const onEnded = () => {
@@ -462,9 +750,57 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       nextTrackRef.current(true);
     };
 
+    const onWaiting = () => {
+      setIsBuffering(true);
+    };
+
+    const onCanPlay = () => {
+      setIsBuffering(false);
+      retryCountRef.current = 0;
+    };
+
+    const onPlaying = () => {
+      setIsBuffering(false);
+      setIsPlaying(true);
+      retryCountRef.current = 0;
+    };
+
     const onError = (e: Event) => {
       console.warn("Audio playback issue:", e);
-      setIsPlaying(false);
+      setIsBuffering(false);
+
+      // Tự động khôi phục luồng stream khi mạng yếu/chập chờn với Exponential Backoff & Server Fallback
+      if (retryCountRef.current < 3) {
+        retryCountRef.current += 1;
+        const savedPos = audio.currentTime;
+        console.log(`[AudioStream] Network hiccup detected. Auto-retrying playback (${retryCountRef.current}/3) at ${savedPos.toFixed(1)}s...`);
+        setIsBuffering(true);
+
+        setTimeout(() => {
+          if (!audioRef.current) return;
+          const currentTrk = currentTrackRef.current;
+          if (!currentTrk) return;
+
+          let targetUrl = resolveTrackAudioUrl(currentTrk);
+          // Lần thử thứ 2: fallback sang endpoint streaming của backend gateway
+          if (retryCountRef.current >= 2) {
+            targetUrl = getTrackStreamUrl(currentTrk.spotifyId || currentTrk.id || "");
+          }
+          const streamUrl = `${targetUrl}${targetUrl.includes("?") ? "&" : "?"}retry=${Date.now()}`;
+          audioRef.current.src = streamUrl;
+          audioRef.current.currentTime = savedPos;
+          audioRef.current.load();
+          audioRef.current
+            .play()
+            .then(() => {
+              setIsPlaying(true);
+              setIsBuffering(false);
+            })
+            .catch(() => {});
+        }, retryCountRef.current * 1500);
+      } else {
+        setIsPlaying(false);
+      }
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -472,10 +808,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("error", onError);
+
+    // Persist latest state on page reload / tab close / navigation
+    const handleBeforeUnload = () => {
+      if (currentTrackRef.current) {
+        savePersistedPlaybackState({
+          currentTrack: currentTrackRef.current,
+          currentTime: audioRef.current?.currentTime ?? currentTimeRef.current,
+          duration: audioRef.current?.duration ?? durationRef.current,
+          queue: queueRef.current,
+          queueIndex: queueIndexRef.current,
+          volume: volumeRef.current,
+          isMuted: isMutedRef.current,
+          repeatMode: repeatModeRef.current,
+          isShuffle: isShuffleRef.current,
+          playbackRate: playbackRateRef.current,
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
 
     return () => {
       window.clearInterval(heartbeat);
+      handleBeforeUnload();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
       flushListeningSession("PLAYBACK_STOPPED");
       audio.pause();
       audio.removeEventListener("timeupdate", onTimeUpdate);
@@ -483,10 +846,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("error", onError);
       audioRef.current = null;
     };
   }, [flushListeningSession]);
+
+  // Synchronize audio volume without re-initializing or interrupting the Audio element
+  useEffect(() => {
+    const effectiveVol = isMuted ? 0 : volume;
+    if (audioRef.current) {
+      audioRef.current.volume = effectiveVol;
+    }
+    if (adAudioRef.current) {
+      adAudioRef.current.volume = effectiveVol;
+    }
+  }, [volume, isMuted]);
 
   const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
     setCurrentTrack(track);
@@ -565,6 +942,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audioRef.current.pause();
       } catch (_) {}
       
+      retryCountRef.current = 0;
+      setIsBuffering(true);
       setCurrentTime(0);
       if (track.durationMs) {
         setDuration(track.durationMs / 1000);
@@ -580,10 +959,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          setIsBuffering(false);
+        })
         .catch((err) => {
           console.warn("Autoplay was prevented or audio stream not available:", err);
           setIsPlaying(false);
+          setIsBuffering(false);
         });
     }
   }, [flushListeningSession]);
@@ -688,12 +1071,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      const currentSrc = audioRef.current.src;
+      if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
+        const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
+        const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        audioRef.current.src = streamUrl;
+        audioRef.current.currentTime = currentTimeRef.current || currentTime || 0;
+        audioRef.current.playbackRate = playbackRateRef.current;
+        audioRef.current.load();
+      }
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => console.warn("Could not resume audio:", err));
     }
-  }, [isPlaying, currentTrack]);
+  }, [isPlaying, currentTrack, currentTime]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
@@ -704,17 +1096,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const resume = useCallback(() => {
     if (audioRef.current && currentTrack) {
+      const currentSrc = audioRef.current.src;
+      if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
+        const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
+        const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        audioRef.current.src = streamUrl;
+        audioRef.current.currentTime = currentTimeRef.current || currentTime || 0;
+        audioRef.current.playbackRate = playbackRateRef.current;
+        audioRef.current.load();
+      }
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => console.warn("Could not resume:", err));
     }
-  }, [currentTrack]);
+  }, [currentTrack, currentTime]);
 
   const seek = useCallback((timeSeconds: number) => {
     if (audioRef.current) {
+      if (currentTrack && (!audioRef.current.src || audioRef.current.src === "" || audioRef.current.src === window.location.href || audioRef.current.src.endsWith("/"))) {
+        const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
+        audioRef.current.src = onlineAudioUrl;
+        audioRef.current.load();
+      }
       const oldPosMs = Math.round(audioRef.current.currentTime * 1000);
       const targetPosMs = Math.round(timeSeconds * 1000);
+      try {
+        audioRef.current.currentTime = timeSeconds;
+      } catch (_) {}
+      setCurrentTime(timeSeconds);
+      currentTimeRef.current = timeSeconds;
+      savePersistedPlaybackState({ currentTime: timeSeconds });
+
       const session = listeningSessionRef.current;
       if (session && session.trackId && oldPosMs >= 60_000 && targetPosMs <= 2_000) {
         // Rewinding a substantially played song to its start begins a genuine new replay.
@@ -748,7 +1161,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current.currentTime = timeSeconds;
       setCurrentTime(timeSeconds);
     }
-  }, [flushListeningSession]);
+  }, [flushListeningSession, currentTrack]);
 
   const setVolume = useCallback((vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
@@ -757,18 +1170,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) {
       audioRef.current.volume = clamped;
     }
+    if (adAudioRef.current) {
+      adAudioRef.current.volume = clamped;
+    }
   }, []);
 
   const toggleMute = useCallback(() => {
-    if (!audioRef.current) return;
-    if (isMuted) {
-      audioRef.current.volume = volume > 0 ? volume : 0.8;
-      setIsMuted(false);
-    } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-    }
-  }, [isMuted, volume]);
+    setIsMuted((prev) => {
+      const nextMuted = !prev;
+      const targetVol = nextMuted ? 0 : (volume > 0 ? volume : 0.8);
+      if (nextMuted) {
+        if (audioRef.current) audioRef.current.volume = 0;
+        if (adAudioRef.current) adAudioRef.current.volume = 0;
+      } else {
+        setVolumeState(targetVol);
+        if (audioRef.current) audioRef.current.volume = targetVol;
+        if (adAudioRef.current) adAudioRef.current.volume = targetVol;
+      }
+      return nextMuted;
+    });
+  }, [volume]);
 
   const setPlaybackRate = useCallback((rate: number) => {
     const validRate = Math.max(0.25, Math.min(3, rate));
@@ -915,6 +1336,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       value={{
         currentTrack,
         isPlaying,
+        isBuffering,
         currentTime,
         duration,
         volume: isMuted ? 0 : volume,
@@ -991,6 +1413,59 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                 <span>Nâng cấp VIP</span>
                 <span className="text-[10px]">→</span>
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deviceRevokedNotice?.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-md w-full rounded-3xl p-[1px] bg-gradient-to-b from-amber-400/40 via-white/10 to-transparent shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-200">
+            <div className="rounded-[calc(1.5rem-1px)] bg-[#0d0e15] p-6 border border-white/10 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10">
+                <Laptop className="w-7 h-7" />
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-400 block mb-1">
+                  RÀNG BUỘC THIẾT BỊ
+                </span>
+                <h3 className="text-lg font-bold text-white">
+                  Giới Hạn Thiết Bị Đã Vượt Quá
+                </h3>
+                <p className="text-xs text-white/70 mt-2 leading-relaxed">
+                  {deviceRevokedNotice.message}
+                </p>
+              </div>
+
+              <div className="w-full h-px bg-white/10 my-1" />
+
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+                <button
+                  type="button"
+                  disabled={isReclaimingDevice}
+                  onClick={handleReclaimDevice}
+                  className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isReclaimingDevice ? "Đang kích hoạt..." : "Sử dụng trên thiết bị này"}
+                </button>
+
+                <a
+                  href="/dashboard/premium"
+                  onClick={() => setDeviceRevokedNotice(null)}
+                  className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold shadow-lg shadow-amber-400/20 active:scale-95 transition-all text-center"
+                >
+                  Nâng cấp gói VIP
+                </a>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDeviceRevokedNotice(null)}
+                className="text-xs text-white/40 hover:text-white/80 transition-colors cursor-pointer pt-1"
+              >
+                Đóng thông báo
+              </button>
             </div>
           </div>
         </div>

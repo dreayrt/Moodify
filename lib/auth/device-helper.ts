@@ -82,7 +82,9 @@ export function getDeviceIdentity(): DeviceIdentity {
 export function getCurrentDeviceUuid(): string {
   if (typeof window === "undefined") return "";
   try {
-    return window.localStorage.getItem(DEVICE_UUID_KEY) || "";
+    const existing = window.localStorage.getItem(DEVICE_UUID_KEY);
+    if (existing && existing.trim()) return existing.trim();
+    return getDeviceIdentity().deviceUuid;
   } catch (_) {
     return "";
   }

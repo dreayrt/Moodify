@@ -117,7 +117,6 @@ export function ModeratorAudioPlayer({
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.playbackRate = playbackRate;
-      audioRef.current.volume = isMuted ? 0 : volume;
       if (autoPlay && resolvedAudioUrl) {
         audioRef.current
           .play()
@@ -128,7 +127,14 @@ export function ModeratorAudioPlayer({
           });
       }
     }
-  }, [track.id, autoPlay, playbackRate, isMuted, volume, resolvedAudioUrl]);
+  }, [track.id, autoPlay, playbackRate, resolvedAudioUrl]);
+
+  // Synchronize volume without resetting playback position
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
 
   // Synthetic simulation timer only for mock tracks without real audioUrl
   useEffect(() => {
@@ -206,8 +212,10 @@ export function ModeratorAudioPlayer({
 
   const toggleMute = () => {
     if (isMuted) {
+      const restored = volume > 0 ? volume : 0.85;
+      setVolume(restored);
       setIsMuted(false);
-      if (audioRef.current) audioRef.current.volume = volume || 0.85;
+      if (audioRef.current) audioRef.current.volume = restored;
     } else {
       setIsMuted(true);
       if (audioRef.current) audioRef.current.volume = 0;
