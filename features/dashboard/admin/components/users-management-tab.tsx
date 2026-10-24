@@ -29,6 +29,8 @@ import {
 import { AdminUser, AdminUserRole, AdminUserStatus, UserDevice } from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
+import { fetchAdminUserDevices } from "@/lib/api/admin-client";
+import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 
 type UsersManagementTabProps = {
   users: AdminUser[];
@@ -52,7 +54,6 @@ type UsersManagementTabProps = {
     status: AdminUserStatus;
     password?: string;
   }) => void;
-  onDeleteUser?: (userId: number) => void;
 };
 
 export function UsersManagementTab({
@@ -65,7 +66,6 @@ export function UsersManagementTab({
   onResetPassword,
   onUpdateProfile,
   onCreateUser,
-  onDeleteUser,
 }: UsersManagementTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
@@ -87,7 +87,6 @@ export function UsersManagementTab({
 
   const [selectedUserForDevices, setSelectedUserForDevices] = useState<AdminUser | null>(null);
   const [selectedUserForResetPassword, setSelectedUserForResetPassword] = useState<AdminUser | null>(null);
-  const [selectedUserForDelete, setSelectedUserForDelete] = useState<AdminUser | null>(null);
 
   // Create User Modal State
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
@@ -202,13 +201,6 @@ export function UsersManagementTab({
     setIsCreateUserModalOpen(false);
   };
 
-  const handleDeleteUser = (user: AdminUser) => {
-    if (user.username === "admin01" || user.id === 1) {
-      return;
-    }
-    setSelectedUserForDelete(user);
-  };
-
   const handleStartEditProfile = (user: AdminUser) => {
     setIsEditProfileMode(true);
     setEditProfileForm({
@@ -229,9 +221,38 @@ export function UsersManagementTab({
     setIsEditProfileMode(false);
   };
 
-  const userDevices = selectedUserForDevices
-    ? devices.filter((d) => d.userId === selectedUserForDevices.id)
-    : [];
+  const [activeUserDevices, setActiveUserDevices] = useState<UserDevice[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  useEffect(() => {
+    if (!selectedUserForDevices) {
+      setActiveUserDevices([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingDevices(true);
+    fetchAdminUserDevices(selectedUserForDevices.id)
+      .then((data) => {
+        if (!cancelled) setActiveUserDevices(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load user devices:", err);
+        if (!cancelled) setActiveUserDevices([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDevices(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUserForDevices]);
+
+  const handleRevokeDevice = (deviceId: number) => {
+    onRevokeDevice(deviceId);
+    setActiveUserDevices((prev) =>
+      prev.map((d) => (d.id === deviceId ? { ...d, status: "REVOKED" } : d))
+    );
+  };
 
   return (
     <div className="space-y-6 anim-fade-in">
@@ -240,14 +261,14 @@ export function UsersManagementTab({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
-              Quản Lý Người Dùng &amp; Phân Quyền
+              Quản Lý Người Dùng
             </h2>
             <span className="font-mono text-xs text-zinc-400">
               · {users.length} tài khoản
             </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Giám sát tài khoản hệ thống (thính giả, nghệ sĩ, quản trị viên), bổ nhiệm nhân sự và quản lý quyền truy cập.
+            Quản trị tài khoản người dùng, phân quyền vai trò và trạng thái hoạt động.
           </p>
         </div>
 
@@ -257,11 +278,96 @@ export function UsersManagementTab({
             onClick={handleOpenCreateUser}
             className="flex items-center gap-2 rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
           >
-            <UserPlus className="h-4 w-4" /> Thêm Người Dùng Mới
+            <UserPlus className="h-4 w-4" /> Thêm Người Dùng
           </button>
           <span className="text-xs font-mono text-zinc-400">
             Hiển thị {filteredUsers.length} / {users.length} tài khoản
           </span>
+        </div>
+      </div>
+
+      {/* 4 User Statistics Cards with MiniSparkline */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Tổng Người Dùng</span>
+              <Users className="w-4 h-4 text-sky-400" />
+            </div>
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {users.length}
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Toàn bộ tài khoản</p>
+          </div>
+          <div className="pt-2">
+            <MiniSparkline
+              data={[users.filter((u) => u.status !== "ACTIVE").length, users.length]}
+              color="#38bdf8"
+              height={22}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Nghệ Sĩ</span>
+              <UserCheck className="w-4 h-4 text-purple-400" />
+            </div>
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length}
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Tài khoản nghệ sĩ</p>
+          </div>
+          <div className="pt-2">
+            <MiniSparkline
+              data={[0, users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length]}
+              color="#c084fc"
+              height={22}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Kiểm Duyệt Viên</span>
+              <Shield className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {users.filter((u) => u.role === "MODERATOR").length}
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Đội ngũ kiểm duyệt</p>
+          </div>
+          <div className="pt-2">
+            <MiniSparkline
+              data={[0, users.filter((u) => u.role === "MODERATOR").length]}
+              color="#f59e0b"
+              height={22}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
+              <span>Đang Hoạt Động</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="font-display text-2xl font-bold text-white tracking-tight">
+              {users.filter((u) => u.status === "ACTIVE").length}
+            </div>
+            <p className="text-[11px] text-emerald-400 mt-0.5 font-mono">
+              Tài khoản hoạt động
+            </p>
+          </div>
+          <div className="pt-2">
+            <MiniSparkline
+              data={[users.filter((u) => u.status === "BANNED").length, users.filter((u) => u.status === "ACTIVE").length]}
+              color="#10b981"
+              height={22}
+            />
+          </div>
         </div>
       </div>
 
@@ -510,16 +616,6 @@ export function UsersManagementTab({
                             >
                               Role
                             </button>
-
-                            {/* Delete User */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUser(user)}
-                              className="p-1.5 rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/40 transition"
-                              title="Xóa tài khoản người dùng"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
                           </div>
                         ) : (
                           <span className="font-mono text-xs text-purple-400 font-semibold">Tài khoản này</span>
@@ -724,16 +820,6 @@ export function UsersManagementTab({
                   Mở Khóa Phục Hồi Quyền Truy Cập
                 </button>
               )}
-
-              {inspectingUser.username !== "admin01" && (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteUser(inspectingUser)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition"
-                >
-                  <Trash2 className="h-4 w-4" /> Xóa Vĩnh Viễn Người Dùng Này
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -928,12 +1014,17 @@ export function UsersManagementTab({
             </p>
 
             <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-              {userDevices.length === 0 ? (
+              {isLoadingDevices ? (
+                <div className="flex items-center justify-center py-8 gap-2 text-white/50 text-xs font-mono">
+                  <RefreshCw className="h-4 w-4 animate-spin text-[#ff5500]" />
+                  <span>Đang tải danh sách thiết bị từ cơ sở dữ liệu...</span>
+                </div>
+              ) : activeUserDevices.length === 0 ? (
                 <p className="text-center py-6 text-white/30 text-[12px] font-mono">
-                  Chưa có thiết bị nào được đăng ký offline.
+                  Chưa có thiết bị nào được đăng ký offline trong cơ sở dữ liệu.
                 </p>
               ) : (
-                userDevices.map((dev) => (
+                activeUserDevices.map((dev) => (
                   <div
                     key={dev.id}
                     className="flex items-center justify-between p-3 rounded-[14px] border border-white/8 bg-black/40 text-[12px]"
@@ -946,8 +1037,8 @@ export function UsersManagementTab({
                     {dev.status === "ACTIVE" ? (
                       <button
                         type="button"
-                        onClick={() => onRevokeDevice(dev.id)}
-                        className="font-mono text-[10px] font-semibold text-rose-300 bg-rose-500/15 border border-rose-500/20 px-2.5 py-1 rounded-full hover:bg-rose-500/25"
+                        onClick={() => handleRevokeDevice(dev.id)}
+                        className="font-mono text-[10px] font-semibold text-rose-300 bg-rose-500/15 border border-rose-500/20 px-2.5 py-1 rounded-full hover:bg-rose-500/25 transition cursor-pointer"
                       >
                         Thu hồi
                       </button>
@@ -1149,58 +1240,6 @@ export function UsersManagementTab({
                 className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] shadow-lg shadow-[#ff5500]/25 active:scale-[0.98] transition cursor-pointer"
               >
                 Tạo Người Dùng
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
-    )}
-
-      {/* CONFIRMATION MODAL: DELETE USER */}
-      {selectedUserForDelete && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
-            <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-rose-500/30 bg-[#0c1017] p-6 shadow-2xl">
-            <div className="flex items-center gap-3 text-rose-400 mb-4">
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                <Trash2 className="h-6 w-6 text-rose-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Xác Nhận Xóa Tài Khoản</h3>
-                <p className="text-xs text-rose-400/80 font-mono">Hủy phiên đăng nhập & xóa vĩnh viễn</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
-              Bạn có chắc chắn muốn xóa tài khoản người dùng <strong className="text-white">"{selectedUserForDelete.fullName}"</strong> (@{selectedUserForDelete.username}, vai trò {selectedUserForDelete.role}) khỏi cơ sở dữ liệu?
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setSelectedUserForDelete(null)}
-                className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/5 transition"
-              >
-                Hủy Bỏ
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const targetId = selectedUserForDelete.id;
-                  setSelectedUserForDelete(null);
-                  if (inspectingUser?.id === targetId) {
-                    setInspectingUser(null);
-                  }
-                  if (onDeleteUser) {
-                    onDeleteUser(targetId);
-                  } else {
-                    onBanUser(targetId, "Tài khoản bị xóa / hủy bởi Admin", "Vĩnh viễn");
-                  }
-                }}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-900/30 hover:brightness-110 active:scale-95 transition cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4" /> Xác Nhận Xóa Tài Khoản
               </button>
             </div>
           </div>

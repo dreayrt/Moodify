@@ -1,5 +1,5 @@
 // API Base URL - Luôn đảm bảo có tiền tố /api
-const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8088').replace(/\/$/, '');
 const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
 import { getValidAccessToken } from './auth-client';
@@ -24,6 +24,27 @@ export type Track = {
   lyricsSynced?: string | null;
   localPath?: string | null;
   audioUrl?: string | null;
+  moodMatchDistance?: number | null;
+  moodFeatureCoverage?: number | null;
+  moodMatchedTags?: string[] | null;
+  moodFeatureDistances?: Record<string, MoodFeatureDistance> | null;
+};
+
+export type MoodFeatureDistance = {
+  weight: number;
+  targetValue: number | null;
+  actualValue: number | null;
+  normalizedDistance: number | null;
+  weightedSquaredError: number | null;
+  insideRecommendedRange: boolean | null;
+};
+
+export type MoodCatalogDiagnostics = {
+  tracksWithAudioFeatures: number;
+  tracksWithCompleteAudioFeatures: number;
+  tracksWithGenreTags: number;
+  tracksWithMoodTags: number;
+  averageFeatureCoverage: number;
 };
 
 export type TrackPageResponse = {
@@ -94,6 +115,10 @@ export type EmotionInfo = {
     mood_analysis?: string;
     target_valence?: number;
     target_energy?: number;
+    target_danceability?: number;
+    target_acousticness?: number;
+    target_tempo?: string;
+    target_mode?: string;
     seed_genres?: string[];
   };
 };
@@ -102,6 +127,34 @@ export type MoodRecommendationResponse = {
   emotion: EmotionInfo;
   tracks: Track[];
   totalMatched: number;
+  candidateCount?: number;
+  matchStatus?: "MATCHED" | "LIMITED" | "NO_CANDIDATES" | string;
+  rankingVersion?: string;
+  maxMatchDistance?: number;
+  catalogDiagnostics?: MoodCatalogDiagnostics | null;
+};
+
+export type SearchHistoryType = "ALL" | "TRACK" | "ARTIST" | "ALBUM" | "PLAYLIST" | "EMOTION";
+
+export type SearchHistoryItem = {
+  id: number;
+  keyword: string;
+  searchType: SearchHistoryType;
+  detectedEmotion: string | null;
+  emotionConfidence: number | null;
+  selectedTargetType: string | null;
+  selectedTargetId: string | null;
+  searchedAt: string;
+};
+
+export type SearchHistoryPage = {
+  content: SearchHistoryItem[];
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
 };
 
 /**
@@ -110,7 +163,8 @@ export type MoodRecommendationResponse = {
 export async function fetchMoodRecommendation(
   text: string,
   strategy: string = 'empathy',
-  limit: number = 50
+  limit: number = 50,
+  signal?: AbortSignal
 ): Promise<MoodRecommendationResponse> {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   try {
@@ -124,12 +178,102 @@ export async function fetchMoodRecommendation(
     method: 'POST',
     headers,
     body: JSON.stringify({ text, strategy, limit }),
+    signal,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to recommend tracks by mood: ${response.status}`);
+    const errorBody = await response.json().catch(() => null) as { detail?: string; message?: string; title?: string } | null;
+    throw new Error(errorBody?.detail || errorBody?.message || errorBody?.title || `Không thể tìm nhạc theo cảm xúc (${response.status})`);
   }
 
+  return response.json();
+}
+
+export async function recordMySearchHistory(input: {
+  keyword: string;
+  searchType: SearchHistoryType;
+  detectedEmotion?: string;
+  emotionConfidence?: number;
+}): Promise<SearchHistoryItem> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) throw new Error("Vui lòng đăng nhập để lưu lịch sử tìm kiếm");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error("Không thể lưu lịch sử tìm kiếm");
+  return response.json();
+}
+
+export async function selectMySearchHistoryResult(
+  historyId: number,
+  targetType: "TRACK" | "ARTIST" | "ALBUM" | "PLAYLIST",
+  targetId: string
+): Promise<SearchHistoryItem> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để lưu kết quả đã chọn");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history/${historyId}/selection`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ targetType, targetId }),
+  });
+  if (!response.ok) throw new Error("Không thể lưu kết quả tìm kiếm đã chọn");
+  return response.json();
+}
+
+export async function fetchMySearchHistory(params: {
+  page?: number;
+  size?: number;
+  type?: SearchHistoryType | "";
+  query?: string;
+} = {}): Promise<SearchHistoryPage> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xem lịch sử tìm kiếm");
+
+  const query = new URLSearchParams({
+    page: String(params.page ?? 0),
+    size: String(params.size ?? 20),
+  });
+  if (params.type) query.set("type", params.type);
+  if (params.query?.trim()) query.set("q", params.query.trim());
+
+  const response = await fetch(`${API_BASE}/users/me/search-history?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new Error("Vui lòng đăng nhập để xem lịch sử tìm kiếm");
+  if (!response.ok) throw new Error("Không thể tải lịch sử tìm kiếm");
+  return response.json();
+}
+
+export async function deleteMySearchHistoryItem(historyId: number): Promise<void> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xóa lịch sử tìm kiếm");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history/${historyId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Không thể xóa mục lịch sử tìm kiếm");
+}
+
+export async function clearMySearchHistory(): Promise<{ deletedCount: number }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xóa lịch sử tìm kiếm");
+
+  const response = await fetch(`${API_BASE}/users/me/search-history`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Không thể xóa lịch sử tìm kiếm");
   return response.json();
 }
 
@@ -142,6 +286,7 @@ export async function fetchTracks(options?: {
   query?: string;
   genre?: string;
   mode?: string;
+  signal?: AbortSignal;
 }): Promise<TrackPageResponse> {
   const params = new URLSearchParams();
   
@@ -159,7 +304,10 @@ export async function fetchTracks(options?: {
     }
   } catch {}
 
-  const response = await fetch(`${API_BASE}/tracks?${params.toString()}`, { headers });
+  const response = await fetch(`${API_BASE}/tracks?${params.toString()}`, {
+    headers,
+    signal: options?.signal,
+  });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch tracks: ${response.status}`);
@@ -342,7 +490,7 @@ export async function fetchUserLibrary(
 /**
  * Fetch all liked track Spotify IDs for current user
  */
-export async function fetchLikedTrackIds(): Promise<string[]> {
+export async function fetchLikedTrackIds(signal?: AbortSignal): Promise<string[]> {
   const token = await getValidAccessToken().catch(() => null);
   if (!token) return [];
 
@@ -350,6 +498,7 @@ export async function fetchLikedTrackIds(): Promise<string[]> {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal,
   });
 
   if (!response.ok) {
@@ -396,7 +545,7 @@ export async function isTrackInLibrary(trackSpotifyId: string): Promise<boolean>
 /**
  * Search for artists
  */
-export async function fetchArtists(query: string): Promise<Artist[]> {
+export async function fetchArtists(query: string, signal?: AbortSignal): Promise<Artist[]> {
   if (!query || query.trim() === '') {
     return [];
   }
@@ -404,7 +553,7 @@ export async function fetchArtists(query: string): Promise<Artist[]> {
   const params = new URLSearchParams();
   params.set('query', query.trim());
 
-  const response = await fetch(`${API_BASE}/artists?${params.toString()}`);
+  const response = await fetch(`${API_BASE}/artists?${params.toString()}`, { signal });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch artists: ${response.status}`);
@@ -639,13 +788,11 @@ export interface PackageEntitlements {
   adIntervalAfterLimit: number;
   skipPolicy: "UNLIMITED" | "LIMITED";
   skipDailyLimit: number;
-  audioQuality?: "STANDARD_128" | "HQ_320" | "LOSSLESS_FLAC";
   offlineAllowed: boolean;
   offlineMaxTracks: number;
   maxDevices: number;
   syncedLyrics?: boolean;
   vipBadge?: boolean;
-  customThemes?: boolean;
   familySharing?: boolean;
   familyMembers?: number;
 }
@@ -657,13 +804,11 @@ export const FREE_ENTITLEMENTS: PackageEntitlements = {
   adIntervalAfterLimit: 2,
   skipPolicy: "LIMITED",
   skipDailyLimit: 6,
-  audioQuality: "STANDARD_128",
   offlineAllowed: false,
   offlineMaxTracks: 0,
   maxDevices: 1,
   syncedLyrics: false,
   vipBadge: false,
-  customThemes: false,
   familySharing: false,
 };
 
@@ -797,6 +942,72 @@ export async function subscribePackage(
   return res.json();
 }
 
+export interface CheckoutResponse {
+  success: boolean;
+  orderCode: string;
+  paymentId: number;
+  subscriptionId: number;
+  packageId: number;
+  packageName: string;
+  amount: number;
+  bankAccount: string;
+  bankName: string;
+  accountName: string;
+  transferContent: string;
+  qrUrl: string;
+  status: string;
+  message: string;
+}
+
+export interface PaymentStatusResponse {
+  orderCode: string;
+  status: 'PENDING' | 'SUCCESS' | 'CANCELLED' | 'EXPIRED';
+  amount?: number;
+  packageName?: string;
+  paidAt?: string;
+  expiresAt?: string;
+  isPremium?: boolean;
+}
+
+export async function createCheckoutPayment(
+  packageId: number,
+  idempotencyKey?: string
+): Promise<CheckoutResponse> {
+  const token = await getValidAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
+  }
+  const res = await fetch(`${API_BASE}/subscriptions/checkout`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ packageId, idempotencyKey }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.message || 'Tạo đơn thanh toán thất bại');
+  }
+  return res.json();
+}
+
+export async function getPaymentStatus(
+  orderCode: string
+): Promise<PaymentStatusResponse> {
+  const res = await fetch(`${API_BASE}/subscriptions/payment-status/${orderCode}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    throw new Error('Không thể kiểm tra trạng thái thanh toán');
+  }
+  return res.json();
+}
+
 export async function devTogglePremium(
   enable: boolean,
   days: number = 30,
@@ -857,6 +1068,135 @@ export async function downloadTrackFile(
 }
 
 // ============================================================================
+// User Listening History & Activity Trace
+// ============================================================================
+
+export type UserListeningHistoryItem = {
+  id: number;
+  trackId: string;
+  spotifyId?: string;
+  title: string;
+  trackTitle?: string;
+  artist: string;
+  artistName?: string;
+  coverUrl: string;
+  audioUrl?: string;
+  durationMs: number;
+  totalDuration: string;
+  genre: string;
+  startedAt: string;
+  endedAt: string;
+  listenedDurationMs: number;
+  listenedDurationSeconds: number;
+  listenedDurationFormatted: string;
+  lastPositionMs: number;
+  lastPositionSeconds: number;
+  lastPositionFormatted: string;
+  source: string;
+  sourceId?: string;
+  deviceType: string;
+  eventCount: number;
+  completionRatePercent: number;
+  isCompleted: boolean;
+  lyricsSynced?: string;
+  lyricsPlain?: string;
+};
+
+export type UserListeningHistorySummary = {
+  totalListenedTracks: number;
+  totalListenedMinutes: number;
+  totalListenedHours: number;
+  completionRatePercent: number;
+  totalCompletedSessions: number;
+};
+
+export type UserListeningHistoryResponse = {
+  items: UserListeningHistoryItem[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+  summary: UserListeningHistorySummary;
+};
+
+export type UserHistoryTraceEvent = {
+  id: number;
+  listeningHistoryId: number;
+  eventType: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+  positionMs: number;
+  positionFormatted: string;
+  targetPositionMs: number;
+  targetPositionFormatted: string;
+  occurredAt: string;
+};
+
+export async function fetchMyListeningHistory(params: {
+  page?: number;
+  size?: number;
+  search?: string;
+} = {}): Promise<UserListeningHistoryResponse> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const query = new URLSearchParams();
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.size !== undefined) query.set("size", String(params.size));
+  if (params.search) query.set("search", params.search);
+
+  const res = await fetch(`${API_BASE}/analytics/my-history?${query.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể tải lịch sử nghe");
+  return res.json();
+}
+
+export async function fetchMyHistoryTraceEvents(historyId: number): Promise<{
+  historyId: number;
+  items: UserHistoryTraceEvent[];
+  totalEvents: number;
+}> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history/${historyId}/events`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể tải chi tiết sự kiện");
+  return res.json();
+}
+
+export async function deleteMyHistoryItem(historyId: number): Promise<{ success: boolean; message: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history/${historyId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể xóa bài hát khỏi lịch sử");
+  return res.json();
+}
+
+export async function clearMyListeningHistory(): Promise<{ success: boolean; deletedCount: number; message: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Chưa đăng nhập");
+  const res = await fetch(`${API_BASE}/analytics/my-history`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Không thể xóa toàn bộ lịch sử nghe");
+  return res.json();
+}
+
 // Album APIs (MySQL Hybrid Architecture)
 // ============================================================================
 
@@ -1027,6 +1367,5 @@ export async function toggleFavoriteAlbum(
   if (!res.ok) throw new Error(`Failed to toggle favorite album: ${res.status}`);
   return res.json();
 }
-
 
 

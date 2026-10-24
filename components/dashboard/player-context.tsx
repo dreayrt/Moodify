@@ -15,7 +15,7 @@ import {
   resolveTrackAudioUrl,
   type PackageEntitlements,
 } from "@/lib/api-client";
-import { recordPlatformVisit } from "@/lib/auth/auth-client";
+import { recordPlatformVisit, recordListeningSessionTelemetry } from "@/lib/auth/auth-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -39,6 +39,7 @@ export type AdReason = "FREE_REGULAR" | "BASIC_DAILY_LIMIT_EXCEEDED" | "SKIP_PEN
 interface PlayerContextType {
   currentTrack: PlayerTrack | null;
   isPlaying: boolean;
+  isBuffering: boolean;
   currentTime: number;
   duration: number;
   volume: number;
@@ -58,7 +59,7 @@ interface PlayerContextType {
   dailySkipsCount: number;
   skipLimitNotice: { show: boolean; message: string; tier: SubTier } | null;
   clearSkipLimitNotice: () => void;
-  skipAd: () => void;
+  skipAd: (force?: boolean) => void;
   triggerAd: (force?: boolean, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[], reason?: AdReason) => void;
   playTrack: (track: PlayerTrack, playlist?: PlayerTrack[]) => void;
   addToQueue: (track: PlayerTrack) => void;
@@ -115,6 +116,7 @@ function recordDailySkip(): number {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
@@ -182,6 +184,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const adAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Preload next track for gapless/zero-lag playback
+  const preloadNextTrackInQueue = useCallback((nextItem: PlayerTrack | null | undefined) => {
+    if (typeof window === "undefined" || !nextItem) return;
+    try {
+      if (!preloadAudioRef.current) {
+        preloadAudioRef.current = new Audio();
+        preloadAudioRef.current.preload = "auto";
+        preloadAudioRef.current.muted = true;
+      }
+      const nextUrl = resolveTrackAudioUrl(nextItem);
+      if (nextUrl && preloadAudioRef.current.src !== nextUrl) {
+        preloadAudioRef.current.src = nextUrl;
+      }
+    } catch (_) {}
+  }, []);
 
   // Load daily stats on mount
   useEffect(() => {
@@ -345,6 +365,42 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ── Listening History & Playback Telemetry ──────────────────
+  const listeningSessionRef = useRef<{
+    historyId: number | null;
+    trackId: string;
+    startedAt: number;
+    lastPlayTimestamp: number | null;
+    accumulatedDurationMs: number;
+  } | null>(null);
+
+  const flushListeningSession = useCallback((eventType: string = "TRACK_CHANGED") => {
+    const session = listeningSessionRef.current;
+    if (!session || !session.trackId) return;
+
+    let totalDuration = session.accumulatedDurationMs;
+    if (session.lastPlayTimestamp) {
+      totalDuration += (Date.now() - session.lastPlayTimestamp);
+    }
+
+    const posMs = audioRef.current ? Math.round(audioRef.current.currentTime * 1000) : totalDuration;
+
+    // Ghi nhận đầy đủ 100% mọi phiên nghe và sự kiện vào MySQL listening_history và playback_events
+    if (totalDuration > 0 || eventType === "COMPLETE" || eventType === "TRACK_CHANGED" || eventType === "SKIP_NEXT" || eventType === "SKIP_PREVIOUS" || eventType === "PLAYBACK_STOPPED") {
+      void recordListeningSessionTelemetry({
+        historyId: session.historyId ?? undefined,
+        trackId: session.trackId,
+        durationMs: Math.max(0, totalDuration),
+        positionMs: Math.max(0, posMs),
+        eventType,
+        deviceType: "WEB",
+        source: "HOME",
+      });
+    }
+
+    listeningSessionRef.current = null;
+  }, []);
+
   // Initialize audio element once in browser
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -364,17 +420,68 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      const session = listeningSessionRef.current;
+      if (session) {
+        session.lastPlayTimestamp = Date.now();
+        // Nếu đã từng pause và giờ resume lại -> ghi nhận sự kiện RESUME
+        if (session.accumulatedDurationMs > 0) {
+          const posMs = Math.round(audio.currentTime * 1000);
+          void recordListeningSessionTelemetry({
+            historyId: session.historyId ?? undefined,
+            trackId: session.trackId,
+            durationMs: session.accumulatedDurationMs,
+            positionMs: posMs,
+            eventType: "RESUME",
+            deviceType: "WEB",
+            source: "HOME",
+          });
+        }
+      }
+      setIsPlaying(true);
+      setIsBuffering(false);
+    };
+
+    const onPause = () => {
+      const session = listeningSessionRef.current;
+      if (session && session.lastPlayTimestamp) {
+        session.accumulatedDurationMs += (Date.now() - session.lastPlayTimestamp);
+        session.lastPlayTimestamp = null;
+        const posMs = Math.round(audio.currentTime * 1000);
+        void recordListeningSessionTelemetry({
+          historyId: session.historyId ?? undefined,
+          trackId: session.trackId,
+          durationMs: session.accumulatedDurationMs,
+          positionMs: posMs,
+          eventType: "PAUSE",
+          deviceType: "WEB",
+          source: "HOME",
+        });
+      }
+      setIsPlaying(false);
+      setIsBuffering(false);
+    };
+
+    const onWaiting = () => setIsBuffering(true);
+    const onStalled = () => setIsBuffering(true);
+    const onSeeking = () => setIsBuffering(true);
+    const onSeeked = () => setIsBuffering(false);
+    const onCanPlay = () => setIsBuffering(false);
+    const onCanPlayThrough = () => setIsBuffering(false);
+    const onPlaying = () => {
+      setIsBuffering(false);
+      setIsPlaying(true);
+    };
 
     const onEnded = () => {
+      setIsBuffering(false);
+      flushListeningSession("COMPLETE");
       if (repeatModeRef.current === "one") {
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
-          audioRef.current
-            .play()
-            .then(() => setIsPlaying(true))
-            .catch(() => {});
+          const p = audioRef.current.play();
+          playPromiseRef.current = p;
+          p.then(() => setIsPlaying(true)).catch(() => {});
         }
       } else {
         nextTrackRef.current(true);
@@ -384,26 +491,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onError = (e: Event) => {
       console.warn("Audio playback issue:", e);
       setIsPlaying(false);
+      setIsBuffering(false);
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("stalled", onStalled);
+    audio.addEventListener("seeking", onSeeking);
+    audio.addEventListener("seeked", onSeeked);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("canplaythrough", onCanPlayThrough);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
 
     return () => {
-      audio.pause();
+      flushListeningSession("PLAYBACK_STOPPED");
+      try {
+        audio.pause();
+      } catch (_) {}
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("stalled", onStalled);
+      audio.removeEventListener("seeking", onSeeking);
+      audio.removeEventListener("seeked", onSeeked);
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("canplaythrough", onCanPlayThrough);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       audioRef.current = null;
     };
-  }, []);
+  }, [flushListeningSession, volume]);
 
   const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
     setCurrentTrack(track);
@@ -421,9 +546,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Telemetry: Record web platform visit event for Content Lead acquisition analytics
+    // Telemetry: Flush previous track session and initialize new session
+    flushListeningSession("TRACK_CHANGED");
     const targetTrackId = track.id || track.spotifyId;
     if (targetTrackId) {
+      const newSession = {
+        historyId: null as number | null,
+        trackId: targetTrackId,
+        startedAt: Date.now(),
+        lastPlayTimestamp: Date.now(),
+        accumulatedDurationMs: 0,
+      };
+      listeningSessionRef.current = newSession;
+
+      // Ghi nhận sự kiện khởi phát PLAY ban đầu và lưu historyId
+      void recordListeningSessionTelemetry({
+        trackId: targetTrackId,
+        durationMs: 0,
+        positionMs: 0,
+        eventType: "PLAY",
+        deviceType: "WEB",
+        source: "HOME",
+      }).then((res) => {
+        if (res?.success && res.historyId && listeningSessionRef.current?.trackId === targetTrackId) {
+          listeningSessionRef.current.historyId = res.historyId;
+        }
+      });
+
       recordPlatformVisit({
         targetType: "TRACK",
         targetId: targetTrackId,
@@ -448,9 +597,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (audioRef.current) {
-      // 1. Immediately pause and flush existing audio buffer to prevent playing old cached audio
+      // 1. Safely pause previous playback without throwing unhandled AbortErrors
       try {
-        audioRef.current.pause();
+        if (playPromiseRef.current) {
+          playPromiseRef.current
+            .catch(() => {})
+            .finally(() => {
+              try {
+                audioRef.current?.pause();
+              } catch (_) {}
+            });
+        } else {
+          audioRef.current.pause();
+        }
       } catch (_) {}
       
       setCurrentTime(0);
@@ -458,23 +617,41 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setDuration(track.durationMs / 1000);
       }
 
-      // 2. Set new stream: Luôn ưu tiên phát trực tiếp từ máy chủ đám mây trực tuyến trên mạng (Oracle Cloud Music Server)
+      // 2. Set new stream directly without cache-busting timestamp to allow browser HTTP & Range caching
       const onlineAudioUrl = resolveTrackAudioUrl(track);
-      const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
-      audioRef.current.src = streamUrl;
+      setIsBuffering(true);
+
+      if (audioRef.current.src !== onlineAudioUrl) {
+        audioRef.current.src = onlineAudioUrl;
+      }
       audioRef.current.currentTime = 0;
       audioRef.current.playbackRate = playbackRateRef.current;
-      audioRef.current.load(); // Forces browser to flush old buffer and load new track stream
 
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
+      const p = audioRef.current.play();
+      playPromiseRef.current = p;
+      p.then(() => {
+        setIsPlaying(true);
+        setIsBuffering(false);
+      }).catch((err) => {
+        if (err.name !== "AbortError") {
           console.warn("Autoplay was prevented or audio stream not available:", err);
-          setIsPlaying(false);
-        });
+        }
+        setIsPlaying(false);
+        setIsBuffering(false);
+      });
+
+      // 3. Preload the next track in the queue for zero-delay instant switching
+      const targetQueue = (playlist && playlist.length > 0) ? playlist : queueRef.current;
+      if (targetQueue.length > 1) {
+        const curIdx = targetQueue.findIndex((t) => t.spotifyId === track.spotifyId);
+        const nextIdx = (curIdx >= 0 && curIdx < targetQueue.length - 1) ? curIdx + 1 : 0;
+        const candidate = targetQueue[nextIdx];
+        if (candidate && candidate.spotifyId !== track.spotifyId) {
+          preloadNextTrackInQueue(candidate);
+        }
+      }
     }
-  }, []);
+  }, [flushListeningSession, preloadNextTrackInQueue]);
 
   // Keep a ref for executePlayTrack so ad audio ended callback can access latest
   const executePlayTrackRef = useRef(executePlayTrack);
@@ -500,7 +677,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     playAdAudio();
   }, [playAdAudio]);
 
-  const skipAd = useCallback(() => {
+  const skipAd = useCallback((force = false) => {
+    // Chỉ người dùng gói VIP Tiết Kiệm (INDIVIDUAL_BASIC) mới có quyền bấm bỏ qua quảng cáo sớm sau đếm ngược.
+    // Người dùng FREE bắt buộc phải nghe trọn vẹn quảng cáo trừ khi chuyển hướng mua gói (force = true) hoặc đã hết thời gian.
+    const isSaverVip = subTier === "INDIVIDUAL_BASIC";
+    if (!force && !isSaverVip && !isPremiumUser && adSecondsRemaining > 0) {
+      return;
+    }
+
     setIsAdPlaying(false);
     setAdReason(null);
     // Stop ad audio
@@ -515,7 +699,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else if (audioRef.current && currentTrack) {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
-  }, [executePlayTrack, currentTrack]);
+  }, [executePlayTrack, currentTrack, subTier, isPremiumUser, adSecondsRemaining]);
 
   const playTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
     const todayTracks = recordDailyTrackPlayed();
@@ -566,36 +750,93 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentTrack) return;
     if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+      if (playPromiseRef.current) {
+        playPromiseRef.current
+          .catch(() => {})
+          .finally(() => {
+            try {
+              audioRef.current?.pause();
+            } catch (_) {}
+            setIsPlaying(false);
+          });
+      } else {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
     } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.warn("Could not resume audio:", err));
+      setIsBuffering(true);
+      const p = audioRef.current.play();
+      playPromiseRef.current = p;
+      p.then(() => {
+        setIsPlaying(true);
+        setIsBuffering(false);
+      }).catch((err) => {
+        if (err.name !== "AbortError") {
+          console.warn("Could not resume audio:", err);
+        }
+        setIsPlaying(false);
+        setIsBuffering(false);
+      });
     }
   }, [isPlaying, currentTrack]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+      if (playPromiseRef.current) {
+        playPromiseRef.current
+          .catch(() => {})
+          .finally(() => {
+            try {
+              audioRef.current?.pause();
+            } catch (_) {}
+            setIsPlaying(false);
+          });
+      } else {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
     }
   }, []);
 
   const resume = useCallback(() => {
     if (audioRef.current && currentTrack) {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.warn("Could not resume:", err));
+      setIsBuffering(true);
+      const p = audioRef.current.play();
+      playPromiseRef.current = p;
+      p.then(() => {
+        setIsPlaying(true);
+        setIsBuffering(false);
+      }).catch((err) => {
+        if (err.name !== "AbortError") {
+          console.warn("Could not resume:", err);
+        }
+        setIsPlaying(false);
+        setIsBuffering(false);
+      });
     }
   }, [currentTrack]);
 
   const seek = useCallback((timeSeconds: number) => {
     if (audioRef.current) {
+      const oldPosMs = Math.round(audioRef.current.currentTime * 1000);
+      const targetPosMs = Math.round(timeSeconds * 1000);
       audioRef.current.currentTime = timeSeconds;
       setCurrentTime(timeSeconds);
+
+      const session = listeningSessionRef.current;
+      if (session && session.trackId) {
+        const curDur = session.accumulatedDurationMs + (session.lastPlayTimestamp ? (Date.now() - session.lastPlayTimestamp) : 0);
+        void recordListeningSessionTelemetry({
+          historyId: session.historyId ?? undefined,
+          trackId: session.trackId,
+          durationMs: Math.max(0, curDur),
+          positionMs: oldPosMs,
+          targetPositionMs: targetPosMs,
+          eventType: "SEEK",
+          deviceType: "WEB",
+          source: "HOME",
+        });
+      }
     }
   }, []);
 
@@ -646,6 +887,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (currentQueue.length === 0) return;
 
     if (!isAutoAdvance) {
+      flushListeningSession("SKIP_NEXT");
       const ent = entitlementsRef.current;
       if (ent.skipPolicy === "LIMITED") {
         const todaySkips = recordDailySkip();
@@ -734,6 +976,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    flushListeningSession("SKIP_PREVIOUS");
+
     // Pop from played history (important for shuffle navigation)
     if (historyIndicesRef.current.length > 0) {
       const prevIdx = historyIndicesRef.current.pop()!;
@@ -767,11 +1011,78 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     nextTrackRef.current = nextTrack;
   }, [nextTrack]);
 
+  // ── MediaSession API Support (Lockscreen & OS Media Overlay) ──
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+
+    if (currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.name || "Moodify",
+        artist: currentTrack.artistName || "Moodify Artist",
+        album: currentTrack.albumName || "Moodify Music",
+        artwork: currentTrack.imageUrl
+          ? [
+              { src: currentTrack.imageUrl, sizes: "96x96", type: "image/jpeg" },
+              { src: currentTrack.imageUrl, sizes: "128x128", type: "image/jpeg" },
+              { src: currentTrack.imageUrl, sizes: "256x256", type: "image/jpeg" },
+              { src: currentTrack.imageUrl, sizes: "512x512", type: "image/jpeg" },
+            ]
+          : [{ src: "/icon.png", sizes: "192x192", type: "image/png" }],
+      });
+    }
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+    try {
+      navigator.mediaSession.setActionHandler("play", () => resume());
+      navigator.mediaSession.setActionHandler("pause", () => pause());
+      navigator.mediaSession.setActionHandler("previoustrack", () => prevTrack());
+      navigator.mediaSession.setActionHandler("nexttrack", () => nextTrack(false));
+      navigator.mediaSession.setActionHandler("seekto", (details) => {
+        if (details.seekTime != null) seek(details.seekTime);
+      });
+      navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+        seek(Math.max(0, currentTime - (details.seekOffset || 10)));
+      });
+      navigator.mediaSession.setActionHandler("seekforward", (details) => {
+        seek(Math.min(duration || 300, currentTime + (details.seekOffset || 10)));
+      });
+    } catch (_) {}
+  }, [currentTrack, isPlaying, resume, pause, prevTrack, nextTrack, seek, currentTime, duration]);
+
+  // ── Global Keyboard Shortcuts (Space for Play/Pause, M for Mute) ──
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.tagName === "SELECT" ||
+          activeEl.getAttribute("contenteditable") === "true");
+
+      if (isInput) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === "m" || e.key === "M") {
+        toggleMute();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePlay, toggleMute]);
+
   return (
     <PlayerContext.Provider
       value={{
         currentTrack,
         isPlaying,
+        isBuffering,
         currentTime,
         duration,
         volume: isMuted ? 0 : volume,

@@ -448,7 +448,7 @@ function LumenHeroContent() {
   const searchParams = useSearchParams();
   const vibeFromUrl = searchParams.get("vibe") || "all";
 
-  const { playTrack, currentTrack, isPlaying, currentTime, duration, seek, togglePlay, isPremiumUser } = usePlayer();
+  const { playTrack, currentTrack, isPlaying, duration, seek, togglePlay, isPremiumUser } = usePlayer();
   const { vipButtonsEnabled, currentVipTheme } = useVipTheme();
   const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
   const activeVipTheme = isVipButtonsActive ? currentVipTheme : null;
@@ -728,7 +728,6 @@ function LumenHeroContent() {
           <div className="anim-fade-up">
             <RealtimeLyrics
               track={currentTrack}
-              currentTime={currentTime}
               duration={duration}
               isPlaying={isPlaying}
               onSeek={seek}

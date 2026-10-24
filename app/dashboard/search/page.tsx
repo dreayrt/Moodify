@@ -14,12 +14,22 @@ import {
   addToLibrary,
   removeFromLibrary,
   fetchLikedTrackIds,
+  recordMySearchHistory,
+  selectMySearchHistoryResult,
   type Track,
   type Artist,
   type Album,
   type Playlist,
   type EmotionInfo,
+  type MoodCatalogDiagnostics,
+  type SearchHistoryItem,
+  type SearchHistoryType,
 } from "@/lib/api-client";
+import {
+  onEmotionSearchSubmitted,
+  queueEmotionSearchHistory,
+  takePendingEmotionSearchHistory,
+} from "@/lib/mood-search-history";
 import TrackCard from "@/components/dashboard/track-card";
 import ArtistCard from "@/components/dashboard/artist-card";
 import AlbumCard from "@/components/dashboard/album-card";
@@ -45,10 +55,13 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const qParam = searchParams.get("q") || "";
   const modeParam = searchParams.get("mode") || "";
-  const { playTrack, currentTrack, isPlaying, isPremiumUser } = usePlayer();
+  const typeParam = searchParams.get("type") || "";
+  const { playTrack, isPremiumUser } = usePlayer();
   const isMoodMode = modeParam === "mood" && Boolean(isPremiumUser);
 
-  const [activeTab, setActiveTab] = useState<Tab>("tracks");
+  const [activeTab, setActiveTab] = useState<Tab>(typeParam === "ARTIST" ? "artists" : "tracks");
+  const [prevTypeParam, setPrevTypeParam] = useState(typeParam);
+  const currentTab: Tab = isMoodMode ? "tracks" : activeTab;
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [query, setQuery] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
@@ -58,6 +71,11 @@ function SearchContent() {
     setQuery(qParam);
   }
 
+  if (prevTypeParam !== typeParam) {
+    setPrevTypeParam(typeParam);
+    setActiveTab(typeParam === "ARTIST" ? "artists" : "tracks");
+  }
+
   const [tracks, setTracks] = useState<Track[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -65,52 +83,126 @@ function SearchContent() {
   const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [moodInfo, setMoodInfo] = useState<EmotionInfo | null>(null);
+  const [moodError, setMoodError] = useState<string | null>(null);
+  const [historySaveError, setHistorySaveError] = useState<string | null>(null);
+  const [moodMatchStatus, setMoodMatchStatus] = useState<string | null>(null);
+  const [moodCandidateCount, setMoodCandidateCount] = useState(0);
+  const [moodDistanceCutoff, setMoodDistanceCutoff] = useState<number | null>(null);
+  const [moodCatalogDiagnostics, setMoodCatalogDiagnostics] = useState<MoodCatalogDiagnostics | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const historyRecordRef = useRef<{
+    keyword: string;
+    searchType: SearchHistoryType;
+    promise: Promise<SearchHistoryItem>;
+  } | null>(null);
+  const [moodSubmissionVersion, setMoodSubmissionVersion] = useState(0);
   const [likedTracks, setLikedTracks] = useState<Set<string>>(new Set());
   const [totalFound, setTotalFound] = useState<number | null>(null);
 
+  const saveSearchHistory = useCallback((input: Parameters<typeof recordMySearchHistory>[0]) => {
+    setHistorySaveError(null);
+    const promise = recordMySearchHistory(input);
+    historyRecordRef.current = { keyword: input.keyword, searchType: input.searchType, promise };
+    void promise.catch((error) => {
+      console.error("Failed to save search history:", error);
+      if (input.searchType === "EMOTION") {
+        setHistorySaveError("Đã tìm được nhạc nhưng chưa lưu được lịch sử. Vui lòng thử tìm lại.");
+      }
+    });
+    return promise;
+  }, []);
+
+  useEffect(() => onEmotionSearchSubmitted(() => setMoodSubmissionVersion((version) => version + 1)), []);
+
   // Perform search or catalog fetch
   const loadData = useCallback(
-    async (searchQuery: string, genre: string, isMood: boolean) => {
+    async (
+      searchQuery: string,
+      genre: string,
+      isMood: boolean,
+      signal: AbortSignal = new AbortController().signal
+    ) => {
       setLoading(true);
+      setMoodError(null);
+      setHistorySaveError(null);
+      setMoodCatalogDiagnostics(null);
       try {
-        if (activeTab === "tracks") {
+        if (isMood && isPremiumUser && searchQuery.trim()) {
+          setMoodInfo(null);
+          setMoodMatchStatus(null);
+          setMoodCandidateCount(0);
+          setMoodDistanceCutoff(null);
+          setMoodCatalogDiagnostics(null);
+          const moodRes = await fetchMoodRecommendation(searchQuery.trim(), "empathy", 50, signal);
+          if (signal.aborted) return;
+          setMoodInfo(moodRes.emotion);
+          setMoodMatchStatus(moodRes.matchStatus || null);
+          setMoodCandidateCount(moodRes.candidateCount || 0);
+          setMoodDistanceCutoff(moodRes.maxMatchDistance ?? null);
+          setMoodCatalogDiagnostics(moodRes.catalogDiagnostics ?? null);
+          setTracks(moodRes.tracks || []);
+          setTotalFound(moodRes.totalMatched || moodRes.tracks?.length || 0);
+          const predictedEmotion = moodRes.emotion;
+          if (
+            predictedEmotion?.label?.trim() &&
+            typeof predictedEmotion.confidence === "number" &&
+            Number.isFinite(predictedEmotion.confidence) &&
+            predictedEmotion.confidence >= 0 &&
+            predictedEmotion.confidence <= 1 &&
+            takePendingEmotionSearchHistory(searchQuery)
+          ) {
+            await saveSearchHistory({
+              keyword: searchQuery.trim(),
+              searchType: "EMOTION",
+              detectedEmotion: predictedEmotion.label,
+              emotionConfidence: predictedEmotion.confidence,
+            }).catch(() => undefined);
+            if (signal.aborted) return;
+          }
+          const likedIds = await fetchLikedTrackIds(signal).catch(() => []);
+          if (signal.aborted) return;
+          setLikedTracks(new Set(likedIds));
+          return;
+        }
+
+        if (currentTab === "tracks") {
           let response;
           if (searchQuery.trim()) {
-            if (isMood && isPremiumUser) {
-              try {
-                const moodRes = await fetchMoodRecommendation(searchQuery.trim(), "empathy", 50);
-                setMoodInfo(moodRes.emotion);
-                setTracks(moodRes.tracks || []);
-                setTotalFound(moodRes.totalMatched ?? (moodRes.tracks ? moodRes.tracks.length : 0));
-                const likedIds = await fetchLikedTrackIds().catch(() => []);
-                setLikedTracks(new Set(likedIds));
-                return;
-              } catch (e) {
-                console.warn("Mood recommendation API error, falling back to fetchTracks with mode=mood", e);
-                response = await fetchTracks({ query: searchQuery.trim(), size: 100, mode: "mood" });
-              }
-            } else {
-              setMoodInfo(null);
-              response = await fetchTracks({ query: searchQuery.trim(), size: 100 });
-            }
+            setMoodInfo(null);
+            setMoodMatchStatus(null);
+            setMoodCandidateCount(0);
+            setMoodDistanceCutoff(null);
+            response = await fetchTracks({ query: searchQuery.trim(), size: 100, signal });
           } else if (genre !== "all") {
             setMoodInfo(null);
-            response = await fetchTracks({ genre, size: 100 });
+            setMoodMatchStatus(null);
+            setMoodCandidateCount(0);
+            setMoodDistanceCutoff(null);
+            response = await fetchTracks({ genre, size: 100, signal });
           } else {
             setMoodInfo(null);
-            response = await fetchTracks({ size: 200 });
+            setMoodMatchStatus(null);
+            setMoodCandidateCount(0);
+            setMoodDistanceCutoff(null);
+            response = await fetchTracks({ size: 200, signal });
           }
+
+          if (signal.aborted) return;
 
           setTracks(response.content);
           setTotalFound(response.totalElements);
 
           // Fast single query for all liked track IDs
-          const likedIds = await fetchLikedTrackIds().catch(() => []);
+          const likedIds = await fetchLikedTrackIds(signal).catch(() => []);
+          if (signal.aborted) return;
           setLikedTracks(new Set(likedIds));
         } else if (activeTab === "artists") {
           setMoodInfo(null);
-          const artistsData = await fetchArtists(searchQuery);
+          setMoodMatchStatus(null);
+          setMoodCandidateCount(0);
+          setMoodDistanceCutoff(null);
+          const artistsData = await fetchArtists(searchQuery, signal);
+          if (signal.aborted) return;
           setArtists(artistsData);
           setTotalFound(artistsData.length);
         } else if (activeTab === "albums") {
@@ -125,12 +217,22 @@ function SearchContent() {
           setTotalFound(playlistsData ? playlistsData.length : 0);
         }
       } catch (error) {
-        console.error("Search failed:", error);
+        if (signal.aborted) return;
+        if (isMood && isPremiumUser && searchQuery.trim()) {
+          setMoodInfo(null);
+          setMoodMatchStatus(null);
+          setTracks([]);
+          setTotalFound(0);
+          setMoodCatalogDiagnostics(null);
+          setMoodError(error instanceof Error ? error.message : "Không thể tìm nhạc theo cảm xúc lúc này.");
+        } else {
+          console.error("Search failed:", error);
+        }
       } finally {
-        setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
     },
-    [activeTab]
+    [currentTab, isPremiumUser, saveSearchHistory]
   );
 
   // Debounced search when query changes
@@ -139,16 +241,19 @@ function SearchContent() {
       clearTimeout(timeoutRef.current);
     }
 
+    const controller = new AbortController();
     timeoutRef.current = setTimeout(() => {
-      loadData(query, selectedGenre, isMoodMode);
+      void loadData(query, selectedGenre, isMoodMode, controller.signal);
     }, query ? 350 : 0);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      controller.abort();
     };
-  }, [query, selectedGenre, isMoodMode, loadData]);
+  }, [query, selectedGenre, isMoodMode, loadData, moodSubmissionVersion]);
 
   const handleTabChange = (tab: Tab) => {
+    if (isMoodMode) return;
     setActiveTab(tab);
   };
 
@@ -220,7 +325,21 @@ function SearchContent() {
     };
   }, []);
 
+  const recordSelectedResult = (targetType: "TRACK" | "ARTIST", targetId: string) => {
+    const recordedSearch = historyRecordRef.current;
+    if (!recordedSearch || recordedSearch.keyword !== query.trim()) return;
+    if (isMoodMode !== (recordedSearch.searchType === "EMOTION")) return;
+
+    void recordedSearch.promise
+      .then((history) => selectMySearchHistoryResult(history.id, targetType, targetId))
+      .catch((error) => {
+        console.error("Failed to save selected search result:", error);
+        if (isMoodMode) setHistorySaveError("Chưa lưu được bài hát đã chọn vào lịch sử tìm kiếm.");
+      });
+  };
+
   const handlePlayTrack = (track: Track) => {
+    recordSelectedResult("TRACK", track.spotifyId);
     playTrack(
       {
         spotifyId: track.spotifyId,
@@ -342,6 +461,7 @@ function SearchContent() {
             isMoodMode={isMoodMode}
             onToggleMood={(next) => {
               if (!isPremiumUser) return;
+              if (next) setActiveTab("tracks");
               const params = new URLSearchParams(window.location.search);
               if (query.trim()) params.set("q", query.trim());
               if (next) {
@@ -352,9 +472,38 @@ function SearchContent() {
               router.push(`/dashboard/search?${params.toString()}`);
             }}
             onSubmit={(val, isMood) => {
+              const normalized = val.trim();
+              if (normalized) {
+                const matchingEmotion = isMood && moodInfo?.text?.trim() === normalized ? moodInfo : null;
+                if (isMood && isPremiumUser) {
+                  if (
+                    matchingEmotion?.label?.trim() &&
+                    typeof matchingEmotion.confidence === "number" &&
+                    Number.isFinite(matchingEmotion.confidence) &&
+                    matchingEmotion.confidence >= 0 &&
+                    matchingEmotion.confidence <= 1
+                  ) {
+                    void saveSearchHistory({
+                      keyword: normalized,
+                      searchType: "EMOTION",
+                      detectedEmotion: matchingEmotion.label,
+                      emotionConfidence: matchingEmotion.confidence,
+                    });
+                  } else {
+                    queueEmotionSearchHistory(normalized);
+                  }
+                } else {
+                  void saveSearchHistory({
+                    keyword: normalized,
+                    searchType: currentTab === "artists" ? "ARTIST" : "TRACK",
+                  });
+                }
+              }
+
               const params = new URLSearchParams();
-              if (val.trim()) params.set("q", val.trim());
+              if (normalized) params.set("q", normalized);
               if (isMood && isPremiumUser) params.set("mode", "mood");
+              else if (currentTab === "artists") params.set("type", "ARTIST");
               router.push(`/dashboard/search?${params.toString()}`);
             }}
             isPremium={Boolean(isPremiumUser)}
@@ -416,8 +565,50 @@ function SearchContent() {
             </div>
           )}
 
+          {isMoodMode && query.trim() && moodError && (
+            <div role="alert" className="mt-3 rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
+              Không thể hoàn tất tìm kiếm cảm xúc: {moodError}
+            </div>
+          )}
+
+          {isMoodMode && query.trim() && historySaveError && (
+            <div role="alert" className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100">
+              {historySaveError}
+            </div>
+          )}
+
+          {isMoodMode && query.trim() && moodMatchStatus === "MATCHED" && (
+            <div className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-950/20 px-4 py-2.5 text-xs text-emerald-100">
+              Tìm được {totalFound} bài đạt ngưỡng phù hợp trong {moodCandidateCount} bài đã chấm.
+              {moodDistanceCutoff !== null && <span> Ngưỡng khoảng cách: {moodDistanceCutoff.toFixed(2)}.</span>}
+            </div>
+          )}
+
+          {isMoodMode && query.trim() && moodMatchStatus === "LIMITED" && (
+            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/25 px-4 py-2.5 text-xs text-amber-100">
+              Chưa có bài nào đạt ngưỡng phù hợp trong {moodCandidateCount} bài đã chấm. Đang hiển thị các bài gần nhất để bạn tham khảo.
+              {moodDistanceCutoff !== null && <span> Ngưỡng khoảng cách: {moodDistanceCutoff.toFixed(2)}.</span>}
+            </div>
+          )}
+
+          {isMoodMode && query.trim() && moodMatchStatus === "NO_CANDIDATES" && (
+            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/25 px-4 py-2.5 text-xs text-amber-100">
+              Kho nhạc hiện chưa có bài hát phù hợp để chấm theo tâm trạng này.
+            </div>
+          )}
+
+          {isMoodMode && query.trim() && moodCatalogDiagnostics && (
+            <div className="mt-2 text-[11px] text-slate-400">
+              Dữ liệu kho nhạc: {moodCatalogDiagnostics.tracksWithAudioFeatures}/{moodCandidateCount} bài có đặc trưng âm thanh,
+              {" "}{moodCatalogDiagnostics.tracksWithCompleteAudioFeatures} bài đủ đặc trưng,
+              {" "}{moodCatalogDiagnostics.tracksWithGenreTags} bài có thẻ thể loại,
+              {" "}{moodCatalogDiagnostics.tracksWithMoodTags} bài có thẻ tâm trạng,
+              {" "}độ phủ trung bình {Math.round(moodCatalogDiagnostics.averageFeatureCoverage * 100)}%.
+            </div>
+          )}
+
           {/* Genre quick filters */}
-          {activeTab === "tracks" && (
+          {currentTab === "tracks" && (
             <div className="flex items-center gap-2 mt-2 overflow-x-auto pb-2 scrollbar-none">
               {GENRE_FILTERS.map((g) => (
                 <button
@@ -443,26 +634,27 @@ function SearchContent() {
             <button
               onClick={() => handleTabChange("tracks")}
               className={`px-4 py-3 text-sm font-medium transition-all relative ${
-                activeTab === "tracks"
+                currentTab === "tracks"
                   ? "text-cyan-400"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Bài hát ({tracks.length})
-              {activeTab === "tracks" && (
+              {currentTab === "tracks" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
             </button>
             <button
+              disabled={isMoodMode}
               onClick={() => handleTabChange("artists")}
-              className={`px-4 py-3 text-sm font-medium transition-all relative ${
-                activeTab === "artists"
+              className={`px-4 py-3 text-sm font-medium transition-all relative disabled:cursor-not-allowed disabled:opacity-40 ${
+                currentTab === "artists"
                   ? "text-cyan-400"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Nghệ sĩ
-              {activeTab === "artists" && (
+              {currentTab === "artists" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
             </button>
@@ -515,13 +707,21 @@ function SearchContent() {
             <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-sm text-slate-400">Đang tìm kiếm...</p>
           </div>
-        ) : activeTab === "tracks" ? (
+        ) : currentTab === "tracks" ? (
           tracks.length === 0 ? (
             <div className="text-center py-24">
               <Music className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-300 font-medium text-lg">Không tìm thấy bài hát</p>
+              <p className="text-slate-300 font-medium text-lg">
+                {moodError
+                  ? "Chưa thể hiển thị kết quả tìm kiếm"
+                  : isMoodMode && moodMatchStatus === "NO_CANDIDATES"
+                    ? "Kho nhạc chưa có bài hát để gợi ý"
+                    : "Không tìm thấy bài hát"}
+              </p>
               <p className="text-slate-500 text-sm mt-1">
-                Thử tìm với từ khóa khác (ví dụ: &quot;Ngọt&quot;, &quot;Vô Tình&quot;, &quot;Pop&quot;)
+                {moodError
+                  ? "Thông tin lỗi được hiển thị phía trên; thử lại khi dịch vụ cảm xúc hoạt động."
+                  : "Thử tìm với từ khóa khác (ví dụ: \"Ngọt\", \"Vô Tình\", \"Pop\")"}
               </p>
             </div>
           ) : (
@@ -549,6 +749,7 @@ function SearchContent() {
                   key={artist.spotifyId}
                   artist={artist}
                   onClick={() => {
+                    recordSelectedResult("ARTIST", artist.spotifyId);
                     router.push(`/dashboard/artists/${artist.spotifyId}`);
                   }}
                 />

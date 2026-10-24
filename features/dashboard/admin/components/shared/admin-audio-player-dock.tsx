@@ -30,7 +30,7 @@ type AdminAudioPlayerDockProps = {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8080";
+  "http://localhost:8088";
 
 export const AUDIO_SERVER_BASE_URL = "http://158.178.247.33";
 export const FALLBACK_REAL_AUDIO_URL =

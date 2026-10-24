@@ -1,3 +1,9 @@
+/**
+ * @deprecated TOÀN BỘ MOCK DATA TRONG FILE NÀY ĐÃ BỊ LOẠI BỎ KHỎI ADMIN DASHBOARD.
+ * Hệ thống Moodify Admin hiện tại đã kết nối 100% vào cơ sở dữ liệu thật (MySQL & MongoDB).
+ * File này được lưu trữ để tham chiếu cấu trúc lịch sử và không còn được import ở bất kỳ đâu.
+ */
+
 import {
   AdminUser,
   CatalogTrack,

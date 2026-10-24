@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Search, Library, LogOut, Plus, Music } from "lucide-react";
+import { Home, Search, Library, Clock, History, LogOut, Plus, Music } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -19,6 +19,8 @@ const navigation = [
   { name: "Trang chủ", href: "/dashboard", icon: Home },
   { name: "Tìm kiếm", href: "/dashboard/search", icon: Search },
   { name: "Thư viện", href: "/dashboard/library", icon: Library },
+  { name: "Lịch sử nghe", href: "/dashboard/history", icon: Clock },
+  { name: "Lịch sử tìm kiếm", href: "/dashboard/search-history", icon: History },
 ];
 
 export function Sidebar() {

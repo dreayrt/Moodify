@@ -13,11 +13,11 @@ export interface LyricLine {
 }
 
 interface RealtimeLyricsProps {
-  track: PlayerTrack | null;
-  currentTime: number;
-  duration: number;
-  isPlaying: boolean;
-  onSeek: (timeSeconds: number) => void;
+  track?: PlayerTrack | null;
+  currentTime?: number;
+  duration?: number;
+  isPlaying?: boolean;
+  onSeek?: (timeSeconds: number) => void;
   onTogglePlay?: () => void;
   className?: string;
 }
@@ -123,15 +123,22 @@ function formatTime(seconds: number): string {
 }
 
 export default function RealtimeLyrics({
-  track,
-  currentTime,
-  duration,
-  isPlaying,
-  onSeek,
-  onTogglePlay,
+  track: propTrack,
+  currentTime: propCurrentTime,
+  duration: propDuration,
+  isPlaying: propIsPlaying,
+  onSeek: propOnSeek,
+  onTogglePlay: propOnTogglePlay,
   className = "",
 }: RealtimeLyricsProps) {
-  const { isPremiumUser } = usePlayer();
+  const player = usePlayer();
+  const track = propTrack !== undefined ? propTrack : player.currentTrack;
+  const currentTime = propCurrentTime !== undefined ? propCurrentTime : player.currentTime;
+  const duration = propDuration !== undefined ? propDuration : player.duration;
+  const isPlaying = propIsPlaying !== undefined ? propIsPlaying : player.isPlaying;
+  const onSeek = propOnSeek || player.seek;
+  const onTogglePlay = propOnTogglePlay || player.togglePlay;
+  const isPremiumUser = player.isPremiumUser;
   const { vipButtonsEnabled, currentVipTheme } = useVipTheme();
   const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
 

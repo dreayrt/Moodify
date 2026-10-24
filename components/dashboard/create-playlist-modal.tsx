@@ -84,9 +84,9 @@ export default function CreatePlaylistModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -224,7 +224,7 @@ export default function CreatePlaylistModal({
                       key={preset.url}
                       type="button"
                       onClick={() => setCoverUrl(preset.url)}
-                      className={`group relative aspect-square rounded-lg overflow-hidden border transition-all ${
+                      className={`group relative aspect-square rounded-lg overflow-hidden border transition-all bg-slate-800 ${
                         isSelected
                           ? "border-cyan-400 ring-2 ring-cyan-400/50 scale-105"
                           : "border-white/10 opacity-70 hover:opacity-100 hover:border-white/30"
@@ -233,9 +233,15 @@ export default function CreatePlaylistModal({
                       <img
                         src={preset.url}
                         alt={preset.label}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1">
+                      <div className="absolute inset-0 bg-gradient-to-tr from-cyan-600/40 to-purple-600/40 -z-0 flex items-center justify-center">
+                        <Music2 className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1">
                         <span className="text-[9px] text-white font-medium truncate">
                           {preset.label}
                         </span>
