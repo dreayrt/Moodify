@@ -54,6 +54,7 @@ export interface SongLicense {
   status: LicenseStatus;
   documentUrl?: string | null;
   documentName?: string | null;
+  acquisitionCostVnd?: number | null;
 }
 
 export type TrackFilterStatus = "all" | "draft" | "published";

@@ -27,7 +27,6 @@ import {
   Square,
   FastForward,
   UploadCloud,
-  Users,
   Share2,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
@@ -53,7 +52,7 @@ import { TrackDeleteModal } from "./track-delete-modal";
 import { TrackUploadModal } from "./track-upload-modal";
 import { ToastNotification } from "./toast-notification";
 import { AudienceDistributionCard } from "./audience-distribution-card";
-import { RevenueAnalyticsDrawer } from "./revenue-analytics-drawer";
+import { RevenueAnalyticsDrawer } from "./revenue-analytics-live";
 
 type Stat = {
   key: "plays" | "reposts" | "downloads" | "likes" | "comments";
@@ -1109,7 +1108,6 @@ export default function ContentLeadDashboardPage() {
 
   // Dynamic calculated stats from tracks
   const statsList: Stat[] = useMemo(() => {
-    const totalPlays = tracks.reduce((sum, tr) => sum + tr.plays, 0);
     const totalLikes = tracks.reduce((sum, tr) => sum + tr.likes, 0);
 
     const formatNum = (num: number) => {
@@ -1119,7 +1117,6 @@ export default function ContentLeadDashboardPage() {
     const downloadedTracks = tracks.filter((tr) => tr.downloadStatus === "completed").length;
 
     return [
-      { key: "plays", value: formatNum(totalPlays), icon: Activity },
       { key: "reposts", value: "0", icon: Radio },
       { key: "downloads", value: formatNum(downloadedTracks), icon: Download },
       { key: "likes", value: formatNum(totalLikes), icon: Heart },
@@ -1255,8 +1252,8 @@ export default function ContentLeadDashboardPage() {
               className="anim-fade-up overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(135deg,rgba(18,19,22,0.96)_0%,rgba(12,13,18,0.9)_58%,rgba(13,17,28,0.94)_100%)] px-5 py-6 shadow-[0_30px_90px_rgba(0,0,0,0.28)] md:px-7 md:py-7"
               style={{ animationDelay: "260ms" }}
             >
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
-                <div>
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+                <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">{t("dashboard.artist.studio.eyebrow")}</p>
                   <div className="mt-4 flex flex-wrap items-end gap-3">
                     <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
@@ -1269,85 +1266,51 @@ export default function ContentLeadDashboardPage() {
                   </p>
                 </div>
 
-                <div className="relative mx-auto flex h-[190px] w-[190px] items-center justify-center">
+                <div className="relative mx-auto flex h-[160px] w-[160px] shrink-0 items-center justify-center lg:mr-3">
                   <div
                     className="absolute inset-0 rounded-full border border-white/8"
                     style={{ animation: "artistPulse 5s ease-in-out infinite" }}
                   />
                   <div
-                    className="absolute inset-[16px] rounded-full border border-[#ff7a2c]/30"
+                    className="absolute inset-[14px] rounded-full border border-[#ff7a2c]/30"
                     style={{ animation: "artistPulse 5s ease-in-out 400ms infinite" }}
                   />
                   <div
-                    className="absolute inset-[34px] rounded-full bg-[radial-gradient(circle,_rgba(255,122,44,0.24),_rgba(255,122,44,0.04)_60%,_transparent_70%)] blur-sm"
+                    className="absolute inset-[30px] rounded-full bg-[radial-gradient(circle,_rgba(255,122,44,0.24),_rgba(255,122,44,0.04)_60%,_transparent_70%)] blur-sm"
                     style={{ animation: "artistFloat 7s ease-in-out infinite" }}
                   />
-                  <div className="relative grid h-[88px] w-[88px] place-items-center rounded-full border border-white/10 bg-white/[0.06] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
-                    <Music2 className="h-10 w-10 text-white" strokeWidth={1.6} />
+                  <div className="relative grid h-[76px] w-[76px] place-items-center rounded-full border border-white/10 bg-white/[0.06] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
+                    <Music2 className="h-8 w-8 text-white" strokeWidth={1.6} />
                   </div>
                 </div>
               </div>
 
               {/* Dynamic Stats Grid */}
-              <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 {statsList.map((item, index) => (
                   <StatCard key={item.key} item={item} delay={340 + index * 70} />
                 ))}
               </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {[
-                  {
-                    icon: CircleDollarSign,
-                    label: t("dashboard.artist.studio.earnings"),
-                    copy: "$1,420.80 tháng này",
-                    clickable: true,
-                    onClick: () => setIsRevenueDrawerOpen(true),
-                    badge: "Xem chi tiết →",
-                  },
-                  {
-                    icon: Users,
-                    label: t("dashboard.artist.studio.fans"),
-                    copy: "+420 người theo dõi mới",
-                    clickable: false,
-                  },
-                ].map((item, index) => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={item.label}
-                      onClick={item.onClick}
-                      className={`anim-fade-up flex items-center justify-between rounded-[22px] border border-white/8 bg-black/20 p-4 transition ${
-                        item.clickable
-                          ? "hover:border-[#ff7a2c]/50 hover:bg-white/[0.05] cursor-pointer group shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
-                          : "hover:bg-white/[0.04]"
-                      }`}
-                      style={{ animationDelay: `${620 + index * 80}ms` }}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`grid h-12 w-12 place-items-center rounded-[18px] border transition ${
-                            item.clickable
-                              ? "border-white/10 bg-white/[0.04] group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/10 text-[#ffb488]"
-                              : "border-white/10 bg-white/[0.04] text-[#ffb488]"
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" strokeWidth={1.7} />
-                        </div>
-                        <div>
-                          <p className="text-[14px] text-white font-medium">{item.label}</p>
-                          <p className="mt-1 text-[12px] text-white/44">{item.copy}</p>
-                        </div>
-                      </div>
-                      {item.badge && (
-                        <span className="hidden sm:inline-flex items-center text-[11px] font-medium text-[#ffb488] bg-[#ff7a2c]/10 border border-[#ff7a2c]/20 px-2.5 py-1 rounded-full group-hover:bg-[#ff7a2c]/20 group-hover:border-[#ff7a2c]/40 transition">
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsRevenueDrawerOpen(true)}
+                className="anim-fade-up group mt-5 flex w-full items-center gap-4 rounded-[22px] border border-white/8 bg-black/20 p-4 text-left transition hover:border-[#ff7a2c]/45 hover:bg-[#ff7a2c]/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a2c]/40"
+                style={{ animationDelay: "620ms" }}
+              >
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] border border-white/10 bg-white/[0.04] text-[#ffb488] transition group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/10">
+                  <CircleDollarSign className="h-5 w-5" strokeWidth={1.7} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-medium text-white">{t("dashboard.artist.studio.earnings")}</span>
+                  <span className="mt-0.5 block text-[12px] text-white/45">Theo dõi lượt nghe hợp lệ, doanh thu và tiến độ thu hồi vốn theo từng bài hát</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#ff7a2c]/20 bg-[#ff7a2c]/10 px-3.5 py-1.5 text-[11px] font-medium text-[#ffb488] transition group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/20">
+                  Xem chi tiết
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </span>
+              </button>
+
             </div>
 
             {/* Catalog Section */}

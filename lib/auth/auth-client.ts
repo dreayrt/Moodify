@@ -65,7 +65,30 @@ export type ArtistTrackResponse = {
   explicit: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  acquisitionCostVnd?: number | null;
 };
+
+export type RevenueTrack = {
+  id: string; title: string; genre: string; coverUrl: string | null;
+  qualifiedPlays: number; pendingPlays: number;
+  grossVnd: number; contentLeadVnd: number; platformVnd: number;
+  acquisitionCostVnd: number | null; lifetimeContentLeadVnd: number;
+  recoupBalanceVnd: number | null;
+};
+
+export type ContentLeadRevenueResponse = {
+  period: "today" | "week" | "month" | "year";
+  fromDate: string; toDate: string; qualifiedPlays: number; pendingPlays: number;
+  grossVnd: number; contentLeadVnd: number; platformVnd: number;
+  trend: Array<{ day: string; contentLeadVnd: number }>;
+  tracks: RevenueTrack[];
+};
+
+export async function getContentLeadRevenue(period: ContentLeadRevenueResponse["period"]): Promise<ContentLeadRevenueResponse> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xem doanh thu.");
+  return requestJson<ContentLeadRevenueResponse>(`/api/content-lead/me/analytics/revenue?period=${period}`, { token });
+}
 
 export type ArtistAlbumResponse = {
   id: string;
@@ -544,6 +567,8 @@ export interface OcrExtractLicenseResponse {
   confidence?: number;
   message?: string;
   rawFields?: Record<string, unknown>;
+  acquisitionCostVnd?: number;
+  costEvidence?: { page?: number; source_text?: string; amount_vnd?: number };
 }
 
 export async function extractLicenseFromDoc(
@@ -611,6 +636,7 @@ export async function recordPlatformVisit(payload: {
 }
 
 export async function recordListeningSessionTelemetry(payload: {
+  sessionKey: string;
   historyId?: number;
   trackId: string;
   durationMs: number;
@@ -619,7 +645,7 @@ export async function recordListeningSessionTelemetry(payload: {
   source?: "HOME" | "SEARCH" | "PLAYLIST" | "ALBUM" | "ARTIST" | "LIBRARY" | "FAVORITES" | "EMOTION" | "OTHER" | string;
   sourceId?: string;
   deviceType?: "WEB" | "ANDROID" | "IOS" | "OTHER";
-  eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+  eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "HEARTBEAT" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
 }) {
   try {
     const token = await getValidAccessToken();

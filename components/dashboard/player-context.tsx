@@ -347,6 +347,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ── Listening History & Playback Telemetry ──────────────────
   const listeningSessionRef = useRef<{
+    sessionKey: string;
     historyId: number | null;
     trackId: string;
     startedAt: number;
@@ -368,6 +369,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Ghi nhận đầy đủ 100% mọi phiên nghe và sự kiện vào MySQL listening_history và playback_events
     if (totalDuration > 0 || eventType === "COMPLETE" || eventType === "TRACK_CHANGED" || eventType === "SKIP_NEXT" || eventType === "SKIP_PREVIOUS" || eventType === "PLAYBACK_STOPPED") {
       void recordListeningSessionTelemetry({
+        sessionKey: session.sessionKey,
         historyId: session.historyId ?? undefined,
         trackId: session.trackId,
         durationMs: Math.max(0, totalDuration),
@@ -386,13 +388,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     const audio = new Audio();
     audio.preload = "auto";
-    audio.volume = volume;
+    audio.volume = 0.8;
     audio.playbackRate = playbackRateRef.current;
     audioRef.current = audio;
 
     const onTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
     };
+
+    const heartbeat = window.setInterval(() => {
+      const session = listeningSessionRef.current;
+      if (!session || audio.paused || audio.seeking || audio.readyState < 2) return;
+      void recordListeningSessionTelemetry({
+        sessionKey: session.sessionKey,
+        historyId: session.historyId ?? undefined,
+        trackId: session.trackId,
+        durationMs: session.accumulatedDurationMs,
+        positionMs: Math.round(audio.currentTime * 1000),
+        eventType: "HEARTBEAT",
+      });
+    }, 5000);
 
     const onLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration)) {
@@ -408,6 +423,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (session.accumulatedDurationMs > 0) {
           const posMs = Math.round(audio.currentTime * 1000);
           void recordListeningSessionTelemetry({
+            sessionKey: session.sessionKey,
             historyId: session.historyId ?? undefined,
             trackId: session.trackId,
             durationMs: session.accumulatedDurationMs,
@@ -428,6 +444,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         session.lastPlayTimestamp = null;
         const posMs = Math.round(audio.currentTime * 1000);
         void recordListeningSessionTelemetry({
+          sessionKey: session.sessionKey,
           historyId: session.historyId ?? undefined,
           trackId: session.trackId,
           durationMs: session.accumulatedDurationMs,
@@ -442,17 +459,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     const onEnded = () => {
       flushListeningSession("COMPLETE");
-      if (repeatModeRef.current === "one") {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current
-            .play()
-            .then(() => setIsPlaying(true))
-            .catch(() => {});
-        }
-      } else {
-        nextTrackRef.current(true);
-      }
+      nextTrackRef.current(true);
     };
 
     const onError = (e: Event) => {
@@ -468,6 +475,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener("error", onError);
 
     return () => {
+      window.clearInterval(heartbeat);
       flushListeningSession("PLAYBACK_STOPPED");
       audio.pause();
       audio.removeEventListener("timeupdate", onTimeUpdate);
@@ -478,7 +486,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("error", onError);
       audioRef.current = null;
     };
-  }, [flushListeningSession, volume]);
+  }, [flushListeningSession]);
 
   const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
     setCurrentTrack(track);
@@ -498,9 +506,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     // Telemetry: Flush previous track session and initialize new session
     flushListeningSession("TRACK_CHANGED");
+    // Stop the previous audio before assigning the next session; otherwise its
+    // pause event would be attributed to the new song.
+    audioRef.current?.pause();
     const targetTrackId = track.id || track.spotifyId;
     if (targetTrackId) {
       const newSession = {
+        sessionKey: crypto.randomUUID(),
         historyId: null as number | null,
         trackId: targetTrackId,
         startedAt: Date.now(),
@@ -511,6 +523,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       // Ghi nhận sự kiện khởi phát PLAY ban đầu và lưu historyId
       void recordListeningSessionTelemetry({
+        sessionKey: newSession.sessionKey,
         trackId: targetTrackId,
         durationMs: 0,
         positionMs: 0,
@@ -575,7 +588,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [flushListeningSession]);
 
-  // Keep a ref for executePlayTrack so ad audio ended callback can access latest
+  // Ad completion needs the latest play callback without recreating the ad audio element.
   const executePlayTrackRef = useRef(executePlayTrack);
   useEffect(() => {
     executePlayTrackRef.current = executePlayTrack;
@@ -702,13 +715,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) {
       const oldPosMs = Math.round(audioRef.current.currentTime * 1000);
       const targetPosMs = Math.round(timeSeconds * 1000);
-      audioRef.current.currentTime = timeSeconds;
-      setCurrentTime(timeSeconds);
-
       const session = listeningSessionRef.current;
-      if (session && session.trackId) {
+      if (session && session.trackId && oldPosMs >= 60_000 && targetPosMs <= 2_000) {
+        // Rewinding a substantially played song to its start begins a genuine new replay.
+        flushListeningSession("TRACK_CHANGED");
+        const replaySession = {
+          sessionKey: crypto.randomUUID(), historyId: null as number | null,
+          trackId: session.trackId, startedAt: Date.now(),
+          lastPlayTimestamp: audioRef.current.paused ? null : Date.now(),
+          accumulatedDurationMs: 0,
+        };
+        listeningSessionRef.current = replaySession;
+        void recordListeningSessionTelemetry({
+          sessionKey: replaySession.sessionKey, trackId: replaySession.trackId,
+          durationMs: 0, positionMs: targetPosMs, eventType: "PLAY",
+          deviceType: "WEB", source: "HOME",
+        });
+      } else if (session && session.trackId) {
         const curDur = session.accumulatedDurationMs + (session.lastPlayTimestamp ? (Date.now() - session.lastPlayTimestamp) : 0);
         void recordListeningSessionTelemetry({
+          sessionKey: session.sessionKey,
           historyId: session.historyId ?? undefined,
           trackId: session.trackId,
           durationMs: Math.max(0, curDur),
@@ -719,8 +745,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           source: "HOME",
         });
       }
+      audioRef.current.currentTime = timeSeconds;
+      setCurrentTime(timeSeconds);
     }
-  }, []);
+  }, [flushListeningSession]);
 
   const setVolume = useCallback((vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
@@ -791,24 +819,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     // Single track repeat triggered by natural track end
     if (isAutoAdvance && repeatModeRef.current === "one") {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current
-          .play()
-          .then(() => setIsPlaying(true))
-          .catch(() => {});
-      }
+      const repeated = currentQueue[currentIdx];
+      if (repeated) playTrack(repeated, currentQueue);
       return;
     }
 
     if (currentQueue.length === 1) {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current
-          .play()
-          .then(() => setIsPlaying(true))
-          .catch(() => {});
-      }
+      playTrack(currentQueue[0], currentQueue);
       return;
     }
 
