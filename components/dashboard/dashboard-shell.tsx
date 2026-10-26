@@ -50,6 +50,7 @@ import { BrandLogo } from "@/components/shared/logo-mark";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
 import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
+import { usePlayer } from "./player-context";
 
 export type Vibe = {
   id: string;
@@ -859,6 +860,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPlayerBarHidden } = usePlayer();
 
   const currentVibe = searchParams.get("vibe") || "all";
   const activeVibeObj = VIBES.find((v) => v.id === currentVibe) ?? VIBES[0];
@@ -1156,7 +1158,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
+        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>

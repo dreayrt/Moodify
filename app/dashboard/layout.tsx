@@ -17,14 +17,16 @@ export default function DashboardLayout({
     pathname?.startsWith("/dashboard/moderator") ||
     pathname?.startsWith("/dashboard/admin");
 
-  if (isStudioRoute) {
-    return <>{children}</>;
-  }
-
   return (
     <PlayerProvider>
-      <DashboardShell>{children}</DashboardShell>
-      <GlobalPlayerBar />
+      {isStudioRoute ? (
+        children
+      ) : (
+        <>
+          <DashboardShell>{children}</DashboardShell>
+          <GlobalPlayerBar />
+        </>
+      )}
     </PlayerProvider>
   );
 }

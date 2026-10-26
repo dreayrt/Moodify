@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Share2,
   Gauge,
+  ChevronDown,
 } from "lucide-react";
 import { usePlayer } from "./player-context";
 import { addToLibrary, removeFromLibrary, isTrackInLibrary } from "@/lib/api-client";
@@ -36,11 +37,12 @@ function formatSeconds(sec: number): string {
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
 export function GlobalPlayerBar() {
   const pathname = usePathname();
   const {
     currentTrack,
+    isPlayerBarHidden,
+    setPlayerBarHidden,
     isPlaying,
     isBuffering,
     currentTime,
@@ -129,6 +131,33 @@ export function GlobalPlayerBar() {
     return null;
   }
 
+  if (isPlayerBarHidden) {
+    return (
+      <>
+        <AdInterstitialBanner />
+        <button
+          type="button"
+          onClick={() => setPlayerBarHidden(false)}
+          className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/90 px-4 py-3 text-sm font-medium text-white shadow-[0_12px_36px_rgba(0,0,0,0.55)] backdrop-blur-xl transition hover:border-purple-400/60 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Mở thanh phát nhạc"
+          title={`Mở thanh phát nhạc${isPlaying ? ` — đang phát ${currentTrack.name}` : ""}`}
+        >
+          <span className="relative inline-flex">
+            <Music2 className="h-4 w-4 text-purple-300" />
+            {isPlaying && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />}
+          </span>
+          <span className="hidden sm:inline">Mở trình phát</span>
+        </button>
+        <ShareSongCardModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          track={currentTrack}
+          currentTime={currentTime}
+        />
+      </>
+    );
+  }
+
   const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
 
   const handleSeekClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -142,7 +171,16 @@ export function GlobalPlayerBar() {
   return (
     <>
       <AdInterstitialBanner />
-      <div className={`fixed bottom-0 left-0 right-0 z-50 px-4 md:px-8 py-3 backdrop-blur-3xl transition-all duration-300 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder}`}>
+      <div className={`fixed bottom-0 left-0 right-0 z-50 px-4 md:px-8 py-3 pr-12 backdrop-blur-3xl transition-all duration-300 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder}`}>
+        <button
+          type="button"
+          onClick={() => setPlayerBarHidden(true)}
+          className="absolute right-2 top-1.5 z-10 rounded-full p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Ẩn thanh phát nhạc"
+          title="Ẩn thanh phát nhạc"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Track info */}
           <div className="flex items-center gap-3 w-[220px] md:w-[280px] min-w-0">

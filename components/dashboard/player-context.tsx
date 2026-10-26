@@ -38,6 +38,8 @@ export type AdReason = "FREE_REGULAR" | "BASIC_DAILY_LIMIT_EXCEEDED" | "SKIP_PEN
 
 interface PlayerContextType {
   currentTrack: PlayerTrack | null;
+  isPlayerBarHidden: boolean;
+  setPlayerBarHidden: (hidden: boolean) => void;
   isPlaying: boolean;
   isBuffering: boolean;
   currentTime: number;
@@ -115,6 +117,7 @@ function recordDailySkip(): number {
 
 // ── Playback State Persistence Helpers ───────────────────────
 const PLAYBACK_STATE_KEY = "moodify_playback_state";
+const PLAYER_BAR_HIDDEN_KEY = "moodify-player-bar-hidden";
 
 export interface PersistedPlaybackState {
   currentTrack: PlayerTrack | null;
@@ -170,6 +173,7 @@ function savePersistedPlaybackState(state: Partial<PersistedPlaybackState>) {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
+  const [isPlayerBarHidden, setIsPlayerBarHidden] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const retryCountRef = useRef(0);
@@ -179,6 +183,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [queue, setQueue] = useState<PlayerTrack[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+
+  useEffect(() => {
+    try {
+      setIsPlayerBarHidden(window.localStorage.getItem(PLAYER_BAR_HIDDEN_KEY) === "true");
+    } catch (_) {}
+  }, []);
+
+  const setPlayerBarHidden = useCallback((hidden: boolean) => {
+    setIsPlayerBarHidden(hidden);
+    try {
+      window.localStorage.setItem(PLAYER_BAR_HIDDEN_KEY, String(hidden));
+    } catch (_) {}
+  }, []);
 
   // ── Playback Speed ───────────────────────────────────────────
   const [playbackRate, setPlaybackRateState] = useState(1);
@@ -361,6 +378,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           adAudioRef.current.pause();
         } catch (_) {}
       }
+      playbackIntentRef.current = false;
       setIsPlaying(false);
       setIsAdPlaying(false);
 
@@ -399,7 +417,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     let timer: NodeJS.Timeout | null = null;
 
     const checkStatus = async () => {
-      if (typeof window === "undefined" || !isPlaying) return;
+      if (typeof window === "undefined" || !playbackIntentRef.current) return;
       try {
         await pingDeviceStatus();
       } catch (_) {
@@ -407,26 +425,42 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    if (isPlaying) {
-      // Check every 6 seconds while music is actively playing
+    if (playbackIntentRef.current) {
+      // Keep the device session alive while playback is intended, including
+      // brief browser/OS pauses while this tab is in the background.
       timer = setInterval(checkStatus, 6000);
     }
 
     const handleFocusOrVisible = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        void pingDeviceStatus();
-      }
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+
+      void pingDeviceStatus();
+
+      // Some browsers or operating systems pause background media. Resume only
+      // when playback was active before it paused, never after an explicit stop.
+      if (!playbackIntentRef.current || resumeAttemptRef.current) return;
+      const audio = isAdPlaying ? adAudioRef.current : audioRef.current;
+      if (!audio?.paused) return;
+      if (!isAdPlaying && !currentTrackRef.current) return;
+
+      resumeAttemptRef.current = true;
+      void audio.play()
+        .then(() => setIsPlaying(true))
+        .catch((error) => console.warn("Could not resume background audio:", error))
+        .finally(() => {
+          resumeAttemptRef.current = false;
+        });
     };
 
-    window.addEventListener("visibilitychange", handleFocusOrVisible);
+    document.addEventListener("visibilitychange", handleFocusOrVisible);
     window.addEventListener("focus", handleFocusOrVisible);
 
     return () => {
       if (timer) clearInterval(timer);
-      window.removeEventListener("visibilitychange", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleFocusOrVisible);
       window.removeEventListener("focus", handleFocusOrVisible);
     };
-  }, [isPlaying]);
+  }, [isPlaying, isAdPlaying]);
   const tracksPlayedRef = useRef(0);
   const freeTracksSinceLastAdRef = useRef(0);
   // Random threshold between 1 and 3 songs before next ad
@@ -437,6 +471,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const adAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackIntentRef = useRef(false);
+  const resumeAttemptRef = useRef(false);
 
   // Load daily stats on mount
   useEffect(() => {
@@ -701,6 +737,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onPlay = () => {
+      playbackIntentRef.current = true;
       const session = listeningSessionRef.current;
       if (session) {
         session.lastPlayTimestamp = Date.now();
@@ -789,6 +826,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onPlaying = () => {
+      playbackIntentRef.current = true;
       setIsBuffering(false);
       setIsPlaying(true);
       retryCountRef.current = 0;
@@ -828,6 +866,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             .catch(() => {});
         }, retryCountRef.current * 1500);
       } else {
+        playbackIntentRef.current = false;
         setIsPlaying(false);
       }
     };
@@ -895,6 +934,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [volume, isMuted]);
 
   const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
+    playbackIntentRef.current = true;
     setCurrentTrack(track);
 
     if (playlist && playlist.length > 0) {
@@ -989,11 +1029,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current
         .play()
         .then(() => {
+          playbackIntentRef.current = true;
           setIsPlaying(true);
           setIsBuffering(false);
         })
         .catch((err) => {
           console.warn("Autoplay was prevented or audio stream not available:", err);
+          playbackIntentRef.current = false;
           setIsPlaying(false);
           setIsBuffering(false);
         });
@@ -1009,6 +1051,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const triggerAd = useCallback((force = false, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[], reason: AdReason = "FREE_REGULAR") => {
     // Gói NO_ADS (Gia Đình / Cá Nhân FULL) không bị chèn quảng cáo
     if (entitlementsRef.current.adPolicy === "NO_ADS" && !force) return;
+    playbackIntentRef.current = true;
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -1097,9 +1140,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentTrack) return;
     if (isPlaying) {
+      playbackIntentRef.current = false;
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      playbackIntentRef.current = true;
       const currentSrc = audioRef.current.src;
       if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
         const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
@@ -1112,12 +1157,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
-        .catch((err) => console.warn("Could not resume audio:", err));
+        .catch((err) => {
+          playbackIntentRef.current = false;
+          console.warn("Could not resume audio:", err);
+        });
     }
   }, [isPlaying, currentTrack, currentTime]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
+      playbackIntentRef.current = false;
       audioRef.current.pause();
       setIsPlaying(false);
     }
@@ -1125,6 +1174,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const resume = useCallback(() => {
     if (audioRef.current && currentTrack) {
+      playbackIntentRef.current = true;
       const currentSrc = audioRef.current.src;
       if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
         const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
@@ -1364,6 +1414,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     <PlayerContext.Provider
       value={{
         currentTrack,
+        isPlayerBarHidden,
+        setPlayerBarHidden,
         isPlaying,
         isBuffering,
         currentTime,
