@@ -3,7 +3,7 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Lịch Sử Nghe Nhạc | Moodify",
-  description: "Xem lại những bài hát bạn đã thưởng thức gần đây trên Moodify.",
+  description: "Lịch sử phát các bài hát gần đây trên Moodify.",
 };
 
 export default function HistoryPage() {

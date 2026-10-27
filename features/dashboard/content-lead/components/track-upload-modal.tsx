@@ -164,7 +164,7 @@ export function TrackUploadModal({
   const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("Independent Artist");
   const [distributorId, setDistributorId] = useState<string>("");
-  const [distributionContractId, setDistributionContractId] = useState<string>("");
+  const [distributionContractCode, setDistributionContractCode] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>(getTodayDateString());
   const [expiryDate, setExpiryDate] = useState<string>(getDefaultExpiryDateString());
   const [isPerpetual, setIsPerpetual] = useState<boolean>(false);
@@ -172,11 +172,14 @@ export function TrackUploadModal({
   const [licenseDocName, setLicenseDocName] = useState<string>("");
   const [licenseDocSize, setLicenseDocSize] = useState<string>("");
   const [licenseDocUrl, setLicenseDocUrl] = useState<string>("");
+  const [acquisitionCostVnd, setAcquisitionCostVnd] = useState<string>("");
+  const [costEvidence, setCostEvidence] = useState<string>("");
 
   // UI helpers
   const [isDragging, setIsDragging] = useState(false);
   const [isDocDragging, setIsDocDragging] = useState(false);
   const [isExtractingOcr, setIsExtractingOcr] = useState<boolean>(false);
+  const ocrRequestRef = useRef(0);
   const [ocrExtractedFields, setOcrExtractedFields] = useState<string[]>([]);
   const [ocrNotification, setOcrNotification] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -203,9 +206,11 @@ export function TrackUploadModal({
   };
 
   const runOcrExtraction = async (file: File) => {
+    const requestId = ocrRequestRef.current;
     const extension = file.name.toLowerCase().split(".").pop();
     const isSupported = ["pdf", "png", "jpg", "jpeg"].includes(extension || "");
     if (!isSupported) {
+      setIsExtractingOcr(false);
       setOcrNotification(null);
       setStepError("OCR chỉ hỗ trợ PDF, PNG và JPG. Vui lòng chọn một trong các định dạng này để bóc tách tự động.");
       return;
@@ -216,11 +221,20 @@ export function TrackUploadModal({
       setOcrNotification(null);
       setStepError(null);
       const res = await extractLicenseFromDoc(file);
+      if (requestId !== ocrRequestRef.current) return;
       if (res && res.success) {
         const fields: string[] = [];
         if (res.licenseType) {
           setLicenseType(res.licenseType);
           fields.push("licenseType");
+        }
+        if (res.acquisitionCostVnd !== undefined && res.acquisitionCostVnd !== null) {
+          setAcquisitionCostVnd(String(res.acquisitionCostVnd));
+          setCostEvidence(`${res.costEvidence?.source_text || "Đã trích xuất từ tài liệu bản quyền"}${res.costEvidence?.page ? ` · trang ${res.costEvidence.page}` : ""}`);
+          fields.push("acquisitionCostVnd");
+        } else {
+          setAcquisitionCostVnd("");
+          setCostEvidence("");
         }
         if (res.copyrightOwner) {
           setCopyrightOwner(res.copyrightOwner);
@@ -231,7 +245,7 @@ export function TrackUploadModal({
           fields.push("distributorId");
         }
         if (res.contractId) {
-          setDistributionContractId(res.contractId);
+          setDistributionContractCode(res.contractId);
           fields.push("contractId");
         }
         if (res.issueDate) {
@@ -252,21 +266,31 @@ export function TrackUploadModal({
         if (fields.length > 0) {
           setOcrNotification(`Mô hình OCR đã tự động bóc tách và điền ${fields.length} trường thông tin từ tài liệu!`);
         } else {
-          setOcrNotification("Tài liệu đã được quét nhưng không phát hiện các trường mẫu hợp đồng bản quyền. Bạn có thể nhập tay các thông tin bên phải.");
+          setOcrNotification("Tài liệu đã được quét nhưng chưa đọc được giá quyền. Hãy kiểm tra tài liệu hoặc tải bản rõ hơn; các trường bản quyền khác có thể nhập tay.");
         }
       } else {
         const errMsg = res?.message || "Tài liệu không hợp lệ hoặc không đọc được.";
         setStepError(`⚠️ OCR cảnh báo: ${errMsg}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (requestId !== ocrRequestRef.current) return;
       console.warn("OCR Service extraction warning:", err);
-      setStepError(`⚠️ Không thể bóc tách dữ liệu từ file: ${err.message || "Lỗi kết nối tới OCR Service"}. Bạn có thể tự nhập tay thông tin.`);
+      setStepError(`⚠️ Không thể bóc tách dữ liệu từ file: ${err instanceof Error ? err.message : "Lỗi kết nối tới OCR Service"}. Hãy kiểm tra OCR hoặc tải bản rõ hơn để nhận diện giá quyền.`);
     } finally {
-      setIsExtractingOcr(false);
+      if (requestId === ocrRequestRef.current) setIsExtractingOcr(false);
     }
   };
 
   const handleLicenseDocFile = (file: File) => {
+    ocrRequestRef.current += 1;
+    if (!["pdf", "png", "jpg", "jpeg"].includes(file.name.toLowerCase().split(".").pop() || "")) {
+      setIsExtractingOcr(false);
+      setStepError("Tài liệu bản quyền phải là PDF, PNG hoặc JPG.");
+      return;
+    }
+    setAcquisitionCostVnd("");
+    setCostEvidence("");
+    setOcrExtractedFields([]);
     setLicenseDocFile(file);
     setLicenseDocName(file.name);
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -326,6 +350,10 @@ export function TrackUploadModal({
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isExtractingOcr) {
+      setStepError("Vui lòng chờ OCR đọc xong tài liệu bản quyền.");
+      return;
+    }
 
     if (!audioFile && !selectedFileName) {
       setStepError("Vui lòng chọn tệp âm thanh trước khi gửi yêu cầu.");
@@ -354,7 +382,7 @@ export function TrackUploadModal({
       setStepError("Ngày hết hạn phải từ hôm nay trở đi và không được trước ngày cấp. Nếu giấy phép vô thời hạn, hãy chọn “Vô thời hạn”.");
       return;
     }
-    if (distributorId && !distributionContractId.trim()) {
+    if (distributorId && !distributionContractCode.trim()) {
       setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
       return;
     }
@@ -388,11 +416,11 @@ export function TrackUploadModal({
 
       // License Info
       formData.append("licenseType", licenseType);
+      if (acquisitionCostVnd !== "") formData.append("acquisitionCostVnd", acquisitionCostVnd);
       if (distributorId && distributorId !== "0") {
         formData.append("distributorId", distributorId);
-        if (distributionContractId.trim()) {
-          const cleanContractId = distributionContractId.replace(/\D/g, "");
-          if (cleanContractId) formData.append("distributionContractId", cleanContractId);
+        if (distributionContractCode.trim()) {
+          formData.append("distributionContractCode", distributionContractCode.trim());
         }
       } else {
         formData.append("copyrightOwner", copyrightOwner.trim() || "Independent Artist");
@@ -410,10 +438,10 @@ export function TrackUploadModal({
         id: `lic-${savedResponse.id}`,
         trackId: savedResponse.id,
         distributorId: distributorId ? Number(distributorId) : null,
-        distributionContractId: distributionContractId.trim()
-          ? Number(distributionContractId.replace(/\D/g, "")) || 1
-          : null,
+        // This local model field is a database FK; the OCR contract code is a document reference, not an ID.
+        distributionContractId: null,
         licenseType,
+        acquisitionCostVnd: savedResponse.acquisitionCostVnd ?? null,
         copyrightOwner: copyrightOwner.trim() || "Independent Artist",
         issueDate: issueDate || null,
         expiryDate: isPerpetual ? null : expiryDate || null,
@@ -449,13 +477,13 @@ export function TrackUploadModal({
       onUploadSuccess(newTrack);
       handleReset();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to upload track and submit license:", err);
-      // Fallback optimistic mode if offline or backend connection error so user is never blocked
-      if (err.message && err.message.includes("Failed to fetch")) {
+      const errorMessage = err instanceof Error ? err.message : "";
+      if (errorMessage.includes("Failed to fetch")) {
         setStepError("Không thể kết nối đến máy chủ backend. Vui lòng kiểm tra backend đang chạy.");
       } else {
-        setStepError(err.message || "Gửi yêu cầu kiểm duyệt thất bại. Vui lòng thử lại!");
+        setStepError(errorMessage || "Gửi yêu cầu kiểm duyệt thất bại. Vui lòng thử lại!");
       }
     } finally {
       setIsSubmitting(false);
@@ -486,13 +514,15 @@ export function TrackUploadModal({
     setLicenseType("DIGITAL_STREAMING");
     setCopyrightOwner("Independent Artist");
     setDistributorId("1");
-    setDistributionContractId("");
+    setDistributionContractCode("");
     setIssueDate(getTodayDateString());
     setExpiryDate(getDefaultExpiryDateString());
     setIsPerpetual(false);
     setLicenseDocName("");
     setLicenseDocSize("");
     setLicenseDocUrl("");
+    setAcquisitionCostVnd("");
+    setCostEvidence("");
     setIsExtractingOcr(false);
     setOcrExtractedFields([]);
     setOcrNotification(null);
@@ -1087,6 +1117,17 @@ export function TrackUploadModal({
                   {/* Copyright Owner */}
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
+                      Chi phí mua quyền bài hát (VND)
+                    </label>
+                    <input type="number" min="0" step="1" value={acquisitionCostVnd} readOnly
+                      placeholder="OCR sẽ tự điền nếu tài liệu ghi rõ chi phí"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50" />
+                    <p className="mt-1 text-[11px] text-white/45">
+                      {costEvidence || "Không có giá rõ ràng trong tài liệu: để trống, báo cáo hoàn vốn sẽ hiển thị chưa đủ dữ liệu."}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
                       Chủ sở hữu quyền tác giả (<span className="text-[#ffb488] font-mono">copyright_owner</span>) <span className="text-[#ff7a2c]">*</span>
                     </label>
                     <input
@@ -1125,13 +1166,13 @@ export function TrackUploadModal({
                     {/* Distribution Contract ID */}
                     <div>
                       <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                        Mã hợp đồng (<span className="text-[#ffb488] font-mono">contract_id</span>)
+                        Mã hợp đồng trong tài liệu (<span className="text-[#ffb488] font-mono">contract_code</span>)
                       </label>
                       <input
                         type="text"
-                        value={distributionContractId}
-                        onChange={(e) => setDistributionContractId(e.target.value)}
-                        placeholder="Ví dụ: CTR-2026-088"
+                        value={distributionContractCode}
+                        onChange={(e) => setDistributionContractCode(e.target.value)}
+                        placeholder="Ví dụ: CTR-MUSIC-2026/89"
                         className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50 transition"
                       />
                     </div>
@@ -1210,7 +1251,7 @@ export function TrackUploadModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isExtractingOcr}
                   className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e64] px-5 py-2 text-[12px] font-semibold text-black shadow-[0_8px_20px_rgba(255,122,44,0.3)] hover:brightness-110 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (

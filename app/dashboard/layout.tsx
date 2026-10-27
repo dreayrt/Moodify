@@ -13,18 +13,19 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const isStudioRoute =
     pathname?.startsWith("/dashboard/content-lead") ||
-    pathname?.startsWith("/dashboard/artist") ||
     pathname?.startsWith("/dashboard/moderator") ||
     pathname?.startsWith("/dashboard/admin");
 
-  if (isStudioRoute) {
-    return <>{children}</>;
-  }
-
   return (
     <PlayerProvider>
-      <DashboardShell>{children}</DashboardShell>
-      <GlobalPlayerBar />
+      {isStudioRoute ? (
+        children
+      ) : (
+        <>
+          <DashboardShell>{children}</DashboardShell>
+          <GlobalPlayerBar />
+        </>
+      )}
     </PlayerProvider>
   );
 }

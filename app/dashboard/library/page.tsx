@@ -15,10 +15,13 @@ import {
   deleteAlbum,
   toggleFavoriteAlbum,
   fetchAlbumDetail,
+  fetchFollowedArtists,
+  toggleFollowArtist,
   type LibraryTrack,
   type Playlist,
   type Track,
   type Album,
+  type FollowedArtist,
 } from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,6 +48,8 @@ import {
   Disc,
   Globe,
   Lock,
+  Users,
+  UserCheck,
 } from "lucide-react";
 
 function LibraryContent() {
@@ -56,15 +61,14 @@ function LibraryContent() {
   const { user } = useAuth();
   const canCreateAlbum = user?.role === "CONTENT_LEAD" || user?.role === "ARTIST" || user?.role === "ADMIN";
 
-  // Active tab: "playlists" | "liked" | "albums"
-  const [activeTab, setActiveTab] = useState<"playlists" | "liked" | "albums">("playlists");
+  // Active tab: "playlists" | "liked" | "albums" | "artists"
+  const [activeTab, setActiveTab] = useState<"playlists" | "liked" | "albums" | "artists">("playlists");
 
   // Playlists state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [loadingSelectedPlaylist, setLoadingSelectedPlaylist] = useState(false);
-  const [playlistError, setPlaylistError] = useState<string | null>(null);
 
   // Albums state
   const [myAlbums, setMyAlbums] = useState<Album[]>([]);
@@ -72,6 +76,11 @@ function LibraryContent() {
   const [loadingAlbums, setLoadingAlbums] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
+
+  // Followed artists state
+  const [followedArtists, setFollowedArtists] = useState<FollowedArtist[]>([]);
+  const [loadingArtists, setLoadingArtists] = useState(false);
+  const [unfollowingArtistId, setUnfollowingArtistId] = useState<string | null>(null);
 
   // Liked tracks state
   const [likedTracks, setLikedTracks] = useState<LibraryTrack[]>([]);
@@ -86,20 +95,23 @@ function LibraryContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [removingTrackId, setRemovingTrackId] = useState<string | null>(null);
 
-  // Load playlists, albums and liked count on mount
+  // Load playlists, albums, liked count and followed artists on mount
   useEffect(() => {
     loadUserPlaylists();
     loadLikedCount();
     loadAlbums();
+    loadFollowedArtists();
   }, []);
 
   useEffect(() => {
     if (activeTab === "albums") {
       loadAlbums();
+    } else if (activeTab === "artists") {
+      loadFollowedArtists();
     }
   }, [activeTab]);
 
-  // Listen for global library and playlist changes from other components
+  // Listen for global library, playlist, and artist follow changes
   useEffect(() => {
     const handleLibraryChange = () => {
       loadLikedCount();
@@ -115,14 +127,45 @@ function LibraryContent() {
       }
     };
 
+    const handleArtistChange = () => {
+      loadFollowedArtists();
+    };
+
     window.addEventListener("moodify-library-updated", handleLibraryChange);
     window.addEventListener("moodify-playlist-updated", handlePlaylistChange);
+    window.addEventListener("moodify-artist-followed", handleArtistChange);
 
     return () => {
       window.removeEventListener("moodify-library-updated", handleLibraryChange);
       window.removeEventListener("moodify-playlist-updated", handlePlaylistChange);
+      window.removeEventListener("moodify-artist-followed", handleArtistChange);
     };
   }, [activeTab, currentPage, selectedPlaylist]);
+
+  const loadFollowedArtists = async () => {
+    setLoadingArtists(true);
+    try {
+      const data = await fetchFollowedArtists();
+      setFollowedArtists(data);
+    } catch (err) {
+      console.error("Failed to load followed artists:", err);
+    } finally {
+      setLoadingArtists(false);
+    }
+  };
+
+  const handleUnfollowArtist = async (e: React.MouseEvent, artistId: string) => {
+    e.stopPropagation();
+    try {
+      setUnfollowingArtistId(artistId);
+      await toggleFollowArtist(artistId);
+      setFollowedArtists((prev) => prev.filter((a) => a.artistId !== artistId));
+    } catch (err) {
+      console.error("Failed to unfollow artist:", err);
+    } finally {
+      setUnfollowingArtistId(null);
+    }
+  };
 
   // Handle URL playlistId parameter
   useEffect(() => {
@@ -131,7 +174,6 @@ function LibraryContent() {
       setActiveTab("playlists");
     } else {
       setSelectedPlaylist(null);
-      setPlaylistError(null);
     }
   }, [playlistIdFromUrl]);
 
@@ -165,13 +207,11 @@ function LibraryContent() {
 
   const loadSinglePlaylist = async (id: string) => {
     setLoadingSelectedPlaylist(true);
-    setPlaylistError(null);
     try {
       const data = await fetchPlaylistById(id);
       setSelectedPlaylist(data);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to load playlist details:", err);
-      setPlaylistError(err?.message || "Không thể tải thông tin danh sách phát.");
     } finally {
       setLoadingSelectedPlaylist(false);
     }
@@ -300,6 +340,7 @@ function LibraryContent() {
       const detail = await fetchAlbumDetail(alb.id);
       if (detail.tracks && detail.tracks.length > 0) {
         const playlistTracks = detail.tracks.map((t) => ({
+          id: t.id,
           spotifyId: t.spotifyId,
           name: t.name,
           artistName: t.artistName,
@@ -392,7 +433,7 @@ function LibraryContent() {
       </div>
 
       {/* Tab Navigation */}
-      {!selectedPlaylist && !playlistIdFromUrl && (
+      {!selectedPlaylist && (
         <div className="flex gap-6 border-b border-white/8">
           <button
             onClick={() => setActiveTab("playlists")}
@@ -440,6 +481,22 @@ function LibraryContent() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
             )}
           </button>
+
+          <button
+            onClick={() => setActiveTab("artists")}
+            className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer ${
+              activeTab === "artists"
+                ? "text-cyan-400 font-semibold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Users className="w-4 h-4 text-purple-400" />
+            Nghệ sĩ ({followedArtists.length})
+            {activeTab === "artists" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
+            )}
+          </button>
+
           <button
             onClick={() => router.push("/dashboard/history")}
             className="pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer text-slate-400 hover:text-cyan-300"
@@ -451,292 +508,235 @@ function LibraryContent() {
       )}
 
       {/* VIEW 1: PLAYLIST DETAIL VIEW */}
-      {selectedPlaylist || playlistIdFromUrl ? (
-        <div className="space-y-8 animate-in fade-in duration-200">
-          {/* Back Button */}
-          <button
-            onClick={() => {
-              setSelectedPlaylist(null);
-              setPlaylistError(null);
-              router.push("/dashboard/library");
-            }}
-            className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Quay lại danh sách phát
-          </button>
+      {selectedPlaylist ? (
+          <div className="space-y-8 animate-in fade-in duration-200">
+            {/* Back Button */}
+            <button
+              onClick={() => {
+                setSelectedPlaylist(null);
+                router.push("/dashboard/library");
+              }}
+              className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Quay lại danh sách phát
+            </button>
 
-          {loadingSelectedPlaylist ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <Loader2 className="w-10 h-10 animate-spin text-cyan-400" />
-              <p className="text-sm text-slate-400">Đang tải danh sách phát...</p>
-            </div>
-          ) : playlistError ? (
-            <div className="p-8 rounded-2xl border border-red-500/20 bg-red-500/10 text-center max-w-lg mx-auto">
-              <p className="text-red-400 text-sm font-semibold mb-2">{playlistError}</p>
-              <p className="text-xs text-slate-400 mb-4">
-                Không thể hiển thị thông tin danh sách phát này. Có thể playlist không tồn tại hoặc bạn chưa có quyền truy cập.
-              </p>
-              <button
-                onClick={() => {
-                  setSelectedPlaylist(null);
-                  setPlaylistError(null);
-                  router.push("/dashboard/library");
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
-              >
-                Trở về Thư viện
-              </button>
-            </div>
-          ) : selectedPlaylist ? (
-            <>
-              {/* Playlist Hero Banner */}
-              <div className="flex flex-col md:flex-row gap-6 items-start md:items-end p-6 rounded-3xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 shadow-2xl relative overflow-hidden backdrop-blur-xl">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+            {loadingSelectedPlaylist ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="w-10 h-10 animate-spin text-cyan-400" />
+              </div>
+            ) : (
+              <>
+                {/* Playlist Hero Banner */}
+                <div className="flex flex-col md:flex-row gap-6 items-start md:items-end p-6 rounded-3xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Playlist Cover Art */}
-                <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden bg-slate-800 shrink-0 shadow-2xl border border-white/15 relative group flex items-center justify-center">
-                  {selectedPlaylist.coverUrl ? (
-                    <img
-                      src={selectedPlaylist.coverUrl}
-                      alt={selectedPlaylist.name}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        const fallback = e.currentTarget.nextElementSibling;
-                        if (fallback) (fallback as HTMLElement).style.display = "flex";
-                      }}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : null}
-                  <div
-                    className="w-full h-full bg-gradient-to-tr from-cyan-600 to-purple-600 flex items-center justify-center"
-                    style={{ display: selectedPlaylist.coverUrl ? "none" : "flex" }}
-                  >
-                    <Music className="w-16 h-16 text-white/80" />
-                  </div>
-                </div>
-
-                {/* Playlist Info */}
-                <div className="flex-1 min-w-0 space-y-3">
-                  <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold uppercase tracking-wider">
-                    Danh sách phát
-                  </span>
-                  <h1 className="text-3xl md:text-5xl font-bold font-display text-white tracking-tight break-words">
-                    {selectedPlaylist.name}
-                  </h1>
-                  {selectedPlaylist.description && (
-                    <p className="text-sm text-slate-300 line-clamp-2">
-                      {selectedPlaylist.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 text-xs text-slate-400 pt-1 flex-wrap">
-                    <span className="font-semibold text-white">
-                      {selectedPlaylist.username ? `@${selectedPlaylist.username}` : "Tôi"}
-                    </span>
-                    <span>•</span>
-                    <span>{selectedPlaylist.tracks?.length || 0} bài hát</span>
-                    <span>•</span>
-                    <span>{calculateTotalDuration(selectedPlaylist.tracks)}</span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 pt-3 flex-wrap">
-                    <button
-                      onClick={() => handlePlayPlaylist(selectedPlaylist, 0)}
-                      disabled={!selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0}
-                      className="flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm bg-cyan-400 hover:bg-cyan-300 text-black shadow-lg shadow-cyan-400/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      <Play className="w-5 h-5 fill-current" />
-                      Phát tất cả
-                    </button>
-
-                    {Boolean(user?.username && selectedPlaylist?.username === user?.username) ? (
-                      <>
-                        <button
-                          onClick={() => handleToggleVisibility(selectedPlaylist.id, Boolean(selectedPlaylist.isPublic))}
-                          className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                            selectedPlaylist.isPublic
-                              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
-                              : "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
-                          }`}
-                          title="Bấm để thay đổi chế độ Công khai / Riêng tư"
-                        >
-                          {selectedPlaylist.isPublic ? (
-                            <>
-                              <Globe className="w-4 h-4 text-emerald-400" />
-                              <span>Công khai (Mọi người có thể thấy)</span>
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="w-4 h-4 text-amber-400" />
-                              <span>Riêng tư (Chỉ mình bạn)</span>
-                            </>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
-                          disabled={deletingId === selectedPlaylist.id}
-                          className="p-3 rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition-colors cursor-pointer"
-                          title="Xóa danh sách phát"
-                        >
-                          {deletingId === selectedPlaylist.id ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-5 h-5" />
-                          )}
-                        </button>
-                      </>
+                  {/* Playlist Cover Art */}
+                  <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden bg-slate-800 shrink-0 shadow-2xl border border-white/15 relative group flex items-center justify-center">
+                    {selectedPlaylist.coverUrl ? (
+                      <img
+                        src={selectedPlaylist.coverUrl}
+                        alt={selectedPlaylist.name}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-white/5 border border-white/10 text-slate-300">
-                        {selectedPlaylist.isPublic ? (
-                          <>
-                            <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Công khai</span>
-                          </>
-                        ) : (
-                          <>
-                            <Lock className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Riêng tư</span>
-                          </>
-                        )}
+                      <div className="w-full h-full bg-gradient-to-tr from-cyan-600 to-purple-600 flex items-center justify-center">
+                        <Music className="w-16 h-16 text-white/80" />
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
 
-              {/* Tracks Table */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-white mb-4">
-                  Danh sách bài hát ({selectedPlaylist.tracks?.length || 0})
-                </h3>
+                  {/* Playlist Info */}
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold uppercase tracking-wider">
+                      Danh sách phát
+                    </span>
+                    <h1 className="text-3xl md:text-5xl font-bold font-display text-white tracking-tight break-words">
+                      {selectedPlaylist.name}
+                    </h1>
+                    {selectedPlaylist.description && (
+                      <p className="text-sm text-slate-300 line-clamp-2">
+                        {selectedPlaylist.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 text-xs text-slate-400 pt-1">
+                      <span className="font-semibold text-white">
+                        {selectedPlaylist.username}
+                      </span>
+                      <span>•</span>
+                      <span>{selectedPlaylist.tracks?.length || 0} bài hát</span>
+                      <span>•</span>
+                      <span>{calculateTotalDuration(selectedPlaylist.tracks)}</span>
+                    </div>
 
-                {!selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0 ? (
-                  <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-white/10 bg-white/5">
-                    <Music className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                    <h4 className="text-base font-semibold text-white mb-1">
-                      Playlist này còn trống
-                    </h4>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5">
-                      Hãy khám phá các ca khúc bạn yêu thích và thêm vào danh sách phát này!
-                    </p>
-                    <button
-                      onClick={() => router.push("/dashboard/search")}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-cyan-400 border border-cyan-400/20 transition-all cursor-pointer"
-                    >
-                      Khám phá bài hát ngay
-                    </button>
+                    {/* Actions */}
+                    <div className="flex items-center gap-3 pt-3 flex-wrap">
+                      <button
+                        onClick={() => handlePlayPlaylist(selectedPlaylist, 0)}
+                        disabled={!selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0}
+                        className="flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm bg-cyan-400 hover:bg-cyan-300 text-black shadow-lg shadow-cyan-400/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                        Phát tất cả
+                      </button>
+
+                      <button
+                        onClick={() => handleToggleVisibility(selectedPlaylist.id, Boolean(selectedPlaylist.isPublic))}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                          selectedPlaylist.isPublic
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
+                            : "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
+                        }`}
+                        title="Bấm để thay đổi chế độ Công khai / Riêng tư"
+                      >
+                        {selectedPlaylist.isPublic ? (
+                          <>
+                            <Globe className="w-4 h-4 text-emerald-400" />
+                            <span>Công khai (Mọi người có thể thấy)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4 text-amber-400" />
+                            <span>Riêng tư (Chỉ mình bạn)</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
+                        disabled={deletingId === selectedPlaylist.id}
+                        className="p-3 rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition-colors cursor-pointer"
+                        title="Xóa danh sách phát"
+                      >
+                        {deletingId === selectedPlaylist.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <div className="rounded-2xl border border-white/5 bg-slate-900/40 overflow-hidden divide-y divide-white/5">
-                    {selectedPlaylist.tracks.map((track, idx) => {
-                      const isCurrentPlaying =
-                        currentTrack?.spotifyId === track.spotifyId && isPlaying;
-                      const isOwner = Boolean(
-                        user?.username && selectedPlaylist?.username === user?.username
-                      );
+                </div>
 
-                      return (
-                        <div
-                          key={track.spotifyId || track.id || idx}
-                          className="group flex items-center justify-between p-3 sm:px-4 hover:bg-white/5 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                            {/* Index / Play Button */}
-                            <div className="w-8 text-center shrink-0">
-                              <button
-                                onClick={() => {
-                                  if (currentTrack?.spotifyId === track.spotifyId) {
-                                    togglePlay();
-                                  } else {
-                                    handlePlayPlaylist(selectedPlaylist, idx);
-                                  }
-                                }}
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:text-white group-hover:bg-cyan-500/20 transition-all cursor-pointer"
-                              >
-                                {isCurrentPlaying ? (
-                                  <Pause className="w-4 h-4 text-cyan-400 fill-current" />
-                                ) : (
-                                  <span className="group-hover:hidden text-xs text-slate-500">
-                                    {idx + 1}
-                                  </span>
-                                )}
-                                <Play
-                                  className={`w-4 h-4 fill-current ${
-                                    isCurrentPlaying ? "hidden" : "hidden group-hover:block"
-                                  }`}
-                                />
-                              </button>
-                            </div>
+                {/* Tracks Table */}
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-white mb-4">
+                    Danh sách bài hát ({selectedPlaylist.tracks?.length || 0})
+                  </h3>
 
-                            {/* Thumbnail */}
-                            <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-800 shrink-0 border border-white/10 relative flex items-center justify-center">
-                              {track.imageUrl ? (
-                                <img
-                                  src={track.imageUrl}
-                                  alt={track.name}
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                    const fallback = e.currentTarget.nextElementSibling;
-                                    if (fallback) (fallback as HTMLElement).style.display = "flex";
+                  {!selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0 ? (
+                    <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-white/10 bg-white/5">
+                      <Music className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                      <h4 className="text-base font-semibold text-white mb-1">
+                        Playlist này còn trống
+                      </h4>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5">
+                        Hãy khám phá 147 ca khúc Việt Nam và thêm những giai điệu bạn yêu thích vào playlist này!
+                      </p>
+                      <button
+                        onClick={() => router.push("/dashboard/search")}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-cyan-400 border border-cyan-400/20 transition-all"
+                      >
+                        Khám phá bài hát ngay
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-white/5 bg-slate-900/40 overflow-hidden divide-y divide-white/5">
+                      {selectedPlaylist.tracks.map((track, idx) => {
+                        const isCurrentPlaying =
+                          currentTrack?.spotifyId === track.spotifyId && isPlaying;
+
+                        return (
+                          <div
+                            key={track.spotifyId || track.id || idx}
+                            className="group flex items-center justify-between p-3 sm:px-4 hover:bg-white/5 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                              {/* Index / Play Button */}
+                              <div className="w-8 text-center shrink-0">
+                                <button
+                                  onClick={() => {
+                                    if (currentTrack?.spotifyId === track.spotifyId) {
+                                      togglePlay();
+                                    } else {
+                                      handlePlayPlaylist(selectedPlaylist, idx);
+                                    }
                                   }}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : null}
-                              <div
-                                className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-800/80"
-                                style={{ display: track.imageUrl ? "none" : "flex" }}
-                              >
-                                <Music className="w-4 h-4" />
+                                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:text-white group-hover:bg-cyan-500/20 transition-all"
+                                >
+                                  {isCurrentPlaying ? (
+                                    <Pause className="w-4 h-4 text-cyan-400 fill-current" />
+                                  ) : (
+                                    <span className="group-hover:hidden text-xs text-slate-500">
+                                      {idx + 1}
+                                    </span>
+                                  )}
+                                  <Play
+                                    className={`w-4 h-4 fill-current ${
+                                      isCurrentPlaying ? "hidden" : "hidden group-hover:block"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+
+                              {/* Thumbnail */}
+                              <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-800 shrink-0 border border-white/10">
+                                {track.imageUrl ? (
+                                  <img
+                                    src={track.imageUrl}
+                                    alt={track.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                    <Music className="w-5 h-5" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Title and Artist */}
+                              <div className="truncate min-w-0 pr-2">
+                                <h4
+                                  className={`text-sm font-semibold truncate ${
+                                    currentTrack?.spotifyId === track.spotifyId
+                                      ? "text-cyan-400"
+                                      : "text-white"
+                                  }`}
+                                >
+                                  {track.name}
+                                </h4>
+                                <p className="text-xs text-slate-400 truncate">
+                                  {track.artistName}
+                                </p>
                               </div>
                             </div>
 
-                            {/* Title and Artist */}
-                            <div className="truncate min-w-0 pr-2">
-                              <h4
-                                className={`text-sm font-semibold truncate ${
-                                  currentTrack?.spotifyId === track.spotifyId
-                                    ? "text-cyan-400"
-                                    : "text-white"
-                                }`}
-                              >
-                                {track.name}
-                              </h4>
-                              <p className="text-xs text-slate-400 truncate">
-                                {track.artistName}
-                              </p>
+                            {/* Album name */}
+                            <div className="hidden md:block w-1/3 truncate text-xs text-slate-400 px-4">
+                              {track.albumName || "—"}
                             </div>
-                          </div>
 
-                          {/* Album name */}
-                          <div className="hidden md:block w-1/3 truncate text-xs text-slate-400 px-4">
-                            {track.albumName || "—"}
-                          </div>
+                            {/* Duration and Actions */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs text-slate-500 flex items-center gap-1 mr-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                {formatDuration(track.durationMs)}
+                              </span>
 
-                          {/* Duration and Actions */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-slate-500 flex items-center gap-1 mr-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              {formatDuration(track.durationMs)}
-                            </span>
+                              <TrackActionMenu
+                                track={track}
+                                onRemoveFromPlaylist={() =>
+                                  handleRemoveTrackFromPlaylist(track.spotifyId || track.id)
+                                }
+                              />
 
-                            <TrackActionMenu
-                              track={track}
-                              onRemoveFromPlaylist={
-                                isOwner
-                                  ? () => handleRemoveTrackFromPlaylist(track.spotifyId || track.id)
-                                  : undefined
-                              }
-                            />
-
-                            {isOwner && (
                               <button
                                 onClick={() =>
                                   handleRemoveTrackFromPlaylist(track.spotifyId || track.id)
                                 }
                                 disabled={removingTrackId === (track.spotifyId || track.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
                                 title="Xóa khỏi playlist này"
                               >
                                 {removingTrackId === (track.spotifyId || track.id) ? (
@@ -745,18 +745,17 @@ function LibraryContent() {
                                   <Trash2 className="w-4 h-4" />
                                 )}
                               </button>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : null}
-        </div>
-      ) : activeTab === "playlists" ? (
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ) : activeTab === "playlists" ? (
           /* VIEW 2: PLAYLISTS GRID */
           <div className="space-y-6 animate-in fade-in duration-200">
             {loadingPlaylists ? (
@@ -810,25 +809,18 @@ function LibraryContent() {
                     className="group relative flex flex-col p-3 rounded-2xl bg-slate-900/40 border border-white/5 hover:border-white/15 hover:bg-slate-900/80 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-2xl"
                   >
                     {/* Cover art */}
-                    <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-800 mb-3 border border-white/5 flex items-center justify-center">
+                    <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-800 mb-3 border border-white/5">
                       {playlist.coverUrl ? (
                         <img
                           src={playlist.coverUrl}
                           alt={playlist.name}
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            const fallback = e.currentTarget.nextElementSibling;
-                            if (fallback) (fallback as HTMLElement).style.display = "flex";
-                          }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
-                      ) : null}
-                      <div
-                        className="w-full h-full bg-gradient-to-tr from-cyan-600/40 to-purple-600/40 flex items-center justify-center"
-                        style={{ display: playlist.coverUrl ? "none" : "flex" }}
-                      >
-                        <Music className="w-10 h-10 text-slate-400" />
-                      </div>
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-tr from-cyan-600/40 to-purple-600/40 flex items-center justify-center">
+                          <Music className="w-10 h-10 text-slate-400" />
+                        </div>
+                      )}
 
                       {/* Visibility indicator */}
                       <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] flex items-center gap-1 shadow-md">
@@ -846,14 +838,13 @@ function LibraryContent() {
                       </div>
 
                       {/* Play overlay button */}
-                      {(playlist.trackCount > 0 || (playlist.tracks && playlist.tracks.length > 0)) && (
+                      {playlist.trackCount > 0 && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePlayPlaylist(playlist, 0);
                           }}
-                          className="absolute bottom-2 right-2 p-3 rounded-full bg-cyan-400 text-black shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:scale-110 cursor-pointer"
-                          title="Phát danh sách phát"
+                          className="absolute bottom-2 right-2 p-3 rounded-full bg-cyan-400 text-black shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:scale-110"
                         >
                           <Play className="w-4 h-4 fill-current" />
                         </button>
@@ -1125,6 +1116,150 @@ function LibraryContent() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 4: ARTISTS TAB VIEW */}
+        {!selectedPlaylist && activeTab === "artists" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-purple-400" />
+                  Nghệ sĩ bạn theo dõi
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Truy cập nhanh trang cá nhân, nghe các bài hát nổi bật và theo dõi sản phẩm mới
+                </p>
+              </div>
+
+              {followedArtists.length > 0 && (
+                <button
+                  onClick={() => router.push("/dashboard/search?type=ARTIST")}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Khám phá thêm
+                </button>
+              )}
+            </div>
+
+            {loadingArtists ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <Loader2 className="w-10 h-10 animate-spin text-purple-400 mb-3" />
+                <p className="text-xs text-slate-400">Đang tải danh sách nghệ sĩ...</p>
+              </div>
+            ) : followedArtists.length === 0 ? (
+              <div className="text-center py-20 px-4 rounded-3xl border border-white/5 bg-slate-900/30">
+                <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto mb-4 text-purple-400">
+                  <Users className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">
+                  Bạn chưa theo dõi nghệ sĩ nào
+                </h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5 leading-relaxed">
+                  Khi bạn bấm <span className="text-cyan-400 font-semibold">Theo dõi</span> một nghệ sĩ, họ sẽ xuất hiện tại đây để bạn có thể nhanh chóng nghe các tác phẩm và cập nhật bài hát mới nhất.
+                </p>
+                <button
+                  onClick={() => router.push("/dashboard/search?type=ARTIST")}
+                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/25 transition-all cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Khám phá nghệ sĩ ngay
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+                {followedArtists.map((artist) => (
+                  <div
+                    key={artist.artistId}
+                    onClick={() => router.push(`/dashboard/artist/${encodeURIComponent(artist.artistId)}`)}
+                    className="group relative flex flex-col p-4 rounded-2xl bg-slate-900/40 border border-white/5 hover:border-cyan-500/30 hover:bg-slate-900/80 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-1"
+                  >
+                    {/* Avatar with circle styling */}
+                    <div className="relative aspect-square rounded-full overflow-hidden bg-slate-800 mb-4 mx-auto w-3/4 ring-2 ring-white/10 group-hover:ring-cyan-400/60 transition-all duration-500">
+                      {artist.imageUrl ? (
+                        <img
+                          src={artist.imageUrl}
+                          alt={artist.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-tr from-purple-600/40 to-cyan-600/40 flex items-center justify-center">
+                          <Users className="w-10 h-10 text-slate-400" />
+                        </div>
+                      )}
+
+                      {/* Verified Badge */}
+                      {artist.verified && (
+                        <div
+                          className="absolute bottom-1 right-1 p-1 rounded-full bg-cyan-500 text-slate-950 shadow-md border-2 border-slate-900"
+                          title="Nghệ sĩ đã xác minh"
+                        >
+                          <Sparkles className="w-3 h-3 fill-slate-950" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Artist Name & Tag */}
+                    <div className="text-center min-w-0">
+                      <span className="text-[10px] uppercase tracking-wider text-cyan-400/80 font-bold block mb-1">
+                        Nghệ sĩ
+                      </span>
+                      <h4 className="text-sm font-bold text-white truncate group-hover:text-cyan-400 transition-colors">
+                        {artist.name}
+                      </h4>
+                      <p className="text-xs text-slate-400 truncate mt-1 flex items-center justify-center gap-1">
+                        <Users className="w-3 h-3 text-slate-500" />
+                        {artist.followersCount >= 1000
+                          ? `${(artist.followersCount / 1000).toFixed(1)}k người theo dõi`
+                          : `${artist.followersCount} người theo dõi`}
+                      </p>
+
+                      {/* Genres tags */}
+                      {artist.genres && artist.genres.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-center gap-1 mt-2.5">
+                          {artist.genres.slice(0, 2).map((genre, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 capitalize truncate max-w-[90px]"
+                            >
+                              {genre}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action buttons on card hover */}
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/artist/${encodeURIComponent(artist.artistId)}`);
+                        }}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black text-slate-200 text-xs font-semibold transition-all text-center cursor-pointer"
+                      >
+                        Trang cá nhân
+                      </button>
+
+                      <button
+                        onClick={(e) => handleUnfollowArtist(e, artist.artistId)}
+                        disabled={unfollowingArtistId === artist.artistId}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Bỏ theo dõi"
+                      >
+                        {unfollowingArtistId === artist.artistId ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                        ) : (
+                          <UserCheck className="w-4 h-4 text-cyan-400 hover:text-rose-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

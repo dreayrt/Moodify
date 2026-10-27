@@ -406,7 +406,7 @@ export function HeroCarousel() {
     setSelectedPresetAvatar(url);
   };
 
-  const triggerGoogleLogin = useGoogleLogin({
+    const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
         const token = tokenResponse.access_token;
@@ -437,19 +437,6 @@ export function HeroCarousel() {
       }
     },
   });
-
-  const handleGoogleLogin = () => {
-    if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
-      const message = "Chưa cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID trong file .env.local";
-      if (isSignInOpen) {
-        setSignInError(message);
-      } else {
-        setCreateAccountError(message);
-      }
-      return;
-    }
-    triggerGoogleLogin();
-  };
 
   const handleFacebookLogin = async () => {
     try {

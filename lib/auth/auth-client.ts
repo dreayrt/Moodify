@@ -65,7 +65,30 @@ export type ArtistTrackResponse = {
   explicit: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  acquisitionCostVnd?: number | null;
 };
+
+export type RevenueTrack = {
+  id: string; title: string; genre: string; coverUrl: string | null;
+  qualifiedPlays: number; pendingPlays: number;
+  grossVnd: number; contentLeadVnd: number; platformVnd: number;
+  acquisitionCostVnd: number | null; lifetimeContentLeadVnd: number;
+  recoupBalanceVnd: number | null;
+};
+
+export type ContentLeadRevenueResponse = {
+  period: "today" | "week" | "month" | "year";
+  fromDate: string; toDate: string; qualifiedPlays: number; pendingPlays: number;
+  grossVnd: number; contentLeadVnd: number; platformVnd: number;
+  trend: Array<{ day: string; contentLeadVnd: number }>;
+  tracks: RevenueTrack[];
+};
+
+export async function getContentLeadRevenue(period: ContentLeadRevenueResponse["period"]): Promise<ContentLeadRevenueResponse> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để xem doanh thu.");
+  return requestJson<ContentLeadRevenueResponse>(`/api/content-lead/me/analytics/revenue?period=${period}`, { token });
+}
 
 export type ArtistAlbumResponse = {
   id: string;
@@ -151,7 +174,7 @@ export type StoredAuthSession = {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8088";
+  "http://localhost:8080";
 
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
@@ -250,14 +273,26 @@ export function clearAuthSession() {
 
 //main auth functions
 export async function loginWithGoogle(idToken: string) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
   return requestJson<AuthResponse>("/api/auth/google", {
-    body: { idToken },
+    body: {
+      idToken,
+      deviceUuid: device?.deviceUuid,
+      deviceName: device?.deviceName,
+      platform: device?.platform,
+    },
   });
 }
 
 export async function loginWithFacebook(accessToken: string) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
   return requestJson<AuthResponse>("/api/auth/facebook", {
-    body: { accessToken },
+    body: {
+      accessToken,
+      deviceUuid: device?.deviceUuid,
+      deviceName: device?.deviceName,
+      platform: device?.platform,
+    },
   });
 }
 
@@ -329,6 +364,15 @@ export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
     token: token ?? undefined,
     body: { deviceUuid },
   });
+}
+
+export async function pingDeviceStatus(): Promise<{ active: boolean } | null> {
+  const token = await getValidAccessToken();
+  if (!token) return null;
+  return requestJson<{ active: boolean }>("/api/auth/devices/ping", {
+    method: "GET",
+    token,
+  }).catch(() => null);
 }
 
 export async function register(payload: {
@@ -544,6 +588,8 @@ export interface OcrExtractLicenseResponse {
   confidence?: number;
   message?: string;
   rawFields?: Record<string, unknown>;
+  acquisitionCostVnd?: number;
+  costEvidence?: { page?: number; source_text?: string; amount_vnd?: number };
 }
 
 export async function extractLicenseFromDoc(
@@ -611,6 +657,7 @@ export async function recordPlatformVisit(payload: {
 }
 
 export async function recordListeningSessionTelemetry(payload: {
+  sessionKey: string;
   historyId?: number;
   trackId: string;
   durationMs: number;
@@ -619,16 +666,18 @@ export async function recordListeningSessionTelemetry(payload: {
   source?: "HOME" | "SEARCH" | "PLAYLIST" | "ALBUM" | "ARTIST" | "LIBRARY" | "FAVORITES" | "EMOTION" | "OTHER" | string;
   sourceId?: string;
   deviceType?: "WEB" | "ANDROID" | "IOS" | "OTHER";
-  eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
+  eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "HEARTBEAT" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
 }) {
   try {
     const token = await getValidAccessToken();
+    const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : undefined;
     return await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
       method: "POST",
       token: token ?? undefined,
       body: {
         deviceType: "WEB",
         source: "HOME",
+        deviceUuid,
         ...payload,
       },
     });
@@ -687,9 +736,12 @@ async function requestJson<T>(
     authToken = (await getValidAccessToken()) ?? undefined;
   }
 
+  const currentDeviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : "";
+
   console.log(`[RequestJson] 📡 Sending ${requestMethod} ${fullUrl}`, {
     hasToken: !!authToken,
     hasBody: !!body,
+    deviceUuid: currentDeviceUuid,
     body,
   });
 
@@ -699,6 +751,7 @@ async function requestJson<T>(
     headers: {
       "Content-Type": "application/json",
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(currentDeviceUuid ? { "X-Device-Uuid": currentDeviceUuid } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -755,6 +808,19 @@ async function extractErrorMessage(response: Response, path?: string) {
         error?: string;
         detail?: string;
       };
+
+      if (response.status === 403) {
+        if (payload.error === "DEVICE_REVOKED" || payload.message?.includes("thiết bị") || payload.detail?.includes("thiết bị")) {
+          const alertMsg = payload.message || payload.detail || "Thiết bị này đã bị thu hồi quyền truy cập do tài khoản đã đăng nhập trên thiết bị khác vượt quá hạn mức thiết bị.";
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("moodify:device-revoked", {
+              detail: { message: alertMsg }
+            }));
+          }
+          return alertMsg;
+        }
+      }
+
       if (payload.message && payload.message.trim() && payload.message !== "Not Found") {
         return payload.message;
       }

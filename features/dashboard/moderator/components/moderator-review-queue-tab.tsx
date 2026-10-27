@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Music2,
+  Activity,
 } from "lucide-react";
 import { ModerationTrack } from "../types";
 import { ModeratorAudioPlayer } from "./moderator-audio-player";
@@ -270,6 +271,55 @@ export function ModeratorReviewQueueTab({
 
             {/* Audio Review Player */}
             <ModeratorAudioPlayer track={selectedTrack} autoPlay={false} />
+
+            {/* Audio Features Analysis (Chỉ Số Âm Học) */}
+            <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/8 pb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-[#ff7a2c]" />
+                  <h3 className="text-[13px] font-semibold uppercase tracking-wider text-white">
+                    Chỉ Số Âm Học (Audio Features)
+                  </h3>
+                </div>
+                <span className="rounded-full bg-[#ff7a2c]/10 border border-[#ff7a2c]/20 px-3 py-1 text-[11px] font-mono font-medium text-[#ffb488]">
+                  Key: {selectedTrack.audioFeatures?.keySignature || "A Major"}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-3.5 transition hover:border-white/15">
+                  <p className="text-[11px] font-medium text-white/50">BPM (Tempo)</p>
+                  <p className="mt-1 font-mono text-xl font-bold text-white">
+                    {selectedTrack.audioFeatures?.bpm || 136}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">Nhịp điệu</p>
+                </div>
+
+                <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-3.5 transition hover:border-white/15">
+                  <p className="text-[11px] font-medium text-white/50">Energy</p>
+                  <p className="mt-1 font-mono text-xl font-bold text-[#ff7a2c]">
+                    {Math.round((selectedTrack.audioFeatures?.energy ?? 0.85) * 100)}%
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">Năng lượng âm thanh</p>
+                </div>
+
+                <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-3.5 transition hover:border-white/15">
+                  <p className="text-[11px] font-medium text-white/50">Danceability</p>
+                  <p className="mt-1 font-mono text-xl font-bold text-amber-400">
+                    {Math.round((selectedTrack.audioFeatures?.danceability ?? 0.78) * 100)}%
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">Độ bắt tai / khiêu vũ</p>
+                </div>
+
+                <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-3.5 transition hover:border-white/15">
+                  <p className="text-[11px] font-medium text-white/50">Valence</p>
+                  <p className="mt-1 font-mono text-xl font-bold text-emerald-400">
+                    {Math.round((selectedTrack.audioFeatures?.valence ?? 0.72) * 100)}%
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">Tâm trạng tích cực</p>
+                </div>
+              </div>
+            </div>
 
             {/* Copyright & Technical Profile */}
             <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">

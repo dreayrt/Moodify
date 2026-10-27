@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  Eye,
   FileCheck,
   FileText,
   Globe2,
@@ -30,6 +31,7 @@ type LicensingTabProps = {
   onToggleDistributorStatus?: (id: number) => void;
   onCreateContract?: (data: Partial<DistributionContract>) => void;
   onToggleContractStatus?: (id: number, newStatus: string) => void;
+  isReadOnly?: boolean;
 };
 
 export function LicensingTab({
@@ -40,6 +42,7 @@ export function LicensingTab({
   onToggleDistributorStatus,
   onCreateContract,
   onToggleContractStatus,
+  isReadOnly = true,
 }: LicensingTabProps) {
   const [subTab, setSubTab] = useState<"contracts" | "distributors" | "licenses">("contracts");
 
@@ -108,18 +111,21 @@ export function LicensingTab({
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
               Bản Quyền &amp; Hợp Đồng Phân Phối
             </h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-[11px] font-mono text-blue-300">
+              <Eye className="h-3 w-3" /> Chế độ xem hợp đồng (Chỉ xem)
+            </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Quản lý đối tác phân phối, hợp đồng tác quyền và chứng nhận bản quyền bài hát phát hành lưu trữ trực tiếp trên cơ sở dữ liệu.
+            Tra cứu đối tác phân phối, hợp đồng tác quyền và chứng nhận bản quyền bài hát phát hành trên hệ thống (Chế độ giám sát chỉ đọc dành cho Admin).
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {subTab === "contracts" && onCreateContract && (
+          {!isReadOnly && subTab === "contracts" && onCreateContract && (
             <button
               type="button"
               onClick={() => setIsContractModalOpen(true)}
@@ -130,7 +136,7 @@ export function LicensingTab({
             </button>
           )}
 
-          {subTab === "distributors" && onCreateDistributor && (
+          {!isReadOnly && subTab === "distributors" && onCreateDistributor && (
             <button
               type="button"
               onClick={() => setIsDistributorModalOpen(true)}
@@ -194,26 +200,37 @@ export function LicensingTab({
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[11px] font-semibold text-[#ff5500]">{ct.contractCode}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onToggleContractStatus) {
+                      {isReadOnly || !onToggleContractStatus ? (
+                        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              ct.status === "ACTIVE" ? "bg-emerald-400" : "bg-zinc-500"
+                            }`}
+                          />
+                          <span className={ct.status === "ACTIVE" ? "text-emerald-400" : "text-zinc-500"}>
+                            {ct.status}
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
                             const next = ct.status === "ACTIVE" ? "TERMINATED" : "ACTIVE";
                             onToggleContractStatus(ct.id, next);
-                          }
-                        }}
-                        title="Nhấn để đổi trạng thái"
-                        className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium hover:opacity-80 transition cursor-pointer"
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            ct.status === "ACTIVE" ? "bg-emerald-400" : "bg-zinc-500"
-                          }`}
-                        />
-                        <span className={ct.status === "ACTIVE" ? "text-emerald-400" : "text-zinc-500"}>
-                          {ct.status}
-                        </span>
-                      </button>
+                          }}
+                          title="Nhấn để đổi trạng thái"
+                          className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium hover:opacity-80 transition cursor-pointer"
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              ct.status === "ACTIVE" ? "bg-emerald-400" : "bg-zinc-500"
+                            }`}
+                          />
+                          <span className={ct.status === "ACTIVE" ? "text-emerald-400" : "text-zinc-500"}>
+                            {ct.status}
+                          </span>
+                        </button>
+                      )}
                     </div>
 
                     <h3 className="mt-3 font-graphik text-[17px] font-semibold text-white">{ct.title}</h3>
@@ -273,7 +290,17 @@ export function LicensingTab({
                     <div className="grid h-12 w-12 place-items-center rounded-xl border border-[#ff5500]/20 bg-[#ff5500]/10 text-[#ff5500]">
                       <Building2 className="h-6 w-6" />
                     </div>
-                    {onToggleDistributorStatus && (
+                    {isReadOnly || !onToggleDistributorStatus ? (
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-mono font-semibold ${
+                          dist.status === "ACTIVE"
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                            : "bg-white/10 text-white/50 border border-white/10"
+                        }`}
+                      >
+                        {dist.status}
+                      </span>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => onToggleDistributorStatus(dist.id)}

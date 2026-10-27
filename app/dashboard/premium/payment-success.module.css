@@ -1,0 +1,324 @@
+.successState {
+  position: relative;
+  isolation: isolate;
+  padding: 1.5rem 0 0.25rem;
+  animation: successFadeUp 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.successVisual {
+  position: relative;
+  display: grid;
+  width: 7.25rem;
+  height: 7.25rem;
+  margin: 0 auto 0.9rem;
+  place-items: center;
+}
+
+.successVisual::before {
+  position: absolute;
+  inset: 0.65rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.17), rgba(16, 185, 129, 0.035) 63%, transparent 72%);
+  content: "";
+  animation: successGlow 3.2s ease-in-out 500ms infinite;
+}
+
+.orbit {
+  position: absolute;
+  inset: 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  animation: orbitSpin 12s linear infinite;
+}
+
+.orbit::after {
+  position: absolute;
+  top: 0.62rem;
+  left: 50%;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.orbitGold {
+  border-top-color: rgba(252, 211, 77, 0.42);
+  border-right-color: rgba(252, 211, 77, 0.08);
+}
+
+.orbitGold::after {
+  background: #fcd34d;
+  box-shadow: 0 0 12px rgba(252, 211, 77, 0.7);
+}
+
+.orbitTeal {
+  inset: 0.86rem;
+  border-right-color: rgba(45, 212, 191, 0.3);
+  border-bottom-color: rgba(45, 212, 191, 0.08);
+  animation-direction: reverse;
+  animation-duration: 16s;
+}
+
+.orbitTeal::after {
+  top: auto;
+  bottom: 0.55rem;
+  width: 0.25rem;
+  height: 0.25rem;
+  background: #5eead4;
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.6);
+}
+
+.successCore {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 4.25rem;
+  height: 4.25rem;
+  place-items: center;
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(6, 78, 59, 0.9), rgba(2, 44, 34, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 28px rgba(16, 185, 129, 0.2);
+  animation: successPop 650ms cubic-bezier(0.18, 0.85, 0.28, 1.25) both;
+}
+
+.particle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 1px;
+  background: var(--particle-color, #fcd34d);
+  opacity: 0;
+  box-shadow: 0 0 9px var(--particle-glow, rgba(252, 211, 77, 0.6));
+  transform: translate(-50%, -50%) scale(0.2) rotate(45deg);
+  animation: particleBurst 1.2s cubic-bezier(0.16, 0.75, 0.25, 1) 180ms both;
+}
+
+.particleOne {
+  --particle-color: #fcd34d;
+  --particle-glow: rgba(252, 211, 77, 0.7);
+  --spark-x: -45px;
+  --spark-y: -26px;
+}
+
+.particleTwo {
+  --particle-color: #5eead4;
+  --particle-glow: rgba(45, 212, 191, 0.65);
+  --spark-x: 44px;
+  --spark-y: -27px;
+  width: 0.24rem;
+  height: 0.24rem;
+  animation-delay: 260ms;
+}
+
+.particleThree {
+  --particle-color: #fde68a;
+  --particle-glow: rgba(253, 230, 138, 0.6);
+  --spark-x: -40px;
+  --spark-y: 36px;
+  width: 0.22rem;
+  height: 0.22rem;
+  animation-delay: 340ms;
+}
+
+.particleFour {
+  --particle-color: #6ee7b7;
+  --particle-glow: rgba(110, 231, 183, 0.65);
+  --spark-x: 43px;
+  --spark-y: 34px;
+  animation-delay: 220ms;
+}
+
+.activatedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(52, 211, 153, 0.24);
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #6ee7b7;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.statusDot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 9px rgba(52, 211, 153, 0.75);
+}
+
+.packageSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.35rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1rem;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+  text-align: left;
+}
+
+.packageIcon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(252, 211, 77, 0.2);
+  border-radius: 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.packageLabel {
+  display: block;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.packageName {
+  overflow: hidden;
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeMark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  color: #6ee7b7;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.successButton {
+  position: relative;
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: linear-gradient(105deg, #f5c94a 0%, #ffe28a 52%, #f7d25d 100%);
+  box-shadow: 0 10px 26px rgba(202, 138, 4, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.successButton::after {
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -35%;
+  width: 22%;
+  background: rgba(255, 255, 255, 0.5);
+  content: "";
+  transform: translateX(-180%) skewX(-18deg);
+  transition: transform 500ms ease;
+}
+
+.successButton:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow: 0 13px 30px rgba(202, 138, 4, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.successButton:hover::after {
+  transform: translateX(650%) skewX(-18deg);
+}
+
+.successButton:active {
+  transform: translateY(0) scale(0.99);
+}
+
+@keyframes successFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes successPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  72% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes successGlow {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes orbitSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes particleBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(45deg);
+  }
+
+  28% {
+    opacity: 0.95;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(0.35) rotate(135deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .successState,
+  .successVisual::before,
+  .orbit,
+  .successCore,
+  .particle {
+    animation: none;
+  }
+
+  .successButton {
+    transition: none;
+  }
+}

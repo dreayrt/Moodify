@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Play,
   Pause,
+  Loader2,
   SkipBack,
   SkipForward,
   Volume2,
@@ -19,6 +21,7 @@ import {
   ShieldCheck,
   Share2,
   Gauge,
+  ChevronDown,
 } from "lucide-react";
 import { usePlayer } from "./player-context";
 import { addToLibrary, removeFromLibrary, isTrackInLibrary } from "@/lib/api-client";
@@ -35,11 +38,12 @@ function formatSeconds(sec: number): string {
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
 export function GlobalPlayerBar() {
   const pathname = usePathname();
   const {
     currentTrack,
+    isPlayerBarHidden,
+    setPlayerBarHidden,
     isPlaying,
     isBuffering,
     currentTime,
@@ -72,50 +76,6 @@ export function GlobalPlayerBar() {
   const [liked, setLiked] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
-
-  // Smooth Scrub Bar Dragging & Hover Tooltip
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragRatio, setDragRatio] = useState<number | null>(null);
-  const [hoverPreview, setHoverPreview] = useState<{ x: number; time: number } | null>(null);
-
-  const displayedRatio = isDragging && dragRatio !== null ? dragRatio : duration > 0 ? currentTime / duration : 0;
-  const progressPercent = Math.min(100, Math.max(0, displayedRatio * 100));
-  const displayedTimeSeconds = isDragging && dragRatio !== null && duration > 0 ? dragRatio * duration : currentTime;
-
-  const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isAdPlaying || !duration || duration <= 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    setIsDragging(true);
-    setDragRatio(ratio);
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch (_) {}
-  };
-
-  const handleScrubPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    if (isDragging) {
-      setDragRatio(ratio);
-    }
-    if (duration > 0) {
-      setHoverPreview({ x: Math.max(20, Math.min(rect.width - 20, e.clientX - rect.left)), time: ratio * duration });
-    }
-  };
-
-  const handleScrubPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isDragging && duration > 0) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      seek(ratio * duration);
-    }
-    setIsDragging(false);
-    setDragRatio(null);
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch (_) {}
-  };
 
   // Check liked status when track changes
   React.useEffect(() => {
@@ -172,10 +132,56 @@ export function GlobalPlayerBar() {
     return null;
   }
 
+  if (isPlayerBarHidden) {
+    return (
+      <>
+        <AdInterstitialBanner />
+        <button
+          type="button"
+          onClick={() => setPlayerBarHidden(false)}
+          className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/90 px-4 py-3 text-sm font-medium text-white shadow-[0_12px_36px_rgba(0,0,0,0.55)] backdrop-blur-xl transition hover:border-purple-400/60 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Mở thanh phát nhạc"
+          title={`Mở thanh phát nhạc${isPlaying ? ` — đang phát ${currentTrack.name}` : ""}`}
+        >
+          <span className="relative inline-flex">
+            <Music2 className="h-4 w-4 text-purple-300" />
+            {isPlaying && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />}
+          </span>
+          <span className="hidden sm:inline">Mở trình phát</span>
+        </button>
+        <ShareSongCardModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          track={currentTrack}
+          currentTime={currentTime}
+        />
+      </>
+    );
+  }
+
+  const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+
+  const handleSeekClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!duration || duration <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    seek(ratio * duration);
+  };
+
   return (
     <>
       <AdInterstitialBanner />
-      <div className={`fixed bottom-0 left-0 right-0 z-50 px-4 md:px-8 py-3 backdrop-blur-3xl transition-all duration-300 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder}`}>
+      <div className={`fixed bottom-0 left-0 right-0 z-50 px-4 md:px-8 py-3 pr-12 backdrop-blur-3xl transition-all duration-300 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder}`}>
+        <button
+          type="button"
+          onClick={() => setPlayerBarHidden(true)}
+          className="absolute right-2 top-1.5 z-10 rounded-full p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+          aria-label="Ẩn thanh phát nhạc"
+          title="Ẩn thanh phát nhạc"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Track info */}
           <div className="flex items-center gap-3 w-[220px] md:w-[280px] min-w-0">
@@ -252,9 +258,12 @@ export function GlobalPlayerBar() {
                   <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
                     {currentTrack.name}
                   </h4>
-                  <p className="text-xs text-slate-400 leading-tight truncate mt-0.5">
+                  <Link
+                    href={`/dashboard/artist/${encodeURIComponent(currentTrack.artistSpotifyId || currentTrack.artistName)}`}
+                    className="text-xs text-slate-400 hover:text-cyan-400 hover:underline leading-tight truncate mt-0.5 block transition-colors"
+                  >
                     {currentTrack.artistName}
-                  </p>
+                  </Link>
                 </div>
               )}
             </div>
@@ -277,6 +286,16 @@ export function GlobalPlayerBar() {
                   isLiked={liked}
                   onLikeChange={setLiked}
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="flex md:hidden text-slate-400 hover:text-purple-300 transition-colors p-1.5 rounded-lg hover:bg-white/5 active:scale-95 cursor-pointer shrink-0"
+                  title="Chia sẻ bài hát"
+                  aria-label="Chia sẻ bài hát"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
               </>
             )}
           </div>
@@ -328,18 +347,17 @@ export function GlobalPlayerBar() {
                 type="button"
                 disabled={isAdPlaying}
                 onClick={togglePlay}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer relative ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                   isAdPlaying
                     ? "bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed"
                     : isVipButtonsActive
                     ? `${currentVipTheme.primaryBtnClass} hover:scale-110 active:scale-95`
                     : "bg-gradient-to-tr from-purple-500 to-pink-500 text-white hover:scale-108 active:scale-95 shadow-[0_4px_20px_rgba(168,85,247,0.5)]"
                 }`}
-                title={isPlaying ? "Tạm dừng (Phím Space)" : "Phát (Phím Space)"}
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
-                {isBuffering && isPlaying ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {isBuffering ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : isPlaying ? (
                   <Pause className="w-5 h-5 fill-current" />
                 ) : (
@@ -459,45 +477,28 @@ export function GlobalPlayerBar() {
             {/* Scrub bar */}
             <div className="w-full flex items-center gap-2.5">
               <span className="text-[11px] font-mono text-slate-400 w-9 text-right select-none">
-                {isAdPlaying ? "QC" : formatSeconds(displayedTimeSeconds)}
+                {isAdPlaying ? "QC" : formatSeconds(currentTime)}
               </span>
 
               <div
-                onPointerDown={handleScrubPointerDown}
-                onPointerMove={handleScrubPointerMove}
-                onPointerUp={handleScrubPointerUp}
-                onPointerLeave={() => setHoverPreview(null)}
-                className={`relative flex-1 h-1.5 rounded-full group py-2 -my-2 flex items-center select-none touch-none ${
+                onClick={!isAdPlaying ? handleSeekClick : undefined}
+                className={`relative flex-1 h-1.5 rounded-full group py-2 -my-2 flex items-center ${
                   isAdPlaying ? "bg-amber-500/20 cursor-not-allowed" : "bg-white/15 cursor-pointer"
                 }`}
               >
-                {/* Floating hover time preview tooltip */}
-                {!isAdPlaying && hoverPreview && (
-                  <div
-                    className="absolute bottom-full mb-2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-neutral-900/95 border border-white/10 text-[10px] font-mono text-white pointer-events-none shadow-lg backdrop-blur-md z-30"
-                    style={{ left: `${hoverPreview.x}px` }}
-                  >
-                    {formatSeconds(hoverPreview.time)}
-                  </div>
-                )}
-
                 {/* Progress bar filler */}
                 <div
-                  className={`h-1.5 rounded-full transition-[height] relative ${
+                  className={`h-1.5 rounded-full transition-all relative ${
                     isAdPlaying
                       ? "bg-gradient-to-r from-amber-500 to-yellow-400 animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.5)]"
                       : isVipButtonsActive
                       ? `${currentVipTheme.equalizerGradient} group-hover:h-2`
                       : "bg-gradient-to-r from-purple-500 via-pink-500 to-amber-300 group-hover:h-2 shadow-[0_0_12px_rgba(244,63,94,0.4)]"
-                  } ${isBuffering && isPlaying ? "opacity-90 animate-pulse" : ""}`}
+                  }`}
                   style={{ width: isAdPlaying ? "100%" : `${progressPercent}%` }}
                 >
                   {!isAdPlaying && (
-                    <div
-                      className={`absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-opacity ${
-                        isDragging ? "opacity-100 scale-125" : "opacity-0 group-hover:opacity-100"
-                      }`}
-                    />
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-opacity" />
                   )}
                 </div>
               </div>

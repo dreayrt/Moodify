@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Crown,
   Check,
   Sparkles,
   Download,
-  Volume2,
   Users,
   ShieldCheck,
   Zap,
@@ -21,22 +20,29 @@ import {
   Loader2,
   X,
 } from "lucide-react";
+import successStyles from "./payment-success.module.css";
+import SubscriptionManagement from "@/components/dashboard/subscription-management";
 import {
   fetchServicePackages,
+  fetchPackageQuotes,
   fetchMySubscription,
   subscribePackage,
   devTogglePremium,
   createCheckoutPayment,
   getPaymentStatus,
   type ServicePackage,
+  type PackageQuote,
   type SubscriptionInfo,
   type CheckoutResponse,
+  type PaymentStatusResponse,
 } from "@/lib/api-client";
 
 export default function PremiumPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [packageQuotes, setPackageQuotes] = useState<PackageQuote[]>([]);
   const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<"1month" | "3months" | "1year">("1month");
@@ -51,6 +57,7 @@ export default function PremiumPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number>(15 * 60);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successIsScheduled, setSuccessIsScheduled] = useState(false);
 
   const loadData = async () => {
     try {
@@ -58,8 +65,10 @@ export default function PremiumPage() {
         fetchServicePackages().catch(() => []),
         fetchMySubscription().catch(() => null),
       ]);
+      const quotes = await fetchPackageQuotes().catch(() => []);
       setPackages(pkgs);
       setSubInfo(sub);
+      setPackageQuotes(quotes);
     } catch (e) {
       console.error(e);
     } finally {
@@ -90,15 +99,17 @@ export default function PremiumPage() {
     setIsModalOpen(true);
     setCheckoutData(null);
     setSuccessMessage(null);
+    setSuccessIsScheduled(false);
     setPollingStatus("IDLE");
     setCountdownSeconds(15 * 60);
     setIsCheckingOut(true);
 
     try {
-      const idempotencyKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `key-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const res = await createCheckoutPayment(pkg.id, idempotencyKey);
+      const res = await createCheckoutPayment(pkg.id);
       setCheckoutData(res);
       setPollingStatus("POLLING");
+      // Starting a new checkout may have cancelled an older pending order.
+      window.dispatchEvent(new Event("moodify-notifications-updated"));
     } catch (err: any) {
       console.error("Lỗi tạo đơn thanh toán SePay:", err);
       alert(err.message || "Không thể tạo đơn thanh toán SePay. Vui lòng thử lại!");
@@ -116,12 +127,10 @@ export default function PremiumPage() {
       try {
         const res = await getPaymentStatus(checkoutData.orderCode);
         if (res.status === "SUCCESS") {
-          setPollingStatus("SUCCESS");
-          setSuccessMessage("Thanh toán thành công! Gói VIP đã được kích hoạt.");
-          await loadData();
-          window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
-        } else if (res.status === "CANCELLED" || res.status === "EXPIRED") {
+          await handlePaymentSuccess(res);
+        } else if (res.status === "CANCELLED" || res.status === "EXPIRED" || res.status === "FAILED") {
           setPollingStatus("EXPIRED");
+          window.dispatchEvent(new Event("moodify-notifications-updated"));
         }
       } catch (e) {
         console.warn("Lỗi kiểm tra trạng thái thanh toán:", e);
@@ -134,17 +143,13 @@ export default function PremiumPage() {
   // Đếm ngược 15 phút
   useEffect(() => {
     if (!isModalOpen || pollingStatus !== "POLLING") return;
-    if (countdownSeconds <= 0) {
-      setPollingStatus("EXPIRED");
-      return;
-    }
+    // Keep polling at 00:00 until the backend finalizes the order and records
+    // the expiry notification. The backend scheduler also expires abandoned QR orders.
+    if (countdownSeconds <= 0) return;
 
     const timer = setInterval(() => {
       setCountdownSeconds((prev) => {
-        if (prev <= 1) {
-          setPollingStatus("EXPIRED");
-          return 0;
-        }
+        if (prev <= 1) return 0;
         return prev - 1;
       });
     }, 1000);
@@ -166,11 +171,52 @@ export default function PremiumPage() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const getPackageQuote = (pkg: ServicePackage | undefined) =>
+    pkg ? packageQuotes.find((quote) => quote.id === pkg.id) : undefined;
+
+  const formatPlanDate = (value?: string) => {
+    if (!value) return "";
+    const date = new Date(value.replace(" ", "T"));
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" });
+  };
+
+  async function handlePaymentSuccess(status: PaymentStatusResponse) {
+    const isScheduled = status.isEffectiveNow === false
+      || (status.isEffectiveNow === undefined
+        && !["NEW", "UPGRADE"].includes(checkoutData?.action || ""));
+    const startAt = status.startAt || checkoutData?.startAt;
+    const expiresAt = status.expiresAt || checkoutData?.expiresAt;
+    setPollingStatus("SUCCESS");
+    setSuccessIsScheduled(isScheduled);
+    setSuccessMessage(isScheduled
+      ? `Thanh toán thành công. Gói sẽ bắt đầu vào ${formatPlanDate(startAt)}${expiresAt ? ` và có hiệu lực đến ${formatPlanDate(expiresAt)}` : ""}.`
+      : `Thanh toán thành công. Gói đã có hiệu lực${expiresAt ? ` đến ${formatPlanDate(expiresAt)}` : ""}.`);
+    await loadData();
+    window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
+    window.dispatchEvent(new Event("moodify-notifications-updated"));
+  }
+
+  const getActionLabel = (pkg: ServicePackage | undefined, fallback: string) => {
+    const quote = getPackageQuote(pkg);
+    if (!quote) return fallback;
+    if (quote.isCurrentPackage) return "Gia hạn gói đang dùng";
+    return quote.actionLabel;
+  };
+
+  const getDisplayedPrice = (pkg: ServicePackage | undefined) => {
+    if (!pkg) return null;
+    const quote = getPackageQuote(pkg);
+    return quote?.amount ?? Number(pkg.price);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCheckoutData(null);
     setPollingStatus("IDLE");
     setSuccessMessage(null);
+    setSuccessIsScheduled(false);
   };
 
   const handleManualCheck = async () => {
@@ -178,11 +224,12 @@ export default function PremiumPage() {
     try {
       const res = await getPaymentStatus(checkoutData.orderCode);
       if (res.status === "SUCCESS") {
-        setPollingStatus("SUCCESS");
-        setSuccessMessage("Thanh toán thành công! Gói VIP đã được kích hoạt.");
-        await loadData();
-        window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
+          await handlePaymentSuccess(res);
+      } else if (res.status === "CANCELLED" || res.status === "EXPIRED" || res.status === "FAILED") {
+        setPollingStatus("EXPIRED");
+        window.dispatchEvent(new Event("moodify-notifications-updated"));
       } else {
+        window.dispatchEvent(new Event("moodify-notifications-updated"));
         alert("Hệ thống chưa nhận được thanh toán. Vui lòng đảm bảo bạn đã chuyển đúng số tiền và nội dung!");
       }
     } catch (err: any) {
@@ -190,32 +237,39 @@ export default function PremiumPage() {
     }
   };
 
-  // Find packages based on selected duration
-  const getPackageForTier = (type: "basic" | "full" | "family") => {
-    if (type === "basic") {
-      if (cycle === "1year") {
-        return packages.find((p) => (p.name.includes("Tiết Kiệm") || p.name.includes("Cơ Bản")) && p.duration_days > 100) || packages.find((p) => p.id === 2);
-      }
-      return packages.find((p) => (p.name.includes("Tiết Kiệm") || p.name.includes("Cơ Bản"))) || packages.find((p) => p.id === 1);
-    } else if (type === "full") {
-      if (cycle === "3months") {
-        return packages.find((p) => p.name.includes("FULL") && p.duration_days === 90) || packages.find((p) => p.id === 4);
-      }
-      if (cycle === "1year") {
-        return packages.find((p) => p.name.includes("FULL") && p.duration_days > 100) || packages.find((p) => p.id === 5);
-      }
-      return packages.find((p) => p.name.includes("FULL")) || packages.find((p) => p.id === 3);
-    } else {
-      if (cycle === "1year") {
-        return packages.find((p) => p.name.includes("Gia Đình") && p.duration_days > 100) || packages.find((p) => p.id === 7 || p.id === 5);
-      }
-      return packages.find((p) => p.name.includes("Gia Đình")) || packages.find((p) => p.id === 6 || p.id === 4);
+  // Find the package matching the selected tier and duration.
+  const getPackageForTier = (type: "full" | "family") => {
+    const tierId = type === "full" ? "INDIVIDUAL_FULL" : "FAMILY";
+    const inTier = packages.filter((pkg) => (pkg.tier_id || pkg.tierId) === tierId);
+    if (inTier.length > 0) {
+      const wantedDuration = cycle === "1year" ? 365 : cycle === "3months" ? 90 : 30;
+      return inTier.find((pkg) => pkg.duration_days === wantedDuration)
+        || inTier.find((pkg) => Math.abs(pkg.duration_days - wantedDuration) < 20)
+        || inTier[0];
     }
+
+    if (type === "full") {
+      if (cycle === "3months") {
+        return packages.find((pkg) => pkg.name.includes("FULL") && pkg.duration_days === 90) || packages.find((pkg) => pkg.id === 4);
+      }
+      if (cycle === "1year") {
+        return packages.find((pkg) => pkg.name.includes("FULL") && pkg.duration_days > 100) || packages.find((pkg) => pkg.id === 5);
+      }
+      return packages.find((pkg) => pkg.name.includes("FULL") && pkg.duration_days <= 31) || packages.find((pkg) => pkg.id === 3);
+    }
+
+    if (cycle === "1year") {
+      return packages.find((pkg) => pkg.duration_days > 100 && (pkg.tier_id || pkg.tierId) === "FAMILY") || packages.find((pkg) => pkg.id === 7);
+    }
+    return packages.find((pkg) => pkg.duration_days <= 31 && (pkg.tier_id || pkg.tierId) === "FAMILY") || packages.find((pkg) => pkg.id === 6);
   };
 
-  const basicPkg = getPackageForTier("basic");
   const fullPkg = getPackageForTier("full");
   const famPkg = getPackageForTier("family");
+
+  if (searchParams.get("tab") === "manage") {
+    return <SubscriptionManagement />;
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-6 md:py-10 space-y-10">
@@ -229,7 +283,7 @@ export default function PremiumPage() {
           Âm Nhạc Không Giới Hạn, Cảm Xúc Thăng Hoa.
         </h1>
         <p className="text-white/60 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-          Lựa chọn gói dịch vụ phù hợp với nhu cầu: Tiết kiệm chi phí, Cá nhân không giới hạn hoặc Chia sẻ trọn bộ gia đình.
+          Lựa chọn gói dịch vụ phù hợp: VIP Cá nhân không giới hạn hoặc Chia sẻ trọn bộ gia đình với chi phí tiết kiệm nhất.
         </p>
       </div>
 
@@ -281,7 +335,7 @@ export default function PremiumPage() {
             <button
               onClick={() => handleDevToggle(false)}
               disabled={isProcessing}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 !subInfo?.isPremium
                   ? "bg-white/20 text-white shadow-sm"
                   : "text-white/60 hover:text-white"
@@ -291,40 +345,28 @@ export default function PremiumPage() {
               Miễn phí (Free)
             </button>
             <button
-              onClick={() => handleDevToggle(true, 1)}
-              disabled={isProcessing}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                subInfo?.isPremium && subInfo?.tier === "INDIVIDUAL_BASIC"
-                  ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 shadow-sm"
-                  : "text-white/60 hover:text-white"
-              }`}
-              title="Chuyển sang Gói VIP Tiết Kiệm (29K)"
-            >
-              Tiết Kiệm (29K)
-            </button>
-            <button
               onClick={() => handleDevToggle(true, 3)}
               disabled={isProcessing}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                subInfo?.isPremium && subInfo?.tier === "INDIVIDUAL_FULL"
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                subInfo?.isPremium && subInfo?.tier !== "FAMILY"
                   ? "bg-purple-500/40 text-purple-200 border border-purple-400/40 shadow-sm"
                   : "text-white/60 hover:text-white"
               }`}
-              title="Chuyển sang Gói Cá Nhân FULL (49K)"
+              title="Kích hoạt Gói VIP Cá Nhân (29K)"
             >
-              Cá Nhân FULL (49K)
+              VIP Cá Nhân (29K)
             </button>
             <button
               onClick={() => handleDevToggle(true, 6)}
               disabled={isProcessing}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 subInfo?.isPremium && subInfo?.tier === "FAMILY"
                   ? "bg-amber-400/30 text-amber-300 border border-amber-400/40 shadow-sm"
                   : "text-white/60 hover:text-white"
               }`}
-              title="Chuyển sang Gói Gia Đình (79K)"
+              title="Kích hoạt Gói Gia Đình (59K)"
             >
-              Gia Đình (79K)
+              Gia Đình (59K)
             </button>
           </div>
         </div>
@@ -353,7 +395,7 @@ export default function PremiumPage() {
           >
             <span>3 Tháng</span>
             <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-400 text-black font-extrabold">
-              -12%
+              -10%
             </span>
           </button>
           <button
@@ -372,136 +414,84 @@ export default function PremiumPage() {
         </div>
       </div>
 
-      {/* Pricing Cards Grid - 3 Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Card 1: Gói VIP Tiết Kiệm */}
-        <div className="rounded-3xl border border-white/10 bg-slate-950/70 backdrop-blur-2xl p-6 flex flex-col justify-between shadow-2xl relative group hover:border-slate-400/40 transition-all">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Giá Mềm Nhất • 1 Người
-                </span>
-                <h3 className="text-xl font-extrabold text-white mt-0.5">VIP Tiết Kiệm</h3>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300">
-                <Volume2 className="w-4 h-4" />
-              </div>
-            </div>
-
-            {/* Price */}
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-extrabold text-white">
-                  {basicPkg ? (basicPkg.price).toLocaleString("vi-VN") : "29.000"} đ
-                </span>
-                <span className="text-xs text-white/50 font-medium">
-                  / {cycle === "1year" ? "năm" : "tháng"}
-                </span>
-              </div>
-              <p className="text-[11.5px] text-slate-400 mt-1 font-medium">
-                Nghe nhạc cá nhân tiết kiệm chi phí
-              </p>
-            </div>
-
-            {/* Benefits */}
-            <div className="pt-3.5 border-t border-white/10 space-y-2.5">
-              <p className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
-                Đặc quyền gói tiết kiệm:
-              </p>
-              <ul className="space-y-2 text-xs text-white/80">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span><strong>15 bài đầu tiên / ngày</strong> hoàn toàn không quảng cáo</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Quảng cáo rất nhẹ nếu nghe vượt 15 bài/ngày</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Chuyển bài thoải mái <strong>30 lượt / ngày</strong></span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Tải tối đa 50 bài hát offline</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>Dành riêng cho 1 thiết bị cá nhân</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <button
-            onClick={() => basicPkg && handleOpenCheckout(basicPkg)}
-            className="mt-6 w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-slate-800 hover:bg-slate-700 border border-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>Chọn Gói Tiết Kiệm</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Card 2: Gói Cá Nhân FULL (Dưới gói Fam, Phổ Biến Nhất) */}
-        <div className="rounded-3xl border-2 border-purple-500/60 bg-gradient-to-br from-purple-950/40 via-slate-950/90 to-purple-900/20 backdrop-blur-2xl p-6 flex flex-col justify-between shadow-2xl relative group hover:border-purple-400 transition-all">
+      {/* Pricing Cards Grid - 2 Columns (Centered & Balanced) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        {/* Card 1: Gói Cá Nhân FULL */}
+        <div className="rounded-3xl border-2 border-purple-500/60 bg-gradient-to-br from-purple-950/40 via-slate-950/90 to-purple-900/20 backdrop-blur-2xl p-7 flex flex-col justify-between shadow-2xl relative group hover:border-purple-400 transition-all">
           <div className="absolute -top-0.5 right-6 px-3 py-1 rounded-b-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-black tracking-wider uppercase shadow-md">
-            PHỔ BIẾN NHẤT • CÁ NHÂN FULL
+            PHỔ BIẾN NHẤT • VIP CÁ NHÂN
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
                   Trọn Vẹn Đặc Quyền • 1 Người
                 </span>
-                <h3 className="text-xl font-extrabold text-white mt-0.5">Cá Nhân FULL</h3>
+                <h3 className="text-2xl font-extrabold text-white mt-0.5">VIP Cá Nhân</h3>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
-                <Sparkles className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                <Sparkles className="w-5 h-5" />
               </div>
             </div>
 
             {/* Price */}
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-extrabold text-white">
-                  {fullPkg ? (fullPkg.price).toLocaleString("vi-VN") : "49.000"} đ
+                <span className="text-4xl font-extrabold text-white">
+                  {(getDisplayedPrice(fullPkg) ?? (cycle === "1year" ? 279000 : cycle === "3months" ? 79000 : 29000)).toLocaleString("vi-VN")} đ
                 </span>
                 <span className="text-xs text-white/50 font-medium">
                   / {cycle === "1year" ? "năm" : cycle === "3months" ? "3 tháng" : "tháng"}
                 </span>
               </div>
-              <p className="text-[11.5px] text-purple-300 mt-1 font-medium">
-                {cycle === "1year" ? "Tương đương ~39.000 đ/tháng" : "Trọn vẹn đặc quyền như Gói Fam"}
+              <p className="text-[11.5px] text-purple-300 mt-1.5 font-medium">
+                {cycle === "1year" ? "Tương đương ~23.250 đ/tháng (Tiết kiệm 69.000 đ)" : cycle === "3months" ? "Tương đương ~26.300 đ/tháng (Tiết kiệm 8.000 đ)" : "Chỉ 29.000 đ/tháng - Trọn vẹn đặc quyền không giới hạn"}
               </p>
+              {getPackageQuote(fullPkg)?.discountApplied && (
+                <p className="mt-1 text-[10px] font-semibold text-emerald-300">
+                  <span className="mr-1 text-white/35 line-through">
+                    {getPackageQuote(fullPkg)?.baseAmount.toLocaleString("vi-VN")} đ
+                  </span>
+                  Gia hạn cùng nhóm quyền lợi: giảm 20%
+                </p>
+              )}
+              {getPackageQuote(fullPkg)?.actionDescription && (
+                <p className="mt-1 text-[10px] leading-4 text-white/45">
+                  {getPackageQuote(fullPkg)?.actionDescription}
+                </p>
+              )}
             </div>
 
             {/* Benefits */}
-            <div className="pt-3.5 border-t border-white/10 space-y-2.5">
+            <div className="pt-4 border-t border-white/10 space-y-3">
               <p className="text-[11px] font-bold text-purple-300 uppercase tracking-wider">
                 Đặc quyền cá nhân không giới hạn:
               </p>
-              <ul className="space-y-2 text-xs text-white/80">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <ul className="space-y-2.5 text-xs text-white/80">
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span className="font-semibold text-white">100% Không quảng cáo vĩnh viễn</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Chuyển bài (Skip) <strong>hoàn toàn vô hạn</strong></span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Tải nhạc ngoại tuyến không giới hạn bài</span>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Tải nhạc ngoại tuyến không giới hạn bài hát</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Mở khóa Theme hào quang Obsidian Royal Gold</span>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Chất lượng âm thanh <strong>Ultra HD 320 kbps Lossless</strong></span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-300 shrink-0" />
-                  <span>Dành riêng cho 1 thiết bị cá nhân</span>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Mở khóa Theme hào quang <strong>Obsidian Royal Gold</strong> & Huy hiệu VIP</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-purple-300 shrink-0" />
+                  <span>Dành riêng cho 1 tài khoản cá nhân</span>
                 </li>
               </ul>
             </div>
@@ -509,72 +499,89 @@ export default function PremiumPage() {
 
           <button
             onClick={() => fullPkg && handleOpenCheckout(fullPkg)}
-            className="mt-6 w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Nâng Cấp Cá Nhân FULL</span>
+            <span>{getActionLabel(fullPkg, "Nâng Cấp Cá Nhân FULL")}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Card 3: Gói Gia Đình (Best Value Cho Nhóm) */}
-        <div className="rounded-3xl border-2 border-amber-400/60 bg-gradient-to-br from-amber-500/10 via-slate-950/80 to-purple-950/40 backdrop-blur-2xl p-6 flex flex-col justify-between shadow-2xl relative group overflow-hidden">
+        {/* Card 2: Gói Gia Đình */}
+        <div className="rounded-3xl border-2 border-amber-400/60 bg-gradient-to-br from-amber-500/10 via-slate-950/80 to-purple-950/40 backdrop-blur-2xl p-7 flex flex-col justify-between shadow-2xl relative group overflow-hidden">
           <div className="absolute -top-0.5 right-6 px-3 py-1 rounded-b-xl bg-gradient-to-r from-amber-400 to-amber-300 text-black text-[10px] font-black tracking-wider uppercase shadow-md">
             TIẾT KIỆM NHẤT • 6 NGƯỜI
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
-                  Dành Cho 6 Tài Khoản
+                  Dành Cho 6 Tài Khoản Độc Lập
                 </span>
-                <h3 className="text-xl font-extrabold text-white mt-0.5">Gói Gia Đình</h3>
+                <h3 className="text-2xl font-extrabold text-white mt-0.5">Gói Gia Đình</h3>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
-                <Users className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+                <Users className="w-5 h-5" />
               </div>
             </div>
 
             {/* Price */}
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-extrabold text-white">
-                  {famPkg ? (famPkg.price).toLocaleString("vi-VN") : "79.000"} đ
+                <span className="text-4xl font-extrabold text-white">
+                  {(getDisplayedPrice(famPkg) ?? (cycle === "1year" ? 590000 : 59000)).toLocaleString("vi-VN")} đ
                 </span>
                 <span className="text-xs text-white/50 font-medium">
                   / {cycle === "1year" ? "năm" : "tháng"}
                 </span>
               </div>
-              <p className="text-[11.5px] text-amber-300 font-medium mt-1">
-                Chỉ ~13.100 đ / người / tháng khi chia 6 người
+              <p className="text-[11.5px] text-amber-300 font-medium mt-1.5">
+                {cycle === "1year" ? "Chỉ ~8.200 đ / người / tháng khi chia 6 người (Tặng 2 tháng)" : "Chỉ ~9.800 đ / người / tháng khi chia 6 người"}
               </p>
+              {getPackageQuote(famPkg)?.discountApplied && (
+                <p className="mt-1 text-[10px] font-semibold text-emerald-300">
+                  <span className="mr-1 text-white/35 line-through">
+                    {getPackageQuote(famPkg)?.baseAmount.toLocaleString("vi-VN")} đ
+                  </span>
+                  Gia hạn cùng nhóm quyền lợi: giảm 20%
+                </p>
+              )}
+              {getPackageQuote(famPkg)?.actionDescription && (
+                <p className="mt-1 text-[10px] leading-4 text-white/45">
+                  {getPackageQuote(famPkg)?.actionDescription}
+                </p>
+              )}
             </div>
 
             {/* Benefits */}
-            <div className="pt-3.5 border-t border-white/10 space-y-2.5">
+            <div className="pt-4 border-t border-white/10 space-y-3">
               <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
                 Đặc quyền trọn bộ gia đình:
               </p>
-              <ul className="space-y-2 text-xs text-white/80">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="font-semibold text-white">Chia sẻ tối đa 6 tài khoản/thiết bị</span>
+              <ul className="space-y-2.5 text-xs text-white/80">
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="font-semibold text-white">Chia sẻ tối đa 6 tài khoản độc lập</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Kho nhạc & thư viện riêng tư từng thành viên</span>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Kho nhạc, playlist & thư viện riêng tư từng thành viên</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>Chặn 100% quảng cáo cho cả 6 thành viên</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Chuyển bài & tải offline không giới hạn</span>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Chuyển bài & tải offline không giới hạn cho mọi thành viên</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Huy hiệu VIP Crown cho toàn bộ thành viên</span>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Chất lượng âm thanh <strong>Ultra HD 320 kbps Lossless</strong> cho tất cả</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Huy hiệu VIP Crown cho toàn bộ 6 thành viên</span>
                 </li>
               </ul>
             </div>
@@ -582,9 +589,9 @@ export default function PremiumPage() {
 
           <button
             onClick={() => famPkg && handleOpenCheckout(famPkg)}
-            className="mt-6 w-full py-3 px-4 rounded-xl font-bold text-xs text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Nâng Cấp Gia Đình (6 Người)</span>
+            <span>{getActionLabel(famPkg, "Nâng Cấp Gia Đình (6 Người)")}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -598,7 +605,7 @@ export default function PremiumPage() {
               Bảng so sánh chi tiết
             </span>
             <h3 className="text-xl md:text-2xl font-black text-white mt-1">
-              Đặc quyền & Phân cấp 4 gói dịch vụ Moodify
+              Đặc quyền & Phân cấp các gói dịch vụ Moodify
             </h3>
           </div>
           <p className="text-xs text-white/50 max-w-sm">
@@ -610,11 +617,10 @@ export default function PremiumPage() {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-white/10 text-white/50 uppercase text-[10.5px] font-bold tracking-wider">
-                <th className="py-3 px-4 w-[28%]">Tính năng / Quyền lợi</th>
-                <th className="py-3 px-4 w-[18%]">Miễn phí (FREE)</th>
-                <th className="py-3 px-4 w-[18%] text-emerald-400">Tiết Kiệm (29K)</th>
-                <th className="py-3 px-4 w-[18%] text-purple-300">Cá Nhân FULL (49K)</th>
-                <th className="py-3 px-4 w-[18%] text-amber-300">Gia Đình (79K)</th>
+                <th className="py-3 px-4 w-[37%]">Tính năng / Quyền lợi</th>
+                <th className="py-3 px-4 w-[21%]">Miễn phí (FREE)</th>
+                <th className="py-3 px-4 w-[21%] text-purple-300">VIP Cá Nhân (29K)</th>
+                <th className="py-3 px-4 w-[21%] text-amber-300">Gia Đình (59K)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-white/80">
@@ -622,9 +628,8 @@ export default function PremiumPage() {
               <tr className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3.5 px-4 font-semibold text-white">Giá cước hàng tháng</td>
                 <td className="py-3.5 px-4 font-medium text-white/60">0 đ</td>
-                <td className="py-3.5 px-4 font-bold text-emerald-400">29.000 đ</td>
-                <td className="py-3.5 px-4 font-bold text-purple-300">49.000 đ</td>
-                <td className="py-3.5 px-4 font-bold text-amber-300">79.000 đ <span className="text-[10px] block text-white/40 font-normal">(~13k/người)</span></td>
+                <td className="py-3.5 px-4 font-bold text-purple-300">29.000 đ</td>
+                <td className="py-3.5 px-4 font-bold text-amber-300">59.000 đ <span className="text-[10px] block text-white/40 font-normal">(~9.8k/người)</span></td>
               </tr>
 
               {/* Row 2: Quảng cáo */}
@@ -634,10 +639,6 @@ export default function PremiumPage() {
                   <span className="block text-[11px] text-white/40 font-normal">Audio lồng nhạc nền & Banner đếm ngược</span>
                 </td>
                 <td className="py-3.5 px-4 text-red-300">Quảng cáo sau mỗi 3 bài</td>
-                <td className="py-3.5 px-4 text-emerald-300">
-                  <strong>15 bài đầu/ngày 0 quảng cáo</strong>
-                  <span className="block text-[10.5px] text-white/40 font-normal">Sau 15 bài: rất thưa (7 bài/lần)</span>
-                </td>
                 <td className="py-3.5 px-4 text-purple-200 font-bold">100% Không quảng cáo vĩnh viễn</td>
                 <td className="py-3.5 px-4 text-amber-200 font-bold">100% Không quảng cáo (Cả 6 người)</td>
               </tr>
@@ -646,7 +647,6 @@ export default function PremiumPage() {
               <tr className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3.5 px-4 font-semibold text-white">Chuyển bài hát (Skip)</td>
                 <td className="py-3.5 px-4 text-white/60">Giới hạn 6 lượt / ngày</td>
-                <td className="py-3.5 px-4 text-emerald-300 font-semibold">30 lượt / ngày</td>
                 <td className="py-3.5 px-4 text-purple-200 font-bold">Không giới hạn (Vô hạn)</td>
                 <td className="py-3.5 px-4 text-amber-200 font-bold">Không giới hạn (Cả 6 người)</td>
               </tr>
@@ -655,7 +655,6 @@ export default function PremiumPage() {
               <tr className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3.5 px-4 font-semibold text-white">Tải nhạc ngoại tuyến (MP3)</td>
                 <td className="py-3.5 px-4 text-white/40">Không hỗ trợ</td>
-                <td className="py-3.5 px-4 text-emerald-300">Tối đa 50 bài</td>
                 <td className="py-3.5 px-4 text-purple-200 font-bold">Không giới hạn bài hát</td>
                 <td className="py-3.5 px-4 text-amber-200 font-bold">Không giới hạn bài hát</td>
               </tr>
@@ -664,7 +663,6 @@ export default function PremiumPage() {
               <tr className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3.5 px-4 font-semibold text-white">Chất lượng âm thanh tối đa</td>
                 <td className="py-3.5 px-4 text-white/60">Chuẩn 128 kbps</td>
-                <td className="py-3.5 px-4 text-emerald-300">Chất lượng cao 192-256 kbps</td>
                 <td className="py-3.5 px-4 text-purple-200 font-bold">Ultra HD 320 kbps Lossless</td>
                 <td className="py-3.5 px-4 text-amber-200 font-bold">Ultra HD 320 kbps Lossless</td>
               </tr>
@@ -673,8 +671,7 @@ export default function PremiumPage() {
               <tr className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3.5 px-4 font-semibold text-white">Số lượng thiết bị / tài khoản</td>
                 <td className="py-3.5 px-4 text-white/60">1 thiết bị</td>
-                <td className="py-3.5 px-4 text-white/60">1 thiết bị</td>
-                <td className="py-3.5 px-4 text-white/60">1 thiết bị</td>
+                <td className="py-3.5 px-4 text-white/60">1 thiết bị cá nhân</td>
                 <td className="py-3.5 px-4 text-amber-300 font-bold">Tối đa 6 tài khoản độc lập</td>
               </tr>
 
@@ -685,7 +682,6 @@ export default function PremiumPage() {
                   <span className="block text-[11px] text-white/40 font-normal">Hào quang Obsidian Royal Gold & Tùy biến nút phát</span>
                 </td>
                 <td className="py-3.5 px-4 text-white/40">Khóa</td>
-                <td className="py-3.5 px-4 text-emerald-300">Theme VIP Cơ Bản</td>
                 <td className="py-3.5 px-4 text-purple-200 font-bold">Mở khóa trọn bộ đặc quyền VIP</td>
                 <td className="py-3.5 px-4 text-amber-200 font-bold">Mở khóa trọn bộ cho cả 6 thành viên</td>
               </tr>
@@ -705,8 +701,14 @@ export default function PremiumPage() {
                   <Crown className="w-5 h-5 text-slate-950 font-bold" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Thanh Toán VietQR (SePay)</h3>
-                  <p className="text-[11px] text-white/50">Tự động kích hoạt VIP trong 3-5 giây</p>
+                  <h3 className="text-base font-bold text-white">
+                    {pollingStatus === "SUCCESS" ? "Thanh toán đã hoàn tất" : "Thanh toán VietQR (SePay)"}
+                  </h3>
+                  <p className="text-[11px] text-white/50">
+                    {pollingStatus === "SUCCESS"
+                      ? successIsScheduled ? "Lịch áp dụng gói đã được xác nhận" : "Gói thành viên của bạn đã có hiệu lực"
+                      : "SePay xác nhận thanh toán; gói được áp dụng theo chính sách hiển thị bên dưới"}
+                  </p>
                 </div>
               </div>
               <button
@@ -727,22 +729,55 @@ export default function PremiumPage() {
               </div>
             ) : pollingStatus === "SUCCESS" ? (
               /* Khi thanh toán thành công */
-              <div className="text-center py-8 space-y-4 animate-in zoom-in-95 duration-300">
-                <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center shadow-xl shadow-emerald-500/30">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-400 animate-bounce" />
+              <div className={`${successStyles.successState} text-center`} role="status" aria-live="polite">
+                <div className={successStyles.successVisual} aria-hidden="true">
+                  <div className={`${successStyles.orbit} ${successStyles.orbitGold}`} />
+                  <div className={`${successStyles.orbit} ${successStyles.orbitTeal}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleOne}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleTwo}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleThree}`} />
+                  <span className={`${successStyles.particle} ${successStyles.particleFour}`} />
+                  <div className={successStyles.successCore}>
+                    <Check className="w-8 h-8 text-emerald-300" strokeWidth={2.5} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-xl font-black text-white">Thanh Toán Thành Công! 🎉</h4>
-                  <p className="text-sm text-emerald-400 font-semibold">{successMessage}</p>
-                  <p className="text-xs text-white/50 pt-1">
-                    Đặc quyền VIP của bạn đã được kích hoạt ngay lập tức trên toàn hệ thống.
+
+                <div className={successStyles.activatedBadge}>
+                  <span className={successStyles.statusDot} />
+                  {successIsScheduled ? "GÓI ĐÃ ĐƯỢC XẾP LỊCH" : "QUYỀN LỢI VIP ĐÃ MỞ KHÓA"}
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-2xl font-bold tracking-tight text-white">
+                    {successIsScheduled ? "Đã ghi nhận lịch gia hạn" : "Chào mừng đến với Moodify VIP"}
+                  </h4>
+                  <p className="mx-auto max-w-sm text-sm leading-6 text-white/60">
+                    {successMessage || "Gói thành viên của bạn đã được kích hoạt."}
                   </p>
                 </div>
+
+                <div className={successStyles.packageSummary}>
+                  <div className={successStyles.packageIcon} aria-hidden="true">
+                    <Crown className="h-4 w-4 text-amber-300" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <span className={successStyles.packageLabel}>GÓI ĐĂNG KÝ</span>
+                    <p className={successStyles.packageName}>
+                      {selectedPkg?.name || checkoutData?.packageName || "Moodify VIP"}
+                    </p>
+                  </div>
+                  <span className={successStyles.activeMark}>
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    {successIsScheduled ? "Đã xếp lịch" : "Đã áp dụng"}
+                  </span>
+                </div>
+
                 <button
                   onClick={handleCloseModal}
-                  className="w-full py-3.5 px-5 rounded-2xl font-bold text-sm text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/30 transition-all cursor-pointer mt-4"
+                  className={`${successStyles.successButton} mt-5 w-full rounded-2xl px-5 py-3.5 text-sm font-semibold text-slate-950 cursor-pointer`}
                 >
-                  Bắt Đầu Trải Nghiệm VIP Ngay 🚀
+                  <span>Tiếp tục khám phá</span>
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             ) : pollingStatus === "EXPIRED" ? (
@@ -773,6 +808,17 @@ export default function PremiumPage() {
                   <div>
                     <span className="text-[11px] text-white/50 uppercase tracking-wider block">Gói đăng ký</span>
                     <span className="font-bold text-sm text-white">{checkoutData.packageName}</span>
+                    {checkoutData.discountApplied && (
+                      <span className="mt-1 block text-[10px] font-semibold text-emerald-300">
+                        Ưu đãi cùng nhóm quyền lợi: giảm {checkoutData.discountPercent}% trên giá biến thể này
+                      </span>
+                    )}
+                    <span className="mt-1 block max-w-[19rem] text-[10px] leading-4 text-white/50">
+                      {checkoutData.actionDescription}
+                    </span>
+                    <span className="mt-1 block text-[10px] text-white/35">
+                      Dự kiến: {formatPlanDate(checkoutData.startAt)} – {formatPlanDate(checkoutData.expiresAt)}
+                    </span>
                   </div>
                   <div className="text-right">
                     <span className="text-[11px] text-white/50 uppercase tracking-wider block">Tổng tiền</span>
@@ -780,6 +826,18 @@ export default function PremiumPage() {
                       {checkoutData.amount.toLocaleString("vi-VN")} đ
                     </span>
                   </div>
+                </div>
+                <div className="-mt-2 px-3.5 pb-1 text-xs space-y-1">
+                  <div className="flex justify-between text-white/45">
+                    <span>Giá gốc</span>
+                    <span>{checkoutData.baseAmount.toLocaleString("vi-VN")} đ</span>
+                  </div>
+                  {checkoutData.discountApplied && (
+                    <div className="flex justify-between text-emerald-300">
+                      <span>Ưu đãi cùng tier</span>
+                      <span>-{checkoutData.discountAmount.toLocaleString("vi-VN")} đ</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Khung Mã QR VietQR SePay */}

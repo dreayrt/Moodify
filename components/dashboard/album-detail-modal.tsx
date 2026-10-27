@@ -80,6 +80,7 @@ export default function AlbumDetailModal({
   const handlePlayEntireAlbum = () => {
     if (!album || !album.tracks || album.tracks.length === 0) return;
     const playlistTracks = album.tracks.map((t) => ({
+      id: t.id,
       spotifyId: t.spotifyId,
       name: t.name,
       artistName: t.artistName,
@@ -98,6 +99,7 @@ export default function AlbumDetailModal({
   const handlePlaySingleTrack = (track: Track) => {
     if (!album) return;
     const playlistTracks = album.tracks.map((t) => ({
+      id: t.id,
       spotifyId: t.spotifyId,
       name: t.name,
       artistName: t.artistName,

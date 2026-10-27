@@ -48,7 +48,7 @@ export function middleware(request: NextRequest) {
     if (!tokenCookie) {
       const homeUrl = new URL("/", request.url);
       homeUrl.searchParams.set("auth", "signin");
-      homeUrl.searchParams.set("redirect", pathname);
+      homeUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
       return NextResponse.redirect(homeUrl);
     }
 
@@ -88,9 +88,13 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(correctDashboard, request.url));
     }
 
-    // Chuyen huong /dashboard/artist sang /dashboard/content-lead
-    if (pathname.startsWith("/dashboard/artist")) {
-      return NextResponse.redirect(new URL("/dashboard/content-lead", request.url));
+    // Trang nghe si cong khai /dashboard/artist/[id] danh cho tat ca nguoi dung xem ho so
+    // Chi chuyen huong ve studio content-lead neu truy cap dung goc /dashboard/artist (khong co id)
+    if (pathname === "/dashboard/artist" || pathname === "/dashboard/artist/") {
+      if (role === "CONTENT_LEAD" || role === "ARTIST") {
+        return NextResponse.redirect(new URL("/dashboard/content-lead", request.url));
+      }
+      return NextResponse.redirect(new URL("/dashboard/search?type=ARTIST", request.url));
     }
 
     // Nguoi khong phai CONTENT_LEAD/ADMIN co tinh vao /dashboard/content-lead

@@ -26,7 +26,7 @@ import {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8088";
+  "http://localhost:8080";
 
 async function adminRequest<T>(
   path: string,
@@ -98,14 +98,25 @@ export type AdminOverviewResponse = {
     audioUrl?: string;
     favoriteCount: number;
   }[];
+  totalListenedHours?: number;
+  totalListenedDurationMs?: number;
+  totalListenedFormatted?: string;
+  avgCompletionRate?: number;
+  completedSessions?: number;
   listeningTrend: {
     date: string;
     label: string;
     streams: number;
+    completed?: number;
+  }[];
+  userTrend?: {
+    date: string;
+    label: string;
+    count: number;
   }[];
   recentActivities: {
     id: string;
-    type: "PAYMENT" | "FAVORITE";
+    type: "PAYMENT" | "FAVORITE" | "STREAM";
     title: string;
     detail: string;
     timestamp: string;

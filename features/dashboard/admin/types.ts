@@ -3,6 +3,7 @@ export type AdminTab =
   | "analytics"
   | "catalog"
   | "favorites"
+  | "history"
   | "users"
   | "moderation"
   | "monetization"
@@ -444,6 +445,7 @@ export type ListeningSummaryMetrics = {
   totalSessions: number;
   totalDurationMs: number;
   totalHours: number;
+  totalDurationFormatted?: string;
   sessionsLast24h: number;
   completeEvents: number;
   completionRatePercent: number;

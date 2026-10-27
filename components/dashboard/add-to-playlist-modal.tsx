@@ -94,7 +94,7 @@ export default function AddToPlaylistModal({
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
         <div
-          className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl"
+          className="relative w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close button */}
@@ -162,25 +162,16 @@ export default function AddToPlaylistModal({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 shrink-0 border border-white/10 flex items-center justify-center relative">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 shrink-0 border border-white/10 flex items-center justify-center">
                         {playlist.coverUrl ? (
                           <img
                             src={playlist.coverUrl}
                             alt={playlist.name}
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                              const fallback = e.currentTarget.nextElementSibling;
-                              if (fallback) (fallback as HTMLElement).style.display = "flex";
-                            }}
                             className="w-full h-full object-cover"
                           />
-                        ) : null}
-                        <div
-                          className="w-full h-full bg-gradient-to-tr from-cyan-600/40 to-purple-600/40 flex items-center justify-center"
-                          style={{ display: playlist.coverUrl ? "none" : "flex" }}
-                        >
-                          <Music className="w-5 h-5 text-slate-400" />
-                        </div>
+                        ) : (
+                          <Music className="w-5 h-5 text-slate-500" />
+                        )}
                       </div>
                       <div className="truncate">
                         <div className="text-sm font-medium truncate">

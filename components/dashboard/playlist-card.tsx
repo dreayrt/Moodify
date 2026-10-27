@@ -31,19 +31,13 @@ export default function PlaylistCard({
     >
       <div>
         {/* Cover Art */}
-        <div className="relative mb-3 aspect-square rounded-lg overflow-hidden bg-slate-800 shadow-md flex items-center justify-center">
-          {imgError || !playlist.coverUrl ? (
-            <div className="w-full h-full bg-gradient-to-tr from-cyan-600/40 to-purple-600/40 flex items-center justify-center">
-              <Music className="w-12 h-12 text-slate-400" />
-            </div>
-          ) : (
-            <img
-              src={playlist.coverUrl}
-              alt={playlist.name}
-              onError={() => setImgError(true)}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-          )}
+        <div className="relative mb-3 aspect-square rounded-lg overflow-hidden bg-slate-800 shadow-md">
+          <img
+            src={displayCover}
+            alt={playlist.name}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
 
           {/* Playlist Badge */}
           <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-semibold text-cyan-300 flex items-center gap-1">
@@ -85,7 +79,7 @@ export default function PlaylistCard({
           {playlist.name}
         </h3>
         <p className="text-xs text-slate-400 mt-0.5 truncate">
-          {playlist.username ? `Tạo bởi @${playlist.username}` : "Danh sách phát cá nhân"}
+          Tạo bởi @{playlist.username}
         </p>
       </div>
 

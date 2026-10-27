@@ -29,7 +29,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const googleClientId =
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-    "placeholder-client-id.apps.googleusercontent.com";
+    "1234567890-placeholder.apps.googleusercontent.com";
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>

@@ -21,6 +21,7 @@ import {
   Clock,
   History,
   HelpCircle,
+  CreditCard,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -35,6 +36,7 @@ import {
   fetchUserPlaylists,
   fetchMySubscription,
   fetchMyNotifications,
+  markNotificationRead,
   markAllNotificationsRead,
   type MoodifyNotification,
   type Playlist,
@@ -48,6 +50,7 @@ import { BrandLogo } from "@/components/shared/logo-mark";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
 import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
+import { usePlayer } from "./player-context";
 
 export type Vibe = {
   id: string;
@@ -517,12 +520,12 @@ function MascotAccountTrigger({
 
           {/* VIP Premium Center */}
           <Link
-            href="/dashboard/premium"
+            href={subInfo?.isPremium ? "/dashboard/premium?tab=manage" : "/dashboard/premium"}
             onClick={() => setOpen(false)}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors group"
           >
             <Crown className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-            <span>{subInfo?.isPremium ? "Quản lý gói VIP" : "Gói Moodify VIP"}</span>
+            <span>{subInfo?.isPremium ? "Quản lý gói dịch vụ" : "Gói Moodify VIP"}</span>
           </Link>
 
           {/* Admin Console Quick Link */}
@@ -607,7 +610,7 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
     setIsLoading(false);
   }, []);
 
-  // Tải thông báo khi mount + lắng nghe sự kiện cập nhật (admin gửi mới, đổi gói...)
+  // Tải khi mount/mở hộp thư và lắng nghe các thay đổi phát sinh trong ứng dụng.
   useEffect(() => {
     void loadNotifications();
     const onUpdated = () => void loadNotifications();
@@ -628,13 +631,22 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
   const handleOpenBell = () => {
     const next = !open;
     setOpen(next);
-    if (next && unreadCount > 0) {
-      // Đánh dấu đã đọc toàn bộ khi mở chuông
-      setUnreadCount(0);
-      void markAllNotificationsRead().then(() => {
-        window.dispatchEvent(new Event("moodify-notifications-updated"));
-      });
+    if (next) {
+      void loadNotifications();
     }
+  };
+
+  const handleMarkNotificationRead = (notificationId: string) => {
+    void markNotificationRead(notificationId).then(() => {
+      window.dispatchEvent(new Event("moodify-notifications-updated"));
+    });
+    setOpen(false);
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    void markAllNotificationsRead().then(() => {
+      window.dispatchEvent(new Event("moodify-notifications-updated"));
+    });
   };
 
   const formatTime = (iso: string | null) => {
@@ -691,14 +703,25 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+        <div className="absolute right-0 mt-2 flex max-h-[calc(100vh-6rem)] w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          <div className="mb-2 flex flex-col gap-2 border-b border-white/10 pb-2 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
               <Bell className={`w-3.5 h-3.5 ${isPremium ? "text-amber-400" : "text-emerald-400"}`} /> Thông báo
             </span>
-            <span className="text-[10px] text-white/40">
-              {isLoading ? "Đang tải..." : unreadCount > 0 ? `${unreadCount} thông báo mới` : "Không có thông báo mới"}
-            </span>
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              <span className="text-[10px] leading-4 text-white/40">
+                {isLoading ? "Đang tải..." : unreadCount > 0 ? `${unreadCount} thông báo mới` : "Không có thông báo mới"}
+              </span>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllNotificationsRead}
+                  className="text-[10px] font-semibold text-purple-300 hover:text-purple-200 transition-colors cursor-pointer"
+                >
+                  Đánh dấu đã đọc
+                </button>
+              )}
+            </div>
           </div>
 
           {items.length === 0 ? (
@@ -707,21 +730,22 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
               <p className="text-[11px] text-white/40">Chưa có thông báo nào.</p>
             </div>
           ) : (
-            <div className="space-y-1.5 max-h-72 overflow-y-auto moodify-scroll pr-1">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto moodify-scroll pr-1">
               {items.map((n) => {
                 const content = (
                   <div
+                    onClick={() => handleMarkNotificationRead(n.id)}
                     className={`p-2.5 rounded-xl transition-colors cursor-pointer group ${
                       n.readAt ? "bg-white/[0.03] hover:bg-white/[0.06]" : "bg-purple-500/[0.08] hover:bg-purple-500/[0.14]"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className={`text-xs font-semibold text-white group-hover:text-purple-300 transition-colors truncate ${n.readAt ? "" : ""}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 whitespace-normal break-words text-xs font-semibold leading-4 text-white transition-colors group-hover:text-purple-300">
                         {n.title}
                       </p>
                       <span className="text-[10px] font-mono text-white/40 shrink-0">{formatTime(n.createdAt)}</span>
                     </div>
-                    <p className="text-[11px] text-white/60 mt-1 leading-relaxed line-clamp-2">
+                    <p className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-white/70">
                       {n.message}
                     </p>
                     <span className="inline-block mt-1.5 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40">
@@ -730,7 +754,7 @@ function HeaderNotifications({ isPremium = false }: { isPremium?: boolean }) {
                   </div>
                 );
                 return n.linkUrl ? (
-                  <Link key={n.id} href={n.linkUrl} onClick={() => setOpen(false)}>
+                  <Link key={n.id} href={n.linkUrl}>
                     {content}
                   </Link>
                 ) : (
@@ -836,6 +860,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPlayerBarHidden } = usePlayer();
 
   const currentVibe = searchParams.get("vibe") || "all";
   const activeVibeObj = VIBES.find((v) => v.id === currentVibe) ?? VIBES[0];
@@ -955,6 +980,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/dashboard" || pathname === "/dashboard/user";
   const isSearch = pathname === "/dashboard/search" || pathname.startsWith("/dashboard/search");
   const isLibrary = pathname.startsWith("/dashboard/library");
+  const isSubscriptionManagement = pathname === "/dashboard/premium" && searchParams.get("tab") === "manage";
   const isHistory = pathname.startsWith("/dashboard/history");
   const isSearchHistory = pathname.startsWith("/dashboard/search-history");
 
@@ -1060,6 +1086,18 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 Thư viện
               </Link>
               <Link
+                href="/dashboard/premium?tab=manage"
+                aria-label="Quản lý gói dịch vụ"
+                title="Quản lý gói dịch vụ"
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  isSubscriptionManagement
+                    ? "bg-amber-400/15 text-amber-100 border border-amber-300/30"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Gói dịch vụ
+              </Link>
+              <Link
                 href="/dashboard/history"
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHistory
@@ -1120,7 +1158,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] pb-[140px]">
+        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
@@ -1179,6 +1217,24 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     strokeWidth={isLibrary ? 2.2 : 1.7}
                   />
                   <span>Thư viện</span>
+                </div>
+              </Link>
+
+              {/* Quản lý gói đăng ký và biên nhận thanh toán */}
+              <Link
+                href="/dashboard/premium?tab=manage"
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                  isSubscriptionManagement
+                    ? navActiveItemClass
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <CreditCard
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
+                    strokeWidth={isSubscriptionManagement ? 2.2 : 1.7}
+                  />
+                  <span>Quản lý gói dịch vụ</span>
                 </div>
               </Link>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Music, Sparkles, AudioLines, HeartPulse, Disc, ListMusic } from "lucide-react";
+import { X, Music, Sparkles, AudioLines, HeartPulse, Disc, ListMusic, Users } from "lucide-react";
 import {
   fetchTracks,
   fetchArtists,
@@ -196,7 +196,7 @@ function SearchContent() {
           const likedIds = await fetchLikedTrackIds(signal).catch(() => []);
           if (signal.aborted) return;
           setLikedTracks(new Set(likedIds));
-        } else if (activeTab === "artists") {
+        } else if (currentTab === "artists") {
           setMoodInfo(null);
           setMoodMatchStatus(null);
           setMoodCandidateCount(0);
@@ -205,12 +205,12 @@ function SearchContent() {
           if (signal.aborted) return;
           setArtists(artistsData);
           setTotalFound(artistsData.length);
-        } else if (activeTab === "albums") {
+        } else if (currentTab === "albums") {
           setMoodInfo(null);
           const albumsData = await fetchPublicAlbums(searchQuery);
           setAlbums(albumsData.content || []);
           setTotalFound(albumsData.totalElements || 0);
-        } else if (activeTab === "playlists") {
+        } else if (currentTab === "playlists") {
           setMoodInfo(null);
           const playlistsData = await fetchPublicPlaylists(searchQuery);
           setPlaylists(playlistsData || []);
@@ -253,8 +253,16 @@ function SearchContent() {
   }, [query, selectedGenre, isMoodMode, loadData, moodSubmissionVersion]);
 
   const handleTabChange = (tab: Tab) => {
-    if (isMoodMode) return;
     setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("mode");
+    if (tab === "artists") {
+      params.set("type", "ARTIST");
+    } else {
+      params.delete("type");
+    }
+    const queryPart = params.toString() ? `?${params.toString()}` : "";
+    router.replace(`/dashboard/search${queryPart}`, { scroll: false });
   };
 
   const handleGenreChange = (genreId: string) => {
@@ -342,6 +350,7 @@ function SearchContent() {
     recordSelectedResult("TRACK", track.spotifyId);
     playTrack(
       {
+        id: track.id,
         spotifyId: track.spotifyId,
         name: track.name,
         artistName: track.artistName,
@@ -354,6 +363,7 @@ function SearchContent() {
         localPath: track.localPath,
       },
       tracks.map((t) => ({
+        id: t.id,
         spotifyId: t.spotifyId,
         name: t.name,
         artistName: t.artistName,
@@ -373,6 +383,7 @@ function SearchContent() {
       const detail = await fetchAlbumDetail(alb.id);
       if (detail.tracks && detail.tracks.length > 0) {
         const playlistTracks = detail.tracks.map((t) => ({
+          id: t.id,
           spotifyId: t.spotifyId,
           name: t.name,
           artistName: t.artistName,
@@ -410,6 +421,7 @@ function SearchContent() {
       }
       if (fullPlaylist.tracks && fullPlaylist.tracks.length > 0) {
         const playlistTracks = fullPlaylist.tracks.map((t) => ({
+          id: t.id,
           spotifyId: t.spotifyId,
           name: t.name,
           artistName: t.artistName,
@@ -645,15 +657,14 @@ function SearchContent() {
               )}
             </button>
             <button
-              disabled={isMoodMode}
               onClick={() => handleTabChange("artists")}
-              className={`px-4 py-3 text-sm font-medium transition-all relative disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`px-4 py-3 text-sm font-medium transition-all relative ${
                 currentTab === "artists"
                   ? "text-cyan-400"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Nghệ sĩ
+              Nghệ sĩ ({artists.length})
               {currentTab === "artists" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
@@ -661,26 +672,26 @@ function SearchContent() {
             <button
               onClick={() => handleTabChange("albums")}
               className={`px-4 py-3 text-sm font-medium transition-all relative ${
-                activeTab === "albums"
+                currentTab === "albums"
                   ? "text-cyan-400"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Album ({albums.length})
-              {activeTab === "albums" && (
+              {currentTab === "albums" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
             </button>
             <button
               onClick={() => handleTabChange("playlists")}
               className={`px-4 py-3 text-sm font-medium transition-all relative ${
-                activeTab === "playlists"
+                currentTab === "playlists"
                   ? "text-cyan-400"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Danh sách phát ({playlists.length})
-              {activeTab === "playlists" && (
+              {currentTab === "playlists" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
             </button>
@@ -690,11 +701,11 @@ function SearchContent() {
             <span className="text-xs text-slate-400 hidden sm:block">
               {query
                 ? `Tìm thấy ${totalFound} kết quả cho "${query}"`
-                : activeTab === "albums"
+                : currentTab === "albums"
                 ? `Hiển thị ${albums.length} album`
-                : activeTab === "playlists"
+                : currentTab === "playlists"
                 ? `Hiển thị ${playlists.length} danh sách phát`
-                : activeTab === "artists"
+                : currentTab === "artists"
                 ? `Hiển thị ${artists.length} nghệ sĩ`
                 : `Hiển thị ${tracks.length} bài hát`}
             </span>
@@ -737,26 +748,46 @@ function SearchContent() {
               ))}
             </div>
           )
-        ) : activeTab === "artists" ? (
+        ) : currentTab === "artists" ? (
           artists.length === 0 ? (
             <div className="text-center py-24">
-              <p className="text-slate-400">Không tìm thấy nghệ sĩ phù hợp</p>
+              <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-300 font-medium text-lg">
+                {query.trim()
+                  ? `Không tìm thấy nghệ sĩ phù hợp với "${query}"`
+                  : "Chưa có nghệ sĩ nào"}
+              </p>
+              {query.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    void loadData("", "all", false);
+                  }}
+                  className="mt-4 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm transition-all cursor-pointer"
+                >
+                  Khám phá tất cả nghệ sĩ
+                </button>
+              ) : (
+                <p className="text-slate-500 text-sm mt-1">
+                  Thử tìm với tên nghệ sĩ khác (ví dụ: "Sơn Tùng", "Ngọt", "HIEUTHUHAI")
+                </p>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {artists.map((artist) => (
                 <ArtistCard
-                  key={artist.spotifyId}
+                  key={artist.spotifyId || artist.id}
                   artist={artist}
                   onClick={() => {
-                    recordSelectedResult("ARTIST", artist.spotifyId);
-                    router.push(`/dashboard/artists/${artist.spotifyId}`);
+                    recordSelectedResult("ARTIST", artist.spotifyId || artist.id);
                   }}
                 />
               ))}
             </div>
           )
-        ) : activeTab === "albums" ? (
+        ) : currentTab === "albums" ? (
           albums.length === 0 ? (
             <div className="text-center py-24">
               <Disc className="w-12 h-12 text-slate-600 mx-auto mb-3" />
@@ -805,7 +836,7 @@ function SearchContent() {
           isOpen={Boolean(selectedAlbumIdForModal)}
           albumId={selectedAlbumIdForModal}
           onClose={() => setSelectedAlbumIdForModal(null)}
-          onAlbumUpdated={() => loadData(query, selectedGenre, isMoodMode)}
+          onAlbumUpdated={() => loadData(query, selectedGenre, isMoodMode, new AbortController().signal)}
         />
     </div>
   );

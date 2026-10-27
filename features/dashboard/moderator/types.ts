@@ -59,6 +59,14 @@ export type ModerationTrack = {
   expiryDate?: string;
   licenseStatus?: string;
   licenseDocumentUrl?: string;
+  audioFeatures?: {
+    bpm?: number;
+    keySignature?: string;
+    energy?: number;
+    danceability?: number;
+    valence?: number;
+    acousticness?: number;
+  };
 };
 
 export type ModerationHistoryItem = {

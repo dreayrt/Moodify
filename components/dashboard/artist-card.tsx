@@ -3,6 +3,7 @@
 import { Users, Play } from "lucide-react";
 import { Artist } from "@/lib/api-client";
 import { useState } from "react";
+import Link from "next/link";
 
 type ArtistCardProps = {
   artist: Artist;
@@ -11,6 +12,7 @@ type ArtistCardProps = {
 
 export default function ArtistCard({ artist, onClick }: ArtistCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const targetHref = `/dashboard/artist/${encodeURIComponent(artist.spotifyId || artist.id || "")}`;
 
   const formatFollowers = (count: number) => {
     if (count >= 1000000) {
@@ -23,11 +25,12 @@ export default function ArtistCard({ artist, onClick }: ArtistCardProps) {
   };
 
   return (
-    <div
-      onClick={onClick}
+    <Link
+      href={targetHref}
+      onClick={() => onClick?.()}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative bg-slate-900/40 rounded-lg p-6 border border-slate-800/50 hover:bg-slate-900/60 hover:border-slate-700 transition-all duration-200 cursor-pointer"
+      className="group relative bg-slate-900/40 rounded-lg p-6 border border-slate-800/50 hover:bg-slate-900/60 hover:border-slate-700 transition-all duration-200 cursor-pointer block text-left"
     >
       {/* Artist image */}
       <div className="relative mb-4 aspect-square rounded-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900">
@@ -96,6 +99,6 @@ export default function ArtistCard({ artist, onClick }: ArtistCardProps) {
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }

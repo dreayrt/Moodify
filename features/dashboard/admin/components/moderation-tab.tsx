@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  Eye,
   FileAudio,
   FileCheck2,
   FileText,
@@ -28,9 +29,10 @@ import { ModalPortal } from "./shared/modal-portal";
 type ModerationTabProps = {
   reviews: ReviewRequest[];
   reviewActions: ReviewAction[];
-  onApproveReview: (requestId: number) => void;
-  onRejectReview: (requestId: number, reason: string) => void;
-  onReturnReview: (requestId: number, reason: string) => void;
+  onApproveReview?: (requestId: number) => void;
+  onRejectReview?: (requestId: number, reason: string) => void;
+  onReturnReview?: (requestId: number, reason: string) => void;
+  isReadOnly?: boolean;
 };
 
 export function ModerationTab({
@@ -39,6 +41,7 @@ export function ModerationTab({
   onApproveReview,
   onRejectReview,
   onReturnReview,
+  isReadOnly = true,
 }: ModerationTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [selectedReview, setSelectedReview] = useState<ReviewRequest | null>(null);
@@ -83,7 +86,9 @@ export function ModerationTab({
 
   const handleConfirmReturn = () => {
     if (!selectedReview) return;
-    onReturnReview(selectedReview.id, returnReason);
+    if (onReturnReview) {
+      onReturnReview(selectedReview.id, returnReason);
+    }
     setIsReturnModalOpen(false);
     setSelectedReview(null);
   };
@@ -96,7 +101,9 @@ export function ModerationTab({
 
   const handleConfirmReject = () => {
     if (!selectedReview) return;
-    onRejectReview(selectedReview.id, rejectReason);
+    if (onRejectReview) {
+      onRejectReview(selectedReview.id, rejectReason);
+    }
     setIsRejectModalOpen(false);
     setSelectedReview(null);
   };
@@ -113,13 +120,16 @@ export function ModerationTab({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
               Kiểm Duyệt Bài Hát &amp; Nội Dung
             </h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-[11px] font-mono text-blue-300">
+              <Eye className="h-3 w-3" /> Chế độ xem kiểm toán (Chỉ xem)
+            </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Hàng đợi tiếp nhận và phê duyệt bài hát, album mới từ Nghệ sĩ trước khi phát hành chính thức lên hệ thống.
+            Hàng đợi tiếp nhận và theo dõi kiểm duyệt tác phẩm từ Nghệ sĩ. Quyền phê duyệt/từ chối do ban Kiểm duyệt viên (MODERATOR) đảm nhiệm.
           </p>
         </div>
 
@@ -241,33 +251,6 @@ export function ModerationTab({
                   )}
                 </div>
 
-                {/* Audio Features Indicators */}
-                {item.audioFeatures && (
-                  <div className="mt-4 rounded-xl border border-[#222432] bg-[#171822] p-3 text-[11px]">
-                    <div className="flex items-center justify-between text-zinc-400 mb-2">
-                      <span className="font-semibold uppercase tracking-wider text-[#ff5500]">Chỉ Số Âm Học (Audio Features)</span>
-                      <span>Key: {item.audioFeatures.keySignature}</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">BPM</p>
-                        <p className="font-graphik font-semibold text-white">{item.audioFeatures.bpm}</p>
-                      </div>
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">Energy</p>
-                        <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.energy * 100)}%</p>
-                      </div>
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">Dance</p>
-                        <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.danceability * 100)}%</p>
-                      </div>
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">Valence</p>
-                        <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.valence * 100)}%</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Lyrics Excerpt */}
                 {item.lyricsPlain && (
@@ -281,34 +264,43 @@ export function ModerationTab({
                   <span className="text-[11px] text-zinc-500">Gửi lúc: {item.submittedAt}</span>
 
                   <div className="flex items-center gap-2">
-                    {item.status !== "APPROVED" && (
-                      <button
-                        type="button"
-                        onClick={() => onApproveReview(item.id)}
-                        className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-[12px] font-medium text-white transition hover:bg-emerald-500 active:scale-[0.98]"
-                      >
-                        Phê duyệt
-                      </button>
-                    )}
+                    {isReadOnly ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-850 border border-zinc-700/60 px-3.5 py-1 text-[11px] font-mono text-zinc-400 shadow-sm">
+                        <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" />
+                        Chỉ xem (Thẩm quyền duyệt: MODERATOR)
+                      </span>
+                    ) : (
+                      <>
+                        {item.status !== "APPROVED" && onApproveReview && (
+                          <button
+                            type="button"
+                            onClick={() => onApproveReview(item.id)}
+                            className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-[12px] font-medium text-white transition hover:bg-emerald-500 active:scale-[0.98]"
+                          >
+                            Phê duyệt
+                          </button>
+                        )}
 
-                    {item.status !== "REJECTED" && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenReturnModal(item)}
-                        className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[12px] text-amber-300 transition hover:bg-amber-500/20 active:scale-[0.98]"
-                      >
-                        Yêu cầu sửa
-                      </button>
-                    )}
+                        {item.status !== "REJECTED" && onReturnReview && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReturnModal(item)}
+                            className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[12px] text-amber-300 transition hover:bg-amber-500/20 active:scale-[0.98]"
+                          >
+                            Yêu cầu sửa
+                          </button>
+                        )}
 
-                    {item.status !== "REJECTED" && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRejectModal(item)}
-                        className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98]"
-                      >
-                        Từ chối
-                      </button>
+                        {item.status !== "REJECTED" && onRejectReview && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRejectModal(item)}
+                            className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98]"
+                          >
+                            Từ chối
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
