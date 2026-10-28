@@ -155,14 +155,14 @@ function resolveMediaUrl(rawUrl: string | null | undefined) {
     rawUrl.startsWith("data:")
   ) {
     if (rawUrl.includes("musiccollector.kandes.io.vn")) {
-      const audioServerUrl = (process.env.NEXT_PUBLIC_AUDIO_SERVER_URL || "http://158.178.247.33").replace(/\/$/, "");
+      const audioServerUrl = (process.env.NEXT_PUBLIC_AUDIO_SERVER_URL || "http://136.85.101.19").replace(/\/$/, "");
       return rawUrl.replace("https://musiccollector.kandes.io.vn", audioServerUrl);
     }
     return rawUrl;
   }
 
   if (rawUrl.startsWith("data/audio/") || rawUrl.startsWith("/data/audio/")) {
-    const audioServerUrl = (process.env.NEXT_PUBLIC_AUDIO_SERVER_URL || "http://158.178.247.33").replace(/\/$/, "");
+    const audioServerUrl = (process.env.NEXT_PUBLIC_AUDIO_SERVER_URL || "http://136.85.101.19").replace(/\/$/, "");
     return `${audioServerUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
   }
 

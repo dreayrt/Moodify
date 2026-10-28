@@ -305,7 +305,7 @@ function LibraryContent() {
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
           lyricsSynced: t.lyricsSynced,
-          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.audioUrl || (t.localPath ? `http://136.85.101.19/${t.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.localPath,
         }));
         playTrack(playlistTracks[0], playlistTracks);

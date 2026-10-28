@@ -658,6 +658,7 @@ export async function recordPlatformVisit(payload: {
 
 export async function recordListeningSessionTelemetry(payload: {
   sessionKey: string;
+  queueToken?: string;
   historyId?: number;
   trackId: string;
   durationMs: number;
@@ -742,7 +743,7 @@ async function requestJson<T>(
     hasToken: !!authToken,
     hasBody: !!body,
     deviceUuid: currentDeviceUuid,
-    body,
+    bodyFields: body && typeof body === "object" ? Object.keys(body) : [],
   });
 
   const response = await fetch(fullUrl, {

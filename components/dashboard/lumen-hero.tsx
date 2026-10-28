@@ -19,6 +19,7 @@ import { fetchTracks, type Track as ApiTrack } from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
 import { useVipTheme, type ThemeOption } from "@/lib/theme";
 import RealtimeLyrics from "./realtime-lyrics";
+import RecommendationSections from "./recommendation-sections";
 import TrackActionMenu, { TrackInlineActions } from "./track-action-menu";
 
 // Map UI vibe ids → real genre strings stored in MongoDB
@@ -529,46 +530,26 @@ function LumenHeroContent() {
     }));
   };
 
-  // Fetch tracks whose MongoDB `genres` array contains any of the target genres.
-  const fetchByGenres = async (genres: string[], size: number): Promise<ApiTrack[]> => {
-    if (activeVibe === "all") {
-      try {
-        const resp = await fetchTracks({ size: 200 });
+  // Fetch tracks whose MongoDB `genres` array contains any of the target genres in a single unified request.
+  const fetchByGenres = async (genres: string[], size: number = 50): Promise<ApiTrack[]> => {
+    try {
+      if (activeVibe === "all") {
+        const resp = await fetchTracks({ size });
         return resp.content;
-      } catch (err) {
-        console.error("Failed to fetch all tracks:", err);
       }
-    }
 
-    const seen = new Set<string>();
-    const merged: ApiTrack[] = [];
-    await Promise.all(
-      genres.map(async (g) => {
-        try {
-          const resp = await fetchTracks({ genre: g, size });
-          for (const t of resp.content) {
-            if (!seen.has(t.spotifyId)) {
-              seen.add(t.spotifyId);
-              merged.push(t);
-            }
-          }
-        } catch (err) {
-          console.error(`Failed to fetch genre "${g}":`, err);
-        }
-      })
-    );
-
-    // If specific genre returned 0 tracks, fallback to general tracks from catalog
-    if (merged.length === 0) {
-      try {
-        const resp = await fetchTracks({ size: 200 });
+      const resp = await fetchTracks({ genre: genres.join(","), size });
+      if (resp.content && resp.content.length > 0) {
         return resp.content;
-      } catch (err) {
-        console.error("Failed to fetch fallback tracks:", err);
       }
-    }
 
-    return merged;
+      // If specific genre returned 0 tracks, fallback to general tracks from catalog
+      const fallback = await fetchTracks({ size });
+      return fallback.content;
+    } catch (err) {
+      console.error("Failed to fetch tracks:", err);
+      return [];
+    }
   };
 
   // Fetch tracks when vibe changes
@@ -578,7 +559,7 @@ function LumenHeroContent() {
       setTracksLoading(true);
       try {
         const genres = VIBE_TO_GENRES[activeVibe] ?? [activeVibe];
-        const items = await fetchByGenres(genres, 150);
+        const items = await fetchByGenres(genres, 50);
         if (!cancelled) {
           setTracks(mapApiTracks(items));
           setActiveTrackIdx(0);
@@ -643,7 +624,7 @@ function LumenHeroContent() {
           durationMs: t.raw.durationMs,
           lyricsPlain: t.raw.lyricsPlain,
           lyricsSynced: t.raw.lyricsSynced,
-          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `http://158.178.247.33/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `http://136.85.101.19/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.raw.localPath,
         },
         tracks
@@ -658,7 +639,7 @@ function LumenHeroContent() {
             durationMs: x.raw!.durationMs,
             lyricsPlain: x.raw!.lyricsPlain,
             lyricsSynced: x.raw!.lyricsSynced,
-            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `http://158.178.247.33/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
+            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `http://136.85.101.19/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
             localPath: x.raw!.localPath,
           }))
       );
@@ -1007,9 +988,11 @@ function LumenHeroContent() {
         )}
       </div>
 
-      {/* Editor picks */}
+      <RecommendationSections />
+
+      {/* Existing catalog discovery remains available alongside personalized recommendations. */}
       <div>
-        <SectionHeader eyebrow="TUYỂN CHỌN ĐẶC BIỆT" title="Editor's Picks" />
+        <SectionHeader eyebrow="KHÁM PHÁ THƯ VIỆN" title="Từ kho nhạc Moodify" />
         {editorPicks.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             {editorPicks.map((t, i) => (
@@ -1029,7 +1012,7 @@ function LumenHeroContent() {
 
       {/* Hottest in genre */}
       <div>
-        <SectionHeader eyebrow="XU HƯỚNG NỔI BẬT" title={`Thịnh hành trong ${active.label}`} />
+        <SectionHeader eyebrow="TIẾP TỤC KHÁM PHÁ" title={`Thêm nhạc ${active.label}`} />
         <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start">
           <div className="flex flex-col gap-1 min-w-0">
             {[...tracks]

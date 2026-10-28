@@ -336,7 +336,7 @@ export async function fetchTrackById(id: string): Promise<Track> {
  * Máy chủ âm nhạc trực tuyến (Oracle Music Cloud Server) lưu trữ toàn bộ kho nhạc MP3
  */
 export const ONLINE_AUDIO_SERVER_URL =
-  process.env.NEXT_PUBLIC_AUDIO_SERVER_URL?.replace(/\/+$/, "") || "http://158.178.247.33";
+  process.env.NEXT_PUBLIC_AUDIO_SERVER_URL?.replace(/\/+$/, "") || "http://136.85.101.19";
 
 /**
  * Trả về trực tiếp URL phát nhạc từ máy chủ đám mây trực tuyến trên mạng (Public IP Oracle)
