@@ -2,6 +2,15 @@
 const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8088').replace(/\/$/, '');
 const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
+function safeEncodeParam(id: string): string {
+  if (!id) return '';
+  try {
+    return encodeURIComponent(decodeURIComponent(id).trim());
+  } catch {
+    return encodeURIComponent(id.trim());
+  }
+}
+
 import { getValidAccessToken } from './auth-client';
 
 // ============================================================================
@@ -545,15 +554,14 @@ export async function isTrackInLibrary(trackSpotifyId: string): Promise<boolean>
 /**
  * Search for artists
  */
-export async function fetchArtists(query: string, signal?: AbortSignal): Promise<Artist[]> {
-  if (!query || query.trim() === '') {
-    return [];
+export async function fetchArtists(query?: string, signal?: AbortSignal): Promise<Artist[]> {
+  const params = new URLSearchParams();
+  if (query?.trim()) {
+    params.set('query', query.trim());
   }
 
-  const params = new URLSearchParams();
-  params.set('query', query.trim());
-
-  const response = await fetch(`${API_BASE}/artists?${params.toString()}`, { signal });
+  const queryStr = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${API_BASE}/artists${queryStr}`, { signal });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch artists: ${response.status}`);
@@ -1457,6 +1465,204 @@ export async function toggleFavoriteAlbum(
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Failed to toggle favorite album: ${res.status}`);
+  return res.json();
+}
+
+// ============================================================================
+// Artist Public Profile, Reviews & Follow
+// ============================================================================
+
+export type ArtistPublicProfile = {
+  artistId: string;
+  name: string;
+  imageUrl: string | null;
+  bannerUrl: string | null;
+  bio: string | null;
+  genres: string[];
+  verified: boolean;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  youtubeUrl: string | null;
+  followersCount: number;
+  isFollowed: boolean;
+  averageRating: number;
+  reviewsCount: number;
+  topTracks: Track[];
+  albums: Album[];
+  appearsOn: Track[];
+};
+
+export type ArtistReview = {
+  id: number;
+  userId: number | null;
+  userName: string;
+  userAvatar: string | null;
+  rating: number;
+  comment: string | null;
+  status: string;
+  artistReply: string | null;
+  artistRepliedAt: string | null;
+  createdAt: string;
+};
+
+export type ArtistReviewsPage = {
+  content: ArtistReview[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  averageRating: number;
+};
+
+export type FollowArtistResponse = {
+  artistId: string;
+  isFollowed: boolean;
+  followersCount: number;
+  message: string;
+};
+
+export type FollowedArtist = {
+  artistId: string;
+  name: string;
+  imageUrl: string | null;
+  genres: string[];
+  verified: boolean;
+  followersCount: number;
+  followedAt: string;
+};
+
+export async function fetchFollowedArtists(signal?: AbortSignal): Promise<FollowedArtist[]> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) return [];
+  const res = await fetch(`${API_BASE}/artists/followed`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchFollowedArtistIds(signal?: AbortSignal): Promise<string[]> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) return [];
+  const res = await fetch(`${API_BASE}/artists/followed-ids`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchArtistPublicProfile(
+  artistId: string,
+  signal?: AbortSignal
+): Promise<ArtistPublicProfile> {
+  const token = await getValidAccessToken().catch(() => null);
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/artists/${safeEncodeParam(artistId)}`, {
+    headers,
+    signal,
+  });
+  if (!res.ok) throw new Error(`Không thể tải thông tin nghệ sĩ (${res.status})`);
+  return res.json();
+}
+
+export async function toggleFollowArtist(artistId: string): Promise<FollowArtistResponse> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để theo dõi nghệ sĩ");
+
+  const res = await fetch(`${API_BASE}/artists/${safeEncodeParam(artistId)}/follow`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error(`Không thể thay đổi trạng thái theo dõi (${res.status})`);
+  const data: FollowArtistResponse = await res.json();
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("moodify-artist-followed", {
+        detail: {
+          artistId,
+          canonicalId: data.artistId,
+          isFollowed: data.isFollowed,
+          followersCount: data.followersCount,
+        },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent("moodify-library-updated", {
+        detail: { type: "artist", artistId, isFollowed: data.isFollowed },
+      })
+    );
+  }
+
+  return data;
+}
+
+export async function fetchArtistReviews(
+  artistId: string,
+  page: number = 0,
+  size: number = 10,
+  signal?: AbortSignal
+): Promise<ArtistReviewsPage> {
+  const res = await fetch(
+    `${API_BASE}/artists/${safeEncodeParam(artistId)}/reviews?page=${page}&size=${size}`,
+    { signal }
+  );
+  if (!res.ok) throw new Error(`Không thể tải đánh giá nghệ sĩ (${res.status})`);
+  return res.json();
+}
+
+export async function submitArtistReview(
+  artistId: string,
+  rating: number,
+  comment?: string
+): Promise<ArtistReview> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập để gửi nhận xét");
+
+  const res = await fetch(`${API_BASE}/artists/${safeEncodeParam(artistId)}/reviews`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ rating, comment }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Không thể gửi nhận xét (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function replyArtistReview(
+  artistId: string,
+  reviewId: number,
+  reply: string
+): Promise<ArtistReview> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Vui lòng đăng nhập");
+
+  const res = await fetch(
+    `${API_BASE}/artists/${safeEncodeParam(artistId)}/reviews/${reviewId}/reply`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ reply }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Không thể phản hồi nhận xét (${res.status})`);
+  }
   return res.json();
 }
 

@@ -15,10 +15,13 @@ import {
   deleteAlbum,
   toggleFavoriteAlbum,
   fetchAlbumDetail,
+  fetchFollowedArtists,
+  toggleFollowArtist,
   type LibraryTrack,
   type Playlist,
   type Track,
   type Album,
+  type FollowedArtist,
 } from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,6 +48,8 @@ import {
   Disc,
   Globe,
   Lock,
+  Users,
+  UserCheck,
 } from "lucide-react";
 
 function LibraryContent() {
@@ -56,8 +61,8 @@ function LibraryContent() {
   const { user } = useAuth();
   const canCreateAlbum = user?.role === "CONTENT_LEAD" || user?.role === "ARTIST" || user?.role === "ADMIN";
 
-  // Active tab: "playlists" | "liked" | "albums"
-  const [activeTab, setActiveTab] = useState<"playlists" | "liked" | "albums">("playlists");
+  // Active tab: "playlists" | "liked" | "albums" | "artists"
+  const [activeTab, setActiveTab] = useState<"playlists" | "liked" | "albums" | "artists">("playlists");
 
   // Playlists state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -72,6 +77,11 @@ function LibraryContent() {
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
 
+  // Followed artists state
+  const [followedArtists, setFollowedArtists] = useState<FollowedArtist[]>([]);
+  const [loadingArtists, setLoadingArtists] = useState(false);
+  const [unfollowingArtistId, setUnfollowingArtistId] = useState<string | null>(null);
+
   // Liked tracks state
   const [likedTracks, setLikedTracks] = useState<LibraryTrack[]>([]);
   const [loadingLiked, setLoadingLiked] = useState(true);
@@ -85,20 +95,23 @@ function LibraryContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [removingTrackId, setRemovingTrackId] = useState<string | null>(null);
 
-  // Load playlists, albums and liked count on mount
+  // Load playlists, albums, liked count and followed artists on mount
   useEffect(() => {
     loadUserPlaylists();
     loadLikedCount();
     loadAlbums();
+    loadFollowedArtists();
   }, []);
 
   useEffect(() => {
     if (activeTab === "albums") {
       loadAlbums();
+    } else if (activeTab === "artists") {
+      loadFollowedArtists();
     }
   }, [activeTab]);
 
-  // Listen for global library and playlist changes from other components
+  // Listen for global library, playlist, and artist follow changes
   useEffect(() => {
     const handleLibraryChange = () => {
       loadLikedCount();
@@ -114,14 +127,45 @@ function LibraryContent() {
       }
     };
 
+    const handleArtistChange = () => {
+      loadFollowedArtists();
+    };
+
     window.addEventListener("moodify-library-updated", handleLibraryChange);
     window.addEventListener("moodify-playlist-updated", handlePlaylistChange);
+    window.addEventListener("moodify-artist-followed", handleArtistChange);
 
     return () => {
       window.removeEventListener("moodify-library-updated", handleLibraryChange);
       window.removeEventListener("moodify-playlist-updated", handlePlaylistChange);
+      window.removeEventListener("moodify-artist-followed", handleArtistChange);
     };
   }, [activeTab, currentPage, selectedPlaylist]);
+
+  const loadFollowedArtists = async () => {
+    setLoadingArtists(true);
+    try {
+      const data = await fetchFollowedArtists();
+      setFollowedArtists(data);
+    } catch (err) {
+      console.error("Failed to load followed artists:", err);
+    } finally {
+      setLoadingArtists(false);
+    }
+  };
+
+  const handleUnfollowArtist = async (e: React.MouseEvent, artistId: string) => {
+    e.stopPropagation();
+    try {
+      setUnfollowingArtistId(artistId);
+      await toggleFollowArtist(artistId);
+      setFollowedArtists((prev) => prev.filter((a) => a.artistId !== artistId));
+    } catch (err) {
+      console.error("Failed to unfollow artist:", err);
+    } finally {
+      setUnfollowingArtistId(null);
+    }
+  };
 
   // Handle URL playlistId parameter
   useEffect(() => {
@@ -434,6 +478,20 @@ function LibraryContent() {
               ? `Album (${myAlbums.length + likedAlbums.length})`
               : `Album đã lưu (${likedAlbums.length})`}
             {activeTab === "albums" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("artists")}
+            className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer ${
+              activeTab === "artists"
+                ? "text-cyan-400 font-semibold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Users className="w-4 h-4 text-purple-400" />
+            Nghệ sĩ ({followedArtists.length})
+            {activeTab === "artists" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
             )}
           </button>
@@ -1056,6 +1114,150 @@ function LibraryContent() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 4: ARTISTS TAB VIEW */}
+        {!selectedPlaylist && activeTab === "artists" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-purple-400" />
+                  Nghệ sĩ bạn theo dõi
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Truy cập nhanh trang cá nhân, nghe các bài hát nổi bật và theo dõi sản phẩm mới
+                </p>
+              </div>
+
+              {followedArtists.length > 0 && (
+                <button
+                  onClick={() => router.push("/dashboard/search?type=ARTIST")}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Khám phá thêm
+                </button>
+              )}
+            </div>
+
+            {loadingArtists ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <Loader2 className="w-10 h-10 animate-spin text-purple-400 mb-3" />
+                <p className="text-xs text-slate-400">Đang tải danh sách nghệ sĩ...</p>
+              </div>
+            ) : followedArtists.length === 0 ? (
+              <div className="text-center py-20 px-4 rounded-3xl border border-white/5 bg-slate-900/30">
+                <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto mb-4 text-purple-400">
+                  <Users className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">
+                  Bạn chưa theo dõi nghệ sĩ nào
+                </h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5 leading-relaxed">
+                  Khi bạn bấm <span className="text-cyan-400 font-semibold">Theo dõi</span> một nghệ sĩ, họ sẽ xuất hiện tại đây để bạn có thể nhanh chóng nghe các tác phẩm và cập nhật bài hát mới nhất.
+                </p>
+                <button
+                  onClick={() => router.push("/dashboard/search?type=ARTIST")}
+                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/25 transition-all cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Khám phá nghệ sĩ ngay
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+                {followedArtists.map((artist) => (
+                  <div
+                    key={artist.artistId}
+                    onClick={() => router.push(`/dashboard/artist/${encodeURIComponent(artist.artistId)}`)}
+                    className="group relative flex flex-col p-4 rounded-2xl bg-slate-900/40 border border-white/5 hover:border-cyan-500/30 hover:bg-slate-900/80 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-cyan-500/10 hover:-translate-y-1"
+                  >
+                    {/* Avatar with circle styling */}
+                    <div className="relative aspect-square rounded-full overflow-hidden bg-slate-800 mb-4 mx-auto w-3/4 ring-2 ring-white/10 group-hover:ring-cyan-400/60 transition-all duration-500">
+                      {artist.imageUrl ? (
+                        <img
+                          src={artist.imageUrl}
+                          alt={artist.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-tr from-purple-600/40 to-cyan-600/40 flex items-center justify-center">
+                          <Users className="w-10 h-10 text-slate-400" />
+                        </div>
+                      )}
+
+                      {/* Verified Badge */}
+                      {artist.verified && (
+                        <div
+                          className="absolute bottom-1 right-1 p-1 rounded-full bg-cyan-500 text-slate-950 shadow-md border-2 border-slate-900"
+                          title="Nghệ sĩ đã xác minh"
+                        >
+                          <Sparkles className="w-3 h-3 fill-slate-950" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Artist Name & Tag */}
+                    <div className="text-center min-w-0">
+                      <span className="text-[10px] uppercase tracking-wider text-cyan-400/80 font-bold block mb-1">
+                        Nghệ sĩ
+                      </span>
+                      <h4 className="text-sm font-bold text-white truncate group-hover:text-cyan-400 transition-colors">
+                        {artist.name}
+                      </h4>
+                      <p className="text-xs text-slate-400 truncate mt-1 flex items-center justify-center gap-1">
+                        <Users className="w-3 h-3 text-slate-500" />
+                        {artist.followersCount >= 1000
+                          ? `${(artist.followersCount / 1000).toFixed(1)}k người theo dõi`
+                          : `${artist.followersCount} người theo dõi`}
+                      </p>
+
+                      {/* Genres tags */}
+                      {artist.genres && artist.genres.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-center gap-1 mt-2.5">
+                          {artist.genres.slice(0, 2).map((genre, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 capitalize truncate max-w-[90px]"
+                            >
+                              {genre}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action buttons on card hover */}
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/artist/${encodeURIComponent(artist.artistId)}`);
+                        }}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black text-slate-200 text-xs font-semibold transition-all text-center cursor-pointer"
+                      >
+                        Trang cá nhân
+                      </button>
+
+                      <button
+                        onClick={(e) => handleUnfollowArtist(e, artist.artistId)}
+                        disabled={unfollowingArtistId === artist.artistId}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Bỏ theo dõi"
+                      >
+                        {unfollowingArtistId === artist.artistId ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                        ) : (
+                          <UserCheck className="w-4 h-4 text-cyan-400 hover:text-rose-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

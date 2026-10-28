@@ -14,8 +14,9 @@ import {
   Radio,
   Headphones,
   Music2,
+  Users,
 } from "lucide-react";
-import { fetchTracks, type Track as ApiTrack } from "@/lib/api-client";
+import { fetchTracks, fetchTrackById, fetchFollowedArtists, type Track as ApiTrack, type FollowedArtist } from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
 import { useVipTheme, type ThemeOption } from "@/lib/theme";
 import RealtimeLyrics from "./realtime-lyrics";
@@ -473,6 +474,49 @@ function LumenHeroContent() {
 
   const selectedImageUrl = currentTrack?.imageUrl || activeSelectedTrack?.raw?.imageUrl;
 
+  // Auto-play shared track from URL (?track=... or ?song=...)
+  const trackIdFromUrl = searchParams.get("track") || searchParams.get("song");
+  const [sharedToast, setSharedToast] = useState<string | null>(null);
+  const handledSharedTrackRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!trackIdFromUrl || handledSharedTrackRef.current === trackIdFromUrl) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const trk = await fetchTrackById(trackIdFromUrl);
+        if (!isMounted || !trk) return;
+        handledSharedTrackRef.current = trackIdFromUrl;
+
+        // Auto play shared track & open live lyrics mode
+        setViewMode("lyrics");
+        playTrack({
+          id: trk.id,
+          spotifyId: trk.spotifyId,
+          name: trk.name,
+          artistName: trk.artistName,
+          albumName: trk.albumName,
+          imageUrl: trk.imageUrl,
+          durationMs: trk.durationMs,
+          lyricsPlain: trk.lyricsPlain,
+          lyricsSynced: trk.lyricsSynced,
+          audioUrl: trk.audioUrl || (trk.localPath ? `http://158.178.247.33/${trk.localPath.replace(/^\/+/, "")}` : undefined),
+          localPath: trk.localPath,
+        });
+
+        setSharedToast(`Đang phát bài hát được chia sẻ: ${trk.name} - ${trk.artistName} 🎵`);
+        setTimeout(() => setSharedToast(null), 5000);
+      } catch (err) {
+        console.warn("Could not load shared track:", err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [trackIdFromUrl, playTrack]);
+
   useEffect(() => {
     if (vibeFromUrl) {
       setActiveVibe(vibeFromUrl);
@@ -622,6 +666,32 @@ function LumenHeroContent() {
     };
   }, []);
 
+  // Fetch followed artists to display their shelf on the dashboard
+  const [followedArtists, setFollowedArtists] = useState<FollowedArtist[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadFollowed = async () => {
+      try {
+        const data = await fetchFollowedArtists();
+        if (!cancelled) {
+          setFollowedArtists(data);
+        }
+      } catch {
+        // user not logged in or network error
+      }
+    };
+    loadFollowed();
+
+    const handleFollowChange = () => {
+      loadFollowed();
+    };
+    window.addEventListener("moodify-artist-followed", handleFollowChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("moodify-artist-followed", handleFollowChange);
+    };
+  }, []);
+
   const handlePlayTrack = (t: Track, index?: number) => {
     if (!t.raw?.audioUrl && !t.raw?.localPath) {
       alert(`Bài hát "${t.title}" hiện chưa có bản thu âm sẵn trên hệ thống. Vui lòng chọn bài hát có sẵn audio.`);
@@ -685,8 +755,16 @@ function LumenHeroContent() {
   }
 
   return (
-    <div className="flex flex-col gap-10 min-w-0">
+    <div className="flex flex-col gap-10 min-w-0 relative">
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
+
+      {/* Floating Shared Track Notification */}
+      {sharedToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] px-5 py-3 rounded-2xl bg-slate-900/95 border border-purple-500/50 text-purple-200 text-sm font-semibold shadow-[0_10px_40px_rgba(168,85,247,0.4)] backdrop-blur-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+          <Sparkles className="w-5 h-5 text-pink-400 animate-pulse shrink-0" />
+          <span>{sharedToast}</span>
+        </div>
+      )}
 
       {/* Middle Stage: Hero Banner or Real-Time Synced Lyrics */}
       <div className="flex flex-col gap-4">
@@ -1006,6 +1084,46 @@ function LumenHeroContent() {
           </>
         )}
       </div>
+
+      {/* Followed Artists Shelf */}
+      {followedArtists.length > 0 && (
+        <div className="anim-fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <SectionHeader eyebrow="BỘ SƯU TẬP CỦA BẠN" title="Nghệ sĩ bạn theo dõi" />
+            <button
+              onClick={() => router.push("/dashboard/library")}
+              className="text-xs text-purple-400 hover:text-purple-300 font-medium transition-colors cursor-pointer"
+            >
+              Xem tất cả ({followedArtists.length})
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+            {followedArtists.slice(0, 6).map((artist) => (
+              <div
+                key={artist.artistId}
+                onClick={() => router.push(`/dashboard/artist/${encodeURIComponent(artist.artistId)}`)}
+                className="group p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer text-center flex flex-col items-center"
+              >
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden mb-3 bg-slate-800 ring-2 ring-white/10 group-hover:ring-purple-400/60 transition-all">
+                  {artist.imageUrl ? (
+                    <img src={artist.imageUrl} alt={artist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-purple-900/30 text-purple-300">
+                      <Users className="w-8 h-8" />
+                    </div>
+                  )}
+                </div>
+                <h4 className="text-xs font-bold text-white truncate w-full group-hover:text-purple-300 transition-colors">
+                  {artist.name}
+                </h4>
+                <p className="text-[10px] text-white/50 truncate w-full mt-0.5">
+                  Nghệ sĩ
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Editor picks */}
       <div>

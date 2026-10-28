@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { PlayerTrack, usePlayer } from "./player-context";
 import { useVipTheme } from "@/lib/theme";
-import { Play, Pause, Music, Mic2, ArrowDown } from "lucide-react";
+import { Play, Pause, Music, Mic2, ArrowDown, Share2 } from "lucide-react";
+import ShareSongCardModal from "./share-song-card-modal";
 
 export interface LyricLine {
   id: number;
@@ -138,6 +139,7 @@ export default function RealtimeLyrics({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [userIsScrolling, setUserIsScrolling] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Parse lyrics: Prioritize millisecond-accurate synced lyrics [mm:ss.xx]
@@ -333,8 +335,8 @@ export default function RealtimeLyrics({
         </div>
 
         {/* Quick controls & time */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right hidden sm:block">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="text-right hidden sm:block mr-1">
             <span className="font-mono text-xs text-purple-300 font-semibold">
               {formatTime(currentTime)}
             </span>
@@ -343,6 +345,15 @@ export default function RealtimeLyrics({
               / {formatTime(duration || (track.durationMs ? track.durationMs / 1000 : 0))}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsShareModalOpen(true)}
+            className="w-9 h-9 rounded-full grid place-items-center bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all cursor-pointer shadow-sm"
+            title="Tạo Story & Card chia sẻ bài hát"
+          >
+            <Share2 className="w-4 h-4 text-purple-300" />
+          </button>
 
           {onTogglePlay && (
             <button
@@ -466,6 +477,14 @@ export default function RealtimeLyrics({
           </div>
         )}
       </div>
+
+      {/* Share Song Card / Story Modal */}
+      <ShareSongCardModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        track={track}
+        currentTime={currentTime}
+      />
     </div>
   );
 }

@@ -265,7 +265,7 @@ export function TrackInlineActions({
     e.stopPropagation();
     e.preventDefault();
 
-    const url = `${window.location.origin}/dashboard?track=${trackSpotifyId}`;
+    const url = `${window.location.origin}/track/${encodeURIComponent(trackSpotifyId)}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       showToast("Đã sao chép liên kết bài hát 🔗");

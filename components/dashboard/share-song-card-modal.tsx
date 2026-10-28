@@ -82,6 +82,16 @@ const THEMES: ThemePreset[] = [
     badgeBg: "rgba(245, 158, 11, 0.2)",
     borderGlow: "rgba(245, 158, 11, 0.4)",
   },
+  {
+    id: "cyan",
+    name: "Cyber Cyan",
+    bgGradient: "from-cyan-950 via-slate-900 to-black",
+    canvasBg: ["#083344", "#0f172a", "#020617"],
+    accentColor: "#06b6d4",
+    textColor: "#cffafe",
+    badgeBg: "rgba(6, 182, 212, 0.2)",
+    borderGlow: "rgba(6, 182, 212, 0.4)",
+  },
 ];
 
 export default function ShareSongCardModal({
@@ -95,8 +105,16 @@ export default function ShareSongCardModal({
   const [customQuote, setCustomQuote] = useState("");
   const [selectedLyricIndex, setSelectedLyricIndex] = useState<number>(-1);
   const [isExporting, setIsExporting] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && Boolean(navigator.share)) {
+      setCanShare(true);
+    }
+  }, []);
 
   const previewCardRef = useRef<HTMLDivElement | null>(null);
 
@@ -130,7 +148,7 @@ export default function ShareSongCardModal({
   const currentDisplayQuote = customQuote.trim() || (track ? `Đang nghe "${track.name}" trên Moodify` : "");
 
   // Generate PNG via high-resolution HTML5 Canvas
-  const generateCanvasImage = async (): Promise<HTMLCanvasElement> => {
+  const generateCanvasImage = async (skipCrossoriginImg = false): Promise<HTMLCanvasElement> => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas context not available");
@@ -205,14 +223,17 @@ export default function ShareSongCardModal({
     const artY = tagY + 50;
 
     let imageLoaded = false;
-    if (track.imageUrl) {
+    if (!skipCrossoriginImg && track.imageUrl) {
       try {
         const img = new Image();
         img.crossOrigin = "anonymous";
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
           img.onerror = () => reject();
-          img.src = track.imageUrl!;
+          const cleanUrl = track.imageUrl!;
+          img.src = cleanUrl.startsWith("http")
+            ? `/api/proxy-image?url=${encodeURIComponent(cleanUrl)}`
+            : cleanUrl;
         });
 
         ctx.save();
@@ -238,7 +259,7 @@ export default function ShareSongCardModal({
     }
 
     if (!imageLoaded) {
-      // Fallback stylized vinyl disc
+      // Stylized vinyl disc with album colors
       ctx.save();
       const discCenterX = width / 2;
       const discCenterY = artY + artSize / 2;
@@ -263,9 +284,15 @@ export default function ShareSongCardModal({
 
       // Center label
       ctx.beginPath();
-      ctx.arc(discCenterX, discCenterY, 65, 0, Math.PI * 2);
+      ctx.arc(discCenterX, discCenterY, 70, 0, Math.PI * 2);
       ctx.fillStyle = activeTheme.accentColor;
       ctx.fill();
+
+      // Music note in center
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 44px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("♫", discCenterX, discCenterY + 15);
       ctx.restore();
     }
 
@@ -369,11 +396,28 @@ export default function ShareSongCardModal({
     return canvas;
   };
 
+  const getShareUrl = () => {
+    if (typeof window === "undefined") return "";
+    const trackParam = track.spotifyId || track.id;
+    return trackParam
+      ? `${window.location.origin}/track/${encodeURIComponent(trackParam)}`
+      : `${window.location.origin}/dashboard/search?q=${encodeURIComponent(track.name)}`;
+  };
+
   const handleDownload = async () => {
     try {
       setIsExporting(true);
-      const canvas = await generateCanvasImage();
-      const dataUrl = canvas.toDataURL("image/png");
+      let canvas: HTMLCanvasElement;
+      let dataUrl: string;
+      try {
+        canvas = await generateCanvasImage(false);
+        dataUrl = canvas.toDataURL("image/png");
+      } catch (taintErr) {
+        console.warn("Tainted canvas fallback to safe artwork render", taintErr);
+        canvas = await generateCanvasImage(true);
+        dataUrl = canvas.toDataURL("image/png");
+      }
+
       const a = document.createElement("a");
       const cleanName = track.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       a.download = `moodify-${cleanName}-${aspect}.png`;
@@ -381,6 +425,8 @@ export default function ShareSongCardModal({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2500);
     } catch (err) {
       console.error("Export error:", err);
       alert("Không thể tải ảnh. Vui lòng thử lại!");
@@ -392,56 +438,115 @@ export default function ShareSongCardModal({
   const handleCopyImage = async () => {
     try {
       setIsExporting(true);
-      const canvas = await generateCanvasImage();
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        if (navigator.clipboard && (window as any).ClipboardItem) {
-          await navigator.clipboard.write([
-            new (window as any).ClipboardItem({ "image/png": blob }),
-          ]);
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = await generateCanvasImage(false);
+      } catch (err) {
+        console.warn("Canvas failed, fallback to disc render:", err);
+        canvas = await generateCanvasImage(true);
+      }
+
+      if (
+        typeof window !== "undefined" &&
+        navigator.clipboard &&
+        typeof (window as any).ClipboardItem !== "undefined"
+      ) {
+        try {
+          const blobPromise = new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((b) => {
+              if (b) resolve(b);
+              else reject(new Error("Không thể trích xuất dữ liệu ảnh"));
+            }, "image/png");
+          });
+
+          const item = new (window as any).ClipboardItem({ "image/png": blobPromise });
+          await navigator.clipboard.write([item]);
           setCopiedImage(true);
-          setTimeout(() => setCopiedImage(false), 2500);
-        } else {
-          handleDownload();
+          setTimeout(() => setCopiedImage(false), 3500);
+          return;
+        } catch (clipErr) {
+          console.warn("ClipboardItem write failed, fallback to download:", clipErr);
         }
-      });
+      }
+
+      // Fallback: If clipboard write is rejected by browser permissions
+      await handleDownload();
     } catch (err) {
-      console.warn("Copy image not supported:", err);
-      handleDownload();
+      console.error("Copy image failed:", err);
+      await handleDownload();
     } finally {
       setIsExporting(false);
     }
   };
 
+  const handleNativeShare = async () => {
+    const shareUrl = getShareUrl();
+    const shareData = {
+      title: `${track.name} - ${track.artistName} | Moodify`,
+      text: customQuote
+        ? `“${customQuote}” — Nghe "${track.name}" của ${track.artistName} trên Moodify 🎧`
+        : `Nghe bài hát "${track.name}" của ${track.artistName} trên Moodify 🎧`,
+      url: shareUrl,
+    };
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.warn("Native share error:", err);
+        }
+      }
+    }
+    handleCopyShareLink();
+  };
+
   const handleCopyShareLink = () => {
-    const url = `${window.location.origin}/dashboard/search?q=${encodeURIComponent(
-      track.name
-    )}`;
-    navigator.clipboard.writeText(url);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+    const shareUrl = getShareUrl();
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    });
+  };
+
+  const handleShareZalo = () => {
+    const shareUrl = getShareUrl();
+    window.open(
+      `https://sp.zalo.me/plugins/share?url=${encodeURIComponent(shareUrl)}`,
+      "_blank",
+      "width=600,height=500"
+    );
   };
 
   const handleShareFacebook = () => {
-    const url = `${window.location.origin}/dashboard/search?q=${encodeURIComponent(
-      track.name
-    )}`;
+    const shareUrl = getShareUrl();
     window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      "_blank"
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+      "_blank",
+      "width=600,height=500"
+    );
+  };
+
+  const handleShareTelegram = () => {
+    const shareUrl = getShareUrl();
+    const text = `Nghe bài hát "${track.name}" của ${track.artistName} trên Moodify 🎵`;
+    window.open(
+      `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`,
+      "_blank",
+      "width=600,height=500"
     );
   };
 
   const handleShareTwitter = () => {
-    const url = `${window.location.origin}/dashboard/search?q=${encodeURIComponent(
-      track.name
-    )}`;
+    const shareUrl = getShareUrl();
     const text = `Đang nghe "${track.name}" của ${track.artistName} trên Moodify 🎵`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(
         text
-      )}&url=${encodeURIComponent(url)}`,
-      "_blank"
+      )}&url=${encodeURIComponent(shareUrl)}`,
+      "_blank",
+      "width=600,height=500"
     );
   };
 
@@ -682,63 +787,125 @@ export default function ShareSongCardModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-5 border-t border-white/10 space-y-2 mt-4">
+              <div className="pt-4 border-t border-white/10 space-y-2.5 mt-3">
+                {/* 1. Quick Native Share (Zalo / Instagram / AirDrop / Mobile apps) */}
+                {canShare && (
+                  <button
+                    type="button"
+                    onClick={handleNativeShare}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30 transition cursor-pointer active:scale-95"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>Chia sẻ nhanh (Zalo, Stories, Tin nhắn...)</span>
+                  </button>
+                )}
+
+                {/* 2. Download Image HD & Copy Image */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={handleDownload}
                     disabled={isExporting}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-xs font-bold shadow-[0_4px_15px_rgba(168,85,247,0.4)] transition cursor-pointer active:scale-95 disabled:opacity-50"
+                    className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-white text-xs font-bold transition cursor-pointer active:scale-95 disabled:opacity-50 ${
+                      downloadSuccess
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
+                        : "bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 hover:text-white"
+                    }`}
                   >
-                    <Download className="w-4 h-4" />
-                    <span>{isExporting ? "Đang tạo..." : "Tải ảnh HD (PNG)"}</span>
+                    {downloadSuccess ? (
+                      <Check className="w-4 h-4 text-white" />
+                    ) : (
+                      <Download className="w-4 h-4 text-cyan-400" />
+                    )}
+                    <span>{isExporting ? "Đang tạo..." : downloadSuccess ? "Đã tải về máy!" : "Tải ảnh HD"}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleCopyImage}
                     disabled={isExporting}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/15 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                    className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-white text-xs font-bold border transition cursor-pointer active:scale-95 disabled:opacity-50 ${
+                      copiedImage
+                        ? "bg-emerald-500/30 border-emerald-400 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                        : "bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 hover:from-pink-500/30 hover:to-cyan-500/30 border-pink-500/30 text-pink-200 hover:text-white"
+                    }`}
+                    title="Chép ảnh để dán (Ctrl+V) vào Zalo, Messenger, Facebook"
                   >
                     {copiedImage ? (
                       <Check className="w-4 h-4 text-emerald-400" />
                     ) : (
-                      <Copy className="w-4 h-4" />
+                      <Copy className="w-4 h-4 text-pink-400" />
                     )}
-                    <span>{copiedImage ? "Đã chép ảnh" : "Chép ảnh"}</span>
+                    <span>{copiedImage ? "Đã chép ảnh (Ctrl+V)!" : "Chép ảnh (Dán Zalo/FB)"}</span>
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* Status Guidance / Tips */}
+                {copiedImage && (
+                  <div className="text-[11px] text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-3 py-2 rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span><b>Đã chép ảnh vào clipboard!</b> Hãy mở Zalo / Messenger và nhấn <b>Ctrl + V</b> để gửi ảnh ngay.</span>
+                  </div>
+                )}
+
+                {copiedLink && (
+                  <div className="text-[11px] text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-3 py-2 rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
+                    <ExternalLink className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span><b>Đã chép link!</b> <i>(Lưu ý: Link localhost dán lên Zalo/FB chỉ hiện chữ do Zalo không thể truy cập máy bạn. Hãy dùng nút <b>&ldquo;Chép ảnh&rdquo;</b> ở trên để gửi có ảnh ngay!)</i></span>
+                  </div>
+                )}
+
+                {!copiedImage && !copiedLink && (
+                  <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+                    💡 <b>Để gửi có ảnh trên Zalo/Messenger:</b> Bấm <b>&ldquo;Chép ảnh&rdquo;</b> rồi sang chat bấm <b>Ctrl + V</b>.
+                  </p>
+                )}
+
+                {/* 3. Social direct buttons & Copy Link */}
+                <div className="grid grid-cols-5 gap-1.5 pt-1">
                   <button
                     type="button"
                     onClick={handleCopyShareLink}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs border border-white/10 transition cursor-pointer"
+                    className={`col-span-2 flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                      copiedLink
+                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                        : "bg-white/5 hover:bg-white/10 border-white/10 text-white/90"
+                    }`}
+                    title="Sao chép link bài hát"
                   >
                     {copiedLink ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     ) : (
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                     )}
-                    <span>{copiedLink ? "Đã copy link" : "Sao chép link"}</span>
+                    <span className="truncate">{copiedLink ? "Đã copy link" : "Copy Link"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleShareZalo}
+                    className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-xs font-bold border border-blue-500/30 transition cursor-pointer"
+                    title="Chia sẻ Zalo"
+                  >
+                    <span>Zalo</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleShareFacebook}
-                    className="px-3 py-2 rounded-xl bg-[#1877f2]/20 hover:bg-[#1877f2]/30 text-[#1877f2] text-xs font-semibold border border-[#1877f2]/30 transition cursor-pointer"
+                    className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-[#1877f2]/20 hover:bg-[#1877f2]/30 text-[#1877f2] text-xs font-bold border border-[#1877f2]/30 transition cursor-pointer"
                     title="Chia sẻ Facebook"
                   >
-                    FB
+                    <span>FB</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={handleShareTwitter}
-                    className="px-3 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-semibold border border-sky-500/30 transition cursor-pointer"
-                    title="Chia sẻ X / Twitter"
+                    onClick={handleShareTelegram}
+                    className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-bold border border-sky-500/30 transition cursor-pointer"
+                    title="Chia sẻ Telegram"
                   >
-                    X
+                    <span>Tele</span>
                   </button>
                 </div>
               </div>

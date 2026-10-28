@@ -1,10 +1,21 @@
 "use client";
 
-import { Heart, Play, Clock, ListPlus } from "lucide-react";
+import { Heart, Play, Clock, ListPlus, Share2 } from "lucide-react";
 import { Track } from "@/lib/api-client";
 import { useState } from "react";
+import Link from "next/link";
 import AddToPlaylistModal from "./add-to-playlist-modal";
 import TrackActionMenu from "./track-action-menu";
+import ShareSongCardModal from "./share-song-card-modal";
+
+const MOOD_FEATURE_LABELS: Record<string, string> = {
+  valence: "Độ tích cực",
+  energy: "Năng lượng",
+  danceability: "Độ nhún",
+  acousticness: "Độ mộc",
+  tempo: "Nhịp độ",
+  mode: "Gam",
+};
 
 const MOOD_FEATURE_LABELS: Record<string, string> = {
   valence: "Độ tích cực",
@@ -57,6 +68,7 @@ export default function TrackCard({
 }: TrackCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [imgError, setImgError] = useState(false);
   const resolvedCover = resolveMediaUrl(track.imageUrl);
 
@@ -121,9 +133,15 @@ export default function TrackCard({
           <h3 className="text-sm font-medium text-slate-100 truncate">
             {track.name}
           </h3>
-          <p className="text-xs text-slate-400 truncate mt-1">
-            {track.artistName}
-          </p>
+          <div className="mt-1">
+            <Link
+              href={`/dashboard/artist/${encodeURIComponent(track.artistSpotifyId || track.artistName || "")}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-slate-400 hover:text-cyan-400 hover:underline transition-colors truncate block w-fit max-w-full"
+            >
+              {track.artistName}
+            </Link>
+          </div>
           {track.albumName && (
             <p className="text-xs text-slate-500 truncate mt-0.5">
               {track.albumName}
@@ -210,6 +228,14 @@ export default function TrackCard({
               </button>
             )}
 
+            <button
+              onClick={() => setShowShareModal(true)}
+              title="Chia sẻ bài hát & Story"
+              className="p-1.5 rounded-full text-slate-500 hover:text-purple-400 hover:bg-purple-500/10 transition-colors cursor-pointer"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+
             <TrackActionMenu track={track} isLiked={isLiked} />
           </div>
 
@@ -233,6 +259,23 @@ export default function TrackCard({
         track={track}
         isOpen={showPlaylistModal}
         onClose={() => setShowPlaylistModal(false)}
+      />
+
+      {/* Share Song Card Modal */}
+      <ShareSongCardModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        track={{
+          id: track.id,
+          spotifyId: track.spotifyId,
+          name: track.name,
+          artistName: track.artistName,
+          albumName: track.albumName,
+          imageUrl: track.imageUrl,
+          durationMs: track.durationMs,
+          lyricsPlain: track.lyricsPlain,
+          lyricsSynced: track.lyricsSynced,
+        }}
       />
     </div>
   );

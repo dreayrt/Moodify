@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Play,
@@ -257,9 +258,12 @@ export function GlobalPlayerBar() {
                   <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
                     {currentTrack.name}
                   </h4>
-                  <p className="text-xs text-slate-400 leading-tight truncate mt-0.5">
+                  <Link
+                    href={`/dashboard/artist/${encodeURIComponent(currentTrack.artistSpotifyId || currentTrack.artistName)}`}
+                    className="text-xs text-slate-400 hover:text-cyan-400 hover:underline leading-tight truncate mt-0.5 block transition-colors"
+                  >
                     {currentTrack.artistName}
-                  </p>
+                  </Link>
                 </div>
               )}
             </div>
@@ -282,6 +286,16 @@ export function GlobalPlayerBar() {
                   isLiked={liked}
                   onLikeChange={setLiked}
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="flex md:hidden text-slate-400 hover:text-purple-300 transition-colors p-1.5 rounded-lg hover:bg-white/5 active:scale-95 cursor-pointer shrink-0"
+                  title="Chia sẻ bài hát"
+                  aria-label="Chia sẻ bài hát"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
               </>
             )}
           </div>

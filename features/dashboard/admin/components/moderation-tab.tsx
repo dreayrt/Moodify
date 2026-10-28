@@ -251,33 +251,6 @@ export function ModerationTab({
                   )}
                 </div>
 
-                {/* Audio Features Indicators */}
-                {item.audioFeatures && (
-                  <div className="mt-4 rounded-xl border border-[#222432] bg-[#171822] p-3 text-[11px]">
-                    <div className="flex items-center justify-between text-zinc-400 mb-2">
-                      <span className="font-semibold uppercase tracking-wider text-[#ff5500]">Chỉ Số Âm Học (Audio Features)</span>
-                      <span>Key: {item.audioFeatures.keySignature}</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">BPM</p>
-                        <p className="font-graphik font-semibold text-white">{item.audioFeatures.bpm}</p>
-                      </div>
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">Energy</p>
-                        <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.energy * 100)}%</p>
-                      </div>
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">Dance</p>
-                        <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.danceability * 100)}%</p>
-                      </div>
-                      <div className="rounded-lg bg-[#12131a] p-1.5 border border-[#222432]">
-                        <p className="text-zinc-500 text-[10px]">Valence</p>
-                        <p className="font-graphik font-semibold text-white">{Math.round(item.audioFeatures.valence * 100)}%</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Lyrics Excerpt */}
                 {item.lyricsPlain && (

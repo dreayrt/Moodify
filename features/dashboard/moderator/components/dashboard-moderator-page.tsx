@@ -159,6 +159,17 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
     expiryDate: readString(item.expiryDate) || undefined,
     licenseStatus: readString(item.licenseStatus) || undefined,
     licenseDocumentUrl: resolveMediaUrl(readString(item.licenseDocumentUrl)),
+    audioFeatures:
+      item.audioFeatures && typeof item.audioFeatures === "object"
+        ? {
+            bpm: readNumber((item.audioFeatures as Record<string, unknown>).bpm, 128),
+            keySignature: readString((item.audioFeatures as Record<string, unknown>).keySignature, "A Major"),
+            energy: readNumber((item.audioFeatures as Record<string, unknown>).energy, 0.8),
+            danceability: readNumber((item.audioFeatures as Record<string, unknown>).danceability, 0.75),
+            valence: readNumber((item.audioFeatures as Record<string, unknown>).valence, 0.7),
+            acousticness: readNumber((item.audioFeatures as Record<string, unknown>).acousticness, 0.2),
+          }
+        : undefined,
   };
 }
 

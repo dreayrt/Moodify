@@ -22,6 +22,7 @@ export type PlayerTrack = {
   spotifyId: string;
   name: string;
   artistName: string;
+  artistSpotifyId?: string | null;
   albumName?: string;
   imageUrl?: string | null;
   durationMs?: number;
