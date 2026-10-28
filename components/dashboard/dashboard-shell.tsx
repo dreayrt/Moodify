@@ -22,6 +22,7 @@ import {
   History,
   HelpCircle,
   CreditCard,
+  Mic2,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -980,6 +981,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/dashboard" || pathname === "/dashboard/user";
   const isSearch = pathname === "/dashboard/search" || pathname.startsWith("/dashboard/search");
   const isLibrary = pathname.startsWith("/dashboard/library");
+  const isKaraoke = pathname.startsWith("/dashboard/karaoke");
   const isSubscriptionManagement = pathname === "/dashboard/premium" && searchParams.get("tab") === "manage";
   const isHistory = pathname.startsWith("/dashboard/history");
   const isSearchHistory = pathname.startsWith("/dashboard/search-history");
@@ -1044,7 +1046,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* Main Shell Container */}
       <div className="relative z-10 w-full min-h-screen flex flex-col">
         {/* Top Header Bar - Fixed/Sticky SoundCloud Style */}
-        <header className={`sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
+        <header className={`${isKaraoke ? "hidden" : ""} sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
           <div className="flex items-center gap-5 md:gap-7 shrink-0 min-w-0 md:min-w-[200px]">
             <Link
               href="/dashboard"
@@ -1064,6 +1066,16 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 Trang chủ
+              </Link>
+              <Link
+                href="/dashboard/karaoke"
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  isKaraoke
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Karaoke
               </Link>
               <Link
                 href="/dashboard/search"
@@ -1158,7 +1170,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
-        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
+        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isKaraoke || isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
@@ -1217,6 +1229,23 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     strokeWidth={isLibrary ? 2.2 : 1.7}
                   />
                   <span>Thư viện</span>
+                </div>
+              </Link>
+
+              <Link
+                href="/dashboard/karaoke"
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                  isKaraoke
+                    ? navActiveItemClass
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Mic2
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
+                    strokeWidth={isKaraoke ? 2.2 : 1.7}
+                  />
+                  <span>Karaoke</span>
                 </div>
               </Link>
 
