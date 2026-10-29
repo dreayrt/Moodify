@@ -531,7 +531,7 @@ export async function getModeratorHistory(token?: string) {
 export async function submitModeratorDecision(
   payload: {
     trackId: string;
-    actionType: "approve" | "reject" | "needs_revision";
+    actionType: "approve" | "reject";
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;

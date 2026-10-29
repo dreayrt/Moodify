@@ -47,6 +47,7 @@ export interface SongLicense {
   trackId?: string;
   distributorId?: number | null;
   distributionContractId?: number | null;
+  distributionContractCode?: string | null;
   licenseType: LicenseType;
   copyrightOwner: string;
   issueDate?: string | null;

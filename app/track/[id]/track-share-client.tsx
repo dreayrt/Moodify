@@ -49,7 +49,7 @@ export default function TrackShareClient({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Audio source resolution
-  const audioSrc = track?.audioUrl || (track?.localPath ? `http://158.178.247.33/${track.localPath.replace(/^\/+/, "")}` : undefined);
+  const audioSrc = track?.audioUrl || (track?.localPath ? `https://moodify.click/${track.localPath.replace(/^\/+/, "")}` : undefined);
 
   useEffect(() => {
     const audio = audioRef.current;

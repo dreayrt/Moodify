@@ -501,7 +501,7 @@ function LumenHeroContent() {
           durationMs: trk.durationMs,
           lyricsPlain: trk.lyricsPlain,
           lyricsSynced: trk.lyricsSynced,
-          audioUrl: trk.audioUrl || (trk.localPath ? `http://158.178.247.33/${trk.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: trk.audioUrl || (trk.localPath ? `https://moodify.click/${trk.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: trk.localPath,
         });
 
@@ -713,7 +713,7 @@ function LumenHeroContent() {
           durationMs: t.raw.durationMs,
           lyricsPlain: t.raw.lyricsPlain,
           lyricsSynced: t.raw.lyricsSynced,
-          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `http://158.178.247.33/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `https://moodify.click/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.raw.localPath,
         },
         tracks
@@ -728,7 +728,7 @@ function LumenHeroContent() {
             durationMs: x.raw!.durationMs,
             lyricsPlain: x.raw!.lyricsPlain,
             lyricsSynced: x.raw!.lyricsSynced,
-            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `http://158.178.247.33/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
+            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `https://moodify.click/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
             localPath: x.raw!.localPath,
           }))
       );

@@ -360,7 +360,7 @@ function SearchContent() {
         durationMs: track.durationMs,
         lyricsPlain: track.lyricsPlain,
         lyricsSynced: track.lyricsSynced,
-        audioUrl: track.audioUrl || (track.localPath ? `http://158.178.247.33/${track.localPath.replace(/^\/+/, "")}` : undefined),
+        audioUrl: track.audioUrl || (track.localPath ? `https://moodify.click/${track.localPath.replace(/^\/+/, "")}` : undefined),
         localPath: track.localPath,
       },
       tracks.map((t) => ({
@@ -373,7 +373,7 @@ function SearchContent() {
         durationMs: t.durationMs,
         lyricsPlain: t.lyricsPlain,
         lyricsSynced: t.lyricsSynced,
-        audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+        audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
         localPath: t.localPath,
       }))
     );
@@ -393,7 +393,7 @@ function SearchContent() {
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
           lyricsSynced: t.lyricsSynced,
-          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.localPath,
         }));
         playTrack(playlistTracks[0], playlistTracks);
@@ -431,7 +431,7 @@ function SearchContent() {
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
           lyricsSynced: t.lyricsSynced,
-          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.localPath,
         }));
         playTrack(playlistTracks[0], playlistTracks);

@@ -64,6 +64,82 @@ export type TrackPageResponse = {
   totalPages: number;
 };
 
+export type KaraokeTrackSummary = {
+  songId: string;
+  title: string;
+  artist: string;
+  imageUrl: string | null;
+  durationMs: number | null;
+  assetVersion: string | null;
+  instrumentalUrl: string;
+  lyricsPlain: string | null;
+  lyricsSynced: string | null;
+  lyricTimeline: KaraokeLyricTimeline | null;
+  scoringAvailable: boolean;
+  scoringReferenceStatus: string;
+};
+
+export type KaraokeLyricWord = {
+  text: string;
+  startMs: number;
+  endMs: number;
+  lineIndex: number;
+  confidence: number;
+};
+
+export type KaraokeLyricLine = {
+  text: string;
+  startMs: number;
+  endMs: number;
+  firstWordIndex: number;
+  wordCount: number;
+};
+
+export type KaraokeLyricTimeline = {
+  version: number;
+  status: "ready" | "needs_review" | string;
+  language: string;
+  method: string;
+  model: string;
+  sampleRate: number;
+  coverage: number;
+  meanConfidence: number;
+  words: KaraokeLyricWord[];
+  lines: KaraokeLyricLine[];
+};
+
+export type KaraokeTrackPageResponse = {
+  content: KaraokeTrackSummary[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export type KaraokeSessionResponse = {
+  sessionId: string;
+  songId: string;
+  assetVersion: string;
+  referenceVersion: string;
+  expiresAt: string;
+};
+
+export type KaraokeScoreResponse = {
+  status: string;
+  score: { overall: number } | null;
+};
+
+export type KaraokePitchFeatures = {
+  duration_seconds: number;
+  f0_hz: Array<number | null>;
+  voiced_probability: number[];
+  rms_dbfs: number;
+  clipped_fraction: number;
+  recording_start_offset_ms: number;
+  capture_latency_ms: number;
+  allow_octave_shift: boolean;
+};
+
 export type LibraryTrack = Track & {
   addedAt: string;
 };
@@ -325,6 +401,107 @@ export async function fetchTracks(options?: {
   return response.json();
 }
 
+/** Fetch only tracks with prepared Karaoke assets. */
+export async function fetchKaraokeTracks(options?: {
+  page?: number;
+  size?: number;
+  query?: string;
+  signal?: AbortSignal;
+}): Promise<KaraokeTrackPageResponse> {
+  const params = new URLSearchParams();
+  if (options?.page !== undefined) params.set("page", String(options.page));
+  if (options?.size !== undefined) params.set("size", String(options.size));
+  if (options?.query?.trim()) params.set("query", options.query.trim());
+
+  const headers: HeadersInit = {};
+  try {
+    const token = await getValidAccessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {}
+
+  const response = await fetch(`${API_BASE}/karaoke/tracks?${params.toString()}`, {
+    headers,
+    signal: options?.signal,
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("Vui lòng đăng nhập để xem kho bài Karaoke.");
+    throw new Error("Không thể tải kho bài Karaoke.");
+  }
+  return response.json();
+}
+
+async function karaokeErrorMessage(response: Response, fallback: string): Promise<Error> {
+  const body = await response.json().catch(() => null) as {
+    message?: string;
+    detail?: string;
+    error?: string;
+  } | null;
+  return new Error(body?.detail || body?.message || body?.error || `${fallback} (HTTP ${response.status})`);
+}
+
+async function karaokeAuthHeaders(): Promise<HeadersInit> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại trước khi chấm điểm.");
+  return { Authorization: `Bearer ${token}` };
+}
+
+/** Create a scoring session bound to the selected karaoke track. */
+export async function startKaraokeSession(songId: string): Promise<KaraokeSessionResponse> {
+  const headers = await karaokeAuthHeaders();
+  const response = await fetch(`${API_BASE}/karaoke/tracks/${encodeURIComponent(songId)}/sessions`, {
+    method: "POST",
+    headers,
+    cache: "no-store",
+  });
+  if (!response.ok) throw await karaokeErrorMessage(response, "Không thể tạo phiên chấm điểm");
+  return response.json();
+}
+
+/** Upload the browser recording to the backend; it forwards the file and reference to the scoring API. */
+export async function submitKaraokeScore(input: {
+  sessionId: string;
+  recording: Blob;
+  recordingStartOffsetMs: number;
+  captureLatencyMs?: number;
+  allowOctaveShift?: boolean;
+}): Promise<KaraokeScoreResponse> {
+  const headers = await karaokeAuthHeaders();
+  const form = new FormData();
+  const extension = input.recording.type.includes("mp4") ? "m4a" : "webm";
+  form.append("recording", input.recording, `karaoke-recording.${extension}`);
+  form.append("recordingStartOffsetMs", String(input.recordingStartOffsetMs));
+  form.append("captureLatencyMs", String(input.captureLatencyMs ?? 0));
+  form.append("allowOctaveShift", String(input.allowOctaveShift ?? true));
+
+  const response = await fetch(`${API_BASE}/karaoke/sessions/${encodeURIComponent(input.sessionId)}/score`, {
+    method: "POST",
+    headers,
+    body: form,
+    cache: "no-store",
+  });
+  if (!response.ok) throw await karaokeErrorMessage(response, "Không thể gửi bản thu để chấm điểm");
+  return response.json();
+}
+
+/** Submit compact pitch features captured while the user was singing. */
+export async function submitKaraokePitchFeatures(input: {
+  sessionId: string;
+  features: KaraokePitchFeatures;
+}): Promise<KaraokeScoreResponse> {
+  const headers = await karaokeAuthHeaders();
+  const requestHeaders = new Headers(headers);
+  requestHeaders.set("Content-Type", "application/json");
+  const response = await fetch(`${API_BASE}/karaoke/sessions/${encodeURIComponent(input.sessionId)}/score/features`, {
+    method: "POST",
+    headers: requestHeaders,
+    body: JSON.stringify(input.features),
+    cache: "no-store",
+  });
+  if (!response.ok) throw await karaokeErrorMessage(response, "Không thể chốt điểm Karaoke");
+  return response.json();
+}
+
 /**
  * Fetch a single track by ID
  */
@@ -342,13 +519,13 @@ export async function fetchTrackById(id: string): Promise<Track> {
 }
 
 /**
- * Máy chủ âm nhạc trực tuyến (Oracle Music Cloud Server) lưu trữ toàn bộ kho nhạc MP3
+ * Máy chủ audio Google Cloud lưu trữ kho nhạc MP3
  */
 export const ONLINE_AUDIO_SERVER_URL =
-  process.env.NEXT_PUBLIC_AUDIO_SERVER_URL?.replace(/\/+$/, "") || "http://158.178.247.33";
+  process.env.NEXT_PUBLIC_AUDIO_SERVER_URL?.replace(/\/+$/, "") || "https://moodify.click";
 
 /**
- * Trả về trực tiếp URL phát nhạc từ máy chủ đám mây trực tuyến trên mạng (Public IP Oracle)
+ * Trả về URL phát nhạc từ máy chủ Google Cloud
  * thay vì phụ thuộc vào tệp cục bộ trên máy.
  */
 export function resolveTrackAudioUrl(track: {

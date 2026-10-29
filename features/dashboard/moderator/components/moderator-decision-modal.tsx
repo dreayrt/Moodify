@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   CheckCircle2,
   XCircle,
-  AlertCircle,
-  Send,
 } from "lucide-react";
 import { ModerationTrack, ViolationCategory } from "../types";
 
@@ -14,46 +12,59 @@ type ModeratorDecisionModalProps = {
   isOpen: boolean;
   onClose: () => void;
   track: ModerationTrack;
-  actionType: "approve" | "reject" | "needs_revision";
+  actionType: "approve" | "reject";
   onSubmitDecision: (payload: {
-    actionType: "approve" | "reject" | "needs_revision";
-    violationCategory?: ViolationCategory;
+    actionType: "approve" | "reject";
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;
   }) => Promise<void> | void;
 };
 
-const VIOLATION_OPTIONS: { category: ViolationCategory; label: string; desc: string }[] = [
+const VIOLATION_OPTIONS: { category: ViolationCategory; label: string }[] = [
   {
     category: "copyright_infringement",
     label: "Vi phạm bản quyền tác quyền / Content ID",
-    desc: "Sử dụng beat, sample hoặc vocal stem chưa được cấp phép sở hữu.",
   },
   {
     category: "poor_audio_quality",
     label: "Chất lượng âm thanh không đạt chuẩn",
-    desc: "File bị vỡ tiếng (clipping), méo dải tần, bitrate thấp dưới 320kbps.",
   },
   {
     category: "hate_speech_offensive",
     label: "Ngôn từ thù địch / Vi phạm tiêu chuẩn",
-    desc: "Lời bài hát chứa nội dung kích động bạo lực, xúc phạm danh dự.",
   },
   {
     category: "explicit_unlabeled",
     label: "Nội dung người lớn nhưng chưa gắn Explicit",
-    desc: "Bài hát có từ ngữ 18+ nhưng nghệ sĩ khai báo là bản nhạc phổ thông.",
   },
   {
     category: "metadata_mismatch",
     label: "Sai lệch thông tin metadata / Cover Art",
-    desc: "Ảnh bìa có watermark, tên nghệ sĩ hoặc thể loại sai lệch thực tế.",
+  },
+  {
+    category: "artist_impersonation",
+    label: "Mạo danh nghệ sĩ / giả giọng trái phép",
+  },
+  {
+    category: "violent_or_dangerous_content",
+    label: "Đe dọa, kích động bạo lực hoặc hành vi nguy hiểm",
+  },
+  {
+    category: "harassment_or_privacy_violation",
+    label: "Quấy rối cá nhân / tiết lộ thông tin riêng tư",
+  },
+  {
+    category: "spam_or_deceptive_content",
+    label: "Spam, lừa đảo hoặc nội dung gây hiểu nhầm",
+  },
+  {
+    category: "non_compliant_cover_art",
+    label: "Ảnh bìa có hình ảnh tình dục hoặc bạo lực đồ họa",
   },
   {
     category: "other",
     label: "Lý do kiểm duyệt khác",
-    desc: "Các trường hợp đặc thù theo quy chế kiểm duyệt nội dung Moodify.",
   },
 ];
 
@@ -64,20 +75,43 @@ export function ModeratorDecisionModal({
   actionType,
   onSubmitDecision,
 }: ModeratorDecisionModalProps) {
-  const [selectedCategory, setSelectedCategory] =
-    useState<ViolationCategory>("copyright_infringement");
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<
+    ViolationCategory[]
+  >([]);
   const [internalNote, setInternalNote] = useState("");
   const [assignExplicit, setAssignExplicit] = useState(
     track.explicitFlagByArtist || track.aiAssessment.explicitLyricsDetected
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setSelectedCategories([]);
+    setInternalNote("");
+    setAssignExplicit(
+      track.explicitFlagByArtist || track.aiAssessment.explicitLyricsDetected
+    );
+  }, [
+    actionType,
+    isOpen,
+    track.id,
+    track.explicitFlagByArtist,
+    track.aiAssessment.explicitLyricsDetected,
+  ]);
+
   if (!isOpen) return null;
 
   const isApprove = actionType === "approve";
   const isReject = actionType === "reject";
-  const isRevision = actionType === "needs_revision";
+
+  const toggleViolationCategory = (category: ViolationCategory) => {
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((selected) => selected !== category)
+        : [...current, category]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,12 +120,19 @@ export function ModeratorDecisionModal({
     try {
       await onSubmitDecision({
         actionType,
-        violationCategory: isApprove ? undefined : selectedCategory,
-        rejectionReason: isApprove ? undefined : rejectionReason,
-        internalNote,
+        rejectionReason: isReject
+          ? VIOLATION_OPTIONS.filter((option) =>
+              selectedCategories.includes(option.category)
+            )
+              .map((option) => option.label)
+              .join("; ")
+          : undefined,
+        internalNote: isApprove ? internalNote : undefined,
         explicitTag: assignExplicit,
       });
       onClose();
+    } catch {
+      // The parent displays the request error; keep the modal open for a retry.
     } finally {
       setIsSubmitting(false);
     }
@@ -106,7 +147,7 @@ export function ModeratorDecisionModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-xl overflow-hidden rounded-[26px] border border-white/12 bg-[#11131a] p-6 md:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-all">
+      <div className="relative max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-[26px] border border-white/12 bg-[#11131a] p-6 shadow-[0_32px_64px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-all md:p-8">
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-white/8 pb-4">
           <div className="flex items-center gap-3">
@@ -120,16 +161,10 @@ export function ModeratorDecisionModal({
                 <XCircle className="h-5 w-5" />
               </div>
             )}
-            {isRevision && (
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-[#ff7a2c]/15 text-[#ffb488]">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-            )}
             <div>
               <h2 className="font-display text-lg font-semibold text-white">
                 {isApprove && "Xác Nhận Phê Duyệt Bài Hát"}
                 {isReject && "Từ Chối Bài Hát & Báo Cáo Vi Phạm"}
-                {isRevision && "Yêu Cầu Nghệ Sĩ Chỉnh Sửa"}
               </h2>
               <p className="text-[12px] text-white/50">
                 {track.title} • {track.artist}
@@ -194,75 +229,41 @@ export function ModeratorDecisionModal({
             </div>
           )}
 
-          {/* Reject or Revision Mode Options */}
-          {(isReject || isRevision) && (
+          {/* Reject Mode Options */}
+          {isReject && (
             <div className="space-y-4">
-              {/* Category Dropdown/Selector */}
-              <div>
-                <label className="block text-[12px] font-medium text-white/70">
-                  Nhóm vi phạm chính
-                </label>
+              <fieldset>
+                <legend className="text-[12px] font-medium text-white/70">
+                  Chọn lý do từ chối
+                </legend>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {VIOLATION_OPTIONS.map((opt) => {
-                    const isSelected = selectedCategory === opt.category;
+                    const isSelected = selectedCategories.includes(
+                      opt.category
+                    );
                     return (
-                      <button
+                      <label
                         key={opt.category}
-                        type="button"
-                        onClick={() => setSelectedCategory(opt.category)}
-                        className={`flex flex-col text-left rounded-xl border p-2.5 transition ${
+                        className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${
                           isSelected
-                            ? "border-red-500/50 bg-red-500/10 text-white shadow-[0_0_12px_rgba(239,68,68,0.15)]"
+                            ? "border-red-500/50 bg-red-500/10 text-white"
                             : "border-white/8 bg-white/[0.02] text-white/70 hover:border-white/20 hover:bg-white/[0.04]"
                         }`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleViolationCategory(opt.category)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-red-500"
+                        />
                         <span className="text-[12px] font-medium leading-snug">
                           {opt.label}
                         </span>
-                        <span className="mt-0.5 text-[10px] text-white/40 line-clamp-2">
-                          {opt.desc}
-                        </span>
-                      </button>
+                      </label>
                     );
                   })}
                 </div>
-              </div>
-
-              {/* Reason / Feedback message to Artist */}
-              <div>
-                <label className="flex items-center justify-between text-[12px] font-medium text-white/70">
-                  <span>Lời nhắn giải thích gửi nghệ sĩ (Bắt buộc)</span>
-                  <span className="text-[10px] text-white/40">
-                    Sẽ gửi trực tiếp qua email
-                  </span>
-                </label>
-                <textarea
-                  required
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder={
-                    isReject
-                      ? "Mô tả chi tiết nguyên nhân vi phạm và căn cứ kiểm duyệt để nghệ sĩ hiểu rõ..."
-                      : "Chỉ rõ phần cần upload lại (ví dụ: cần re-master lại dải cao, cập nhật lại cover art chuẩn 3000x3000px)..."
-                  }
-                  rows={3}
-                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[13px] text-white placeholder-white/30 focus:border-red-500/50 focus:outline-none"
-                />
-              </div>
-
-              {/* Internal Note */}
-              <div>
-                <label className="block text-[12px] font-medium text-white/70">
-                  Ghi chú nội bộ cho ban quản trị
-                </label>
-                <input
-                  type="text"
-                  value={internalNote}
-                  onChange={(e) => setInternalNote(e.target.value)}
-                  placeholder="Ví dụ: AI Content ID khớp 84% với track gốc..."
-                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] text-white placeholder-white/30 focus:border-white/25 focus:outline-none"
-                />
-              </div>
+              </fieldset>
             </div>
           )}
 
@@ -290,22 +291,11 @@ export function ModeratorDecisionModal({
             {isReject && (
               <button
                 type="submit"
-                disabled={isSubmitting || !rejectionReason.trim()}
+                disabled={isSubmitting || selectedCategories.length === 0}
                 className="flex items-center gap-2 rounded-full bg-red-600 px-6 py-2 text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(220,38,38,0.35)] transition hover:bg-red-500 active:scale-95 disabled:opacity-50"
               >
                 <XCircle className="h-4 w-4" />
                 <span>{isSubmitting ? "Đang gửi..." : "Từ chối phát hành"}</span>
-              </button>
-            )}
-
-            {isRevision && (
-              <button
-                type="submit"
-                disabled={isSubmitting || !rejectionReason.trim()}
-                className="flex items-center gap-2 rounded-full bg-[#ff7a2c] px-6 py-2 text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(255,122,44,0.35)] transition hover:bg-[#ff8f50] active:scale-95 disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-                <span>{isSubmitting ? "Đang gửi..." : "Yêu cầu sửa"}</span>
               </button>
             )}
           </div>

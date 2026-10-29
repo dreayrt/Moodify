@@ -162,7 +162,7 @@ export function TrackUploadModal({
 
   // Step 2: License Metadata matching MySQL `song_licenses` table
   const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
-  const [copyrightOwner, setCopyrightOwner] = useState("Independent Artist");
+  const [copyrightOwner, setCopyrightOwner] = useState("");
   const [distributorId, setDistributorId] = useState<string>("");
   const [distributionContractCode, setDistributionContractCode] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>(getTodayDateString());
@@ -416,14 +416,13 @@ export function TrackUploadModal({
 
       // License Info
       formData.append("licenseType", licenseType);
+      formData.append("copyrightOwner", copyrightOwner.trim());
       if (acquisitionCostVnd !== "") formData.append("acquisitionCostVnd", acquisitionCostVnd);
       if (distributorId && distributorId !== "0") {
         formData.append("distributorId", distributorId);
         if (distributionContractCode.trim()) {
           formData.append("distributionContractCode", distributionContractCode.trim());
         }
-      } else {
-        formData.append("copyrightOwner", copyrightOwner.trim() || "Independent Artist");
       }
       formData.append("issueDate", issueDate);
       if (!isPerpetual && expiryDate) {
@@ -440,9 +439,10 @@ export function TrackUploadModal({
         distributorId: distributorId ? Number(distributorId) : null,
         // This local model field is a database FK; the OCR contract code is a document reference, not an ID.
         distributionContractId: null,
+        distributionContractCode: distributorId ? distributionContractCode.trim() || null : null,
         licenseType,
         acquisitionCostVnd: savedResponse.acquisitionCostVnd ?? null,
-        copyrightOwner: copyrightOwner.trim() || "Independent Artist",
+        copyrightOwner: copyrightOwner.trim(),
         issueDate: issueDate || null,
         expiryDate: isPerpetual ? null : expiryDate || null,
         status: "PENDING",

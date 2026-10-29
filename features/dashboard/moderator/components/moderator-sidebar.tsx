@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   X,
-  Radio,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { ModeratorProfile } from "../types";
@@ -55,7 +54,7 @@ export function ModeratorSidebar({
     },
     {
       key: "account" as TabKey,
-      label: "Tài khoản & Ca trực",
+      label: "Tài khoản",
       icon: User,
       badge: null,
     },
@@ -182,12 +181,6 @@ export function ModeratorSidebar({
 
       {/* Bottom section: Language & Actions */}
       <div className="border-t border-white/8 pt-4 space-y-3">
-        {/* System SLA notice badge */}
-        <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3 text-[11px] text-white/40 flex items-center gap-2">
-          <Radio className="h-3.5 w-3.5 text-[#ff8b4d] animate-pulse" />
-          <span>Hệ thống SLA phản hồi: &lt; 4h</span>
-        </div>
-
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="scale-95 origin-left">
             <LanguageSwitcher />

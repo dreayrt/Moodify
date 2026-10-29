@@ -119,11 +119,18 @@
 }
 .stageTopline, .stagePerformer, .stageSong, .lyrics, .stageProgress { position: relative; z-index: 1; }
 .stageTopline { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.stageContent { position: relative; z-index: 1; display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; justify-content: center; }
 .stageTag { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid rgba(255, 172, 220, 0.24); border-radius: 999px; background: rgba(250, 124, 188, 0.11); color: #ffc4e2; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; }
+.soloStageIdentity { display: inline-flex; align-items: center; gap: 11px; min-width: 0; padding: 7px 14px 7px 8px; border: 1px solid rgba(239, 179, 229, 0.22); border-radius: 15px; background: linear-gradient(112deg, rgba(232, 133, 208, 0.16), rgba(138, 99, 174, 0.09) 72%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 22px rgba(12, 7, 18, 0.16); backdrop-filter: blur(12px); }
+.soloStageIdentityIcon { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(255, 224, 248, 0.25); border-radius: 12px; background: linear-gradient(145deg, #d286cf, #865eae 72%); color: #fff7ff; box-shadow: 0 5px 15px rgba(192, 113, 193, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22); }
+.soloStageIdentityText { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.soloStageIdentityText small { color: #c5a8cf; font-size: 8px; font-weight: 800; letter-spacing: 0.16em; line-height: 1; }
+.soloStageIdentityText strong { overflow: hidden; color: #fff4ff; font-size: 13px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .stageRoom { color: rgba(233, 213, 241, 0.48); font-size: 9px; font-weight: 700; letter-spacing: 0.11em; white-space: nowrap; }
 .stageRoom span { margin: 0 4px; opacity: 0.6; }
 
 .stagePerformer { display: flex; align-items: center; flex-direction: column; margin-top: 30px; text-align: center; }
+.soloStage .stagePerformer { margin-top: 0; }
 .performerAvatar { position: relative; display: grid; place-items: center; width: 88px; height: 88px; border-radius: 27px; border: 3px solid rgba(255, 220, 242, 0.4); color: #fff1fa; background: linear-gradient(145deg, #b969aa, #7d529f 58%, #574983); box-shadow: 0 0 0 8px rgba(205, 122, 205, 0.07), 0 18px 45px rgba(68, 28, 79, 0.5); font-size: 24px; font-weight: 800; letter-spacing: -0.05em; }
 .avatarMic { position: absolute; right: -8px; bottom: -7px; display: grid; place-items: center; width: 27px; height: 27px; color: #57244c; border-radius: 50%; border: 2px solid #241329; background: #f4a9d1; }
 .performerCaption { margin-top: 20px; color: #b5a1bc; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -132,13 +139,32 @@
 .performerType span { width: 5px; height: 5px; border-radius: 50%; background: #ef99cf; box-shadow: 0 0 10px #e58ec8; }
 
 .stageSong { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 22px; color: #d7b1dd; }
+.stageContent > .stageSong { margin-top: 0; }
+.stageContent > .stagePerformer + .stageSong { margin-top: 14px; }
 .stageSong strong, .stageSong small { display: block; text-align: center; }
 .stageSong strong { color: #f8eff9; font-size: 12px; font-weight: 700; }
+.soloStage .stageSong strong { max-width: min(82vw, 880px); color: #fff7ff; font-size: clamp(16px, 1.5vw, 20px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; text-shadow: 0 1px 16px rgba(238, 149, 214, 0.18); }
 .stageSong small { margin-top: 1px; color: #a28ba9; font-size: 10px; }
+.soloStage .stageSong small { margin-top: 4px; color: #bba8c3; font-size: 11px; }
 .lyrics { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 175px; padding: 20px 12px 6px; text-align: center; }
+.stageContent > .lyrics { flex: 0 0 auto; min-height: 0; padding: 12px 12px 0; }
 .lyrics p { max-width: 100%; margin: 3px 0 !important; line-height: 1.45 !important; }
 .lyricFaded { color: rgba(242, 221, 245, 0.43); font-size: clamp(12px, 1.3vw, 16px); }
 .lyricActive { color: #fff7ff; font-size: clamp(18px, 2vw, 26px); font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 0 28px rgba(238, 149, 214, 0.55); }
+.soloLyricFaded { color: rgba(242, 221, 245, 0.43); font-size: clamp(12px, 1.3vw, 16px); animation: karaokeLyricSideEnter 300ms ease both; }
+.soloLyricActive { color: #fff7ff; font-size: clamp(18px, 2vw, 26px); font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 0 28px rgba(238, 149, 214, 0.55); animation: karaokeLyricEnter 360ms cubic-bezier(0.2, 0.75, 0.25, 1) both; }
+.soloLyricPreviewSlot { display: flex; flex: 0 0 48px; align-items: center; justify-content: center; width: 100%; margin-top: 7px; }
+.lyrics p.soloLyricPreview { display: flex; max-width: min(84vw, 820px); flex-direction: column; align-items: center; gap: 5px; margin: 0 !important; color: rgba(229, 211, 235, 0.64); font-size: clamp(11px, 1.15vw, 15px); font-weight: 550; line-height: 1.4 !important; animation: karaokeLyricSideEnter 260ms ease both; }
+.soloLyricPreview span:first-child { color: rgba(196, 169, 207, 0.68); font-size: 8px; font-weight: 750; letter-spacing: 0.15em; line-height: 1; text-transform: uppercase; }
+.soloLyricPreview span:last-child { text-wrap: balance; }
+@keyframes karaokeLyricEnter {
+  from { opacity: 0.42; transform: translateY(8px) scale(0.99); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes karaokeLyricSideEnter {
+  from { opacity: 0.2; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .lyricToggle { display: inline-flex; align-items: center; gap: 2px; margin-top: 15px; padding: 4px 8px; border: 0; background: transparent; color: #ddaddb; cursor: pointer; font-size: 10px; }
 .lyricToggle:hover { color: white; }
 .rotateIcon { transform: rotate(90deg); }
@@ -291,6 +317,11 @@
 .soloControls { margin-top: 18px; }
 .soloSongPicker { display: flex; flex: 0 1 330px; flex-direction: column; gap: 6px; color: #cbbbd4; font-size: 10px; font-weight: 700; }
 .soloSongPicker select { width: 100%; }
+.soloStage .stageProgress { justify-content: space-between; }
+.soloCatalog { margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 21px; background: rgba(24, 22, 34, 0.88); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.13); }
+.soloCatalogHeader { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+.soloCatalogHeader h2 { margin: 4px 0 0; font-size: 20px; }
+.catalogHint { color: #91879c; font-size: 10px; }
 
 .createRoomButton { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 15px; border: 1px solid rgba(255, 197, 234, 0.19); border-radius: 11px; background: linear-gradient(100deg, #a962b3, #d37dae 67%, #e38eae); color: #fff7ff; box-shadow: 0 9px 25px rgba(163, 70, 144, 0.22); cursor: pointer; font-size: 11px; font-weight: 800; }
 .createRoomButton:hover { filter: brightness(1.08); }
@@ -326,7 +357,7 @@
 
 @media (max-width: 950px) {
   .roomGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .soloControls { align-items: flex-start; }
+  .soloControls { align-items: flex-start; flex-wrap: wrap; }
   .soloSongPicker { flex-basis: 100%; }
 }
 
@@ -340,9 +371,133 @@
   .soloStage { min-height: 545px; padding: 17px 16px; border-radius: 19px; }
   .soloControls { align-items: flex-start; }
   .soloSongPicker { flex-basis: 100%; }
+  .soloCatalog { padding: 16px 12px; }
+  .soloCatalogHeader { align-items: flex-start; flex-direction: column; gap: 5px; }
   .roomMetaRow { font-size: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .choiceCard, .choiceAction svg { transition: none; }
+  .soloLyricFaded, .soloLyricActive, .soloLyricPreview { animation: none; }
+}
+
+/* Solo Karaoke playback and live microphone check */
+.playbackControls { display: flex; align-items: center; gap: 12px; padding: 12px 0 4px; }
+.playbackButton { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 7px; min-width: 104px; min-height: 38px; padding: 0 13px; border: 1px solid rgba(232, 162, 222, 0.4); border-radius: 11px; background: linear-gradient(135deg, rgba(177, 104, 183, 0.38), rgba(113, 68, 128, 0.35)); color: #fff2ff; cursor: pointer; font-size: 11px; font-weight: 750; }
+.playbackButton:hover:not(:disabled) { background: linear-gradient(135deg, rgba(198, 119, 203, 0.55), rgba(131, 79, 150, 0.48)); }
+.playbackButton:disabled { opacity: 0.45; cursor: not-allowed; }
+.playbackClock { min-width: 36px; color: #c7b5ce; font-size: 10px; font-variant-numeric: tabular-nums; text-align: center; }
+.seekSlider { flex: 1 1 auto; min-width: 50px; height: 5px; accent-color: #e39bd6; cursor: pointer; }
+.seekSlider:disabled { opacity: 0.35; cursor: not-allowed; }
+.playbackError { margin: 5px 0 0; color: #ffaaa9; font-size: 11px; text-align: center; }
+.lyricMeta { color: rgba(229, 190, 232, 0.56); font-size: 9px; }
+.micCheckButton { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 13px; border: 1px solid rgba(228, 166, 226, 0.27); border-radius: 10px; background: rgba(174, 104, 177, 0.13); color: #edc8ef; cursor: pointer; font-size: 10px; font-weight: 750; }
+.micCheckButton:hover:not(:disabled) { border-color: rgba(228, 166, 226, 0.55); background: rgba(174, 104, 177, 0.23); }
+.micCheckButton:disabled { opacity: 0.55; cursor: progress; }
+.micMessage { margin-top: 5px !important; color: #c4a8cf !important; }
+.micError { margin-top: 5px !important; color: #ffaaa9 !important; }
+.scoreMessage { margin-top: 6px !important; color: #d8b8e2 !important; }
+.scoreError { margin-top: 6px !important; color: #ffaaa9 !important; }
+.micMeterRow { display: flex; align-items: center; gap: 9px; margin-top: 9px; color: #cdb4d5; font-size: 9px; }
+.micMeter { width: min(180px, 28vw); height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
+.micMeter span { display: block; width: 100%; height: 100%; transform-origin: left center; border-radius: inherit; background: linear-gradient(90deg, #8fd4aa, #e4d46d, #ed8eae); transition: transform 80ms linear; }
+
+.scoreModalBackdrop {
+  position: fixed;
+  z-index: 5000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 9, 17, 0.76);
+  backdrop-filter: blur(9px);
+  animation: scoreModalFadeIn 180ms ease-out both;
+}
+.scoreModal {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 430px);
+  overflow: hidden;
+  padding: 34px 32px 28px;
+  border: 1px solid rgba(221, 194, 228, 0.2);
+  border-radius: 23px;
+  background: linear-gradient(155deg, #292130 0%, #1d1925 55%, #191720 100%);
+  box-shadow: 0 28px 88px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  color: #f8f4fa;
+  text-align: center;
+  animation: scoreModalSettle 220ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.scoreModal::before {
+  position: absolute;
+  z-index: -1;
+  top: -85px;
+  left: 50%;
+  width: 300px;
+  height: 190px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(176, 128, 184, 0.16), transparent 70%);
+  content: "";
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.scoreModalClose {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(227, 213, 232, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #c8bdce;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.scoreModalClose:hover { border-color: rgba(225, 195, 230, 0.3); background: rgba(255, 255, 255, 0.075); color: #fff; }
+.scoreModalClose:focus-visible, .scoreModalAction:focus-visible { outline: 2px solid #d5b1dc; outline-offset: 3px; }
+.scoreModalMark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(220, 183, 226, 0.2);
+  border-radius: 15px;
+  background: rgba(174, 127, 184, 0.12);
+  color: #dfc4e3;
+}
+.scoreModalEyebrow { margin: 17px 0 6px; color: #bba7c3; font-size: 9px; font-weight: 750; letter-spacing: 0.2em; }
+.scoreModal h2 { margin: 0; color: #fbf8fc; font-size: 21px; font-weight: 650; letter-spacing: -0.035em; }
+.scoreModalSong { max-width: 100%; overflow: hidden; margin: 7px 0 0; color: #a99eae; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.scoreModalValue { display: flex; align-items: baseline; gap: 9px; margin: 25px 0 16px; }
+.scoreModalValue strong { color: #f7eef8; font-size: clamp(60px, 14vw, 78px); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.075em; line-height: 0.95; }
+.scoreModalValue span { color: #a99dae; font-size: 14px; font-variant-numeric: tabular-nums; }
+.scoreModalProgress { width: min(220px, 100%); height: 5px; overflow: hidden; border-radius: 99px; background: rgba(255, 255, 255, 0.1); }
+.scoreModalProgress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #967a9e, #c9a7ce); transition: width 600ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.scoreModalDescription { margin: 17px 0 23px; color: #b8adbd; font-size: 12px; line-height: 1.6; }
+.scoreModalAction { min-width: 158px; min-height: 42px; padding: 0 22px; border: 1px solid rgba(216, 185, 224, 0.28); border-radius: 12px; background: rgba(172, 126, 183, 0.16); color: #f4eaf6; cursor: pointer; font-size: 12px; font-weight: 650; transition: background 140ms ease, border-color 140ms ease; }
+.scoreModalAction:hover { border-color: rgba(222, 194, 229, 0.5); background: rgba(172, 126, 183, 0.25); }
+
+@keyframes scoreModalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scoreModalSettle { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@media (max-width: 700px) {
+  .playbackControls { gap: 7px; }
+  .playbackButton { min-width: 82px; padding: 0 9px; }
+  .deviceCard .micCheckButton { flex: 0 0 100%; margin-left: 0; }
+  .micMeterRow { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+  .scoreModalBackdrop { padding: 16px; }
+  .scoreModal { padding: 30px 22px 23px; border-radius: 19px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scoreModalBackdrop, .scoreModal { animation: none; }
+  .scoreModalClose, .scoreModalAction, .scoreModalProgress span { transition: none; }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -18,7 +18,9 @@ import {
   X,
 } from "lucide-react";
 import { usePlayer } from "@/components/dashboard/player-context";
+import { type KaraokeTrackSummary } from "@/lib/api-client";
 import { DEFAULT_KARAOKE_ROOMS } from "../data/rooms";
+import KaraokeTrackCatalog from "./karaoke-track-catalog";
 import styles from "./karaoke-room-page.module.css";
 
 type Mode = "solo" | "duet";
@@ -30,6 +32,7 @@ type DemoSong = {
   duration: string;
   cover: string;
   initials: string;
+  imageUrl?: string | null;
 };
 
 type QueueItem = {
@@ -38,6 +41,7 @@ type QueueItem = {
   singers: string[];
   mode: Mode;
   isMine?: boolean;
+  songSnapshot?: DemoSong;
 };
 
 const SONGS: DemoSong[] = [
@@ -65,11 +69,22 @@ function getSong(songId: string): DemoSong {
   return SONGS.find((song) => song.id === songId) ?? SONGS[0];
 }
 
+function safeImageBackground(imageUrl?: string | null): string | null {
+  if (!imageUrl) return null;
+  try {
+    const url = new URL(imageUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return `linear-gradient(140deg, rgba(16, 12, 22, .05), rgba(16, 12, 22, .25)), url(${JSON.stringify(url.href)})`;
+  } catch {
+    return null;
+  }
+}
+
 function Cover({ song, small = false }: { song: DemoSong; small?: boolean }) {
+  const backgroundImage = safeImageBackground(song.imageUrl);
   return (
-    <div className={`${styles.cover} ${small ? styles.coverSmall : ""}`} style={{ background: song.cover }} aria-hidden="true">
-      <span className={styles.coverDisc} />
-      <span className={styles.coverInitials}>{song.initials}</span>
+    <div className={`${styles.cover} ${small ? styles.coverSmall : ""}`} style={backgroundImage ? { backgroundImage } : { background: song.cover }} role={backgroundImage ? "img" : undefined} aria-label={backgroundImage ? `Ảnh bìa ${song.title}` : undefined} aria-hidden={backgroundImage ? undefined : true}>
+      {!backgroundImage && <><span className={styles.coverDisc} /><span className={styles.coverInitials}>{song.initials}</span></>}
     </div>
   );
 }
@@ -78,7 +93,7 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
   const { pause } = usePlayer();
   const [queue, setQueue] = useState<QueueItem[]>(INITIAL_QUEUE);
   const [isRequestOpen, setIsRequestOpen] = useState(false);
-  const [selectedSongId, setSelectedSongId] = useState(SONGS[0].id);
+  const [selectedTrack, setSelectedTrack] = useState<KaraokeTrackSummary | null>(null);
   const [mode, setMode] = useState<Mode>("solo");
   const [partnerId, setPartnerId] = useState("");
   const [showAllLyrics, setShowAllLyrics] = useState(false);
@@ -103,12 +118,21 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isRequestOpen]);
 
-  const selectedSong = getSong(selectedSongId);
+  const selectedSong: DemoSong | null = selectedTrack ? {
+    id: selectedTrack.songId,
+    title: selectedTrack.title,
+    artist: selectedTrack.artist,
+    duration: selectedTrack.durationMs ? `${Math.floor(selectedTrack.durationMs / 60000)}:${String(Math.floor(selectedTrack.durationMs / 1000) % 60).padStart(2, "0")}` : "--:--",
+    cover: "linear-gradient(140deg, #6e4166, #353761 57%, #192f44)",
+    initials: selectedTrack.title.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toLocaleUpperCase("vi-VN"),
+    imageUrl: selectedTrack.imageUrl,
+  } : null;
   const myQueueItem = queue.find((item) => item.isMine);
   const partner = MEMBERS.find((member) => member.id === partnerId);
+  const handleTrackSelect = useCallback((track: KaraokeTrackSummary) => setSelectedTrack(track), []);
 
-  const openRequest = (songId = SONGS[0].id) => {
-    setSelectedSongId(songId);
+  const openRequest = () => {
+    setSelectedTrack(null);
     setMode("solo");
     setPartnerId("");
     setIsRequestOpen(true);
@@ -117,7 +141,8 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
   const addRequest = () => {
     if (myQueueItem || (mode === "duet" && !partner)) return;
     const singers = mode === "duet" && partner ? ["Bạn", partner.name] : ["Bạn"];
-    setQueue((items) => [...items, { id: `preview-${Date.now()}`, songId: selectedSongId, singers, mode, isMine: true }]);
+    if (!selectedSong) return;
+    setQueue((items) => [...items, { id: `preview-${Date.now()}`, songId: selectedSong.id, songSnapshot: selectedSong, singers, mode, isMine: true }]);
     setIsRequestOpen(false);
     setNotice("Đã thêm lượt hát vào hàng đợi xem trước. Dữ liệu chưa được gửi lên phòng thật.");
   };
@@ -146,7 +171,7 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
 
       <div className={styles.previewBanner} role="note">
         <Sparkles size={18} aria-hidden="true" />
-        <span><strong>Bản xem trước giao diện.</strong> Bài hát, người tham gia và hàng đợi bên dưới là dữ liệu mẫu. Chưa có phát nhạc, micro hay kết nối phòng trực tuyến.</span>
+        <span><strong>Bản xem trước giao diện.</strong> Danh sách bài trong cửa sổ đăng ký lấy từ kho Karaoke; sân khấu, thành viên và hàng đợi vẫn là dữ liệu minh họa. Chưa có phát nhạc, micro hay kết nối phòng trực tuyến.</span>
       </div>
 
       <div className={styles.mainGrid}>
@@ -207,7 +232,7 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
             </div>
             <div className={styles.queueList}>
               {queue.map((item, index) => {
-                const song = getSong(item.songId);
+                const song = item.songSnapshot ?? getSong(item.songId);
                 return (
                   <div key={item.id} className={`${styles.queueItem} ${item.isMine ? styles.myQueueItem : ""}`}>
                     <span className={styles.queueNumber}>{String(index + 1).padStart(2, "0")}</span>
@@ -253,9 +278,9 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
         <div className={styles.modalBackdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) setIsRequestOpen(false); }}>
           <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="request-title">
             <div className={styles.modalHeader}><div><span className={styles.sectionKicker}>ĐĂNG KÝ LƯỢT HÁT MẪU</span><h2 id="request-title">Bài hát của bạn</h2></div><button type="button" className={styles.modalClose} onClick={() => setIsRequestOpen(false)} aria-label="Đóng"><X size={20} /></button></div>
-            <div className={styles.modalSong}><Cover song={selectedSong} small /><div><strong>{selectedSong.title}</strong><span>{selectedSong.artist} · {selectedSong.duration}</span></div></div>
-            <label className={styles.fieldLabel} htmlFor="karaoke-song-select">Đổi bài hát</label>
-            <select id="karaoke-song-select" className={styles.songSelect} value={selectedSongId} onChange={(event) => setSelectedSongId(event.target.value)}>{SONGS.map((song) => <option value={song.id} key={song.id}>{song.title} — {song.artist}</option>)}</select>
+            {selectedSong && <div className={styles.modalSong}><Cover song={selectedSong} small /><div><strong>{selectedSong.title}</strong><span>{selectedSong.artist} · {selectedSong.duration}</span></div></div>}
+            <div className={styles.fieldLabel}>Chọn bài từ kho Karaoke</div>
+            <KaraokeTrackCatalog selectedSongId={selectedTrack?.songId ?? null} onSelect={handleTrackSelect} pageSize={5} compact />
             <div className={styles.fieldLabel}>Kiểu trình diễn</div>
             <div className={styles.modeGrid}>
               <button type="button" className={`${styles.modeButton} ${mode === "solo" ? styles.modeSelected : ""}`} aria-pressed={mode === "solo"} onClick={() => setMode("solo")}><Mic2 size={20} /><strong>Hát đơn</strong><small>Một mình trên sân khấu</small></button>
@@ -263,7 +288,7 @@ export default function KaraokeRoomPage({ roomId, roomName }: { roomId: string; 
             </div>
             {mode === "duet" && <div className={styles.partnerField}><div className={styles.fieldLabel}>Chọn bạn hát cùng (dữ liệu mẫu)</div><div className={styles.partnerGrid}>{MEMBERS.map((member) => <button key={member.id} type="button" className={`${styles.partnerButton} ${partnerId === member.id ? styles.partnerSelected : ""}`} aria-pressed={partnerId === member.id} onClick={() => setPartnerId(member.id)}><span className={styles.memberAvatar} style={{ backgroundColor: member.color }}>{member.initials}</span>{member.name}{partnerId === member.id && <Check size={15} />}</button>)}</div></div>}
             <div className={styles.modalNotice}><Volume2 size={16} />Đây là thao tác mô phỏng. Chưa gửi yêu cầu đến phòng karaoke thật.</div>
-            <button type="button" className={styles.modalSubmit} onClick={addRequest} disabled={Boolean(myQueueItem) || (mode === "duet" && !partner)}>{myQueueItem ? "Bạn đã có một lượt chờ" : mode === "duet" && !partner ? "Chọn người song ca" : "Thêm vào hàng đợi mẫu"}<ChevronRight size={17} /></button>
+            <button type="button" className={styles.modalSubmit} onClick={addRequest} disabled={Boolean(myQueueItem) || !selectedSong || (mode === "duet" && !partner)}>{myQueueItem ? "Bạn đã có một lượt chờ" : !selectedSong ? "Chọn bài hát" : mode === "duet" && !partner ? "Chọn người song ca" : "Thêm vào hàng đợi mẫu"}<ChevronRight size={17} /></button>
           </div>
         </div>
       )}

@@ -9,12 +9,14 @@ export type ViolationCategory =
   | "metadata_mismatch"
   | "unauthorized_sample"
   | "explicit_unlabeled"
+  | "artist_impersonation"
+  | "violent_or_dangerous_content"
+  | "harassment_or_privacy_violation"
+  | "spam_or_deceptive_content"
+  | "non_compliant_cover_art"
   | "other";
 
 export type AudioSpec = {
-  format: string; // e.g. "FLAC 24-bit" | "MP3 320kbps"
-  sampleRate: string; // e.g. "44.1 kHz" | "48.0 kHz"
-  bitrate: string; // e.g. "320 kbps" | "1411 kbps"
   peakDb: number; // e.g. -0.2 dB
   durationSec: number;
 };
@@ -43,7 +45,6 @@ export type ModerationTrack = {
   submittedAt: string;
   priority: ModerationPriority;
   status: ModerationStatus;
-  isrcCode?: string;
   label?: string;
   releaseType: "Single" | "EP Track" | "Album Track";
   explicitFlagByArtist: boolean;
@@ -51,10 +52,13 @@ export type ModerationTrack = {
   audioSpec: AudioSpec;
   aiAssessment: AiSafetyAssessment;
   // Song license details from MySQL
+  licenseRecordExists: boolean;
   licenseType?: string;
   copyrightOwner?: string;
   distributorId?: number;
+  distributorName?: string;
   distributionContractId?: number;
+  distributionContractCode?: string;
   issueDate?: string;
   expiryDate?: string;
   licenseStatus?: string;
