@@ -3,7 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci || npm install --legacy-peer-deps
 
 # Stage 2: Build Next.js application
 FROM node:20-alpine AS builder
@@ -14,10 +14,12 @@ COPY . .
 # Build-time environment variables for Next.js public client
 ARG NEXT_PUBLIC_API_BASE_URL=https://api.moodify.click
 ARG NEXT_PUBLIC_AUDIO_SERVER_URL=https://moodify.click
-ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=1234567890-placeholder.apps.googleusercontent.com
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=711124485487-2qb1s0uqa7e1uja1qio1kjggqgqdka7i.apps.googleusercontent.com
+ARG NEXT_PUBLIC_FACEBOOK_APP_ID=2981895912150587
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_AUDIO_SERVER_URL=$NEXT_PUBLIC_AUDIO_SERVER_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_FACEBOOK_APP_ID=$NEXT_PUBLIC_FACEBOOK_APP_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build

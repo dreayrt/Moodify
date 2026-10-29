@@ -66,47 +66,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${sora.variable} ${beVietnamPro.variable} ${spaceGrotesk.variable}`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var clean = function(node) {
-                    if (node && node.nodeType === 1 && node.hasAttribute('bis_skin_checked')) {
-                      node.removeAttribute('bis_skin_checked');
-                    }
-                  };
-                  var observer = new MutationObserver(function(mutations) {
-                    for (var i = 0; i < mutations.length; i++) {
-                      var m = mutations[i];
-                      if (m.type === 'attributes' && m.attributeName === 'bis_skin_checked') {
-                        clean(m.target);
-                      } else if (m.type === 'childList') {
-                        for (var j = 0; j < m.addedNodes.length; j++) {
-                          clean(m.addedNodes[j]);
-                          if (m.addedNodes[j].querySelectorAll) {
-                            var nested = m.addedNodes[j].querySelectorAll('[bis_skin_checked]');
-                            for (var k = 0; k < nested.length; k++) {
-                              nested[k].removeAttribute('bis_skin_checked');
-                            }
-                          }
-                        }
-                      }
-                    }
-                  });
-                  observer.observe(document.documentElement, {
-                    attributes: true,
-                    childList: true,
-                    subtree: true,
-                    attributeFilter: ['bis_skin_checked']
-                  });
-                } catch(e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
+      <head />
       <body className={`${beVietnamPro.className} font-sans`} suppressHydrationWarning>
         <I18nProvider>{children}</I18nProvider>
       </body>

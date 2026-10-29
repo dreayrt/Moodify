@@ -73,3 +73,14 @@ desktop.ini
 
 # Raw AI design drafts (exclude 25MB+ unserved raw drafts to keep repository lightweight)
 /public/Brand/raw_source_images/
+
+# Browser test output and local verification artifacts
+/playwright-report/
+/test-results/
+/blob-report/
+/coverage/
+*.env
+*.p12
+*.pfx
+*.keystore
+*.jks

@@ -30,7 +30,30 @@ export type PlayerTrack = {
   lyricsSynced?: string | null;
   audioUrl?: string | null;
   localPath?: string | null;
+  playbackContext?: { source: string; sourceId?: string; queueToken?: string; expiresAt?: string };
 };
+
+function sameTrack(left: PlayerTrack, right: PlayerTrack) {
+  if (left.id && right.id) return left.id === right.id;
+  return Boolean(left.spotifyId && right.spotifyId && left.spotifyId === right.spotifyId);
+}
+
+function capturePlaybackContext(track?: PlayerTrack | null): NonNullable<PlayerTrack["playbackContext"]> {
+  if (track?.playbackContext) return track.playbackContext;
+  if (typeof window === "undefined") return { source: "OTHER" };
+  const url = new URL(window.location.href);
+  const playlistId = url.searchParams.get("playlistId");
+  if (playlistId) return { source: "PLAYLIST", sourceId: playlistId };
+  if (url.pathname.includes("/library")) return { source: "LIBRARY" };
+  if (url.pathname.includes("/search")) return { source: "SEARCH" };
+  return { source: "HOME" };
+}
+
+function telemetryContext(context: PlayerTrack["playbackContext"]) {
+  if (!context) return { source: "OTHER" };
+  const { expiresAt, ...fields } = context;
+  return expiresAt && Date.parse(expiresAt) <= Date.now() ? { ...fields, queueToken: undefined } : fields;
+}
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -209,6 +232,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const volumeRef = useRef(0.8);
   const isMutedRef = useRef(false);
   const durationRef = useRef(0);
+  const sourceGenerationRef = useRef(0);
+  const pendingPositionRef = useRef<{ src: string; seconds: number; restored?: boolean } | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearRetry = useCallback(() => {
+    if (retryTimerRef.current !== null) clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
+  }, []);
 
   // ── Shuffle & Repeat Mode ────────────────────────────────────
   const [isShuffle, setIsShuffle] = useState(false);
@@ -218,6 +248,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const queueRef = useRef<PlayerTrack[]>([]);
   const queueIndexRef = useRef(0);
   const historyIndicesRef = useRef<number[]>([]);
+  const shuffleRemainingRef = useRef<number[] | null>(null);
 
   useEffect(() => {
     isShuffleRef.current = isShuffle;
@@ -258,19 +289,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setCurrentTrack(saved.currentTrack);
         currentTrackRef.current = saved.currentTrack;
 
-        if (typeof saved.currentTime === "number" && !isNaN(saved.currentTime) && saved.currentTime >= 0) {
-          setCurrentTime(saved.currentTime);
-          currentTimeRef.current = saved.currentTime;
-        }
+        const restoredDuration = Number.isFinite(saved.duration) && saved.duration > 0
+          ? saved.duration : (saved.currentTrack.durationMs ?? 0) / 1000;
+        const restoredTime = Number.isFinite(saved.currentTime) && saved.currentTime >= 0 &&
+          (!restoredDuration || saved.currentTime < restoredDuration - 0.25) ? saved.currentTime : 0;
+        setCurrentTime(restoredTime);
+        currentTimeRef.current = restoredTime;
 
-        if (typeof saved.duration === "number" && !isNaN(saved.duration) && saved.duration > 0) {
-          setDuration(saved.duration);
-          durationRef.current = saved.duration;
-        } else if (saved.currentTrack.durationMs) {
-          const d = saved.currentTrack.durationMs / 1000;
-          setDuration(d);
-          durationRef.current = d;
-        }
+        setDuration(restoredDuration);
+        durationRef.current = restoredDuration;
 
         if (Array.isArray(saved.queue) && saved.queue.length > 0) {
           setQueue(saved.queue);
@@ -280,10 +307,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           queueRef.current = [saved.currentTrack];
         }
 
-        if (typeof saved.queueIndex === "number" && saved.queueIndex >= 0) {
-          setQueueIndex(saved.queueIndex);
-          queueIndexRef.current = saved.queueIndex;
+        const restoredIndex = queueRef.current.findIndex(item => sameTrack(item, saved.currentTrack!));
+        if (restoredIndex < 0) {
+          queueRef.current = [saved.currentTrack];
+          setQueue(queueRef.current);
         }
+        queueIndexRef.current = Math.max(0, restoredIndex);
+        setQueueIndex(queueIndexRef.current);
 
         if (typeof saved.volume === "number") {
           setVolumeState(saved.volume);
@@ -354,6 +384,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [dailyTracksCount, setDailyTracksCount] = useState<number>(0);
   const [dailySkipsCount, setDailySkipsCount] = useState<number>(0);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
+  const isAdPlayingRef = useRef(false);
+  useEffect(() => { isAdPlayingRef.current = isAdPlaying; }, [isAdPlaying]);
   const [adSecondsRemaining, setAdSecondsRemaining] = useState(0);
   const [adTotalDuration, setAdTotalDuration] = useState(0);
   const [skipLimitNotice, setSkipLimitNotice] = useState<{ show: boolean; message: string; tier: SubTier } | null>(null);
@@ -380,6 +412,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         } catch (_) {}
       }
       playbackIntentRef.current = false;
+      sourceGenerationRef.current += 1;
+      clearRetry();
       setIsPlaying(false);
       setIsAdPlaying(false);
 
@@ -393,7 +427,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener("moodify:device-revoked", handleDeviceRevoked);
     };
-  }, []);
+  }, [clearRetry]);
 
   const handleReclaimDevice = useCallback(async () => {
     try {
@@ -401,6 +435,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       await revokeOtherDevices();
       setDeviceRevokedNotice(null);
       if (audioRef.current && currentTrack) {
+        playbackIntentRef.current = true;
         audioRef.current
           .play()
           .then(() => setIsPlaying(true))
@@ -548,11 +583,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onAdEnded = () => {
+      isAdPlayingRef.current = false;
       setIsAdPlaying(false);
       setAdReason(null);
       setAdSecondsRemaining(0);
       const pending = pendingTrackRef.current;
       pendingTrackRef.current = null;
+      if (!playbackIntentRef.current) return;
       if (pending) {
         executePlayTrackRef.current(pending.track, pending.playlist);
       } else if (audioRef.current) {
@@ -561,11 +598,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onAdError = () => {
+      isAdPlayingRef.current = false;
       console.warn("Ad audio failed to play, skipping ad");
       setIsAdPlaying(false);
       setAdReason(null);
       const pending = pendingTrackRef.current;
       pendingTrackRef.current = null;
+      if (!playbackIntentRef.current) return;
       if (pending) {
         executePlayTrackRef.current(pending.track, pending.playlist);
       }
@@ -645,6 +684,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     startedAt: number;
     lastPlayTimestamp: number | null;
     accumulatedDurationMs: number;
+    playbackContext: NonNullable<PlayerTrack["playbackContext"]>;
   } | null>(null);
 
   const flushListeningSession = useCallback((eventType: string = "TRACK_CHANGED") => {
@@ -668,7 +708,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         positionMs: Math.max(0, posMs),
         eventType,
         deviceType: "WEB",
-        source: "HOME",
+        ...telemetryContext(session.playbackContext),
       });
     }
 
@@ -689,14 +729,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (saved?.currentTrack) {
       const onlineAudioUrl = resolveTrackAudioUrl(saved.currentTrack);
       audio.src = onlineAudioUrl;
-      if (typeof saved.currentTime === "number" && !isNaN(saved.currentTime) && saved.currentTime > 0) {
-        try {
-          audio.currentTime = saved.currentTime;
-        } catch (_) {}
-      }
+      pendingPositionRef.current = { src: audio.src, seconds: currentTimeRef.current, restored: true };
     }
 
     const onTimeUpdate = () => {
+      if (audio.readyState === 0 || pendingPositionRef.current) return;
       const cur = audio.currentTime;
       setCurrentTime(cur);
       currentTimeRef.current = cur;
@@ -706,6 +743,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (now - lastTimeSaveRef.current > 2000) {
         lastTimeSaveRef.current = now;
         savePersistedPlaybackState({
+          currentTrack: currentTrackRef.current,
           currentTime: cur,
           duration: audio.duration && !isNaN(audio.duration) ? audio.duration : undefined,
         });
@@ -722,6 +760,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         durationMs: session.accumulatedDurationMs,
         positionMs: Math.round(audio.currentTime * 1000),
         eventType: "HEARTBEAT",
+        ...telemetryContext(session.playbackContext),
       });
     }, 5000);
 
@@ -730,14 +769,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setDuration(audio.duration);
         durationRef.current = audio.duration;
       }
-      if (currentTimeRef.current > 0 && Math.abs(audio.currentTime - currentTimeRef.current) > 1) {
+      const pending = pendingPositionRef.current;
+      if (pending && pending.src === (audio.currentSrc || audio.src)) {
+        pendingPositionRef.current = null;
+        const position = Number.isFinite(audio.duration)
+          ? pending.restored && pending.seconds >= audio.duration - 0.25 ? 0 : Math.min(pending.seconds, audio.duration)
+          : pending.seconds;
         try {
-          audio.currentTime = currentTimeRef.current;
+          audio.currentTime = position;
         } catch (_) {}
+        currentTimeRef.current = position;
+        setCurrentTime(position);
       }
     };
 
     const onPlay = () => {
+      if (audio.paused || !playbackIntentRef.current) return;
       playbackIntentRef.current = true;
       const session = listeningSessionRef.current;
       if (session) {
@@ -753,7 +800,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             positionMs: posMs,
             eventType: "RESUME",
             deviceType: "WEB",
-            source: "HOME",
+            ...telemetryContext(session.playbackContext),
           });
         }
       } else {
@@ -769,6 +816,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             startedAt: Date.now(),
             lastPlayTimestamp: Date.now(),
             accumulatedDurationMs: 0,
+            playbackContext: capturePlaybackContext(track),
           };
           listeningSessionRef.current = newSession;
           void recordListeningSessionTelemetry({
@@ -778,9 +826,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             positionMs: Math.round(audio.currentTime * 1000),
             eventType: "PLAY",
             deviceType: "WEB",
-            source: "HOME",
+            ...telemetryContext(newSession.playbackContext),
           }).then((res) => {
-            if (res?.success && res.historyId && listeningSessionRef.current?.trackId === targetTrackId) {
+            if (res?.success && res.historyId && listeningSessionRef.current === newSession) {
               listeningSessionRef.current.historyId = res.historyId;
             }
           });
@@ -790,6 +838,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onPause = () => {
+      // A source replacement queues pause events for the old source. Do not pause the new session.
+      if (!audio.paused || audio.ended || audio.readyState === 0) return;
       const session = listeningSessionRef.current;
       if (session && session.lastPlayTimestamp) {
         session.accumulatedDurationMs += (Date.now() - session.lastPlayTimestamp);
@@ -803,7 +853,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           positionMs: posMs,
           eventType: "PAUSE",
           deviceType: "WEB",
-          source: "HOME",
+          ...telemetryContext(session.playbackContext),
         });
       }
       setIsPlaying(false);
@@ -813,6 +863,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onEnded = () => {
+      if (!audio.ended) return;
       flushListeningSession("COMPLETE");
       nextTrackRef.current(true);
     };
@@ -827,6 +878,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onPlaying = () => {
+      if (audio.paused || !playbackIntentRef.current) return;
       playbackIntentRef.current = true;
       setIsBuffering(false);
       setIsPlaying(true);
@@ -836,16 +888,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onError = (e: Event) => {
       console.warn("Audio playback issue:", e);
       setIsBuffering(false);
+      if (!playbackIntentRef.current || isAdPlayingRef.current) return;
 
       // Tự động khôi phục luồng stream khi mạng yếu/chập chờn với Exponential Backoff & Server Fallback
       if (retryCountRef.current < 3) {
         retryCountRef.current += 1;
         const savedPos = audio.currentTime;
+        const generation = sourceGenerationRef.current;
+        clearRetry();
         console.log(`[AudioStream] Network hiccup detected. Auto-retrying playback (${retryCountRef.current}/3) at ${savedPos.toFixed(1)}s...`);
         setIsBuffering(true);
 
-        setTimeout(() => {
-          if (!audioRef.current) return;
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          if (audioRef.current !== audio || generation !== sourceGenerationRef.current || !playbackIntentRef.current) return;
           const currentTrk = currentTrackRef.current;
           if (!currentTrk) return;
 
@@ -856,11 +912,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           }
           const streamUrl = `${targetUrl}${targetUrl.includes("?") ? "&" : "?"}retry=${Date.now()}`;
           audioRef.current.src = streamUrl;
-          audioRef.current.currentTime = savedPos;
+          pendingPositionRef.current = { src: audioRef.current.src, seconds: savedPos };
+          currentTimeRef.current = savedPos;
           audioRef.current.load();
           audioRef.current
             .play()
             .then(() => {
+              if (generation !== sourceGenerationRef.current || !playbackIntentRef.current) return;
               setIsPlaying(true);
               setIsBuffering(false);
             })
@@ -887,8 +945,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (currentTrackRef.current) {
         savePersistedPlaybackState({
           currentTrack: currentTrackRef.current,
-          currentTime: audioRef.current?.currentTime ?? currentTimeRef.current,
-          duration: audioRef.current?.duration ?? durationRef.current,
+          currentTime: pendingPositionRef.current?.seconds ?? audioRef.current?.currentTime ?? currentTimeRef.current,
+          duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : durationRef.current,
           queue: queueRef.current,
           queueIndex: queueIndexRef.current,
           volume: volumeRef.current,
@@ -905,6 +963,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       window.clearInterval(heartbeat);
+      clearRetry();
+      sourceGenerationRef.current += 1;
       handleBeforeUnload();
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("pagehide", handleBeforeUnload);
@@ -921,7 +981,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("error", onError);
       audioRef.current = null;
     };
-  }, [flushListeningSession]);
+  }, [flushListeningSession, clearRetry]);
 
   // Synchronize audio volume without re-initializing or interrupting the Audio element
   useEffect(() => {
@@ -935,20 +995,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [volume, isMuted]);
 
   const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
-    playbackIntentRef.current = true;
-    setCurrentTrack(track);
-
+    const attribution = capturePlaybackContext(track);
+    track = { ...track, playbackContext: attribution };
+    playlist = playlist?.map(item => ({ ...item, playbackContext: item.playbackContext ?? attribution }));
     if (playlist && playlist.length > 0) {
-      historyIndicesRef.current = [];
+      const sameQueue = queueRef.current.length === playlist.length &&
+        queueRef.current.every((item, index) => sameTrack(item, playlist![index]));
+      if (!sameQueue) {
+        historyIndicesRef.current = [];
+        shuffleRemainingRef.current = null;
+      }
+      queueRef.current = playlist;
       setQueue(playlist);
-      const idx = playlist.findIndex((t) => t.spotifyId === track.spotifyId);
-      setQueueIndex(idx >= 0 ? idx : 0);
+      const idx = playlist.findIndex(item => sameTrack(item, track));
+      queueIndexRef.current = Math.max(0, idx);
+      setQueueIndex(queueIndexRef.current);
     } else {
-      setQueue((prev) => {
-        const exists = prev.some((t) => t.spotifyId === track.spotifyId);
-        if (!exists) return [...prev, track];
-        return prev;
-      });
+      const index = queueRef.current.findIndex(item => sameTrack(item, track));
+      queueRef.current = index < 0 ? [...queueRef.current, track] : queueRef.current.map((item, i) => i === index ? track : item);
+      queueIndexRef.current = index < 0 ? queueRef.current.length - 1 : index;
+      setQueue(queueRef.current);
+      setQueueIndex(queueIndexRef.current);
+    }
+    if (shuffleRemainingRef.current) {
+      shuffleRemainingRef.current = shuffleRemainingRef.current.filter(index => index !== queueIndexRef.current);
     }
 
     // Telemetry: Flush previous track session and initialize new session
@@ -956,6 +1026,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Stop the previous audio before assigning the next session; otherwise its
     // pause event would be attributed to the new song.
     audioRef.current?.pause();
+    clearRetry();
+    const generation = ++sourceGenerationRef.current;
+    pendingPositionRef.current = null;
+    currentTimeRef.current = 0;
+    durationRef.current = (track.durationMs ?? 0) / 1000;
+    lastTimeSaveRef.current = 0;
+    currentTrackRef.current = track;
+    setCurrentTrack(track);
+    setCurrentTime(0);
+    setDuration(durationRef.current);
+    playbackIntentRef.current = true;
+    savePersistedPlaybackState({ currentTrack: track, currentTime: 0, duration: durationRef.current,
+      queue: queueRef.current, queueIndex: queueIndexRef.current });
     const targetTrackId = track.id || track.spotifyId;
     if (targetTrackId) {
       const newSession = {
@@ -963,8 +1046,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         historyId: null as number | null,
         trackId: targetTrackId,
         startedAt: Date.now(),
-        lastPlayTimestamp: Date.now(),
+        lastPlayTimestamp: null,
         accumulatedDurationMs: 0,
+        playbackContext: attribution,
       };
       listeningSessionRef.current = newSession;
 
@@ -976,9 +1060,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         positionMs: 0,
         eventType: "PLAY",
         deviceType: "WEB",
-        source: "HOME",
+        ...telemetryContext(newSession.playbackContext),
       }).then((res) => {
-        if (res?.success && res.historyId && listeningSessionRef.current?.trackId === targetTrackId) {
+        if (res?.success && res.historyId && listeningSessionRef.current === newSession) {
           listeningSessionRef.current.historyId = res.historyId;
         }
       });
@@ -1023,25 +1107,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const onlineAudioUrl = resolveTrackAudioUrl(track);
       const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
       audioRef.current.src = streamUrl;
-      audioRef.current.currentTime = 0;
+      pendingPositionRef.current = { src: audioRef.current.src, seconds: 0 };
       audioRef.current.playbackRate = playbackRateRef.current;
       audioRef.current.load(); // Forces browser to flush old buffer and load new track stream
 
       audioRef.current
         .play()
         .then(() => {
+          if (generation !== sourceGenerationRef.current || !playbackIntentRef.current) return;
           playbackIntentRef.current = true;
           setIsPlaying(true);
           setIsBuffering(false);
         })
         .catch((err) => {
+          if (generation !== sourceGenerationRef.current) return;
           console.warn("Autoplay was prevented or audio stream not available:", err);
           playbackIntentRef.current = false;
           setIsPlaying(false);
           setIsBuffering(false);
         });
     }
-  }, [flushListeningSession]);
+  }, [flushListeningSession, clearRetry]);
 
   // Ad completion needs the latest play callback without recreating the ad audio element.
   const executePlayTrackRef = useRef(executePlayTrack);
@@ -1052,6 +1138,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const triggerAd = useCallback((force = false, trackToPlayAfter?: PlayerTrack, playlistToPlayAfter?: PlayerTrack[], reason: AdReason = "FREE_REGULAR") => {
     // Gói NO_ADS (Gia Đình / Cá Nhân FULL) không bị chèn quảng cáo
     if (entitlementsRef.current.adPolicy === "NO_ADS" && !force) return;
+    clearRetry();
+    if (isAdPlayingRef.current) {
+      if (trackToPlayAfter) pendingTrackRef.current = { track: trackToPlayAfter, playlist: playlistToPlayAfter };
+      return;
+    }
+    sourceGenerationRef.current += 1;
     playbackIntentRef.current = true;
     if (audioRef.current) {
       try {
@@ -1063,10 +1155,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       pendingTrackRef.current = { track: trackToPlayAfter, playlist: playlistToPlayAfter };
     }
     setAdReason(reason);
+    isAdPlayingRef.current = true;
     setIsAdPlaying(true);
     setAdSecondsRemaining(20); // approximate, will be corrected by timeupdate
     playAdAudio();
-  }, [playAdAudio]);
+  }, [playAdAudio, clearRetry]);
 
   const skipAd = useCallback((force = false) => {
     // Chỉ người dùng gói VIP Tiết Kiệm (INDIVIDUAL_BASIC) mới có quyền bấm bỏ qua quảng cáo sớm sau đếm ngược.
@@ -1076,6 +1169,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    isAdPlayingRef.current = false;
     setIsAdPlaying(false);
     setAdReason(null);
     // Stop ad audio
@@ -1093,6 +1187,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [executePlayTrack, currentTrack, subTier, isPremiumUser, adSecondsRemaining]);
 
   const playTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
+    if (isAdPlayingRef.current) {
+      pendingTrackRef.current = { track, playlist };
+      return;
+    }
     const todayTracks = recordDailyTrackPlayed();
     setDailyTracksCount(todayTracks);
     const ent = entitlementsRef.current;
@@ -1139,60 +1237,77 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [triggerAd, executePlayTrack]);
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current || !currentTrack) return;
+    if (!audioRef.current || !currentTrack || isAdPlayingRef.current) return;
     if (isPlaying) {
+      sourceGenerationRef.current += 1;
+      clearRetry();
+      setIsBuffering(false);
       playbackIntentRef.current = false;
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
       playbackIntentRef.current = true;
+      const generation = ++sourceGenerationRef.current;
       const currentSrc = audioRef.current.src;
       if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
         const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
         const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
         audioRef.current.src = streamUrl;
-        audioRef.current.currentTime = currentTimeRef.current || currentTime || 0;
+        pendingPositionRef.current = { src: audioRef.current.src, seconds: currentTimeRef.current };
         audioRef.current.playbackRate = playbackRateRef.current;
         audioRef.current.load();
       }
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          if (generation === sourceGenerationRef.current && playbackIntentRef.current) setIsPlaying(true);
+        })
         .catch((err) => {
+          if (generation !== sourceGenerationRef.current) return;
           playbackIntentRef.current = false;
           console.warn("Could not resume audio:", err);
         });
     }
-  }, [isPlaying, currentTrack, currentTime]);
+  }, [isPlaying, currentTrack, clearRetry]);
 
   const pause = useCallback(() => {
+    sourceGenerationRef.current += 1;
+    clearRetry();
+    setIsBuffering(false);
     if (audioRef.current) {
       playbackIntentRef.current = false;
       audioRef.current.pause();
       setIsPlaying(false);
     }
-  }, []);
+  }, [clearRetry]);
 
   const resume = useCallback(() => {
-    if (audioRef.current && currentTrack) {
+    if (audioRef.current && currentTrack && !isAdPlayingRef.current) {
       playbackIntentRef.current = true;
+      const generation = ++sourceGenerationRef.current;
       const currentSrc = audioRef.current.src;
       if (!currentSrc || currentSrc === "" || currentSrc === window.location.href || currentSrc.endsWith("/")) {
         const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
         const streamUrl = `${onlineAudioUrl}${onlineAudioUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
         audioRef.current.src = streamUrl;
-        audioRef.current.currentTime = currentTimeRef.current || currentTime || 0;
+        pendingPositionRef.current = { src: audioRef.current.src, seconds: currentTimeRef.current };
         audioRef.current.playbackRate = playbackRateRef.current;
         audioRef.current.load();
       }
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.warn("Could not resume:", err));
+        .then(() => {
+          if (generation === sourceGenerationRef.current && playbackIntentRef.current) setIsPlaying(true);
+        })
+        .catch((err) => {
+          if (generation === sourceGenerationRef.current) console.warn("Could not resume:", err);
+        });
     }
-  }, [currentTrack, currentTime]);
+  }, [currentTrack]);
 
   const seek = useCallback((timeSeconds: number) => {
+    if (!Number.isFinite(timeSeconds) || isAdPlayingRef.current) return;
+    timeSeconds = Math.max(0, durationRef.current > 0 ? Math.min(timeSeconds, durationRef.current) : timeSeconds);
     if (audioRef.current) {
       if (currentTrack && (!audioRef.current.src || audioRef.current.src === "" || audioRef.current.src === window.location.href || audioRef.current.src.endsWith("/"))) {
         const onlineAudioUrl = resolveTrackAudioUrl(currentTrack);
@@ -1201,13 +1316,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
       const oldPosMs = Math.round(audioRef.current.currentTime * 1000);
       const targetPosMs = Math.round(timeSeconds * 1000);
-      try {
-        audioRef.current.currentTime = timeSeconds;
-      } catch (_) {}
-      setCurrentTime(timeSeconds);
-      currentTimeRef.current = timeSeconds;
-      savePersistedPlaybackState({ currentTime: timeSeconds });
-
       const session = listeningSessionRef.current;
       if (session && session.trackId && oldPosMs >= 60_000 && targetPosMs <= 2_000) {
         // Rewinding a substantially played song to its start begins a genuine new replay.
@@ -1217,12 +1325,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           trackId: session.trackId, startedAt: Date.now(),
           lastPlayTimestamp: audioRef.current.paused ? null : Date.now(),
           accumulatedDurationMs: 0,
+          playbackContext: session.playbackContext,
         };
         listeningSessionRef.current = replaySession;
         void recordListeningSessionTelemetry({
           sessionKey: replaySession.sessionKey, trackId: replaySession.trackId,
           durationMs: 0, positionMs: targetPosMs, eventType: "PLAY",
-          deviceType: "WEB", source: "HOME",
+          deviceType: "WEB", ...telemetryContext(replaySession.playbackContext),
         });
       } else if (session && session.trackId) {
         const curDur = session.accumulatedDurationMs + (session.lastPlayTimestamp ? (Date.now() - session.lastPlayTimestamp) : 0);
@@ -1235,10 +1344,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           targetPositionMs: targetPosMs,
           eventType: "SEEK",
           deviceType: "WEB",
-          source: "HOME",
+          ...telemetryContext(session.playbackContext),
         });
       }
-      audioRef.current.currentTime = timeSeconds;
+      if (audioRef.current.readyState === 0) {
+        pendingPositionRef.current = { src: audioRef.current.src, seconds: timeSeconds };
+      } else {
+        try { audioRef.current.currentTime = timeSeconds; } catch (_) {}
+      }
+      currentTimeRef.current = timeSeconds;
+      savePersistedPlaybackState({ currentTime: timeSeconds });
       setCurrentTime(timeSeconds);
     }
   }, [flushListeningSession, currentTrack]);
@@ -1281,6 +1396,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleShuffle = useCallback(() => {
+    shuffleRemainingRef.current = null;
     setIsShuffle((prev) => !prev);
   }, []);
 
@@ -1293,12 +1409,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nextTrack = useCallback((isAutoAdvance = false) => {
-    const currentQueue = queueRef.current;
-    const currentIdx = queueIndexRef.current;
+    const pending = isAdPlayingRef.current ? pendingTrackRef.current : null;
+    const currentQueue = pending?.playlist ?? queueRef.current;
+    const currentIdx = pending ? Math.max(0, currentQueue.findIndex(item => sameTrack(item, pending.track))) : queueIndexRef.current;
     if (currentQueue.length === 0) return;
 
     if (!isAutoAdvance) {
-      flushListeningSession("SKIP_NEXT");
       const ent = entitlementsRef.current;
       if (ent.skipPolicy === "LIMITED") {
         const todaySkips = recordDailySkip();
@@ -1316,12 +1432,34 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       }
+      flushListeningSession("SKIP_NEXT");
     }
 
     // Single track repeat triggered by natural track end
     if (isAutoAdvance && repeatModeRef.current === "one") {
       const repeated = currentQueue[currentIdx];
       if (repeated) playTrack(repeated, currentQueue);
+      return;
+    }
+
+    const stopAtEnd = () => {
+      sourceGenerationRef.current += 1;
+      playbackIntentRef.current = false;
+      clearRetry();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      currentTimeRef.current = 0;
+      setIsPlaying(false);
+      setIsBuffering(false);
+      setCurrentTime(0);
+      savePersistedPlaybackState({ currentTime: 0 });
+    };
+    // Natural completion must stop even for a one-song queue. Clear intent so focus cannot restart it.
+    if (isAutoAdvance && repeatModeRef.current === "off" &&
+        (currentQueue.length === 1 || (!isShuffleRef.current && currentIdx >= currentQueue.length - 1))) {
+      stopAtEnd();
       return;
     }
 
@@ -1332,26 +1470,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     // Shuffle logic
     if (isShuffleRef.current) {
-      const candidates = currentQueue
-        .map((_, i) => i)
-        .filter((i) => i !== currentIdx);
+      let candidates = shuffleRemainingRef.current ?? currentQueue.map((_, i) => i).filter(i => i !== currentIdx);
+      if (candidates.length === 0) {
+        if (isAutoAdvance && repeatModeRef.current === "off") { stopAtEnd(); return; }
+        candidates = currentQueue.map((_, i) => i).filter(i => i !== currentIdx);
+      }
       const randomIdx = candidates[Math.floor(Math.random() * candidates.length)];
+      shuffleRemainingRef.current = candidates.filter(index => index !== randomIdx);
       historyIndicesRef.current.push(currentIdx);
       setQueueIndex(randomIdx);
       const nextItem = currentQueue[randomIdx];
       if (nextItem) {
         playTrack(nextItem, currentQueue);
-      }
-      return;
-    }
-
-    // Repeat OFF & auto advance reaches end of queue -> Stop playback
-    if (isAutoAdvance && repeatModeRef.current === "off" && currentIdx >= currentQueue.length - 1) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        setIsPlaying(false);
-        setCurrentTime(0);
       }
       return;
     }
@@ -1364,14 +1494,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (nextItem) {
       playTrack(nextItem, currentQueue);
     }
-  }, [playTrack, subTier]);
+  }, [playTrack, subTier, flushListeningSession, clearRetry]);
 
   const prevTrack = useCallback(() => {
-    const currentQueue = queueRef.current;
-    const currentIdx = queueIndexRef.current;
+    const pending = isAdPlayingRef.current ? pendingTrackRef.current : null;
+    const currentQueue = pending?.playlist ?? queueRef.current;
+    const currentIdx = pending ? Math.max(0, currentQueue.findIndex(item => sameTrack(item, pending.track))) : queueIndexRef.current;
     if (currentQueue.length === 0) return;
 
-    if (currentTime > 3) {
+    if (currentTimeRef.current > 3 && !isAdPlayingRef.current) {
       seek(0);
       return;
     }
@@ -1381,6 +1512,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Pop from played history (important for shuffle navigation)
     if (historyIndicesRef.current.length > 0) {
       const prevIdx = historyIndicesRef.current.pop()!;
+      if (isShuffleRef.current && shuffleRemainingRef.current) {
+        shuffleRemainingRef.current = [...new Set([...shuffleRemainingRef.current, currentIdx])];
+      }
       setQueueIndex(prevIdx);
       const prevItem = currentQueue[prevIdx];
       if (prevItem) {
@@ -1395,16 +1529,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (prevItem) {
       playTrack(prevItem, currentQueue);
     }
-  }, [currentTime, seek, playTrack]);
+  }, [seek, playTrack, flushListeningSession]);
 
   // Keep a ref for ended listener callback to avoid stale closure
   const nextTrackRef = useRef(nextTrack);
   const addToQueue = useCallback((track: PlayerTrack) => {
-    setQueue((prev) => {
-      const exists = prev.some((t) => t.spotifyId === track.spotifyId);
-      if (!exists) return [...prev, track];
-      return prev;
-    });
+    if (queueRef.current.some(item => sameTrack(item, track))) return;
+    queueRef.current = [...queueRef.current, track];
+    shuffleRemainingRef.current = null;
+    setQueue(queueRef.current);
   }, []);
 
   useEffect(() => {
