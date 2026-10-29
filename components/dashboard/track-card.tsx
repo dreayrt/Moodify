@@ -17,15 +17,6 @@ const MOOD_FEATURE_LABELS: Record<string, string> = {
   mode: "Gam",
 };
 
-const MOOD_FEATURE_LABELS: Record<string, string> = {
-  valence: "Độ tích cực",
-  energy: "Năng lượng",
-  danceability: "Độ nhún",
-  acousticness: "Độ mộc",
-  tempo: "Nhịp độ",
-  mode: "Gam",
-};
-
 type TrackCardProps = {
   track: Track;
   isLiked?: boolean;
