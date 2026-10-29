@@ -38,7 +38,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Oracle Cloud VPS via SSH
+      - name: Deploy to Google Cloud VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -48,7 +48,7 @@ jobs:
           script_stop: true
           command_timeout: 15m
           script: |
-            echo "🚀 Starting Frontend CI/CD deployment on main..."
+            echo "🚀 Starting Frontend CI/CD deployment to Google Cloud VM on main..."
             cd /opt/moodify/frontend
             git fetch origin main
             git checkout main
