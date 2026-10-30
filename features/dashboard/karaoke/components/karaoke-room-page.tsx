@@ -217,6 +217,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const [audioOutputDevices, setAudioOutputDevices] = useState<{ deviceId: string; label: string }[]>([]);
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState("");
   const [remoteAudioSettings, setRemoteAudioSettings] = useState<Record<string, { muted: boolean; volume: number }>>({});
+  const [selectedMemberAudioId, setSelectedMemberAudioId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -811,48 +812,21 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
             </div>
             {audioError && <p className={styles.playbackError} role="status">{audioError}</p>}
             <audio ref={audioRef} preload="auto" data-karaoke-room-audio="instrumental" onEnded={roomScoring.trackEnded} />
-            {voice.remoteVoices.map((remote) => {
-              const settings = remoteAudioSettings[remote.userId] ?? { muted: false, volume: 1 };
-              const memberName = room.members.find((member) => String(member.userId) === remote.userId)?.name ?? `Thành viên ${remote.userId}`;
-              return (
-                <div className={styles.remoteVoiceControl} key={remote.userId}>
+            <div className={styles.remoteAudioPlayers} aria-hidden="true">
+              {voice.remoteVoices.map((remote) => {
+                const settings = remoteAudioSettings[remote.userId] ?? { muted: false, volume: 1 };
+                return (
                   <RemoteAudioPlayer
+                    key={remote.userId}
                     userId={remote.userId}
                     stream={remote.stream}
                     muted={settings.muted}
                     volume={settings.volume}
                     outputDeviceId={selectedOutputDeviceId}
                   />
-                  <span className={styles.remoteVoiceName}>{memberName}</span>
-                  <button
-                    type="button"
-                    className={styles.remoteVoiceMute}
-                    aria-label={`${settings.muted ? "Bật tiếng" : "Tắt tiếng"} ${memberName} trên thiết bị của bạn`}
-                    aria-pressed={settings.muted}
-                    onClick={() => setRemoteAudioSettings((current) => ({
-                      ...current,
-                      [remote.userId]: { ...settings, muted: !settings.muted },
-                    }))}
-                  >
-                    {settings.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                  </button>
-                  <label className={styles.remoteVoiceVolume}>
-                    <span className={styles.visuallyHidden}>Âm lượng của {memberName}</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={settings.volume}
-                      onChange={(event) => setRemoteAudioSettings((current) => ({
-                        ...current,
-                        [remote.userId]: { ...settings, volume: Number(event.target.value) },
-                      }))}
-                    />
-                  </label>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
             <div className={styles.stageProgress}>
               <span>{currentTrack ? clockLabel(currentPositionMs) : "Chưa phát"}</span>
               <div className={styles.progressTrack}>
@@ -954,6 +928,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                   CÙNG CHUNG GIAI ĐIỆU
                 </span>
                 <h2 id="members-heading">Trong phòng</h2>
+                <p className={styles.memberCardHint}>Chọn thành viên để chỉnh âm lượng riêng.</p>
               </div>
               <span className={styles.memberCount}>
                 {room.memberCount}/{room.maxMembers} người
@@ -962,27 +937,85 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
             <div className={styles.memberList}>
               {room.members.map((member) => {
                 const backgroundImage = safeImageBackground(member.avatarUrl);
+                const memberId = String(member.userId);
+                const settings = remoteAudioSettings[memberId] ?? { muted: false, volume: 1 };
+                const isSelected = selectedMemberAudioId === memberId;
+                const hasRemoteVoice = voice.remoteVoices.some((remote) => remote.userId === memberId);
+                const controlsId = `member-audio-controls-${memberId}`;
                 return (
-                  <div key={member.userId} className={styles.member}>
-                    <span
-                      className={styles.memberAvatar}
-                      style={
-                        backgroundImage
-                          ? { backgroundImage, backgroundSize: "cover" }
-                          : undefined
-                      }
+                  <div key={member.userId} className={styles.memberEntry}>
+                    <button
+                      id={`room-member-${memberId}`}
+                      type="button"
+                      className={`${styles.member} ${isSelected ? styles.memberSelected : ""}`}
+                      aria-expanded={isSelected}
+                      aria-controls={controlsId}
+                      aria-label={`Điều chỉnh âm thanh của ${member.name}`}
+                      onClick={() => setSelectedMemberAudioId((current) => current === memberId ? null : memberId)}
                     >
-                      {!backgroundImage && initials(member.name)}
-                    </span>
-                    <span className={styles.memberName}>
-                      {member.name}
-                      {member.host && <small>Chủ phòng</small>}
-                    </span>
-                    <span
-                      className={`${styles.memberDot} ${voice.speakingUserIds.includes(String(member.userId)) ? styles.memberSpeaking : ""}`}
-                      title={voice.speakingUserIds.includes(String(member.userId)) ? "Đang nói" : "Đang ở trong phòng"}
-                      aria-label={voice.speakingUserIds.includes(String(member.userId)) ? "Đang nói" : "Đang kết nối"}
-                    />
+                      <span
+                        className={styles.memberAvatar}
+                        aria-hidden="true"
+                        style={
+                          backgroundImage
+                            ? { backgroundImage, backgroundSize: "cover" }
+                            : undefined
+                        }
+                      >
+                        {!backgroundImage && initials(member.name)}
+                      </span>
+                      <span className={styles.memberName}>
+                        {member.name}
+                        {member.host && <small>Chủ phòng</small>}
+                      </span>
+                      <span className={styles.memberAffordance} aria-hidden="true">
+                        <AudioLines size={13} />
+                        <span
+                          className={`${styles.memberDot} ${voice.speakingUserIds.includes(memberId) ? styles.memberSpeaking : ""}`}
+                        />
+                      </span>
+                    </button>
+                    {isSelected && (
+                      <div id={controlsId} className={styles.memberAudioControls} aria-labelledby={`room-member-${memberId}`}>
+                        <div className={styles.memberAudioControlHeader}>
+                          <span className={styles.memberAudioControlTitle}>
+                            <Volume2 size={14} /> Âm lượng của bạn
+                          </span>
+                          <span className={styles.memberAudioLevel}>{Math.round(settings.volume * 100)}%</span>
+                        </div>
+                        <div className={styles.memberAudioControlRow}>
+                          <button
+                            type="button"
+                            className={styles.memberAudioMute}
+                            aria-label={`${settings.muted ? "Bật tiếng" : "Tắt tiếng"} ${member.name} trên thiết bị của bạn`}
+                            aria-pressed={settings.muted}
+                            onClick={() => setRemoteAudioSettings((current) => {
+                              const currentSettings = current[memberId] ?? { muted: false, volume: 1 };
+                              return { ...current, [memberId]: { ...currentSettings, muted: !currentSettings.muted } };
+                            })}
+                          >
+                            {settings.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                          </button>
+                          <label className={styles.memberAudioSlider}>
+                            <span className={styles.visuallyHidden}>Âm lượng của {member.name}</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                              value={settings.volume}
+                              onChange={(event) => setRemoteAudioSettings((current) => {
+                                const currentSettings = current[memberId] ?? { muted: false, volume: 1 };
+                                return { ...current, [memberId]: { ...currentSettings, volume: Number(event.target.value) } };
+                              })}
+                            />
+                          </label>
+                        </div>
+                        {!hasRemoteVoice && (
+                          <p className={styles.memberAudioHint}>Thành viên chưa bật micro; cài đặt sẽ áp dụng khi họ phát giọng.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

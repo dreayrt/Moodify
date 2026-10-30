@@ -168,7 +168,7 @@
 .deviceSettings { display: grid; flex: 1 1 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 12px; margin-left: 85px; }
 .deviceSettings label { display: grid; gap: 5px; color: #bba9c5; font-size: 9px; font-weight: 700; }
 .deviceSettings select { width: 100%; min-height: 34px; padding: 0 10px; border: 1px solid rgba(222, 183, 230, 0.2); border-radius: 9px; outline: none; background: #211b2b; color: #eee3f2; font: inherit; font-size: 10px; }
-.deviceSettings select:focus-visible, .remoteVoiceMute:focus-visible { outline: 2px solid #e1a2db; outline-offset: 2px; }
+.deviceSettings select:focus-visible, .memberAudioMute:focus-visible, .member:focus-visible { outline: 2px solid #e1a2db; outline-offset: 2px; }
 .deviceSettings select:disabled { opacity: .55; }
 .deviceSettings p { grid-column: 1 / -1; margin: 0; color: #908398; font-size: 9px; }
 .disabledButton { display: flex; align-items: center; justify-content: center; gap: 7px; flex: 0 0 auto; padding: 11px 13px; border: 1px solid rgba(234, 198, 237, 0.1); border-radius: 10px; background: rgba(255, 255, 255, 0.04); color: #77717f; font-size: 10px; font-weight: 700; cursor: not-allowed; }
@@ -196,13 +196,31 @@
 .queueNote { display: flex; align-items: flex-start; gap: 6px; margin: 11px 0 0; color: #888092; font-size: 9px; line-height: 1.5 !important; }
 .queueNote svg { flex: 0 0 auto; margin-top: 1px; }
 .membersCard { min-height: 165px; }
+.memberCardHint { margin: 4px 0 0; color: #9c91a5; font-size: 9px; }
 .memberCount { color: #867d91; font-size: 10px; white-space: nowrap; }
-.memberList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 8px; }
-.member { display: flex; align-items: center; gap: 7px; min-width: 0; color: #d6cede; font-size: 10px; }
-.member > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberList { display: flex; flex-direction: column; gap: 7px; }
+.memberEntry { display: grid; min-width: 0; gap: 5px; }
+.member { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: #d6cede; font: inherit; font-size: 10px; text-align: left; cursor: pointer; transition: border-color .18s ease, background .18s ease; }
+.member:hover { border-color: rgba(222, 177, 237, .16); background: rgba(255, 255, 255, .035); }
+.memberSelected { border-color: rgba(221, 158, 221, .35); background: rgba(177, 102, 200, .1); }
 .memberAvatar { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 9px; color: #1b1730; font-size: 8px; font-weight: 900; }
+.memberName { display: flex; min-width: 0; flex: 1; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberAffordance { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; color: #a991b7; }
 .memberDot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: #78cfaa; }
 .memberSpeaking { width: 8px; height: 8px; background: #f3a2d9; box-shadow: 0 0 0 4px rgba(243, 162, 217, .12), 0 0 12px rgba(243, 162, 217, .72); }
+.memberAudioControls { padding: 10px 11px 9px; border: 1px solid rgba(222, 177, 237, .17); border-radius: 12px; background: linear-gradient(120deg, rgba(107, 64, 121, .18), rgba(255, 255, 255, .025)); animation: memberAudioOpen .18s ease-out; }
+.memberAudioControlHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.memberAudioControlTitle { display: inline-flex; align-items: center; gap: 7px; color: #e7cee9; font-size: 10px; font-weight: 700; }
+.memberAudioControlTitle svg { color: #d797d3; }
+.memberAudioLevel { color: #c7a2cf; font-size: 10px; font-variant-numeric: tabular-nums; }
+.memberAudioControlRow { display: flex; align-items: center; gap: 10px; }
+.memberAudioMute { display: grid; flex: 0 0 30px; place-items: center; width: 30px; height: 30px; border: 1px solid rgba(221, 183, 230, .2); border-radius: 9px; background: rgba(173, 120, 190, .12); color: #edc5ec; cursor: pointer; }
+.memberAudioMute[aria-pressed="true"] { border-color: rgba(244, 157, 184, .4); background: rgba(190, 88, 124, .16); color: #f1aec9; }
+.memberAudioSlider { display: flex; flex: 1; min-width: 0; }
+.memberAudioSlider input { width: 100%; accent-color: #dc91cc; cursor: pointer; }
+.memberAudioHint { margin: 7px 0 0; color: #9b8fa4; font-size: 9px; line-height: 1.5; }
+.remoteAudioPlayers { display: none; }
+@keyframes memberAudioOpen { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 
 .cover { position: relative; display: grid; place-items: center; flex: 0 0 62px; width: 62px; height: 62px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06); background: linear-gradient(145deg, #5b3568, #241d35); }
 .cover::before { content: ""; position: absolute; z-index: 1; width: 78%; height: 78%; top: -25%; right: -18%; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; pointer-events: none; }
@@ -382,11 +400,6 @@
 .roomLyricsPlain { max-width: min(100%, 640px); margin-top: 14px; color: rgba(235, 220, 240, .72); font-size: 12px; line-height: 1.7; }
 .roomPlaybackControls { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 12px 0; }
 .roomPlaybackControls .playbackButton { min-height: 34px; }
-.remoteVoiceControl { position: relative; z-index: 1; display: flex; align-items: center; gap: 9px; width: min(100%, 410px); margin: 0 auto 8px; padding: 7px 10px; border: 1px solid rgba(228, 190, 235, 0.14); border-radius: 11px; background: rgba(255, 255, 255, 0.035); }
-.remoteVoiceName { min-width: 0; flex: 1; overflow: hidden; color: #e9d9ee; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.remoteVoiceMute { display: grid; flex: 0 0 28px; place-items: center; width: 28px; height: 28px; border: 1px solid rgba(221, 183, 230, 0.2); border-radius: 8px; background: rgba(173, 120, 190, 0.12); color: #edc5ec; cursor: pointer; }
-.remoteVoiceVolume { display: flex; width: 90px; }
-.remoteVoiceVolume input { width: 100%; accent-color: #dc91cc; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 .roomIdleStage .stageSong { margin-top: 0; }
 .roomIdleStage .stageSong small { color: #a98fba; font-size: 8px; font-weight: 800; letter-spacing: 0.13em; text-align: left; }
@@ -430,7 +443,6 @@
   .roomMetaRow { font-size: 8px; }
   .deviceSettings { grid-template-columns: 1fr; }
   .deviceSettings p { grid-column: auto; }
-  .remoteVoiceVolume { width: 70px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
