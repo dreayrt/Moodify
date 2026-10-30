@@ -48,6 +48,8 @@ export function useKaraokeRoomLive({
     let socket: WebSocket | null = null;
     let reconnectTimer: number | undefined;
     let heartbeatTimer: number | undefined;
+    let connectionTimeout: number | undefined;
+    let subscriptionTimeout: number | undefined;
     let attempts = 0;
 
     const connect = async () => {
@@ -59,7 +61,14 @@ export function useKaraokeRoomLive({
 
         const currentSocket = new WebSocket(getKaraokeRoomSocketUrl());
         socket = currentSocket;
+        connectionTimeout = window.setTimeout(() => {
+          if (currentSocket.readyState === WebSocket.CONNECTING) {
+            currentSocket.close(4000, "connection timeout");
+          }
+        }, 5000);
         currentSocket.onopen = () => {
+          if (connectionTimeout !== undefined) window.clearTimeout(connectionTimeout);
+          connectionTimeout = undefined;
           const deviceUuid = typeof window === "undefined" ? "" : getCurrentDeviceUuid();
           currentSocket.send(JSON.stringify({
             type: scope === "rooms" ? "subscribeRooms" : "subscribeRoom",
@@ -67,6 +76,11 @@ export function useKaraokeRoomLive({
             accessToken,
             deviceUuid,
           }));
+          subscriptionTimeout = window.setTimeout(() => {
+            if (currentSocket.readyState === WebSocket.OPEN) {
+              currentSocket.close(4000, "subscription timeout");
+            }
+          }, 5000);
         };
         currentSocket.onmessage = (message) => {
           let event: LiveEvent;
@@ -76,6 +90,8 @@ export function useKaraokeRoomLive({
             return;
           }
           if (event.type === "subscribed") {
+            if (subscriptionTimeout !== undefined) window.clearTimeout(subscriptionTimeout);
+            subscriptionTimeout = undefined;
             attempts = 0;
             setConnected(true);
             callbacks.current.onSubscribed?.();
@@ -87,6 +103,7 @@ export function useKaraokeRoomLive({
             }, 20_000);
             return;
           }
+          if (event.type === "heartbeat.ack") return;
           if (event.type === "error") {
             callbacks.current.onError?.(new Error(event.code || "Không thể kết nối phòng."));
             currentSocket.close(1008, event.code || "subscription rejected");
@@ -96,8 +113,13 @@ export function useKaraokeRoomLive({
         };
         currentSocket.onerror = () => {
           callbacks.current.onError?.(new Error("Kết nối realtime bị gián đoạn."));
+          currentSocket.close();
         };
         currentSocket.onclose = () => {
+          if (connectionTimeout !== undefined) window.clearTimeout(connectionTimeout);
+          if (subscriptionTimeout !== undefined) window.clearTimeout(subscriptionTimeout);
+          connectionTimeout = undefined;
+          subscriptionTimeout = undefined;
           setConnected(false);
           if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
           heartbeatTimer = undefined;
@@ -121,6 +143,8 @@ export function useKaraokeRoomLive({
       stopped = true;
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
+      if (connectionTimeout !== undefined) window.clearTimeout(connectionTimeout);
+      if (subscriptionTimeout !== undefined) window.clearTimeout(subscriptionTimeout);
       socket?.close(1000, "page closed");
     };
   }, [enabled, roomId, scope]);

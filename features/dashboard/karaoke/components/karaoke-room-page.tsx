@@ -296,19 +296,21 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
 
   useEffect(() => pause(), [pause]);
 
-  const refreshRoom = useCallback(async () => {
+  const refreshRoom = useCallback(async (silent = false) => {
     if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
       setPageError("Đường dẫn phòng không hợp lệ.");
       setLoading(false);
-      return;
+      return false;
     }
     try {
       const requestStartedAt = Date.now();
       const snapshot = await fetchKaraokeRoom(numericRoomId);
       applyRoomSnapshot(snapshot, requestStartedAt);
       setPageError("");
+      return true;
     } catch (error) {
-      setPageError(messageFor(error));
+      if (!silent) setPageError(messageFor(error));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -392,6 +394,22 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     onSubscribed,
     onError: onRealtimeError,
   });
+
+  useEffect(() => {
+    if (!joined || inviteRequired || connected) return;
+    let requestInFlight = false;
+    const syncRoom = () => {
+      if (document.visibilityState !== "visible" || requestInFlight) return;
+      requestInFlight = true;
+      void refreshRoom(true).finally(() => { requestInFlight = false; });
+    };
+    const timer = window.setInterval(syncRoom, 1000);
+    document.addEventListener("visibilitychange", syncRoom);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", syncRoom);
+    };
+  }, [connected, inviteRequired, joined, refreshRoom]);
 
   useEffect(() => {
     if (!notice) return;

@@ -664,8 +664,7 @@ export function fetchKaraokeRoomScoreSession(roomId: number, sessionId: string):
 }
 
 export function getKaraokeRoomSocketUrl(): string {
-  const base = rawBase.endsWith("/api") ? rawBase.slice(0, -4) : rawBase;
-  return `${base.replace(/^http/, "ws")}/ws/karaoke`;
+  return `${API_BASE.replace(/^http/, "ws")}/ws/karaoke`;
 }
 
 async function karaokeErrorMessage(response: Response, fallback: string): Promise<Error> {
