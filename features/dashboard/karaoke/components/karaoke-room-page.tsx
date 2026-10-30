@@ -841,15 +841,28 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
 
       {room.visibility === "PRIVATE" && room.canManage && room.inviteCode && (
         <section className={styles.roomInviteCard} aria-label="Mã mời phòng riêng">
-          <div>
-            <span className={styles.sectionKicker}>MÃ MỜI PHÒNG RIÊNG</span>
-            <p>Chia sẻ mã này để thành viên vào phòng. Mã luôn có sẵn tại đây khi bạn cần.</p>
+          <div className={styles.roomInviteHeader}>
+            <div className={styles.roomInviteHeading}>
+              <span className={styles.roomInviteIcon} aria-hidden="true">
+                <LockKeyhole size={16} />
+              </span>
+              <div>
+                <span className={styles.sectionKicker}>MÃ MỜI PHÒNG RIÊNG</span>
+                <p>Chia sẻ mã này để bạn bè tham gia buổi hát. Bạn có thể sao chép lại bất cứ lúc nào.</p>
+              </div>
+            </div>
+            <span className={styles.roomInviteBadge}>Chỉ chủ phòng xem được</span>
           </div>
-          <code className={styles.roomInviteCode}>{room.inviteCode}</code>
-          <button type="button" className={styles.leaveRoomButton} onClick={() => void copyRoomInviteCode()}>
-            {inviteCodeCopied ? <Check size={15} /> : <Copy size={15} />}
-            {inviteCodeCopied ? "Đã sao chép" : "Sao chép mã"}
-          </button>
+          <div className={styles.roomInviteBottom}>
+            <div className={styles.roomInviteCodeBox}>
+              <span className={styles.roomInviteCodeLabel}>MÃ THAM GIA</span>
+              <code className={styles.roomInviteCode}>{room.inviteCode}</code>
+            </div>
+            <button type="button" className={styles.roomInviteCopyButton} onClick={() => void copyRoomInviteCode()}>
+              {inviteCodeCopied ? <Check size={16} /> : <Copy size={16} />}
+              {inviteCodeCopied ? "Đã sao chép" : "Sao chép mã"}
+            </button>
+          </div>
         </section>
       )}
 

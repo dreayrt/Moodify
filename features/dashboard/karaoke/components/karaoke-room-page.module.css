@@ -385,10 +385,19 @@
 .inviteValue { overflow-wrap: anywhere; margin-bottom: 15px; padding: 10px; border: 1px solid rgba(226, 197, 236, 0.1); border-radius: 9px; background: rgba(255, 255, 255, 0.03); color: #d9cbe1; font-size: 10px; }
 .inviteCodeRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
 .inviteCode { overflow-wrap: anywhere; color: #f3d8f1; font-size: 14px; letter-spacing: 0.08em; }
-.roomInviteCard { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; margin-top: 18px; padding: 15px 18px; border: 1px solid rgba(211, 177, 128, 0.2); border-radius: 16px; background: linear-gradient(110deg, rgba(54, 43, 48, 0.82), rgba(31, 25, 41, 0.88)); }
-.roomInviteCard > div { flex: 1 1 260px; min-width: 0; }
-.roomInviteCard p { margin: 5px 0 0; color: #b8aabe; font-size: 10px; line-height: 1.5; }
-.roomInviteCode { max-width: 100%; overflow-wrap: anywhere; padding: 9px 12px; border: 1px solid rgba(226, 197, 236, 0.13); border-radius: 9px; background: rgba(255, 255, 255, 0.04); color: #f3d8f1; font-size: 13px; letter-spacing: 0.07em; }
+.roomInviteCard { display: flex; flex-direction: column; gap: 15px; margin: 18px 0; padding: 19px 21px; border: 1px solid rgba(211, 177, 128, 0.2); border-radius: 18px; background: radial-gradient(ellipse at 0 0, rgba(168, 97, 144, 0.13), transparent 48%), linear-gradient(110deg, rgba(39, 31, 46, 0.96), rgba(28, 24, 37, 0.97)); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.025); }
+.roomInviteHeader { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.roomInviteHeading { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.roomInviteIcon { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(211, 177, 128, 0.2); border-radius: 12px; background: rgba(211, 177, 128, 0.08); color: #e2c18e; }
+.roomInviteHeading p { margin: 4px 0 0; color: #b8aabe; font-size: 10px; line-height: 1.5; }
+.roomInviteBadge { flex: 0 0 auto; padding: 6px 9px; border: 1px solid rgba(211, 177, 128, 0.16); border-radius: 999px; background: rgba(211, 177, 128, 0.06); color: #d4bd91; font-size: 9px; font-weight: 700; }
+.roomInviteBottom { display: flex; align-items: stretch; gap: 10px; }
+.roomInviteCodeBox { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; justify-content: center; gap: 5px; padding: 9px 13px; border: 1px solid rgba(226, 197, 236, 0.11); border-radius: 11px; background: rgba(10, 8, 17, 0.25); }
+.roomInviteCodeLabel { color: #9f91aa; font-size: 8px; font-weight: 800; letter-spacing: 0.14em; }
+.roomInviteCode { max-width: 100%; overflow-wrap: anywhere; color: #f3d8f1; font-family: var(--font-display-family), monospace; font-size: 14px; font-weight: 700; letter-spacing: 0.055em; line-height: 1.4; }
+.roomInviteCopyButton { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 0 17px; border: 1px solid rgba(255, 197, 234, 0.2); border-radius: 11px; background: linear-gradient(105deg, #a962b3, #d37dae 67%, #e38eae); color: #fff7ff; box-shadow: 0 8px 22px rgba(163, 70, 144, 0.18); cursor: pointer; font-size: 10px; font-weight: 800; transition: filter 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
+.roomInviteCopyButton:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 11px 26px rgba(186, 83, 159, 0.27); }
+.roomInviteCopyButton:focus-visible { outline: 2px solid #dfa4e0; outline-offset: 3px; }
 .invitePanel { display: flex; width: min(460px, 100%); flex-direction: column; align-items: stretch; gap: 10px; margin: 40px auto; padding: 25px; border: 1px solid var(--line); border-radius: 20px; background: rgba(24, 22, 34, 0.92); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25); }
 .invitePanel > .roomCardIcon { align-self: flex-start; }
 .invitePanel h1 { margin: 0; color: #f9f5ff; font-size: 26px; }
@@ -425,8 +434,13 @@
 
 @media (max-width: 700px) {
   .roomActions { align-self: flex-start; justify-content: flex-start; width: fit-content; max-width: 100%; }
-  .roomInviteCard { align-items: stretch; flex-direction: column; }
-  .roomInviteCode { align-self: flex-start; }
+  .roomInviteCard { gap: 13px; padding: 15px; }
+  .roomInviteHeader { align-items: flex-start; }
+  .roomInviteBadge { display: none; }
+  .roomInviteBottom { flex-direction: column; }
+  .roomInviteCodeBox { min-height: 58px; }
+  .roomInviteCode { font-size: 13px; }
+  .roomInviteCopyButton { min-height: 43px; }
   .leaveRoomButton { min-height: 39px; }
   .roomIdleStage { min-height: 430px; }
   .invitePanel { margin: 24px auto; padding: 21px 17px; }
