@@ -1471,76 +1471,7 @@ function LumenHeroContent() {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* BOX 5: GIAI ĐIỆU THEO TÂM TRẠNG (Mood & Atmosphere Stations)               */}
-      {/* ========================================================================= */}
-      <div className="anim-fade-up">
-        <SectionHeader
-          eyebrow="TRẠM CẢM XÚC"
-          title="Giai điệu theo tâm trạng"
-          subtitle="Chọn trạng thái cảm xúc để đắm chìm vào không gian âm nhạc phù hợp"
-        />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-          {[
-            {
-              id: "indie",
-              title: "Cà Phê Quán Quen",
-              desc: "Acoustic, Indie, Lofi êm dịu",
-              icon: "☕",
-              bg: "linear-gradient(135deg, #581c87 0%, #1e1b4b 100%)",
-              border: "rgba(192, 132, 252, 0.3)",
-            },
-            {
-              id: "hiphop",
-              title: "Năng Lượng & Flow",
-              desc: "Rap Việt bốc lửa, beat căng",
-              icon: "🔥",
-              bg: "linear-gradient(135deg, #78350f 0%, #180d2b 100%)",
-              border: "rgba(251, 191, 36, 0.3)",
-            },
-            {
-              id: "pop",
-              title: "V-Pop Thịnh Hành",
-              desc: "Ballad ngọt ngào, hit viral",
-              icon: "💖",
-              bg: "linear-gradient(135deg, #881337 0%, #1e1b4b 100%)",
-              border: "rgba(251, 113, 133, 0.3)",
-            },
-            {
-              id: "edm",
-              title: "Sôi Động / Remix",
-              desc: "Vinahouse, bass drop bùng nổ",
-              icon: "🎉",
-              bg: "linear-gradient(135deg, #0369a1 0%, #0f172a 100%)",
-              border: "rgba(56, 189, 248, 0.3)",
-            },
-            {
-              id: "all",
-              title: "Tập Trung Đỉnh Cao",
-              desc: "Deep focus, giai điệu thư thái",
-              icon: "🎧",
-              bg: "linear-gradient(135deg, #134e4a 0%, #0f172a 100%)",
-              border: "rgba(45, 212, 191, 0.3)",
-            },
-          ].map((st) => (
-            <div
-              key={st.title}
-              onClick={() => handleVibeChange(st.id)}
-              className="group relative rounded-2xl p-4 overflow-hidden transition-all duration-300 cursor-pointer hover:-translate-y-1.5 shadow-lg border hover:shadow-2xl"
-              style={{ background: st.bg, borderColor: st.border }}
-            >
-              <div className="text-3xl mb-3">{st.icon}</div>
-              <h4 className="text-white font-bold text-sm leading-tight group-hover:text-purple-200 transition-colors">
-                {st.title}
-              </h4>
-              <p className="text-white/70 text-[11px] mt-1 line-clamp-2 leading-relaxed">
-                {st.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* BOX 6: KHÁM PHÁ DANH SÁCH BÀI HÁT (Interactive Catalog Explorer)          */}
