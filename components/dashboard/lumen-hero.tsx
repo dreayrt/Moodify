@@ -15,12 +15,36 @@ import {
   Headphones,
   Music2,
   Users,
+  Heart,
+  TrendingUp,
+  CheckCircle2,
+  Clock,
+  Compass,
+  Coffee,
+  Moon,
+  Zap,
+  PartyPopper,
+  Search,
+  ChevronRight,
+  MoreHorizontal,
+  Layers,
+  ChevronUp,
 } from "lucide-react";
-import { fetchTracks, fetchTrackById, fetchFollowedArtists, type Track as ApiTrack, type FollowedArtist } from "@/lib/api-client";
+import Link from "next/link";
+import {
+  fetchTracks,
+  fetchTrackById,
+  fetchFollowedArtists,
+  fetchPublicAlbums,
+  type Track as ApiTrack,
+  type FollowedArtist,
+  type Album,
+} from "@/lib/api-client";
 import { usePlayer } from "@/components/dashboard/player-context";
 import { useVipTheme, type ThemeOption } from "@/lib/theme";
 import RealtimeLyrics from "./realtime-lyrics";
 import TrackActionMenu, { TrackInlineActions } from "./track-action-menu";
+import AlbumDetailModal from "./album-detail-modal";
 
 // Map UI vibe ids → real genre strings stored in MongoDB
 // 147 Vietnamese tracks catalog
@@ -129,11 +153,17 @@ function WaveformPreview({ active }: { active: boolean }) {
 function SectionHeader({
   eyebrow,
   title,
-  seeAllHref = "#",
+  subtitle,
+  seeAllHref,
+  onSeeAll,
+  seeAllText = "Xem tất cả",
 }: {
   eyebrow?: string;
   title: string;
+  subtitle?: string;
   seeAllHref?: string;
+  onSeeAll?: () => void;
+  seeAllText?: string;
 }) {
   return (
     <div className="flex items-end justify-between mb-4">
@@ -147,13 +177,189 @@ function SectionHeader({
         <h2 className="font-display font-bold text-white text-[20px] md:text-[24px] leading-[1.2] tracking-[-0.015em]">
           {title}
         </h2>
+        {subtitle && (
+          <p className="font-manrope text-[12px] text-white/50 mt-1 font-normal">
+            {subtitle}
+          </p>
+        )}
       </div>
-      <a
-        href={seeAllHref}
-        className="font-manrope text-[11px] tracking-[0.06em] text-white/45 hover:text-purple-300 transition-colors uppercase font-medium"
+      {(seeAllHref || onSeeAll) && (
+        onSeeAll ? (
+          <button
+            type="button"
+            onClick={onSeeAll}
+            className="font-manrope text-[11px] tracking-[0.06em] text-purple-400 hover:text-purple-300 transition-colors uppercase font-semibold cursor-pointer"
+          >
+            {seeAllText}
+          </button>
+        ) : (
+          <Link
+            href={seeAllHref || "#"}
+            className="font-manrope text-[11px] tracking-[0.06em] text-white/45 hover:text-purple-300 transition-colors uppercase font-medium"
+          >
+            {seeAllText}
+          </Link>
+        )
+      )}
+    </div>
+  );
+}
+
+function SquareMusicCard({
+  track,
+  isCurrent,
+  isPlaying,
+  onPlay,
+  vipTheme,
+}: {
+  track: Track;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  onPlay: () => void;
+  vipTheme?: ThemeOption | null;
+}) {
+  const coverUrl = track.raw?.imageUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400";
+  return (
+    <div
+      onClick={onPlay}
+      className={`group/card relative flex flex-col p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border transition-all duration-300 cursor-pointer shadow-md hover:shadow-2xl hover:shadow-purple-900/20 hover:-translate-y-1.5 ${
+        isCurrent
+          ? "border-purple-500/50 bg-purple-500/[0.08]"
+          : "border-white/[0.06] hover:border-white/20"
+      }`}
+    >
+      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-900 shadow-md mb-3">
+        <img
+          src={coverUrl}
+          alt={track.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+        />
+
+        {/* Floating Spotify Play button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className={`absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full flex items-center justify-center shadow-xl shadow-black/60 transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer ${
+            isCurrent && isPlaying
+              ? "opacity-100 translate-y-0 bg-purple-500 text-black"
+              : "opacity-0 translate-y-2 group-hover/card:opacity-100 group-hover/card:translate-y-0 bg-purple-500 hover:bg-purple-400 text-black"
+          }`}
+        >
+          {isCurrent && isPlaying ? (
+            <Pause className="w-5 h-5 fill-current" />
+          ) : (
+            <Play className="w-5 h-5 fill-current ml-0.5" />
+          )}
+        </button>
+      </div>
+
+      <h3
+        className={`text-sm font-bold truncate transition-colors ${
+          isCurrent ? "text-purple-300" : "text-white group-hover/card:text-purple-300"
+        }`}
       >
-        Xem tất cả
-      </a>
+        {track.title}
+      </h3>
+      <p className="text-white/50 text-xs truncate mt-1">
+        {track.artist}
+      </p>
+    </div>
+  );
+}
+
+function RankedTrackItem({
+  rank,
+  track,
+  isCurrent,
+  isPlaying,
+  onPlay,
+}: {
+  rank: number;
+  track: Track;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  onPlay: () => void;
+}) {
+  const rankColors = [
+    "from-amber-400 to-amber-600 text-black font-black",
+    "from-purple-400 to-pink-500 text-white font-black",
+    "from-cyan-400 to-blue-500 text-black font-black",
+  ];
+  const isTop3 = rank <= 3;
+  const rankBadgeClass = isTop3 ? rankColors[rank - 1] : "bg-white/10 text-white/60 font-bold";
+
+  return (
+    <div
+      onClick={onPlay}
+      className={`group flex items-center justify-between p-2.5 sm:p-3 rounded-xl transition-all duration-200 cursor-pointer border ${
+        isCurrent
+          ? "bg-purple-500/15 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+          : "bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-white/10"
+      }`}
+    >
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+        {/* Rank Number Badge */}
+        <div
+          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs ${
+            isTop3 ? `bg-gradient-to-br ${rankBadgeClass} shadow-md` : rankBadgeClass
+          }`}
+        >
+          {rank}
+        </div>
+
+        {/* Cover */}
+        <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-slate-800 relative group/cover">
+          <img
+            src={track.raw?.imageUrl || "/covers/focus-flow.jpg"}
+            alt={track.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+            <Play className="w-4 h-4 fill-white text-white ml-0.5" />
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-semibold truncate ${isCurrent ? "text-purple-300 font-bold" : "text-white group-hover:text-purple-200"}`}>
+            {track.title}
+          </p>
+          <p className="text-xs text-white/50 truncate mt-0.5">{track.artist}</p>
+        </div>
+      </div>
+
+      {/* Right meta */}
+      <div className="flex items-center gap-3 shrink-0 pl-2">
+        {isCurrent && isPlaying ? (
+          <div className="flex items-center gap-1">
+            <span className="w-1 h-3.5 bg-purple-400 rounded-full animate-bounce" />
+            <span className="w-1 h-5 bg-pink-400 rounded-full animate-bounce delay-75" />
+            <span className="w-1 h-2.5 bg-amber-400 rounded-full animate-bounce delay-150" />
+          </div>
+        ) : (
+          <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-purple-300/80 bg-purple-500/10 border border-purple-500/20">
+            HOT
+          </span>
+        )}
+        <span className="text-xs font-mono text-white/40">{track.duration}</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className="w-8 h-8 rounded-full bg-white/5 hover:bg-purple-500 hover:text-black flex items-center justify-center text-white/60 transition-all cursor-pointer"
+        >
+          {isCurrent && isPlaying ? (
+            <Pause className="w-3.5 h-3.5 fill-current" />
+          ) : (
+            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -644,6 +850,36 @@ function LumenHeroContent() {
     };
   }, [activeVibe]);
 
+  // Public Albums State
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<number | string | null>(null);
+  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [albumsLoading, setAlbumsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setAlbumsLoading(true);
+      try {
+        const resp = await fetchPublicAlbums(undefined, 0, 8);
+        if (!cancelled && resp?.content) {
+          setAlbums(resp.content);
+        }
+      } catch (err) {
+        console.error("Failed to fetch public albums:", err);
+      } finally {
+        if (!cancelled) setAlbumsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Catalog Section State
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [isCatalogExpanded, setIsCatalogExpanded] = useState(false);
+
   // Fetch editor picks from MongoDB (popular tracks across all genres)
   const [editorPicks, setEditorPicks] = useState<Track[]>([]);
   useEffect(() => {
@@ -997,127 +1233,172 @@ function LumenHeroContent() {
         )}
       </div>
 
-      {/* Danh sách bài hát */}
-      <div>
-        <SectionHeader eyebrow="DANH SÁCH BÀI HÁT" title="Tất cả bài hát" />
-        {tracksLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : (
-          <>
-            {/* Desktop (md+): 2 independent vertical columns so expanding a track only pushes down its own column */}
-            <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start max-h-[640px] overflow-y-auto pr-2 moodify-scroll">
-              {/* Left Column: 01, 03, 05, 07... */}
-              <div className="flex flex-col gap-1 min-w-0">
-                {tracks
-                  .map((t, i) => ({ track: t, originalIndex: i }))
-                  .filter((_, i) => i % 2 === 0)
-                  .map(({ track, originalIndex }) => (
-                    <TrackRow
-                      key={`${activeVibe}-${track.spotifyId || originalIndex}`}
-                      track={track}
-                      index={originalIndex}
-                      vipTheme={activeVipTheme}
-                      active={
-                        currentTrack?.spotifyId
-                          ? currentTrack.spotifyId === track.spotifyId
-                          : originalIndex === activeTrackIdx
-                      }
-                      playing={
-                        currentTrack?.spotifyId === track.spotifyId && isPlaying
-                      }
-                      onClick={() => handlePlayTrack(track, originalIndex)}
-                      onMouseEnter={() => setHoveredTrackIdx(originalIndex)}
-                      onMouseLeave={() => setHoveredTrackIdx(null)}
-                    />
-                  ))}
-              </div>
-
-              {/* Right Column: 02, 04, 06, 08... */}
-              <div className="flex flex-col gap-1 min-w-0">
-                {tracks
-                  .map((t, i) => ({ track: t, originalIndex: i }))
-                  .filter((_, i) => i % 2 !== 0)
-                  .map(({ track, originalIndex }) => (
-                    <TrackRow
-                      key={`${activeVibe}-${track.spotifyId || originalIndex}`}
-                      track={track}
-                      index={originalIndex}
-                      vipTheme={activeVipTheme}
-                      active={
-                        currentTrack?.spotifyId
-                          ? currentTrack.spotifyId === track.spotifyId
-                          : originalIndex === activeTrackIdx
-                      }
-                      playing={
-                        currentTrack?.spotifyId === track.spotifyId && isPlaying
-                      }
-                      onClick={() => handlePlayTrack(track, originalIndex)}
-                      onMouseEnter={() => setHoveredTrackIdx(originalIndex)}
-                      onMouseLeave={() => setHoveredTrackIdx(null)}
-                    />
-                  ))}
-              </div>
+      {/* ========================================================================= */}
+      {/* SPOTIFY QUICK ACCESS SHORTCUTS (6 cards)                                  */}
+      {/* ========================================================================= */}
+      {tracks.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 anim-fade-up">
+          {/* 1. Liked Songs card */}
+          <Link
+            href="/dashboard/library?tab=tracks"
+            className="group relative flex items-center gap-3.5 bg-white/[0.04] hover:bg-white/[0.09] rounded-xl overflow-hidden transition-all duration-300 border border-white/[0.06] hover:border-purple-500/40 shadow-md hover:shadow-xl cursor-pointer pr-4"
+          >
+            <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-purple-700 via-pink-600 to-indigo-800 flex items-center justify-center shadow-lg">
+              <Heart className="w-7 h-7 text-white fill-white animate-pulse" />
             </div>
-
-            {/* Mobile (<md): 1 single sequential column */}
-            <div className="flex md:hidden flex-col gap-1 max-h-[640px] overflow-y-auto pr-2 moodify-scroll">
-              {tracks.map((t, i) => (
-                <TrackRow
-                  key={`${activeVibe}-${t.spotifyId || i}`}
-                  track={t}
-                  index={i}
-                  vipTheme={activeVipTheme}
-                  active={
-                    currentTrack?.spotifyId
-                      ? currentTrack.spotifyId === t.spotifyId
-                      : i === activeTrackIdx
-                  }
-                  playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(t, i)}
-                  onMouseEnter={() => setHoveredTrackIdx(i)}
-                  onMouseLeave={() => setHoveredTrackIdx(null)}
-                />
-              ))}
+            <div className="min-w-0 flex-1 py-2">
+              <p className="text-white font-bold text-sm truncate">Bài hát đã thích</p>
+              <p className="text-purple-300/70 text-xs truncate mt-0.5">Playlist của bạn</p>
             </div>
-          </>
-        )}
-      </div>
+            <div className="w-10 h-10 rounded-full bg-purple-500 text-black flex items-center justify-center shadow-lg opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 shrink-0">
+              <Play className="w-5 h-5 fill-current ml-0.5" />
+            </div>
+          </Link>
 
-      {/* Followed Artists Shelf */}
-      {followedArtists.length > 0 && (
-        <div className="anim-fade-up">
-          <div className="flex items-center justify-between mb-4">
-            <SectionHeader eyebrow="BỘ SƯU TẬP CỦA BẠN" title="Nghệ sĩ bạn theo dõi" />
-            <button
-              onClick={() => router.push("/dashboard/library")}
-              className="text-xs text-purple-400 hover:text-purple-300 font-medium transition-colors cursor-pointer"
-            >
-              Xem tất cả ({followedArtists.length})
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-            {followedArtists.slice(0, 6).map((artist) => (
+          {/* 2-6: Popular Playable Tracks */}
+          {(tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath).length >= 5
+            ? tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath)
+            : tracks
+          )
+            .slice(0, 5)
+            .map((t, idx) => (
               <div
-                key={artist.artistId}
-                onClick={() => router.push(`/dashboard/artist/${encodeURIComponent(artist.artistId)}`)}
-                className="group p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer text-center flex flex-col items-center"
+                key={t.spotifyId || idx}
+                onClick={() => handlePlayTrack(t)}
+                className="group relative flex items-center gap-3.5 bg-white/[0.04] hover:bg-white/[0.09] rounded-xl overflow-hidden transition-all duration-300 border border-white/[0.06] hover:border-purple-500/40 shadow-md hover:shadow-xl cursor-pointer pr-4"
               >
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden mb-3 bg-slate-800 ring-2 ring-white/10 group-hover:ring-purple-400/60 transition-all">
-                  {artist.imageUrl ? (
-                    <img src={artist.imageUrl} alt={artist.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                <div
+                  className="w-16 h-16 shrink-0 bg-slate-800 bg-cover bg-center"
+                  style={{ backgroundImage: t.raw?.imageUrl ? `url(${t.raw.imageUrl})` : undefined }}
+                />
+                <div className="min-w-0 flex-1 py-2">
+                  <p className="text-white font-bold text-sm truncate group-hover:text-purple-200 transition-colors">
+                    {t.title}
+                  </p>
+                  <p className="text-white/50 text-xs truncate mt-0.5">{t.artist}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-purple-500 text-black flex items-center justify-center shadow-lg opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 shrink-0">
+                  {isPlaying && currentTrack?.spotifyId === t.spotifyId ? (
+                    <Pause className="w-5 h-5 fill-current" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-purple-900/30 text-purple-300">
-                      <Users className="w-8 h-8" />
-                    </div>
+                    <Play className="w-5 h-5 fill-current ml-0.5" />
                   )}
                 </div>
-                <h4 className="text-xs font-bold text-white truncate w-full group-hover:text-purple-300 transition-colors">
-                  {artist.name}
-                </h4>
-                <p className="text-[10px] text-white/50 truncate w-full mt-0.5">
-                  Nghệ sĩ
+              </div>
+            ))}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* BOX 1: DÀNH RIÊNG CHO BẠN (Made For You / Based on your listening)        */}
+      {/* ========================================================================= */}
+      <div className="anim-fade-up">
+        <SectionHeader
+          eyebrow="MADE FOR YOU"
+          title="Dành riêng cho bạn"
+          subtitle="Giai điệu dựa trên thói quen nghe nhạc gần đây của bạn"
+          onSeeAll={() => handleVibeChange("all")}
+          seeAllText="Khám phá thêm"
+        />
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {(tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath).length >= 6
+            ? tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath)
+            : tracks
+          )
+            .slice(0, 6)
+            .map((t, idx) => (
+              <SquareMusicCard
+                key={`mfy-${t.spotifyId || idx}`}
+                track={t}
+                isCurrent={currentTrack?.spotifyId === t.spotifyId}
+                isPlaying={Boolean(isPlaying && currentTrack?.spotifyId === t.spotifyId)}
+                onPlay={() => handlePlayTrack(t, idx)}
+                vipTheme={activeVipTheme}
+              />
+            ))}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* BOX 2: HÔM NAY NGHE GÌ? - BẢNG XẾP HẠNG TOP HITS (Spotify Charts)          */}
+      {/* ========================================================================= */}
+      <div className="anim-fade-up">
+        <SectionHeader
+          eyebrow="BẢNG XẾP HẠNG"
+          title="Hôm nay nghe gì? / Hot Hits Vietnam"
+          subtitle="Top ca khúc thịnh hành được cộng đồng nghe nhiều nhất tuần này"
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+          {tracks.slice(0, 6).map((t, idx) => (
+            <RankedTrackItem
+              key={`rank-${t.spotifyId || idx}`}
+              rank={idx + 1}
+              track={t}
+              isCurrent={currentTrack?.spotifyId === t.spotifyId}
+              isPlaying={Boolean(isPlaying && currentTrack?.spotifyId === t.spotifyId)}
+              onPlay={() => handlePlayTrack(t, idx)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* BOX 3: TUYỂN TẬP & ALBUM CHỌN LỌC (Curated by Moodify / New Music Friday)  */}
+      {/* ========================================================================= */}
+      {albums.length > 0 && (
+        <div className="anim-fade-up">
+          <SectionHeader
+            eyebrow="CURATED BY MOODIFY"
+            title="Tuyển tập & Album chọn lọc"
+            subtitle="Các album tinh hoa được tuyển tập bởi đội ngũ âm nhạc Moodify"
+            onSeeAll={() => router.push("/dashboard/library?tab=albums")}
+            seeAllText="Tất cả album"
+          />
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {albums.slice(0, 6).map((alb) => (
+              <div
+                key={alb.id}
+                onClick={() => {
+                  setSelectedAlbumId(alb.id);
+                  setIsAlbumModalOpen(true);
+                }}
+                className="group/album relative flex flex-col p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] hover:border-cyan-500/40 transition-all duration-300 cursor-pointer shadow-md hover:shadow-2xl hover:shadow-cyan-950/20 hover:-translate-y-1.5"
+              >
+                <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-800 shadow-md mb-3">
+                  <img
+                    src={alb.coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300"}
+                    alt={alb.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover/album:scale-105"
+                  />
+
+                  {/* Album badge */}
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-[10px] font-bold text-cyan-300 flex items-center gap-1">
+                    <Disc className="w-3 h-3 text-cyan-400 animate-spin-slow" />
+                    <span>ALBUM</span>
+                  </div>
+
+                  {/* Play on hover */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAlbumId(alb.id);
+                      setIsAlbumModalOpen(true);
+                    }}
+                    className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-cyan-400 hover:bg-cyan-300 text-black flex items-center justify-center shadow-xl shadow-black/60 translate-y-2 opacity-0 group-hover/album:translate-y-0 group-hover/album:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer"
+                  >
+                    <Play className="w-5 h-5 fill-current ml-0.5" />
+                  </button>
+                </div>
+
+                <h3 className="text-white text-sm font-bold truncate group-hover/album:text-cyan-300 transition-colors">
+                  {alb.title}
+                </h3>
+                <p className="text-white/50 text-xs truncate mt-1">
+                  {alb.authorName || "Nhiều nghệ sĩ"} • {alb.trackCount || 0} bài hát
                 </p>
               </div>
             ))}
@@ -1125,76 +1406,248 @@ function LumenHeroContent() {
         </div>
       )}
 
-      {/* Editor picks */}
-      <div>
-        <SectionHeader eyebrow="TUYỂN CHỌN ĐẶC BIỆT" title="Editor's Picks" />
-        {editorPicks.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            {editorPicks.map((t, i) => (
-              <EditorPickCard
-                key={t.title}
-                track={t}
-                delay={1000 + i * 80}
-                vipTheme={activeVipTheme}
-                onPlay={() => handlePlayTrack(t)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-white/40 text-sm py-4">Chưa có bài hát tuyển chọn nào.</div>
-        )}
+      {/* ========================================================================= */}
+      {/* BOX 4: NGHỆ SĨ VIỆT NAM NỔI BẬT (Featured Artists / Artists to Follow)     */}
+      {/* ========================================================================= */}
+      <div className="anim-fade-up">
+        <div className="flex items-center justify-between mb-4">
+          <SectionHeader
+            eyebrow="NGHỆ SĨ TIÊU BIỂU"
+            title="Nghệ sĩ Việt Nam nổi bật"
+            subtitle="Theo dõi các giọng ca hàng đầu đang tạo nên làn sóng âm nhạc"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {(() => {
+            const artistMap = new Map<string, { name: string; image?: string; id?: string }>();
+            tracks.forEach((t) => {
+              if (t.artist && !artistMap.has(t.artist) && t.raw?.imageUrl) {
+                artistMap.set(t.artist, {
+                  name: t.artist,
+                  image: t.raw.imageUrl,
+                  id: t.raw.artistSpotifyId || t.raw.artistName,
+                });
+              }
+            });
+            const list = Array.from(artistMap.values()).slice(0, 6);
+            return list.map((art) => (
+              <div
+                key={art.name}
+                onClick={() => router.push(`/dashboard/artist/${encodeURIComponent(art.id || art.name)}`)}
+                className="group p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-purple-500/30 transition-all duration-300 cursor-pointer text-center flex flex-col items-center hover:-translate-y-1.5"
+              >
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden mb-3 bg-slate-800 ring-2 ring-white/10 group-hover:ring-purple-400/80 transition-all shadow-xl relative group/avatar">
+                  {art.image ? (
+                    <img
+                      src={art.image}
+                      alt={art.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-purple-900/30 text-purple-300">
+                      <Users className="w-8 h-8" />
+                    </div>
+                  )}
+
+                  {/* Play overlay on artist avatar */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <div className="w-10 h-10 rounded-full bg-purple-500 text-black flex items-center justify-center shadow-lg">
+                      <Play className="w-5 h-5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 justify-center w-full">
+                  <h4 className="text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                    {art.name}
+                  </h4>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 fill-sky-400/20 shrink-0" />
+                </div>
+                <p className="text-[11px] text-white/50 truncate w-full mt-0.5">Nghệ sĩ xác minh</p>
+              </div>
+            ));
+          })()}
+        </div>
       </div>
 
-      {/* Hottest in genre */}
-      <div>
-        <SectionHeader eyebrow="XU HƯỚNG NỔI BẬT" title={`Thịnh hành trong ${active.label}`} />
-        <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start">
-          <div className="flex flex-col gap-1 min-w-0">
-            {[...tracks]
-              .slice(0, 4)
-              .map((t, i) => ({ track: t, originalIndex: i }))
-              .filter((_, i) => i % 2 === 0)
-              .map(({ track, originalIndex }) => (
-                <TrackRow
-                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
-                  track={track}
-                  index={originalIndex}
-                  active={currentTrack?.spotifyId === track.spotifyId}
-                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(track)}
-                />
-              ))}
-          </div>
-          <div className="flex flex-col gap-1 min-w-0">
-            {[...tracks]
-              .slice(0, 4)
-              .map((t, i) => ({ track: t, originalIndex: i }))
-              .filter((_, i) => i % 2 !== 0)
-              .map(({ track, originalIndex }) => (
-                <TrackRow
-                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
-                  track={track}
-                  index={originalIndex}
-                  active={currentTrack?.spotifyId === track.spotifyId}
-                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(track)}
-                />
-              ))}
-          </div>
-        </div>
-        <div className="flex md:hidden flex-col gap-1">
-          {[...tracks].slice(0, 4).map((t, i) => (
-            <TrackRow
-              key={`more-${activeVibe}-${t.spotifyId || i}`}
-              track={t}
-              index={i}
-              active={currentTrack?.spotifyId === t.spotifyId}
-              playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
-              onClick={() => handlePlayTrack(t)}
-            />
+      {/* ========================================================================= */}
+      {/* BOX 5: GIAI ĐIỆU THEO TÂM TRẠNG (Mood & Atmosphere Stations)               */}
+      {/* ========================================================================= */}
+      <div className="anim-fade-up">
+        <SectionHeader
+          eyebrow="TRẠM CẢM XÚC"
+          title="Giai điệu theo tâm trạng"
+          subtitle="Chọn trạng thái cảm xúc để đắm chìm vào không gian âm nhạc phù hợp"
+        />
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+          {[
+            {
+              id: "indie",
+              title: "Cà Phê Quán Quen",
+              desc: "Acoustic, Indie, Lofi êm dịu",
+              icon: "☕",
+              bg: "linear-gradient(135deg, #581c87 0%, #1e1b4b 100%)",
+              border: "rgba(192, 132, 252, 0.3)",
+            },
+            {
+              id: "hiphop",
+              title: "Năng Lượng & Flow",
+              desc: "Rap Việt bốc lửa, beat căng",
+              icon: "🔥",
+              bg: "linear-gradient(135deg, #78350f 0%, #180d2b 100%)",
+              border: "rgba(251, 191, 36, 0.3)",
+            },
+            {
+              id: "pop",
+              title: "V-Pop Thịnh Hành",
+              desc: "Ballad ngọt ngào, hit viral",
+              icon: "💖",
+              bg: "linear-gradient(135deg, #881337 0%, #1e1b4b 100%)",
+              border: "rgba(251, 113, 133, 0.3)",
+            },
+            {
+              id: "edm",
+              title: "Sôi Động / Remix",
+              desc: "Vinahouse, bass drop bùng nổ",
+              icon: "🎉",
+              bg: "linear-gradient(135deg, #0369a1 0%, #0f172a 100%)",
+              border: "rgba(56, 189, 248, 0.3)",
+            },
+            {
+              id: "all",
+              title: "Tập Trung Đỉnh Cao",
+              desc: "Deep focus, giai điệu thư thái",
+              icon: "🎧",
+              bg: "linear-gradient(135deg, #134e4a 0%, #0f172a 100%)",
+              border: "rgba(45, 212, 191, 0.3)",
+            },
+          ].map((st) => (
+            <div
+              key={st.title}
+              onClick={() => handleVibeChange(st.id)}
+              className="group relative rounded-2xl p-4 overflow-hidden transition-all duration-300 cursor-pointer hover:-translate-y-1.5 shadow-lg border hover:shadow-2xl"
+              style={{ background: st.bg, borderColor: st.border }}
+            >
+              <div className="text-3xl mb-3">{st.icon}</div>
+              <h4 className="text-white font-bold text-sm leading-tight group-hover:text-purple-200 transition-colors">
+                {st.title}
+              </h4>
+              <p className="text-white/70 text-[11px] mt-1 line-clamp-2 leading-relaxed">
+                {st.desc}
+              </p>
+            </div>
           ))}
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* BOX 6: KHÁM PHÁ DANH SÁCH BÀI HÁT (Interactive Catalog Explorer)          */}
+      {/* Thay vì đổ ra 150 bài làm loãng trang, giờ có ô tìm kiếm và thu gọn/mở rộng */}
+      {/* ========================================================================= */}
+      <div className="rounded-3xl border border-white/10 bg-slate-950/40 backdrop-blur-xl p-5 sm:p-6 shadow-xl anim-fade-up">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-white/10">
+          <div>
+            <p className="font-manrope text-[10px] tracking-[0.1em] text-purple-400 uppercase font-bold flex items-center gap-1.5 mb-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+              DANH MỤC CA KHÚC
+            </p>
+            <h3 className="font-display font-bold text-white text-lg sm:text-xl">
+              {active.label === "TẤT CẢ" ? "Tất cả bài hát" : `Giai điệu: ${active.label}`} ({tracks.length} ca khúc)
+            </h3>
+          </div>
+
+          {/* Quick in-section search box */}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              placeholder="Tìm trong danh mục..."
+              className="w-full pl-9 pr-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white placeholder-white/40 text-xs focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Clean track table */}
+        <div className="flex flex-col gap-1.5">
+          {(() => {
+            const filtered = catalogSearch.trim()
+              ? tracks.filter(
+                  (t) =>
+                    t.title.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                    t.artist.toLowerCase().includes(catalogSearch.toLowerCase())
+                )
+              : tracks;
+
+            const displayList = isCatalogExpanded || catalogSearch.trim() ? filtered : filtered.slice(0, 10);
+
+            if (displayList.length === 0) {
+              return (
+                <div className="text-center py-10 text-white/40 text-xs">
+                  Không tìm thấy bài hát nào khớp với từ khóa "{catalogSearch}".
+                </div>
+              );
+            }
+
+            return (
+              <>
+                {displayList.map((track, idx) => (
+                  <TrackRow
+                    key={`cat-${track.spotifyId || idx}`}
+                    track={track}
+                    index={idx}
+                    vipTheme={activeVipTheme}
+                    active={
+                      currentTrack?.spotifyId
+                        ? currentTrack.spotifyId === track.spotifyId
+                        : idx === activeTrackIdx
+                    }
+                    playing={Boolean(currentTrack?.spotifyId === track.spotifyId && isPlaying)}
+                    onClick={() => handlePlayTrack(track, idx)}
+                    onMouseEnter={() => setHoveredTrackIdx(idx)}
+                    onMouseLeave={() => setHoveredTrackIdx(null)}
+                  />
+                ))}
+
+                {!catalogSearch.trim() && filtered.length > 10 && (
+                  <div className="flex justify-center pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsCatalogExpanded(!isCatalogExpanded)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold hover:border-purple-400/40 transition-all cursor-pointer"
+                    >
+                      {isCatalogExpanded ? (
+                        <>
+                          <ChevronUp className="w-4 h-4 text-purple-400" />
+                          <span>Thu gọn danh sách</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-4 h-4 text-purple-400" />
+                          <span>Xem thêm {filtered.length - 10} bài hát còn lại</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* Album Detail Modal */}
+      <AlbumDetailModal
+        albumId={selectedAlbumId}
+        isOpen={isAlbumModalOpen}
+        onClose={() => {
+          setIsAlbumModalOpen(false);
+          setSelectedAlbumId(null);
+        }}
+      />
     </div>
   );
 }
