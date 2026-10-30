@@ -12,6 +12,7 @@ function safeEncodeParam(id: string): string {
 }
 
 import { getValidAccessToken } from './auth-client';
+import { getCurrentDeviceUuid } from './auth/device-helper';
 
 // ============================================================================
 // Types
@@ -115,6 +116,97 @@ export type KaraokeTrackPageResponse = {
   totalElements: number;
   totalPages: number;
 };
+
+export type KaraokeRoomVisibility = "PUBLIC" | "PRIVATE";
+
+export type KaraokeRoomSummary = {
+  id: number;
+  name: string;
+  hostName: string;
+  hostAvatarUrl: string | null;
+  memberCount: number;
+  maxMembers: number;
+  visibility: KaraokeRoomVisibility;
+  createdAt: string;
+};
+
+export type KaraokeRoomCreated = {
+  id: number;
+  name: string;
+  visibility: KaraokeRoomVisibility;
+  maxMembers: number;
+  inviteCode: string | null;
+};
+
+export type KaraokeRoomMember = {
+  userId: number;
+  name: string;
+  avatarUrl: string | null;
+  host: boolean;
+};
+
+export type KaraokeRoomQueueItem = {
+  id: number;
+  trackId: string;
+  title: string;
+  artist: string;
+  imageUrl: string | null;
+  durationMs: number | null;
+  requestedBy: string;
+  requestedByMe: boolean;
+};
+
+export type KaraokePlaybackStatus = "IDLE" | "PLAYING" | "PAUSED";
+
+export type KaraokeRoomPlaybackTrack = {
+  trackId: string;
+  title: string;
+  artist: string;
+  imageUrl: string | null;
+  durationMs: number | null;
+  instrumentalUrl: string | null;
+  lyricsPlain: string | null;
+  lyricsSynced: string | null;
+  lyricTimeline: KaraokeLyricTimeline | null;
+};
+
+export type KaraokeRoomPlayback = {
+  status: KaraokePlaybackStatus;
+  track: KaraokeRoomPlaybackTrack | null;
+  positionMs: number;
+  startedAt: string | null;
+  version: number;
+  serverTimeMs: number;
+};
+
+export type KaraokeVoiceTicket = {
+  ticket: string;
+  websocketUrl: string;
+  expiresAt: string;
+};
+
+export type KaraokeRoomDetail = {
+  id: number;
+  name: string;
+  hostUserId: number;
+  hostName: string;
+  hostAvatarUrl: string | null;
+  maxMembers: number;
+  visibility: KaraokeRoomVisibility;
+  createdAt: string;
+  memberCount: number;
+  canManage: boolean;
+  members: KaraokeRoomMember[];
+  queue: KaraokeRoomQueueItem[];
+  playback: KaraokeRoomPlayback;
+};
+
+export class KaraokeRoomApiError extends Error {
+  constructor(message: string, public readonly status: number, public readonly code: string) {
+    super(message);
+    this.name = "KaraokeRoomApiError";
+  }
+}
 
 export type KaraokeSessionResponse = {
   sessionId: string;
@@ -429,6 +521,102 @@ export async function fetchKaraokeTracks(options?: {
     throw new Error("Không thể tải kho bài Karaoke.");
   }
   return response.json();
+}
+
+async function karaokeRoomRequest<T>(
+  path: string,
+  options: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {},
+): Promise<T> {
+  const token = await getValidAccessToken().catch(() => null);
+  if (!token) throw new KaraokeRoomApiError("Vui lòng đăng nhập để dùng phòng Karaoke.", 401, "AUTHENTICATION_REQUIRED");
+  const deviceUuid = typeof window === "undefined" ? "" : getCurrentDeviceUuid();
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (deviceUuid) headers["X-Device-Uuid"] = deviceUuid;
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as {
+      message?: string;
+      detail?: string;
+      error?: string;
+      code?: string;
+    } | null;
+    const message = body?.detail || body?.message || body?.error || `Yêu cầu phòng Karaoke thất bại (HTTP ${response.status}).`;
+    const code = body?.code || message.match(/(?:ROOM|QUEUE|TRACK|AUTH|USER|PLAYBACK|KARAOKE|VOICE)_[A-Z_]+/)?.[0] || "ROOM_REQUEST_FAILED";
+    throw new KaraokeRoomApiError(message, response.status, code);
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+export function fetchKaraokeRooms(): Promise<KaraokeRoomSummary[]> {
+  return karaokeRoomRequest<KaraokeRoomSummary[]>("/karaoke/rooms");
+}
+
+export function createKaraokeRoom(input: {
+  name: string;
+  maxMembers: number;
+  visibility: KaraokeRoomVisibility;
+}): Promise<KaraokeRoomCreated> {
+  return karaokeRoomRequest<KaraokeRoomCreated>("/karaoke/rooms", { method: "POST", body: input });
+}
+
+export function joinKaraokeRoom(roomId: number, inviteCode?: string): Promise<KaraokeRoomDetail> {
+  return karaokeRoomRequest<KaraokeRoomDetail>(`/karaoke/rooms/${roomId}/join`, {
+    method: "POST",
+    body: inviteCode ? { inviteCode } : {},
+  });
+}
+
+export function fetchKaraokeRoom(roomId: number): Promise<KaraokeRoomDetail> {
+  return karaokeRoomRequest<KaraokeRoomDetail>(`/karaoke/rooms/${roomId}`);
+}
+
+export function leaveKaraokeRoom(roomId: number): Promise<void> {
+  return karaokeRoomRequest<void>(`/karaoke/rooms/${roomId}/leave`, { method: "POST" });
+}
+
+export function addKaraokeRoomQueueItem(roomId: number, trackId: string): Promise<KaraokeRoomQueueItem> {
+  return karaokeRoomRequest<KaraokeRoomQueueItem>(`/karaoke/rooms/${roomId}/queue`, {
+    method: "POST",
+    body: { trackId },
+  });
+}
+
+export function removeKaraokeRoomQueueItem(roomId: number, itemId: number): Promise<void> {
+  return karaokeRoomRequest<void>(`/karaoke/rooms/${roomId}/queue/${itemId}`, { method: "DELETE" });
+}
+
+export function closeKaraokeRoom(roomId: number): Promise<void> {
+  return karaokeRoomRequest<void>(`/karaoke/rooms/${roomId}/close`, { method: "POST" });
+}
+
+export function controlKaraokePlayback(
+  roomId: number,
+  command: "start" | "pause" | "resume" | "skip",
+  expectedVersion: number,
+): Promise<KaraokeRoomDetail> {
+  return karaokeRoomRequest<KaraokeRoomDetail>(`/karaoke/rooms/${roomId}/playback/${command}`, {
+    method: "POST",
+    body: { expectedVersion },
+  });
+}
+
+export function createKaraokeVoiceTicket(roomId: number): Promise<KaraokeVoiceTicket> {
+  return karaokeRoomRequest<KaraokeVoiceTicket>(`/karaoke/rooms/${roomId}/voice-ticket`, {
+    method: "POST",
+  });
+}
+
+export function getKaraokeRoomSocketUrl(): string {
+  const base = rawBase.endsWith("/api") ? rawBase.slice(0, -4) : rawBase;
+  return `${base.replace(/^http/, "ws")}/ws/karaoke`;
 }
 
 async function karaokeErrorMessage(response: Response, fallback: string): Promise<Error> {

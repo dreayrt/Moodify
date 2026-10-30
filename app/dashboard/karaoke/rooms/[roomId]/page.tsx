@@ -8,14 +8,9 @@ export const metadata: Metadata = {
 
 export default async function KaraokeSharedRoomRoute({
   params,
-  searchParams,
 }: {
   params: Promise<{ roomId: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { roomId } = await params;
-  const search = await searchParams;
-  const name = search.name;
-  const roomName = Array.isArray(name) ? name[0] : name;
-  return <KaraokeRoomPage roomId={roomId} roomName={roomName} />;
+  return <KaraokeRoomPage roomId={roomId} />;
 }

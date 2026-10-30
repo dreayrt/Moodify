@@ -25,10 +25,10 @@
 
 .intro {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin: 8px 0 27px;
+  margin: 8px 0 22px;
 }
 
 .eyebrow,
@@ -78,7 +78,7 @@
 .previewBanner svg { flex: 0 0 auto; margin-top: 1px; color: #d991db; }
 .previewBanner strong { color: #f8e6ff; }
 
-.mainGrid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(305px, 0.9fr); gap: 18px; }
+.mainGrid { display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(320px, 0.9fr); align-items: stretch; gap: 16px; }
 .leftColumn, .rightColumn { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
 
 .stage {
@@ -173,7 +173,7 @@
 .progressTrack span { display: block; width: 34%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #af75d3, #ed9cca); }
 
 .deviceCard, .queueCard, .membersCard, .catalog { border: 1px solid var(--line); background: rgba(24, 22, 34, 0.88); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.13); }
-.deviceCard { display: flex; align-items: center; gap: 17px; min-height: 135px; padding: 19px; border-radius: 21px; }
+.deviceCard { display: flex; align-items: center; flex-wrap: wrap; gap: 17px; min-height: 112px; margin-top: 16px; padding: 16px 19px; border-radius: 18px; }
 .deviceArtwork { position: relative; display: grid; place-items: center; flex: 0 0 68px; width: 68px; height: 68px; border-radius: 18px; background: linear-gradient(145deg, #4c315c, #2c294c); color: #edb3df; }
 .deviceWave { position: absolute; display: flex; align-items: center; gap: 2px; right: -9px; bottom: 9px; height: 22px; padding: 4px; border-radius: 6px; background: #2a2039; }
 .deviceWave i { width: 2px; height: 8px; border-radius: 3px; background: #eac2ea; }
@@ -181,10 +181,16 @@
 .deviceCopy { min-width: 0; flex: 1; }
 .deviceCopy h2 { margin: 5px 0 4px; font-size: 17px; }
 .deviceCopy p { margin: 0; max-width: 430px; color: #a69eb0; font-size: 10px; line-height: 1.6 !important; }
+.deviceSettings { display: grid; flex: 1 1 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 12px; margin-left: 85px; }
+.deviceSettings label { display: grid; gap: 5px; color: #bba9c5; font-size: 9px; font-weight: 700; }
+.deviceSettings select { width: 100%; min-height: 34px; padding: 0 10px; border: 1px solid rgba(222, 183, 230, 0.2); border-radius: 9px; outline: none; background: #211b2b; color: #eee3f2; font: inherit; font-size: 10px; }
+.deviceSettings select:focus-visible, .remoteVoiceMute:focus-visible { outline: 2px solid #e1a2db; outline-offset: 2px; }
+.deviceSettings select:disabled { opacity: .55; }
+.deviceSettings p { grid-column: 1 / -1; margin: 0; color: #908398; font-size: 9px; }
 .disabledButton { display: flex; align-items: center; justify-content: center; gap: 7px; flex: 0 0 auto; padding: 11px 13px; border: 1px solid rgba(234, 198, 237, 0.1); border-radius: 10px; background: rgba(255, 255, 255, 0.04); color: #77717f; font-size: 10px; font-weight: 700; cursor: not-allowed; }
 
 .queueCard, .membersCard { border-radius: 21px; padding: 23px 20px; }
-.queueCard { min-height: 387px; display: flex; flex-direction: column; }
+.queueCard { min-height: 320px; display: flex; flex-direction: column; }
 .cardHeader { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 18px; }
 .cardHeader h2 { margin: 3px 0 0; font-size: 21px; }
 .countBadge { flex: 0 0 auto; padding: 6px 9px; border: 1px solid rgba(209, 166, 226, 0.2); border-radius: 999px; color: #dfb8ed; background: rgba(164, 95, 196, 0.1); font-size: 10px; font-weight: 800; }
@@ -201,19 +207,18 @@
 .primaryButton, .removeButton, .modalSubmit { width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 43px; border-radius: 11px; font-size: 11px; font-weight: 800; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease; }
 .primaryButton, .modalSubmit { border: 1px solid rgba(255, 197, 234, 0.18); color: #fff7ff; background: linear-gradient(100deg, #a962b3, #d37dae 67%, #e38eae); box-shadow: 0 9px 25px rgba(163, 70, 144, 0.22); }
 .primaryButton:hover, .modalSubmit:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(186, 83, 159, 0.31); }
-.primaryButton svg:last-child { margin-left: auto; }
-.primaryButton svg:first-child { margin-left: auto; }
 .removeButton { border: 1px solid rgba(225, 158, 205, 0.22); color: #e8b8d6; background: rgba(152, 76, 126, 0.09); }
 .removeButton:hover { background: rgba(152, 76, 126, 0.17); }
 .queueNote { display: flex; align-items: flex-start; gap: 6px; margin: 11px 0 0; color: #888092; font-size: 9px; line-height: 1.5 !important; }
 .queueNote svg { flex: 0 0 auto; margin-top: 1px; }
-.membersCard { min-height: 190px; }
+.membersCard { min-height: 165px; }
 .memberCount { color: #867d91; font-size: 10px; white-space: nowrap; }
 .memberList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 8px; }
 .member { display: flex; align-items: center; gap: 7px; min-width: 0; color: #d6cede; font-size: 10px; }
 .member > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memberAvatar { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 9px; color: #1b1730; font-size: 8px; font-weight: 900; }
 .memberDot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: #78cfaa; }
+.memberSpeaking { width: 8px; height: 8px; background: #f3a2d9; box-shadow: 0 0 0 4px rgba(243, 162, 217, .12), 0 0 12px rgba(243, 162, 217, .72); }
 
 .cover { position: relative; display: grid; place-items: center; flex: 0 0 62px; width: 62px; height: 62px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06); }
 .cover::before { content: ""; position: absolute; width: 78%; height: 78%; top: -25%; right: -18%; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%; }
@@ -251,20 +256,21 @@
 .modalNotice { display: flex; align-items: flex-start; gap: 8px; margin: 19px 0 13px; padding: 10px; border: 1px solid rgba(209, 175, 229, 0.14); border-radius: 9px; background: rgba(129, 94, 154, 0.11); color: #bcadc9; font-size: 10px; line-height: 1.5; }
 .modalNotice svg { flex: 0 0 auto; }
 .modalSubmit:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.createRoomSubmit { margin-top: 14px; }
 .modalSubmit svg { margin-left: 2px; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 1250px) {
-  .mainGrid { grid-template-columns: minmax(0, 1.45fr) minmax(285px, 0.9fr); }
+  .mainGrid { grid-template-columns: minmax(0, 1.4fr) minmax(285px, 0.9fr); }
   .deviceCard { flex-wrap: wrap; }
-  .disabledButton { margin-left: 85px; }
+  .disabledButton { margin-left: 0; }
 }
 
 @media (max-width: 950px) {
   .mainGrid { grid-template-columns: 1fr; }
   .rightColumn { display: grid; grid-template-columns: 1.1fr 0.9fr; align-items: start; }
-  .queueCard { min-height: 340px; }
-  .deviceCard { flex-wrap: nowrap; }
+  .queueCard { min-height: 310px; }
+  .deviceCard { flex-wrap: wrap; }
   .disabledButton { margin-left: 0; }
 }
 
@@ -274,7 +280,7 @@
   .intro h1 { font-size: clamp(29px, 8vw, 38px); }
   .intro p { font-size: 11px; }
   .roomChip { padding: 8px 11px; }
-  .stage { min-height: 545px; padding: 17px 16px 17px; border-radius: 19px; }
+  .stage { min-height: 460px; padding: 17px 16px 17px; border-radius: 19px; }
   .stageRoom { display: none; }
   .stagePerformer { margin-top: 30px; }
   .lyrics { min-height: 175px; }
@@ -330,22 +336,29 @@
 .roomsSectionHeader h2 { margin: 4px 0 0; font-size: 23px; }
 .roomGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .roomCard { display: flex; min-width: 0; flex-direction: column; padding: 17px; border: 1px solid rgba(225, 204, 240, 0.09); border-radius: 15px; background: linear-gradient(145deg, rgba(42, 34, 53, 0.9), rgba(27, 24, 37, 0.96)); }
+.privateRoomCard { border-color: rgba(215, 177, 118, 0.2); background: linear-gradient(145deg, rgba(48, 39, 51, 0.94), rgba(29, 25, 37, 0.98)); }
 .roomCardTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .roomCardIcon { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 12px; background: rgba(185, 115, 197, 0.14); color: #e2afe8; }
+.privateRoomIcon { background: rgba(211, 170, 105, 0.12); color: #e1c18f; }
 .roomStatusLive, .roomStatusWaiting { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid rgba(116, 207, 170, 0.18); border-radius: 999px; background: rgba(79, 173, 130, 0.08); color: #9be0bd; font-size: 9px; font-weight: 750; white-space: nowrap; }
 .roomStatusLive i, .roomStatusWaiting i { width: 5px; height: 5px; border-radius: 50%; background: #7dd8ab; box-shadow: 0 0 8px rgba(125, 216, 171, 0.7); }
 .roomStatusWaiting { border-color: rgba(211, 177, 128, 0.2); background: rgba(211, 177, 128, 0.07); color: #e1c18f; }
 .roomStatusWaiting i { background: #e1c18f; box-shadow: none; }
+.roomStatusPrivate { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid rgba(211, 177, 128, 0.24); border-radius: 999px; background: rgba(211, 177, 128, 0.09); color: #e4c796; font-size: 9px; font-weight: 750; white-space: nowrap; }
 .roomCard h3 { overflow: hidden; margin: 15px 0 4px; color: #f7f0f8; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .roomHost { margin: 0; color: #93899d; font-size: 10px; }
 .roomHost strong { color: #d4c7dc; font-weight: 650; }
 .roomSong { display: flex; min-width: 0; flex-direction: column; gap: 5px; margin: 17px 0 14px; padding: 10px; border: 1px solid rgba(226, 197, 236, 0.07); border-radius: 10px; background: rgba(255, 255, 255, 0.025); }
 .roomSong span { color: #a98fba; font-size: 8px; font-weight: 800; letter-spacing: 0.13em; }
 .roomSong strong { overflow: hidden; color: #e8dfe9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.privateRoomAccess { border-color: rgba(211, 177, 128, 0.13); background: rgba(211, 177, 128, 0.035); }
+.privateRoomAccess span { color: #c4a978; }
 .roomMetaRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9990a4; font-size: 9px; }
 .roomMetaRow span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .roomJoinButton { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 37px; margin-top: 16px; border: 1px solid rgba(219, 174, 230, 0.2); border-radius: 9px; background: rgba(186, 111, 193, 0.1); color: #e9c4ed; cursor: pointer; font-size: 10px; font-weight: 800; }
 .roomJoinButton:hover { background: rgba(186, 111, 193, 0.19); }
+.privateRoomJoinButton { border-color: rgba(211, 177, 128, 0.3); background: rgba(211, 177, 128, 0.09); color: #e4c796; }
+.privateRoomJoinButton:hover { background: rgba(211, 177, 128, 0.16); }
 .roomsEmpty { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #91869b; font-size: 11px; }
 .roomsEmpty strong { color: #e6d9ed; font-size: 14px; }
 .roomTextInput { width: 100%; min-height: 40px; padding: 0 11px; border: 1px solid rgba(226, 197, 236, 0.18); border-radius: 9px; outline: 0; background: #292334; color: #f9f2fb; font-size: 11px; }
@@ -354,6 +367,60 @@
 .visibilityChoice { display: flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 10px; border: 1px solid rgba(224, 196, 233, 0.12); border-radius: 9px; background: rgba(255, 255, 255, 0.025); color: #b8a9c0; cursor: pointer; font-size: 10px; }
 .visibilityChoice svg:last-child { margin-left: auto; }
 .visibilitySelected { border-color: rgba(224, 150, 221, 0.55); background: rgba(184, 98, 186, 0.14); color: #edc5eb; }
+
+.roomsMessage { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 24px; color: #a9a3ba; font-size: 12px; text-align: center; }
+.roomsMessage strong { color: #f1e7f6; font-size: 15px; }
+.roomsMessage > span { max-width: 520px; line-height: 1.6; }
+.roomRetryButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; margin-top: 6px; padding: 0 12px; border: 1px solid rgba(219, 174, 230, 0.2); border-radius: 9px; background: rgba(186, 111, 193, 0.1); color: #e9c4ed; cursor: pointer; font-size: 10px; font-weight: 750; text-decoration: none; }
+.roomRetryButton:hover { background: rgba(186, 111, 193, 0.2); }
+.formError { margin: 10px 0 0; color: #ffaaa9; font-size: 11px; line-height: 1.5; }
+.inviteHelp { margin: 0 0 15px; color: #b8aabe; font-size: 11px; line-height: 1.6; }
+.inviteValue { overflow-wrap: anywhere; margin-bottom: 15px; padding: 10px; border: 1px solid rgba(226, 197, 236, 0.1); border-radius: 9px; background: rgba(255, 255, 255, 0.03); color: #d9cbe1; font-size: 10px; }
+.inviteCodeRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.inviteCode { overflow-wrap: anywhere; color: #f3d8f1; font-size: 14px; letter-spacing: 0.08em; }
+.invitePanel { display: flex; width: min(460px, 100%); flex-direction: column; align-items: stretch; gap: 10px; margin: 40px auto; padding: 25px; border: 1px solid var(--line); border-radius: 20px; background: rgba(24, 22, 34, 0.92); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25); }
+.invitePanel > .roomCardIcon { align-self: flex-start; }
+.invitePanel h1 { margin: 0; color: #f9f5ff; font-size: 26px; }
+.invitePanel p { margin: 0 0 7px; color: #a9a3ba; font-size: 11px; line-height: 1.6; }
+.roomActions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.leaveRoomButton { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid rgba(219, 174, 230, 0.16); border-radius: 10px; background: rgba(26, 23, 39, 0.8); color: #d7c7df; cursor: pointer; font-size: 10px; font-weight: 700; }
+.leaveRoomButton:disabled { opacity: 0.55; cursor: wait; }
+.roomIdleStage { min-height: 500px; }
+.idleStageContent { position: relative; z-index: 1; display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 28px 20px; text-align: center; }
+.idleStageIcon { display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 22px; border: 1px solid rgba(232, 171, 229, 0.27); border-radius: 22px; background: rgba(177, 102, 200, 0.14); color: #e9bce9; box-shadow: 0 0 45px rgba(193, 106, 194, 0.14); }
+.idleStageContent h2 { margin: 8px 0; color: #f8eff9; font-size: clamp(23px, 2.2vw, 32px); letter-spacing: -0.035em; }
+.idleStageContent p { max-width: 420px; margin: 0; color: #a99bb2; font-size: 11px; line-height: 1.7; }
+.roomLyrics { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(100%, 700px); min-height: 92px; margin-top: 15px; padding: 0 12px; text-align: center; }
+.roomLyrics span { max-width: 100%; overflow: hidden; color: rgba(242, 221, 245, .48); font-size: clamp(11px, 1vw, 14px); text-overflow: ellipsis; white-space: nowrap; }
+.roomLyrics strong { max-width: 100%; color: #fff7ff; font-size: clamp(18px, 2vw, 26px); font-weight: 800; letter-spacing: -.025em; line-height: 1.35; text-shadow: 0 0 28px rgba(238, 149, 214, .48); text-wrap: balance; }
+.roomLyricsPlain { max-width: min(100%, 640px); margin-top: 14px; color: rgba(235, 220, 240, .72); font-size: 12px; line-height: 1.7; }
+.roomPlaybackControls { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 12px 0; }
+.roomPlaybackControls .playbackButton { min-height: 34px; }
+.remoteVoiceControl { position: relative; z-index: 1; display: flex; align-items: center; gap: 9px; width: min(100%, 410px); margin: 0 auto 8px; padding: 7px 10px; border: 1px solid rgba(228, 190, 235, 0.14); border-radius: 11px; background: rgba(255, 255, 255, 0.035); }
+.remoteVoiceName { min-width: 0; flex: 1; overflow: hidden; color: #e9d9ee; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.remoteVoiceMute { display: grid; flex: 0 0 28px; place-items: center; width: 28px; height: 28px; border: 1px solid rgba(221, 183, 230, 0.2); border-radius: 8px; background: rgba(173, 120, 190, 0.12); color: #edc5ec; cursor: pointer; }
+.remoteVoiceVolume { display: flex; width: 90px; }
+.remoteVoiceVolume input { width: 100%; accent-color: #dc91cc; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.roomIdleStage .stageSong { margin-top: 0; }
+.roomIdleStage .stageSong small { color: #a98fba; font-size: 8px; font-weight: 800; letter-spacing: 0.13em; text-align: left; }
+.roomIdleStage .stageSong strong { max-width: min(60vw, 510px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.queueEmpty { display: flex; min-height: 135px; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: #93899d; font-size: 10px; text-align: center; }
+.queueEmpty svg { color: #b58ac6; }
+.queueEmpty strong { color: #e9dff0; font-size: 12px; }
+.queueEmpty span { max-width: 210px; line-height: 1.5; }
+.queueRemoveIcon { display: grid; flex: 0 0 29px; place-items: center; width: 29px; height: 29px; border: 1px solid rgba(239, 141, 154, 0.18); border-radius: 8px; background: rgba(173, 63, 84, 0.08); color: #e5a6b2; cursor: pointer; }
+.queueRemoveIcon:disabled { opacity: 0.5; cursor: wait; }
+.memberName { display: flex; min-width: 0; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberName small { margin-top: 2px; color: #a995b3; font-size: 8px; }
+.submitArrow { transform: rotate(180deg); }
+
+@media (max-width: 700px) {
+  .roomActions { justify-content: flex-start; width: 100%; }
+  .roomIdleStage { min-height: 430px; }
+  .invitePanel { margin: 24px auto; padding: 21px 17px; }
+  .deviceSettings { margin-left: 0; }
+}
 
 @media (max-width: 950px) {
   .roomGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -374,6 +441,9 @@
   .soloCatalog { padding: 16px 12px; }
   .soloCatalogHeader { align-items: flex-start; flex-direction: column; gap: 5px; }
   .roomMetaRow { font-size: 8px; }
+  .deviceSettings { grid-template-columns: 1fr; }
+  .deviceSettings p { grid-column: auto; }
+  .remoteVoiceVolume { width: 70px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

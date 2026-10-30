@@ -14,6 +14,7 @@
     "driver.js": "^1.9.0",
     "i18next": "^26.4.2",
     "lucide-react": "^0.446.0",
+    "mediasoup-client": "3.25.3",
     "next": "16.3.1",
     "page-mascot": "^0.1.0",
     "react": "19.2.8",
