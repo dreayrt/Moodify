@@ -46,6 +46,17 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith("/dashboard")) {
     // 1. Neu chua dang nhap (khong co token trong cookie)
     if (!tokenCookie) {
+      // Dashboard nghe nhac la trang dung thu cong khai; trang goc /dashboard
+      // se chuyen tiep den /dashboard/user trong app/dashboard/page.tsx.
+      if (
+        pathname === "/dashboard" ||
+        pathname === "/dashboard/" ||
+        pathname === "/dashboard/user" ||
+        pathname === "/dashboard/user/"
+      ) {
+        return NextResponse.next();
+      }
+
       const homeUrl = new URL("/", request.url);
       homeUrl.searchParams.set("auth", "signin");
       homeUrl.searchParams.set("redirect", pathname + request.nextUrl.search);

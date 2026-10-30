@@ -177,6 +177,7 @@ export type KaraokeRoomPlayback = {
   startedAt: string | null;
   version: number;
   serverTimeMs: number;
+  playbackRunId: string | null;
 };
 
 export type KaraokeVoiceTicket = {
@@ -230,6 +231,21 @@ export type KaraokePitchFeatures = {
   recording_start_offset_ms: number;
   capture_latency_ms: number;
   allow_octave_shift: boolean;
+};
+
+export type KaraokeRoomScoreSession = {
+  sessionId: string;
+  playbackRunId: string;
+  songId: string;
+  status: "collecting" | "scoring" | "completed" | "failed";
+  ended: boolean;
+  participantCount: number;
+  score: { status?: string; score?: { overall: number } | null } | null;
+};
+
+export type KaraokeRoomPitchSegment = {
+  offset_ms: number;
+  features: KaraokePitchFeatures;
 };
 
 export type LibraryTrack = Track & {
@@ -525,7 +541,7 @@ export async function fetchKaraokeTracks(options?: {
 
 async function karaokeRoomRequest<T>(
   path: string,
-  options: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {},
+  options: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown } = {},
 ): Promise<T> {
   const token = await getValidAccessToken().catch(() => null);
   if (!token) throw new KaraokeRoomApiError("Vui lòng đăng nhập để dùng phòng Karaoke.", 401, "AUTHENTICATION_REQUIRED");
@@ -612,6 +628,39 @@ export function createKaraokeVoiceTicket(roomId: number): Promise<KaraokeVoiceTi
   return karaokeRoomRequest<KaraokeVoiceTicket>(`/karaoke/rooms/${roomId}/voice-ticket`, {
     method: "POST",
   });
+}
+
+export function startKaraokeRoomScoreSession(roomId: number): Promise<KaraokeRoomScoreSession> {
+  return karaokeRoomRequest<KaraokeRoomScoreSession>(`/karaoke/rooms/${roomId}/score-sessions/current`, { method: "POST" });
+}
+
+export function registerKaraokeRoomScoreParticipant(roomId: number, sessionId: string): Promise<KaraokeRoomScoreSession> {
+  return karaokeRoomRequest<KaraokeRoomScoreSession>(
+    `/karaoke/rooms/${roomId}/score-sessions/${encodeURIComponent(sessionId)}/participants/me`, { method: "POST" },
+  );
+}
+
+export function submitKaraokeRoomContribution(input: {
+  roomId: number;
+  sessionId: string;
+  segments: KaraokeRoomPitchSegment[];
+}): Promise<KaraokeRoomScoreSession> {
+  return karaokeRoomRequest<KaraokeRoomScoreSession>(
+    `/karaoke/rooms/${input.roomId}/score-sessions/${encodeURIComponent(input.sessionId)}/contribution`,
+    { method: "PUT", body: { segments: input.segments } },
+  );
+}
+
+export function finishKaraokeRoomScoreSession(roomId: number, sessionId: string): Promise<KaraokeRoomScoreSession> {
+  return karaokeRoomRequest<KaraokeRoomScoreSession>(
+    `/karaoke/rooms/${roomId}/score-sessions/${encodeURIComponent(sessionId)}/finish`, { method: "POST" },
+  );
+}
+
+export function fetchKaraokeRoomScoreSession(roomId: number, sessionId: string): Promise<KaraokeRoomScoreSession> {
+  return karaokeRoomRequest<KaraokeRoomScoreSession>(
+    `/karaoke/rooms/${roomId}/score-sessions/${encodeURIComponent(sessionId)}`,
+  );
 }
 
 export function getKaraokeRoomSocketUrl(): string {

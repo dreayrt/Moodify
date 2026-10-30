@@ -54,8 +54,10 @@ type KaraokeScoreState =
   | "completed"
   | "error";
 
-type PitchCaptureSummary = Pick<KaraokePitchFeatures,
-  "duration_seconds" | "rms_dbfs" | "clipped_fraction"> & { frame_count: number };
+type PitchCaptureSummary = Pick<
+  KaraokePitchFeatures,
+  "duration_seconds" | "rms_dbfs" | "clipped_fraction"
+> & { frame_count: number };
 
 const LRC_TIMESTAMP = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
 
@@ -177,7 +179,10 @@ export default function KaraokeSoloPage() {
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingAudioContextRef = useRef<AudioContext | null>(null);
   const pitchProcessorRef = useRef<AudioWorkletNode | null>(null);
-  const pitchFeaturesRef = useRef<{ f0_hz: Array<number | null>; voiced_probability: number[] }>({
+  const pitchFeaturesRef = useRef<{
+    f0_hz: Array<number | null>;
+    voiced_probability: number[];
+  }>({
     f0_hz: [],
     voiced_probability: [],
   });
@@ -210,9 +215,10 @@ export default function KaraokeSoloPage() {
     if (!scoreDialogOpen) return;
 
     const previousOverflow = document.body.style.overflow;
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     document.body.style.overflow = "hidden";
 
     const focusFrame = window.requestAnimationFrame(() => {
@@ -277,7 +283,8 @@ export default function KaraokeSoloPage() {
     recordingStreamRef.current = null;
     const context = recordingAudioContextRef.current;
     recordingAudioContextRef.current = null;
-    if (context && context.state !== "closed") void context.close().catch(() => undefined);
+    if (context && context.state !== "closed")
+      void context.close().catch(() => undefined);
   }, []);
 
   const cancelScoring = useCallback(() => {
@@ -318,17 +325,21 @@ export default function KaraokeSoloPage() {
     setScoreMessage("Bài hát đã kết thúc. Đang chốt điểm…");
     setScoreError("");
     try {
-      const summary = await new Promise<PitchCaptureSummary>((resolve, reject) => {
-        const timeoutId = window.setTimeout(
-          () => reject(new Error("Không thể hoàn tất phân tích âm thanh.")),
-          5_000,
-        );
-        pitchSummaryWaiterRef.current = { resolve, reject, timeoutId };
-        processor.port.postMessage({ type: "finalize" });
-      });
+      const summary = await new Promise<PitchCaptureSummary>(
+        (resolve, reject) => {
+          const timeoutId = window.setTimeout(
+            () => reject(new Error("Không thể hoàn tất phân tích âm thanh.")),
+            5_000,
+          );
+          pitchSummaryWaiterRef.current = { resolve, reject, timeoutId };
+          processor.port.postMessage({ type: "finalize" });
+        },
+      );
       const captured = pitchFeaturesRef.current;
-      if (captured.f0_hz.length !== summary.frame_count
-          || captured.voiced_probability.length !== summary.frame_count) {
+      if (
+        captured.f0_hz.length !== summary.frame_count ||
+        captured.voiced_probability.length !== summary.frame_count
+      ) {
         throw new Error("Dữ liệu âm thanh chưa đầy đủ để tính điểm.");
       }
       const features: KaraokePitchFeatures = {
@@ -376,7 +387,8 @@ export default function KaraokeSoloPage() {
       recordingStreamRef.current = null;
       const context = recordingAudioContextRef.current;
       recordingAudioContextRef.current = null;
-      if (context && context.state !== "closed") void context.close().catch(() => undefined);
+      if (context && context.state !== "closed")
+        void context.close().catch(() => undefined);
       activeScoreSessionRef.current = null;
       pitchFeaturesRef.current = { f0_hz: [], voiced_probability: [] };
     }
@@ -401,7 +413,9 @@ export default function KaraokeSoloPage() {
       }
       if (typeof AudioWorkletNode === "undefined" || !window.AudioContext) {
         setScoreState("error");
-        setScoreError("Trình duyệt này chưa hỗ trợ chấm điểm nhanh. Hãy dùng Chrome hoặc Edge mới.");
+        setScoreError(
+          "Trình duyệt này chưa hỗ trợ chấm điểm nhanh. Hãy dùng Chrome hoặc Edge mới.",
+        );
         return;
       }
       scoreStartLockRef.current = true;
@@ -431,11 +445,15 @@ export default function KaraokeSoloPage() {
         recordingAudioContextRef.current = context;
         await context.audioWorklet.addModule("/karaoke-pitch-worklet.js");
         const source = context.createMediaStreamSource(stream);
-        const processor = new AudioWorkletNode(context, "karaoke-pitch-processor", {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [1],
-        });
+        const processor = new AudioWorkletNode(
+          context,
+          "karaoke-pitch-processor",
+          {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [1],
+          },
+        );
         const mute = context.createGain();
         mute.gain.value = 0;
         source.connect(processor);
@@ -455,14 +473,24 @@ export default function KaraokeSoloPage() {
             clipped_fraction?: number;
             frame_count?: number;
           };
-          if (message.type === "features" && message.f0_hz && message.voiced_probability) {
+          if (
+            message.type === "features" &&
+            message.f0_hz &&
+            message.voiced_probability
+          ) {
             pitchFeaturesRef.current.f0_hz.push(...message.f0_hz);
-            pitchFeaturesRef.current.voiced_probability.push(...message.voiced_probability);
+            pitchFeaturesRef.current.voiced_probability.push(
+              ...message.voiced_probability,
+            );
           } else if (message.type === "summary") {
             const waiter = pitchSummaryWaiterRef.current;
-            if (waiter && message.duration_seconds !== undefined
-                && message.rms_dbfs !== undefined && message.clipped_fraction !== undefined
-                && message.frame_count !== undefined) {
+            if (
+              waiter &&
+              message.duration_seconds !== undefined &&
+              message.rms_dbfs !== undefined &&
+              message.clipped_fraction !== undefined &&
+              message.frame_count !== undefined
+            ) {
               window.clearTimeout(waiter.timeoutId);
               pitchSummaryWaiterRef.current = null;
               waiter.resolve(message as PitchCaptureSummary);
@@ -701,15 +729,6 @@ export default function KaraokeSoloPage() {
           </h1>
           <p>Chọn một bài đã được chuẩn bị để bắt đầu karaoke.</p>
         </div>
-        <div className={styles.roomChip}>
-          <span className={styles.roomChipIcon}>
-            <Mic2 size={18} />
-          </span>
-          <span>
-            <strong>Hát một mình</strong>
-            <small>Kho bài karaoke</small>
-          </span>
-        </div>
       </section>
 
       <div className={styles.previewBanner} role="note">
@@ -805,7 +824,6 @@ export default function KaraokeSoloPage() {
                       className={styles.soloLyricPreview}
                       key={`${song.songId}:upcoming:${upcomingLyric.startMs}`}
                     >
-                   
                       <span>{upcomingLyric.text}</span>
                     </p>
                   ) : null}

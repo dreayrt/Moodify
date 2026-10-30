@@ -3,10 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Headphones,
-  Laptop,
   Play,
-  Radio,
 } from "lucide-react";
 
 import { BrandLogo } from "@/components/shared/logo-mark";
@@ -115,48 +112,6 @@ export default function Home() {
                 </div>
               </button>
             ))}
-          </div>
-        </section>
-
-        {/* Feature Highlights - 3 Asymmetric Editorial Cards */}
-        <section className="grid gap-5 md:grid-cols-3">
-          {/* Card 1 */}
-          <div className="flex flex-col gap-3.5 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/20">
-              <Headphones className="h-5 w-5" />
-            </div>
-            <h3 className="font-display text-base sm:text-lg font-bold text-white">
-              Bắt trọn nhịp cảm xúc
-            </h3>
-            <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Nhận diện và phân tích tâm trạng theo thời gian thực để gợi ý danh sách nhạc tương thích, không mất thời gian tìm kiếm.
-            </p>
-          </div>
-
-          {/* Card 2 */}
-          <div className="flex flex-col gap-3.5 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">
-              <Laptop className="h-5 w-5" />
-            </div>
-            <h3 className="font-display text-lg font-bold text-white">
-              Đồng bộ đa thiết bị
-            </h3>
-            <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Trải nghiệm liền mạch từ không gian làm việc trên máy tính tới tai nghe di động khi di chuyển ngoài đường.
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div className="flex flex-col gap-3.5 rounded-2xl border border-white/8 bg-white/[0.02] p-6 sm:p-7 hover:border-white/15 transition">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20">
-              <Radio className="h-5 w-5" />
-            </div>
-            <h3 className="font-display text-lg font-bold text-white">
-              Không gian nghệ sĩ độc lập
-            </h3>
-            <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Creator Studio hỗ trợ nghệ sĩ tải lên bài hát, tiếp cận cộng đồng thính giả có cùng rung cảm âm nhạc.
-            </p>
           </div>
         </section>
 

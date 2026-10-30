@@ -52,6 +52,8 @@ import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
 import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
 import { usePlayer } from "./player-context";
+import { HeroCarousel } from "@/features/home/components/hero-carousel";
+import UserFeatureHighlights from "@/features/dashboard/user/components/user-feature-highlights";
 
 export type Vibe = {
   id: string;
@@ -1144,28 +1146,51 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
-            <button
-              type="button"
-              onClick={() => triggerUserTour()}
-              className="p-2 rounded-xl text-white/60 hover:text-purple-300 hover:bg-white/5 transition-all cursor-pointer relative group"
-              title="Xem hướng dẫn sử dụng"
-            >
-              <HelpCircle className="w-[18px] h-[18px] transition-transform group-hover:scale-110" />
-            </button>
+            {userLoading ? (
+              <span className="h-9 w-28 animate-pulse rounded-full border border-white/10 bg-white/5" />
+            ) : user ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => triggerUserTour()}
+                  className="p-2 rounded-xl text-white/60 hover:text-purple-300 hover:bg-white/5 transition-all cursor-pointer relative group"
+                  title="Xem hướng dẫn sử dụng"
+                >
+                  <HelpCircle className="w-[18px] h-[18px] transition-transform group-hover:scale-110" />
+                </button>
 
-            <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
-            <HeaderMessages isPremium={Boolean(subInfo?.isPremium)} />
+                <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
+                <HeaderMessages isPremium={Boolean(subInfo?.isPremium)} />
 
-            <div className="w-px h-5 bg-white/10 mx-0.5 hidden sm:block" />
+                <div className="w-px h-5 bg-white/10 mx-0.5 hidden sm:block" />
 
-            <div id="tour-mascot-profile">
-              <MascotAccountTrigger
-                user={user}
-                loading={userLoading}
-                subInfo={subInfo}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-              />
-            </div>
+                <div id="tour-mascot-profile">
+                  <MascotAccountTrigger
+                    user={user}
+                    loading={userLoading}
+                    subInfo={subInfo}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }))}
+                  className="inline-flex h-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] px-3.5 text-xs font-semibold text-white/80 transition hover:border-purple-300/45 hover:bg-white/[0.08] hover:text-white sm:px-4"
+                >
+                  Đăng nhập
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "register" } }))}
+                  className="inline-flex h-9 items-center justify-center rounded-full bg-gradient-to-r from-fuchsia-500 to-orange-400 px-3.5 text-xs font-bold text-white shadow-[0_5px_20px_rgba(217,70,239,0.22)] transition hover:brightness-110 sm:px-4"
+                >
+                  Đăng ký
+                </button>
+              </>
+            )}
           </div>
         </header>
 
@@ -1409,9 +1434,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   DANH SÁCH PHÁT
                 </p>
                 <button
-                  onClick={() => setIsCreateOpen(true)}
+                  onClick={() => {
+                    if (user) {
+                      setIsCreateOpen(true);
+                    } else {
+                      window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "register" } }));
+                    }
+                  }}
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
-                  title="Tạo playlist mới"
+                  title={user ? "Tạo playlist mới" : "Đăng ký để tạo playlist"}
                 >
                   <Plus className={`w-3 h-3 ${navIconClass}`} />
                   <span>Mới</span>
@@ -1448,11 +1479,29 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           {/* Right Column: Page Content */}
           <div className="min-w-0 flex-1">
             {children}
+            {isHome && user ? (
+              <div className="mt-8">
+                <UserFeatureHighlights />
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
 
       {/* Global Create Playlist Modal */}
+      {!userLoading && !user ? (
+        <HeroCarousel
+          authOnly
+          onAuthenticated={(authenticatedUser) => {
+            setUser(authenticatedUser);
+            setUserLoading(false);
+            void refreshPlaylists();
+            void refreshSubscription();
+            void registerCurrentDevice();
+          }}
+        />
+      ) : null}
+
       <CreatePlaylistModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}

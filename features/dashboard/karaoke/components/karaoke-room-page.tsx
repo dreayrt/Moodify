@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -19,7 +20,8 @@ import {
   Play,
   Plus,
   SkipForward,
-  UsersRound,
+  Sparkles,
+  Trophy,
   Volume2,
   VolumeX,
   X,
@@ -41,6 +43,7 @@ import {
 import KaraokeTrackCatalog from "./karaoke-track-catalog";
 import { useKaraokeRoomLive } from "../hooks/use-karaoke-room-live";
 import { useMediasoupRoom } from "../hooks/use-mediasoup-room";
+import { useKaraokeRoomScoring } from "../hooks/use-karaoke-room-scoring";
 import styles from "./karaoke-room-page.module.css";
 
 function initials(name: string): string {
@@ -84,15 +87,24 @@ function clockLabel(milliseconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function safeImageBackground(imageUrl?: string | null): string | null {
+function safeImageSource(imageUrl?: string | null): string | null {
   if (!imageUrl) return null;
+  const cleanedUrl = imageUrl.trim().replaceAll("\\", "/");
+  if (cleanedUrl.startsWith("/") && !cleanedUrl.startsWith("//")) return cleanedUrl;
   try {
-    const url = new URL(imageUrl);
+    const url = new URL(cleanedUrl);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    return `linear-gradient(140deg, rgba(16, 12, 22, .05), rgba(16, 12, 22, .25)), url(${JSON.stringify(url.href)})`;
+    return url.href;
   } catch {
     return null;
   }
+}
+
+function safeImageBackground(imageUrl?: string | null): string | null {
+  const imageSource = safeImageSource(imageUrl);
+  return imageSource
+    ? `linear-gradient(140deg, rgba(16, 12, 22, .05), rgba(16, 12, 22, .25)), url(${JSON.stringify(imageSource)})`
+    : null;
 }
 
 function Cover({
@@ -104,16 +116,40 @@ function Cover({
   imageUrl?: string | null;
   small?: boolean;
 }) {
-  const backgroundImage = safeImageBackground(imageUrl);
+  const imageSource = safeImageSource(imageUrl);
+  const [proxyAttemptFor, setProxyAttemptFor] = useState<string | null>(null);
+  const [failedFor, setFailedFor] = useState<string | null>(null);
+  const usingProxy = imageSource !== null && proxyAttemptFor === imageSource;
+  const imageFailed = imageSource === null || failedFor === imageSource;
+  const visibleImageSource = imageSource && !imageFailed
+    ? usingProxy
+      ? `/api/proxy-image?url=${encodeURIComponent(imageSource)}`
+      : imageSource
+    : null;
+
   return (
     <div
       className={`${styles.cover} ${small ? styles.coverSmall : ""}`}
-      style={backgroundImage ? { backgroundImage } : undefined}
-      role={backgroundImage ? "img" : undefined}
-      aria-label={backgroundImage ? `Ảnh bìa ${title}` : undefined}
-      aria-hidden={backgroundImage ? undefined : true}
+      role="img"
+      aria-label={`Ảnh bìa ${title}`}
     >
-      {!backgroundImage && (
+      {visibleImageSource ? (
+        <img
+          className={styles.coverImage}
+          src={visibleImageSource}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          onError={() => {
+            if (!usingProxy && /^https?:\/\//i.test(imageSource ?? "")) {
+              setProxyAttemptFor(imageSource);
+              return;
+            }
+            setFailedFor(imageSource);
+          }}
+        />
+      ) : (
         <>
           <span className={styles.coverDisc} />
           <span className={styles.coverInitials}>{initials(title)}</span>
@@ -194,6 +230,10 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [connectionError, setConnectionError] = useState("");
+  const [groupScoreOpen, setGroupScoreOpen] = useState(false);
+  const groupScoreCloseRef = useRef<HTMLButtonElement | null>(null);
+  const groupScoreActionRef = useRef<HTMLButtonElement | null>(null);
+  const lastOpenedScoreSessionRef = useRef("");
 
   const applyRoomSnapshot = useCallback((snapshot: KaraokeRoomDetail, requestStartedAt = Date.now()) => {
     const receivedAt = Date.now();
@@ -371,6 +411,52 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       ? Math.max(0, clockNow + serverOffsetMs - playback.serverTimeMs)
       : Math.max(0, clockNow - snapshotAt);
   const currentPositionMs = playback ? playback.positionMs + playingElapsedMs : 0;
+  const roomScoring = useKaraokeRoomScoring({
+    roomId: numericRoomId,
+    playbackRunId: playback?.playbackRunId ?? null,
+    songId: currentTrack?.trackId ?? null,
+    songTitle: currentTrack?.title ?? null,
+    durationMs: currentTrack?.durationMs ?? null,
+    playbackStatus: playback?.status ?? "IDLE",
+    positionMs: currentPositionMs,
+    microphoneStream: voice.microphoneStream,
+    enabled: joined && !inviteRequired && !pageError,
+  });
+
+  useEffect(() => {
+    if (roomScoring.score === null || !roomScoring.scoreSessionId
+        || lastOpenedScoreSessionRef.current === roomScoring.scoreSessionId) return;
+    lastOpenedScoreSessionRef.current = roomScoring.scoreSessionId;
+    setGroupScoreOpen(true);
+  }, [roomScoring.score, roomScoring.scoreSessionId]);
+
+  useEffect(() => {
+    if (!groupScoreOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusFrame = window.requestAnimationFrame(() => groupScoreCloseRef.current?.focus());
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setGroupScoreOpen(false);
+      } else if (event.key === "Tab") {
+        const closeButton = groupScoreCloseRef.current;
+        const actionButton = groupScoreActionRef.current;
+        if (event.shiftKey && document.activeElement === closeButton) {
+          event.preventDefault();
+          actionButton?.focus();
+        } else if (!event.shiftKey && document.activeElement === actionButton) {
+          event.preventDefault();
+          closeButton?.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [groupScoreOpen]);
   const lyricCues = parseLyricCues(currentTrack?.lyricsSynced);
   let activeLyricIndex = -1;
   for (let index = 0; index < lyricCues.length; index += 1) {
@@ -631,15 +717,6 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           </p>
         </div>
         <div className={styles.roomActions}>
-          <div className={styles.roomChip}>
-            <span className={styles.roomChipIcon}>
-              {room.visibility === "PRIVATE" ? <LockKeyhole size={17} /> : <UsersRound size={17} />}
-            </span>
-            <span>
-              <strong>{room.visibility === "PRIVATE" ? "Phòng riêng" : "Phòng công khai"}</strong>
-              <small>{connectionError || (connected ? "Dữ liệu đang đồng bộ trực tiếp" : "Đang kết nối…")}{voice.connected ? " · Media đã kết nối" : ""}</small>
-            </span>
-          </div>
           {room.canManage && (
             <button
               type="button"
@@ -658,6 +735,9 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           >
             <DoorOpen size={14} /> Rời phòng
           </button>
+          <span className={styles.visuallyHidden} role="status" aria-live="polite">
+            {connectionError || (connected ? "Dữ liệu đang đồng bộ trực tiếp" : "Đang kết nối…")}{voice.connected ? " · Media đã kết nối" : ""}
+          </span>
         </div>
       </section>
 
@@ -730,7 +810,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               </button>
             </div>
             {audioError && <p className={styles.playbackError} role="status">{audioError}</p>}
-            <audio ref={audioRef} preload="auto" data-karaoke-room-audio="instrumental" />
+            <audio ref={audioRef} preload="auto" data-karaoke-room-audio="instrumental" onEnded={roomScoring.trackEnded} />
             {voice.remoteVoices.map((remote) => {
               const settings = remoteAudioSettings[remote.userId] ?? { muted: false, volume: 1 };
               const memberName = room.members.find((member) => String(member.userId) === remote.userId)?.name ?? `Thành viên ${remote.userId}`;
@@ -925,6 +1005,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           <span className={styles.sectionKicker}>TRƯỚC KHI LÊN SÂN KHẤU</span>
           <h2 id="device-heading">Thiết bị âm thanh</h2>
           <p>{voice.connected ? "Âm thanh phòng đã kết nối. Micro luôn tắt cho đến khi bạn chủ động bật." : "Đang kết nối máy chủ voice mediasoup; micro mặc định tắt."}</p>
+          <p>Phần cao độ từ micro đang bật được ghép vào một điểm chung cho cả phòng sau khi bài hát kết thúc.</p>
           {voice.voiceError && <p className={styles.micError} role="status">{voice.voiceError}</p>}
         </div>
         <button
@@ -1055,6 +1136,74 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           </div>
         </div>
       )}
+
+      {groupScoreOpen && roomScoring.score !== null && typeof document !== "undefined"
+        ? createPortal(
+        <div
+          className={styles.roomScoreBackdrop}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setGroupScoreOpen(false);
+          }}
+        >
+          <section
+            className={styles.roomScoreModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="room-score-title"
+            aria-describedby="room-score-description"
+          >
+            <button
+              ref={groupScoreCloseRef}
+              type="button"
+              className={styles.roomScoreClose}
+              onClick={() => setGroupScoreOpen(false)}
+              aria-label="Đóng kết quả điểm chung"
+            >
+              <X size={17} />
+            </button>
+            <div className={styles.roomScoreHeading}>
+              <span className={styles.roomScoreMark}><Trophy size={19} strokeWidth={1.8} /></span>
+              <span>KẾT QUẢ PHIÊN HÁT CHUNG</span>
+            </div>
+            <h2 id="room-score-title">Cả phòng đã cùng tỏa sáng</h2>
+            <p className={styles.roomScoreSong} title={roomScoring.scoreSongTitle}>
+              {roomScoring.scoreSongTitle}
+            </p>
+            <div
+              className={styles.roomScoreRing}
+              style={{ background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score))}% 100%)` }}
+              role="meter"
+              aria-label="Điểm chung của phòng"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={roomScoring.score}
+            >
+              <div className={styles.roomScoreRingCore}>
+                <span>ĐIỂM CHUNG</span>
+                <strong>{roomScoring.score.toFixed(1)}</strong>
+                <small>trên 100</small>
+              </div>
+            </div>
+            <div className={styles.roomScoreTogether}>
+              <Sparkles size={15} aria-hidden="true" />
+              Một bài hát · Một phiên · Một điểm số cho cả phòng
+            </div>
+            <p id="room-score-description" className={styles.roomScoreDescription}>
+              Điểm được tổng hợp từ các phần hát của thành viên bật micro trong bài này.
+            </p>
+            <button
+              ref={groupScoreActionRef}
+              type="button"
+              className={styles.roomScoreAction}
+              onClick={() => setGroupScoreOpen(false)}
+            >
+              Trở lại phòng hát
+              <ArrowRight size={16} />
+            </button>
+          </section>
+        </div>,
+        document.body,
+      ) : null}
     </main>
   );
 }

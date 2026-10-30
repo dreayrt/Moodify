@@ -57,6 +57,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
   const [connected, setConnected] = useState(false);
   const [ready, setReady] = useState(false);
   const [microphoneOn, setMicrophoneOn] = useState(false);
+  const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(null);
   const [microphoneBusy, setMicrophoneBusy] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [remoteVoices, setRemoteVoices] = useState<RemoteVoice[]>([]);
@@ -113,6 +114,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
     producerRef.current = null;
     micStreamRef.current?.getTracks().forEach((track) => track.stop());
     micStreamRef.current = null;
+    setMicrophoneStream(null);
     sendTransportRef.current?.close();
     recvTransportRef.current?.close();
     sendTransportRef.current = null;
@@ -436,6 +438,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
         producerRef.current = null;
         micStreamRef.current?.getTracks().forEach((track) => track.stop());
         micStreamRef.current = null;
+        setMicrophoneStream(null);
         setMicrophoneOn(false);
         return;
       }
@@ -446,6 +449,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
         : true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
       micStreamRef.current = stream;
+      setMicrophoneStream(stream);
       const transport = sendTransportRef.current ?? await ensureSendTransportRef.current?.();
       if (!transport) throw new Error("Không thể khởi tạo đường truyền micro.");
       const track = stream.getAudioTracks()[0];
@@ -459,6 +463,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
         void requestRef.current?.("close-producer", { producerId: producer.id }).catch(() => undefined);
         micStreamRef.current?.getTracks().forEach((activeTrack) => activeTrack.stop());
         micStreamRef.current = null;
+        setMicrophoneStream(null);
         setMicrophoneOn(false);
         setVoiceError("Micro đã ngắt kết nối. Hãy chọn lại thiết bị rồi bật micro.");
       }, { once: true });
@@ -468,6 +473,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
     } catch (error) {
       micStreamRef.current?.getTracks().forEach((track) => track.stop());
       micStreamRef.current = null;
+      setMicrophoneStream(null);
       setVoiceError(errorMessage(error));
       setMicrophoneOn(false);
     } finally {
@@ -498,6 +504,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
       await producer.replaceTrack({ track });
       const previousStream = micStreamRef.current;
       micStreamRef.current = replacementStream;
+      setMicrophoneStream(replacementStream);
       replacementStream = null;
       selectedInputDeviceRef.current = deviceId;
       setSelectedInputDeviceId(deviceId);
@@ -517,6 +524,7 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
     connected,
     ready,
     microphoneOn,
+    microphoneStream,
     microphoneBusy,
     remoteVoices,
     speakingUserIds,

@@ -197,7 +197,13 @@ function getDashboardPathForRole(role: string) {
   return USER_DASHBOARD_ROUTE;
 }
 
-export function HeroCarousel() {
+type HeroCarouselProps = {
+  /** Render only the existing authentication dialogs for dashboard guests. */
+  authOnly?: boolean;
+  onAuthenticated?: (user: UserProfileResponse) => void;
+};
+
+export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [authUser, setAuthUser] = useState<UserProfileResponse | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -246,14 +252,21 @@ export function HeroCarousel() {
   });
 
   useEffect(() => {
+    if (authOnly) return;
+
     const timer = window.setInterval(() => {
       advanceSlide();
     }, 5500);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [authOnly]);
 
   useEffect(() => {
+    if (authOnly) {
+      setIsHydratingSession(false);
+      return;
+    }
+
     let isCancelled = false;
 
     const hydrateUser = async () => {
@@ -291,7 +304,7 @@ export function HeroCarousel() {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [authOnly]);
 
   useEffect(() => {
     if (!isSignInOpen && !isCreateAccountOpen) {
@@ -406,6 +419,11 @@ export function HeroCarousel() {
     setSelectedPresetAvatar(url);
   };
 
+  const notifyAuthenticated = (currentUser: UserProfileResponse) => {
+    setAuthUser(currentUser);
+    onAuthenticated?.(currentUser);
+  };
+
     const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
@@ -413,7 +431,7 @@ export function HeroCarousel() {
         const auth = await loginWithGoogleRequest(token);
         saveAuthSession(auth);
         const currentUser = await getCurrentUser(auth.accessToken);
-        setAuthUser(currentUser);
+        notifyAuthenticated(currentUser);
         setIsSignInOpen(false);
         setIsCreateAccountOpen(false);
         router.push(getDashboardPathForRole(currentUser.role));
@@ -444,7 +462,7 @@ export function HeroCarousel() {
       const auth = await loginWithFacebookRequest(token);
       saveAuthSession(auth);
       const currentUser = await getCurrentUser(auth.accessToken);
-      setAuthUser(currentUser);
+      notifyAuthenticated(currentUser);
       setIsSignInOpen(false);
       setIsCreateAccountOpen(false);
       router.push(getDashboardPathForRole(currentUser.role));
@@ -475,7 +493,7 @@ export function HeroCarousel() {
 
         saveAuthSession(auth);
         const currentUser = await getCurrentUser(auth.accessToken);
-        setAuthUser(currentUser);
+        notifyAuthenticated(currentUser);
         setCredentials({
           username: "",
           password: "",
@@ -578,7 +596,7 @@ export function HeroCarousel() {
       }
 
       const currentUser = await getCurrentUser(auth.accessToken);
-      setAuthUser(currentUser);
+      notifyAuthenticated(currentUser);
 
       closeCreateAccount();
 
@@ -607,6 +625,19 @@ export function HeroCarousel() {
     setCreateAccountError(null);
     setIsCreateAccountOpen(true);
   };
+
+  useEffect(() => {
+    if (!authOnly) return;
+
+    const handleOpenAuth = (event: Event) => {
+      const mode = (event as CustomEvent<{ mode?: "login" | "register" }>).detail?.mode;
+      if (mode === "login") openSignIn();
+      if (mode === "register") openCreateAccount();
+    };
+
+    window.addEventListener("moodify-open-auth", handleOpenAuth);
+    return () => window.removeEventListener("moodify-open-auth", handleOpenAuth);
+  }, [authOnly, openSignIn, openCreateAccount]);
 
   const closeSignIn = () => {
     setIsSignInOpen(false);
@@ -650,6 +681,54 @@ export function HeroCarousel() {
   const isSignInComplete =
     credentials.username.trim().length > 0 &&
     credentials.password.trim().length > 0;
+
+  const authModals = (
+    <>
+      {isSignInOpen ? (
+        <SignInModal
+          credentials={credentials}
+          errorMessage={signInError}
+          isFormComplete={isSignInComplete}
+          isSubmitting={isSubmittingSignIn}
+          onChange={handleCredentialsChange}
+          onClose={closeSignIn}
+          onSubmit={handleSignInSubmit}
+          onGoogleLogin={handleGoogleLogin}
+          onFacebookLogin={handleFacebookLogin}
+          onOpenCreateAccount={openCreateAccount}
+        />
+      ) : null}
+
+      {isCreateAccountOpen ? (
+        <CreateAccountModal
+          form={createAccountForm}
+          step={createAccountStep}
+          errorMessage={createAccountError}
+          isSubmitting={isSubmittingCreateAccount}
+          avatarFile={avatarFile}
+          avatarPreviewUrl={avatarPreviewUrl}
+          selectedPresetAvatar={selectedPresetAvatar}
+          onChange={handleCreateAccountChange}
+          onRoleChange={handleRoleChange}
+          onAvatarFileSelect={handleAvatarFileSelect}
+          onClearAvatar={handleClearAvatar}
+          onPresetAvatarSelect={handlePresetAvatarSelect}
+          onNextStep={handleProceedToAvatarStep}
+          onBackStep={handleBackToInfoStep}
+          onFinalSubmit={handleFinalCreateAccountSubmit}
+          onClose={closeCreateAccount}
+          onAddGenre={handleAddGenre}
+          onRemoveGenre={handleRemoveGenre}
+          onToggleSuggestedGenre={handleToggleSuggestedGenre}
+          onOpenSignIn={openSignIn}
+          onGoogleLogin={handleGoogleLogin}
+          onFacebookLogin={handleFacebookLogin}
+        />
+      ) : null}
+    </>
+  );
+
+  if (authOnly) return authModals;
 
   return (
     <section className="space-y-4">
@@ -791,46 +870,7 @@ export function HeroCarousel() {
         </div>
       </div>
 
-      {isSignInOpen ? (
-        <SignInModal
-          credentials={credentials}
-          errorMessage={signInError}
-          isFormComplete={isSignInComplete}
-          isSubmitting={isSubmittingSignIn}
-          onChange={handleCredentialsChange}
-          onClose={closeSignIn}
-          onSubmit={handleSignInSubmit}
-          onGoogleLogin={handleGoogleLogin}
-          onFacebookLogin={handleFacebookLogin}
-        />
-      ) : null}
-
-      {isCreateAccountOpen ? (
-        <CreateAccountModal
-          form={createAccountForm}
-          step={createAccountStep}
-          errorMessage={createAccountError}
-          isSubmitting={isSubmittingCreateAccount}
-          avatarFile={avatarFile}
-          avatarPreviewUrl={avatarPreviewUrl}
-          selectedPresetAvatar={selectedPresetAvatar}
-          onChange={handleCreateAccountChange}
-          onRoleChange={handleRoleChange}
-          onAvatarFileSelect={handleAvatarFileSelect}
-          onClearAvatar={handleClearAvatar}
-          onPresetAvatarSelect={handlePresetAvatarSelect}
-          onNextStep={handleProceedToAvatarStep}
-          onBackStep={handleBackToInfoStep}
-          onFinalSubmit={handleFinalCreateAccountSubmit}
-          onClose={closeCreateAccount}
-          onAddGenre={handleAddGenre}
-          onRemoveGenre={handleRemoveGenre}
-          onToggleSuggestedGenre={handleToggleSuggestedGenre}
-          onOpenSignIn={openSignIn}
-          onGoogleLogin={handleGoogleLogin}
-          onFacebookLogin={handleFacebookLogin}
-        />
-      ) : null}
+      {authModals}
     </section>
   );
 }
@@ -843,6 +883,7 @@ type SignInModalProps = {
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenCreateAccount: () => void;
   onGoogleLogin?: () => void;
   onFacebookLogin?: () => void;
 };
@@ -880,6 +921,7 @@ function SignInModal({
   onChange,
   onClose,
   onSubmit,
+  onOpenCreateAccount,
   onGoogleLogin,
   onFacebookLogin,
 }: SignInModalProps) {
@@ -1012,12 +1054,13 @@ function SignInModal({
           </div>
 
           <div className="modal-item flex flex-wrap items-center justify-between gap-3 px-1 text-sm text-white/64 [animation-delay:0.28s]">
-            <Link
-              href={HOME_ROUTE}
+            <button
+              type="button"
+              onClick={onOpenCreateAccount}
               className="modal-link transition hover:text-white"
             >
               {"Đăng ký tài khoản"}
-            </Link>
+            </button>
             <Link
               href={HOME_ROUTE}
               className="modal-link transition hover:text-white"
