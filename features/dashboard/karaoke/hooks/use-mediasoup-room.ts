@@ -276,6 +276,10 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
       try {
         requestRef.current = (type, payload) => request(type, payload, generation);
         setVoiceError("");
+        // Download the client bundle while the ticket and signaling connection
+        // are being prepared, instead of serializing it behind the first RPC.
+        const mediasoupClientPromise = import("mediasoup-client");
+        void mediasoupClientPromise.catch(() => undefined);
         const ticket = await createKaraokeVoiceTicket(roomId);
         if (disposed || generation !== connectionGeneration) return;
         const socket = new WebSocket(ticket.websocketUrl);
@@ -306,36 +310,45 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
             retries = 0;
             void (async () => {
               try {
-                const capabilities = await request<{
+                const capabilitiesPromise = request<{
                   routerRtpCapabilities: MediaTypes.RtpCapabilities;
                   iceServers: RTCIceServer[];
                 }>("get-rtp-capabilities", {}, generation);
-                const mediasoupClient = await import("mediasoup-client");
+                const [capabilities, mediasoupClient] = await Promise.all([
+                  capabilitiesPromise,
+                  mediasoupClientPromise,
+                ]);
                 const device = new mediasoupClient.Device();
                 await device.load({ routerRtpCapabilities: capabilities.routerRtpCapabilities });
                 if (generation !== connectionGeneration) return;
                 deviceRef.current = device;
-                await makeTransport("recv", capabilities.iceServers, generation);
+                // The send transport is needed by the mic control, so prepare it
+                // before enabling that control. The receive transport can be
+                // prepared in the background without delaying mic readiness.
+                await makeTransport("send", capabilities.iceServers, generation);
                 ensureSendTransportRef.current = () => sendTransportRef.current
                   ? Promise.resolve(sendTransportRef.current)
                   : makeTransport("send", capabilities.iceServers, generation);
                 setReady(true);
+
                 const existing = message.payload?.existingProducers;
                 if (Array.isArray(existing)) {
                   for (const item of existing) {
                     const producer = item as { producerId?: unknown; userId?: unknown };
                     if (isUsableId(producer.producerId) && isUsableId(producer.userId)) {
-                      void receiveProducer(producer.producerId, producer.userId, generation).catch((error: unknown) => {
-                        if (generation === connectionGeneration) setVoiceError(errorMessage(error));
-                      });
+                      pendingProducersRef.current.set(producer.producerId, producer.userId);
                     }
                   }
                 }
-                for (const [producerId, userId] of pendingProducersRef.current) {
-                  void receiveProducer(producerId, userId, generation).catch((error: unknown) => {
-                    if (generation === connectionGeneration) setVoiceError(errorMessage(error));
-                  });
-                }
+                void makeTransport("recv", capabilities.iceServers, generation).then(() => {
+                  for (const [producerId, userId] of pendingProducersRef.current) {
+                    void receiveProducer(producerId, userId, generation).catch((error: unknown) => {
+                      if (generation === connectionGeneration) setVoiceError(errorMessage(error));
+                    });
+                  }
+                }).catch((error: unknown) => {
+                  if (generation === connectionGeneration) setVoiceError(errorMessage(error));
+                });
               } catch (error) {
                 if (generation !== connectionGeneration) return;
                 setVoiceError(errorMessage(error));
@@ -431,15 +444,17 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
     try {
       if (microphoneOn) {
         const producer = producerRef.current;
+        const producerId = producer?.id;
         producer?.close();
-        if (producer) {
-          await requestRef.current?.("close-producer", { producerId: producer.id }).catch(() => undefined);
-        }
         producerRef.current = null;
         micStreamRef.current?.getTracks().forEach((track) => track.stop());
         micStreamRef.current = null;
         setMicrophoneStream(null);
         setMicrophoneOn(false);
+        setVoiceError("");
+        if (producerId) {
+          void requestRef.current?.("close-producer", { producerId }).catch(() => undefined);
+        }
         return;
       }
       if (!connectedRef.current || !socketRef.current || !deviceRef.current || !ready) throw new Error("Đang kết nối máy chủ âm thanh, vui lòng thử lại sau.");
@@ -467,9 +482,9 @@ export function useMediasoupRoom(roomId: number, enabled: boolean) {
         setMicrophoneOn(false);
         setVoiceError("Micro đã ngắt kết nối. Hãy chọn lại thiết bị rồi bật micro.");
       }, { once: true });
-      await refreshAudioDevices();
       setMicrophoneOn(true);
       setVoiceError("");
+      void refreshAudioDevices();
     } catch (error) {
       micStreamRef.current?.getTracks().forEach((track) => track.stop());
       micStreamRef.current = null;

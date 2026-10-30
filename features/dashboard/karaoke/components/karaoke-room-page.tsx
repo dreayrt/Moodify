@@ -1014,10 +1014,10 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           onClick={() => void voice.toggleMicrophone()}
           disabled={!voice.ready || voice.microphoneBusy}
           aria-pressed={voice.microphoneOn}
-          title={!voice.ready ? "Đang kết nối đến mediasoup" : voice.microphoneOn ? "Tắt micro" : "Bật micro cho mọi người trong phòng nghe"}
+          title={!voice.ready ? "Đang kết nối đến mediasoup" : voice.microphoneBusy ? "Đang xử lý micro" : voice.microphoneOn ? "Tắt micro" : "Bật micro cho mọi người trong phòng nghe"}
         >
           {voice.microphoneOn ? <MicOff size={16} /> : <Mic2 size={16} />}
-          {!voice.ready ? "Đang kết nối" : voice.microphoneOn ? "Tắt micro" : "Bật micro"}
+          {!voice.ready ? "Đang kết nối" : voice.microphoneBusy ? "Đang xử lý micro…" : voice.microphoneOn ? "Tắt micro" : "Bật micro"}
         </button>
         <div className={styles.deviceSettings}>
           <label>
