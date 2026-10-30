@@ -194,6 +194,7 @@ export type KaraokeRoomDetail = {
   hostAvatarUrl: string | null;
   maxMembers: number;
   visibility: KaraokeRoomVisibility;
+  inviteCode: string | null;
   createdAt: string;
   memberCount: number;
   canManage: boolean;

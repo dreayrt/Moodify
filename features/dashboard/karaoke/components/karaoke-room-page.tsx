@@ -10,6 +10,7 @@ import {
   ArrowRight,
   AudioLines,
   Check,
+  Copy,
   DoorOpen,
   Headphones,
   LockKeyhole,
@@ -203,6 +204,11 @@ function isInviteError(error: unknown): boolean {
   );
 }
 
+function isClosedRoomError(error: unknown): boolean {
+  return error instanceof KaraokeRoomApiError &&
+    (error.code === "ROOM_CLOSED" || error.status === 410);
+}
+
 export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const { pause } = usePlayer();
   const router = useRouter();
@@ -224,6 +230,8 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const [inviteError, setInviteError] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteRequired, setInviteRequired] = useState(false);
+  const [roomClosed, setRoomClosed] = useState(false);
+  const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
   const [joined, setJoined] = useState(false);
   const [isRequestOpen, setIsRequestOpen] = useState(false);
   const [selectedTrack, setSelectedTrack] =
@@ -235,6 +243,33 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const groupScoreCloseRef = useRef<HTMLButtonElement | null>(null);
   const groupScoreActionRef = useRef<HTMLButtonElement | null>(null);
   const lastOpenedScoreSessionRef = useRef("");
+  const roomClosedRedirectTimerRef = useRef<number | null>(null);
+
+  const goToRooms = useCallback(() => {
+    if (roomClosedRedirectTimerRef.current !== null) {
+      window.clearTimeout(roomClosedRedirectTimerRef.current);
+      roomClosedRedirectTimerRef.current = null;
+    }
+    router.replace("/dashboard/karaoke/rooms");
+  }, [router]);
+
+  const handleRoomClosed = useCallback(() => {
+    setRoomClosed(true);
+    setJoined(false);
+    setInviteRequired(false);
+    setBusy(false);
+    setLoading(false);
+    if (roomClosedRedirectTimerRef.current !== null) {
+      window.clearTimeout(roomClosedRedirectTimerRef.current);
+    }
+    roomClosedRedirectTimerRef.current = window.setTimeout(goToRooms, 3500);
+  }, [goToRooms]);
+
+  useEffect(() => () => {
+    if (roomClosedRedirectTimerRef.current !== null) {
+      window.clearTimeout(roomClosedRedirectTimerRef.current);
+    }
+  }, []);
 
   const applyRoomSnapshot = useCallback((snapshot: KaraokeRoomDetail, requestStartedAt = Date.now()) => {
     const receivedAt = Date.now();
@@ -309,12 +344,16 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       setPageError("");
       return true;
     } catch (error) {
+      if (isClosedRoomError(error)) {
+        handleRoomClosed();
+        return false;
+      }
       if (!silent) setPageError(messageFor(error));
       return false;
     } finally {
       setLoading(false);
     }
-  }, [applyRoomSnapshot, numericRoomId]);
+  }, [applyRoomSnapshot, handleRoomClosed, numericRoomId]);
 
   const enterRoom = useCallback(
     async (code?: string) => {
@@ -341,6 +380,8 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               ? error.message
               : "Nhập mã mời để vào phòng riêng.",
           );
+        } else if (isClosedRoomError(error)) {
+          handleRoomClosed();
         } else {
           setPageError(messageFor(error));
         }
@@ -349,7 +390,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
         setLoading(false);
       }
     },
-    [applyRoomSnapshot, numericRoomId],
+    [applyRoomSnapshot, handleRoomClosed, numericRoomId],
   );
 
   useEffect(() => {
@@ -366,14 +407,23 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     applyRoomSnapshot(snapshot, requestStartedAt);
   }, [applyRoomSnapshot, inviteCode, numericRoomId]);
 
-  const onRealtimeEvent = useCallback(() => {
+  const onRealtimeEvent = useCallback((event: { type: string }) => {
+    if (event.type === "room.closed") {
+      handleRoomClosed();
+      return true;
+    }
     void refreshRoom();
-  }, [refreshRoom]);
+    return false;
+  }, [handleRoomClosed, refreshRoom]);
   const onSubscribed = useCallback(() => {
     setConnectionError("");
     void refreshRoom();
   }, [refreshRoom]);
   const onRealtimeError = useCallback((error: Error) => {
+    if (isClosedRoomError(error)) {
+      handleRoomClosed();
+      return;
+    }
     if (
       error.message.includes("ROOM_INVITE_REQUIRED") ||
       error.message.includes("ROOM_INVITE_INVALID")
@@ -384,7 +434,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       return;
     }
     setConnectionError("Đang thử kết nối lại để cập nhật phòng.");
-  }, []);
+  }, [handleRoomClosed]);
   const { connected } = useKaraokeRoomLive({
     scope: "room",
     roomId: numericRoomId,
@@ -582,11 +632,21 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     setBusy(true);
     try {
       await closeKaraokeRoom(numericRoomId);
-      setJoined(false);
-      router.push("/dashboard/karaoke/rooms");
+      handleRoomClosed();
     } catch (error) {
       setNotice(messageFor(error));
       setBusy(false);
+    }
+  };
+
+  const copyRoomInviteCode = async () => {
+    if (!room?.inviteCode) return;
+    try {
+      await navigator.clipboard.writeText(room.inviteCode);
+      setInviteCodeCopied(true);
+      window.setTimeout(() => setInviteCodeCopied(false), 1800);
+    } catch {
+      setNotice("Không thể sao chép mã mời. Hãy chọn và sao chép mã thủ công.");
     }
   };
 
@@ -634,6 +694,25 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     if (!trimmed) return;
     await enterRoom(trimmed);
   };
+
+  if (roomClosed) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.pageGlow} aria-hidden="true" />
+        <div className={styles.modalBackdrop}>
+          <section className={`${styles.modal} ${styles.roomClosedModal}`} role="alertdialog" aria-modal="true" aria-labelledby="room-closed-title">
+            <span className={styles.roomClosedIcon}><DoorOpen size={25} /></span>
+            <span className={styles.sectionKicker}>PHÒNG KARAOKE</span>
+            <h1 id="room-closed-title">Phòng đã đóng</h1>
+            <p>Chủ phòng đã đóng phòng này. Bạn sẽ được đưa về danh sách phòng trong giây lát.</p>
+            <button type="button" className={styles.modalSubmit} onClick={goToRooms}>
+              Về danh sách phòng <ArrowRight size={17} />
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   if (loading && !room && !inviteRequired) {
     return (
@@ -759,6 +838,20 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           </span>
         </div>
       </section>
+
+      {room.visibility === "PRIVATE" && room.canManage && room.inviteCode && (
+        <section className={styles.roomInviteCard} aria-label="Mã mời phòng riêng">
+          <div>
+            <span className={styles.sectionKicker}>MÃ MỜI PHÒNG RIÊNG</span>
+            <p>Chia sẻ mã này để thành viên vào phòng. Mã luôn có sẵn tại đây khi bạn cần.</p>
+          </div>
+          <code className={styles.roomInviteCode}>{room.inviteCode}</code>
+          <button type="button" className={styles.leaveRoomButton} onClick={() => void copyRoomInviteCode()}>
+            {inviteCodeCopied ? <Check size={15} /> : <Copy size={15} />}
+            {inviteCodeCopied ? "Đã sao chép" : "Sao chép mã"}
+          </button>
+        </section>
+      )}
 
       <div className={styles.mainGrid}>
         <div className={styles.leftColumn}>

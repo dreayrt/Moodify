@@ -18,7 +18,7 @@ type UseKaraokeRoomLiveOptions = {
   roomId?: number;
   enabled: boolean;
   beforeConnect?: () => Promise<void>;
-  onEvent?: (event: LiveEvent) => void;
+  onEvent?: (event: LiveEvent) => boolean | void;
   onSubscribed?: () => void;
   onError?: (error: Error) => void;
 };
@@ -109,7 +109,14 @@ export function useKaraokeRoomLive({
             currentSocket.close(1008, event.code || "subscription rejected");
             return;
           }
-          callbacks.current.onEvent?.(event);
+          const stopListening = callbacks.current.onEvent?.(event) === true;
+          if (stopListening) {
+            stopped = true;
+            setConnected(false);
+            if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
+            heartbeatTimer = undefined;
+            currentSocket.close(1000, "room closed");
+          }
         };
         currentSocket.onerror = () => {
           callbacks.current.onError?.(new Error("Kết nối realtime bị gián đoạn."));

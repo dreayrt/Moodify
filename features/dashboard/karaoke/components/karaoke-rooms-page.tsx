@@ -400,8 +400,8 @@ export default function KaraokeRoomsPage() {
               </button>
             </div>
             <p className={styles.inviteHelp}>
-              Gửi đường dẫn và mã mời này cho bạn bè. Mã chỉ hiển thị trong lần
-              tạo phòng này.
+              Gửi đường dẫn và mã mời này cho bạn bè. Bạn cũng có thể xem và sao
+              chép mã trong phòng bất cứ lúc nào.
             </p>
             <label className={styles.fieldLabel}>Đường dẫn phòng</label>
             <div className={styles.inviteValue}>{inviteLink}</div>
