@@ -74,8 +74,10 @@ export function useKaraokeRoomScoring(input: {
   const [scoreError, setScoreError] = useState("");
   const [capturing, setCapturing] = useState(false);
 
-  microphoneStreamRef.current = input.microphoneStream;
-  playbackStatusRef.current = input.playbackStatus;
+  useEffect(() => {
+    microphoneStreamRef.current = input.microphoneStream;
+    playbackStatusRef.current = input.playbackStatus;
+  }, [input.microphoneStream, input.playbackStatus]);
 
   const stopCapture = useCallback(async (run: RoomRun, discard = false) => {
     const capture = run.activeCapture;
@@ -203,7 +205,9 @@ export function useKaraokeRoomScoring(input: {
       activeCapture: null,
       captureStarting: false,
       segments: [],
-      lastPositionMs: input.positionMs,
+      // The following playback-position effect records the current position
+      // in the same commit without making this session effect rerun every tick.
+      lastPositionMs: 0,
       closed: false,
       finishing: false,
     };
@@ -237,7 +241,10 @@ export function useKaraokeRoomScoring(input: {
     const run = runRef.current;
     if (!run || run.closed) return;
     run.lastPositionMs = input.positionMs;
-    if (input.playbackStatus === "PLAYING" && input.positionMs >= run.durationMs - 300) {
+    // The backend can transition playback to PAUSED at the track boundary (for
+    // example after a realtime reconnect). The position is still authoritative
+    // in that state, so do not require PLAYING to finalize the score session.
+    if (input.positionMs >= run.durationMs - 300) {
       void finishRun(run);
       return;
     }
