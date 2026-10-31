@@ -1,30 +1,58 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+type JwtPayload = {
+  role?: string;
+  exp?: number;
+  tokenType?: string;
+};
+
 /**
- * Giai ma payload JWT tren Edge Runtime (Next.js Middleware)
+ * Decode claims for route navigation only. The backend still verifies the JWT
+ * signature and is the authority for every protected API request.
  */
-function parseJwtPayload(token: string): { role?: string; sub?: string; exp?: number } | null {
+function parseJwtPayload(token: string): JwtPayload | null {
   try {
     const parts = token.split(".");
-    if (parts.length < 2) return null;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    if (parts.length !== 3) return null;
+
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
     const jsonPayload = decodeURIComponent(
-      atob(base64)
+      atob(padded)
         .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+        .map((character) => `%${character.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join(""),
     );
-    return JSON.parse(jsonPayload);
+    return JSON.parse(jsonPayload) as JwtPayload;
   } catch {
     return null;
   }
 }
 
-/**
- * Danh sach duong dan dashboard tuong ung voi tung role
- */
+function getActivePayload(token: string | undefined, tokenType: "ACCESS" | "REFRESH") {
+  if (!token) return null;
+
+  const payload = parseJwtPayload(token);
+  if (
+    !payload ||
+    payload.tokenType !== tokenType ||
+    typeof payload.exp !== "number" ||
+    payload.exp <= Math.floor(Date.now() / 1000)
+  ) {
+    return null;
+  }
+
+  return payload;
+}
+
+function clearAuthCookies(response: NextResponse) {
+  for (const name of ["moodify_token", "moodify_refresh", "moodify_role", "accessToken", "token"]) {
+    response.cookies.delete(name);
+  }
+}
+
+/** Dashboard destinations for each authenticated role. */
 const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
   USER: "/dashboard/user",
   MODERATOR: "/dashboard/moderator",
@@ -36,92 +64,88 @@ const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Lay token tu cookie
-  const tokenCookie =
-    request.cookies.get("moodify_token")?.value ||
-    request.cookies.get('accessToken')?.value ||
-    request.cookies.get('token')?.value;
+  if (!pathname.startsWith("/dashboard")) {
+    return NextResponse.next();
+  }
 
-  // Chi ap dung bao ve cho cac route bat dau bang /dashboard
-  if (pathname.startsWith("/dashboard")) {
-    // 1. Neu chua dang nhap (khong co token trong cookie)
-    if (!tokenCookie) {
-      // Dashboard nghe nhac la trang dung thu cong khai; trang goc /dashboard
-      // se chuyen tiep den /dashboard/user trong app/dashboard/page.tsx.
-      if (
-        pathname === "/dashboard" ||
-        pathname === "/dashboard/" ||
-        pathname === "/dashboard/user" ||
-        pathname === "/dashboard/user/"
-      ) {
-        return NextResponse.next();
-      }
+  // Only current Moodify cookies are trusted as session hints. Legacy cookie
+  // names were long-lived and could keep an expired session looking logged in.
+  const accessPayload = getActivePayload(
+    request.cookies.get("moodify_token")?.value,
+    "ACCESS",
+  );
+  const refreshPayload = accessPayload
+    ? null
+    : getActivePayload(request.cookies.get("moodify_refresh")?.value, "REFRESH");
+  const sessionPayload = accessPayload ?? refreshPayload;
 
-      const homeUrl = new URL("/", request.url);
-      homeUrl.searchParams.set("auth", "signin");
-      homeUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
-      return NextResponse.redirect(homeUrl);
-    }
+  if (!sessionPayload) {
+    const isPublicDashboard =
+      pathname === "/dashboard" ||
+      pathname === "/dashboard/" ||
+      pathname === "/dashboard/user" ||
+      pathname === "/dashboard/user/" ||
+      pathname === "/dashboard/search" ||
+      pathname === "/dashboard/search/";
 
-    // 2. Lay role tu cookie moodify_role hoac decode tu JWT payload
-    let role = request.cookies.get("moodify_role")?.value?.toUpperCase();
-    if (!role) {
-      const payload = parseJwtPayload(tokenCookie);
-      role = payload?.role?.toUpperCase();
-    }
-
-    // Neu token loi hoac khong co role hop le
-    if (!role) {
-      const homeUrl = new URL("/", request.url);
-      const response = NextResponse.redirect(homeUrl);
-      response.cookies.delete("moodify_token");
-      response.cookies.delete("moodify_role");
+    if (isPublicDashboard) {
+      const response = NextResponse.next();
+      clearAuthCookies(response);
       return response;
     }
 
-    const correctDashboard = ROLE_DASHBOARD_ROUTES[role] || "/dashboard/user";
+    const homeUrl = new URL("/", request.url);
+    homeUrl.searchParams.set("auth", "signin");
+    homeUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
+    const response = NextResponse.redirect(homeUrl);
+    clearAuthCookies(response);
+    return response;
+  }
 
-    // 3. Neu truy cap /dashboard hoac /dashboard/ -> Chuyen huong ve dung dashboard cua role do
-    if (pathname === "/dashboard" || pathname === "/dashboard/") {
-      const redirectUrl = new URL(correctDashboard, request.url);
-      redirectUrl.search = request.nextUrl.search;
-      return NextResponse.redirect(redirectUrl);
-    }
+  // Both access and refresh JWTs carry the user's role. Ignore the separate
+  // role cookie so a stale or edited cookie cannot choose the dashboard role.
+  const role = sessionPayload.role?.toUpperCase();
+  if (!role || !ROLE_DASHBOARD_ROUTES[role]) {
+    const homeUrl = new URL("/", request.url);
+    const response = NextResponse.redirect(homeUrl);
+    clearAuthCookies(response);
+    return response;
+  }
 
-    // 4. KIEM TRA PHAN QUYEN TUNG ROUTE:
-    // Chi USER va ADMIN moi duoc phep truy cap /dashboard/user (Admin co toan quyen truy cap de kiem tra)
-    if (pathname.startsWith("/dashboard/user") && role !== "USER" && role !== "ADMIN") {
-      return NextResponse.redirect(new URL(correctDashboard, request.url));
-    }
+  const correctDashboard = ROLE_DASHBOARD_ROUTES[role];
 
-    // Nguoi khong phai MODERATOR/ADMIN co tinh vao /dashboard/moderator
-    if (pathname.startsWith("/dashboard/moderator") && role !== "MODERATOR" && role !== "ADMIN") {
-      return NextResponse.redirect(new URL(correctDashboard, request.url));
-    }
+  if (pathname === "/dashboard" || pathname === "/dashboard/") {
+    const redirectUrl = new URL(correctDashboard, request.url);
+    redirectUrl.search = request.nextUrl.search;
+    return NextResponse.redirect(redirectUrl);
+  }
 
-    // Trang nghe si cong khai /dashboard/artist/[id] danh cho tat ca nguoi dung xem ho so
-    // Chi chuyen huong ve studio content-lead neu truy cap dung goc /dashboard/artist (khong co id)
-    if (pathname === "/dashboard/artist" || pathname === "/dashboard/artist/") {
-      if (role === "CONTENT_LEAD" || role === "ARTIST") {
-        return NextResponse.redirect(new URL("/dashboard/content-lead", request.url));
-      }
-      return NextResponse.redirect(new URL("/dashboard/search?type=ARTIST", request.url));
-    }
+  if (pathname.startsWith("/dashboard/user") && role !== "USER" && role !== "ADMIN") {
+    return NextResponse.redirect(new URL(correctDashboard, request.url));
+  }
 
-    // Nguoi khong phai CONTENT_LEAD/ADMIN co tinh vao /dashboard/content-lead
-    if (
-      pathname.startsWith("/dashboard/content-lead") &&
-      role !== "CONTENT_LEAD" &&
-      role !== "ARTIST" &&
-      role !== "ADMIN"
-    ) {
-      return NextResponse.redirect(new URL(correctDashboard, request.url));
+  if (pathname === "/dashboard/artist" || pathname === "/dashboard/artist/") {
+    if (role === "CONTENT_LEAD" || role === "ARTIST") {
+      return NextResponse.redirect(new URL("/dashboard/content-lead", request.url));
     }
+    return NextResponse.redirect(new URL("/dashboard/search?type=ARTIST", request.url));
+  }
 
-    // Nguoi khong phai ADMIN co tinh vao /dashboard/admin
-    if (pathname.startsWith("/dashboard/admin") && role !== "ADMIN") {
-      return NextResponse.redirect(new URL(correctDashboard, request.url));
-    }
+  if (
+    pathname.startsWith("/dashboard/content-lead") &&
+    role !== "CONTENT_LEAD" &&
+    role !== "ARTIST" &&
+    role !== "ADMIN"
+  ) {
+    return NextResponse.redirect(new URL(correctDashboard, request.url));
+  }
+
+  if (pathname.startsWith("/dashboard/moderator") && role !== "MODERATOR" && role !== "ADMIN") {
+    return NextResponse.redirect(new URL(correctDashboard, request.url));
+  }
+
+  if (pathname.startsWith("/dashboard/admin") && role !== "ADMIN") {
+    return NextResponse.redirect(new URL(correctDashboard, request.url));
   }
 
   return NextResponse.next();

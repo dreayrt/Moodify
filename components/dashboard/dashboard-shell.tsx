@@ -875,6 +875,41 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGenresOpen, setIsGenresOpen] = useState(true);
+  const hasPendingSidebarLoginPrompt = useRef(false);
+
+  const requestSidebarLogin = () => {
+    if (userLoading) {
+      hasPendingSidebarLoginPrompt.current = true;
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }),
+    );
+  };
+
+  const guardSidebarNavigation = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (user) return;
+
+    event.preventDefault();
+    requestSidebarLogin();
+  };
+
+  useEffect(() => {
+    if (!hasPendingSidebarLoginPrompt.current || userLoading) return;
+
+    hasPendingSidebarLoginPrompt.current = false;
+    if (user) return;
+
+    // Wait for the guest-only HeroCarousel auth listener to mount.
+    const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }),
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [user, userLoading]);
 
   const refreshPlaylists = async () => {
     try {
@@ -1061,6 +1096,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <nav className="flex min-w-0 max-w-[45vw] items-center gap-1.5 overflow-x-auto lg:hidden">
               <Link
                 href="/dashboard"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHome
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1071,6 +1108,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/karaoke"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isKaraoke
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1081,6 +1120,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/search"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isSearch
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1091,6 +1132,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/library"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isLibrary
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1101,6 +1144,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/premium?tab=manage"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 aria-label="Quản lý gói dịch vụ"
                 title="Quản lý gói dịch vụ"
                 className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
@@ -1113,6 +1158,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHistory
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1123,6 +1170,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/search-history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 aria-label="Lịch sử tìm kiếm"
                 title="Lịch sử tìm kiếm"
                 className={`shrink-0 px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
@@ -1201,11 +1250,13 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
               <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden moodify-scroll w-full ${isPre ? "rounded-[18.8px]" : "rounded-[20px]"} backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
 
-            {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Lịch sử -> Thể loại */}
+            {/* Primary Navigation: Trang chủ -> Thư viện -> Karaoke -> Lịch sử -> Thể loại */}
             <div id="tour-sidebar-nav" className="space-y-1">
               {/* 1. Trang chủ */}
               <Link
                 href="/dashboard"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHome
                     ? navActiveItemClass
@@ -1221,27 +1272,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
 
-              {/* 2. Tìm kiếm */}
-              <Link
-                href="/dashboard/search"
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
-                  isSearch
-                    ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Search
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
-                    strokeWidth={isSearch ? 2.2 : 1.7}
-                  />
-                  <span>Tìm kiếm</span>
-                </div>
-              </Link>
-
-              {/* 3. Thư viện */}
+              {/* 2. Thư viện */}
               <Link
                 href="/dashboard/library"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isLibrary
                     ? navActiveItemClass
@@ -1259,6 +1294,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
               <Link
                 href="/dashboard/karaoke"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isKaraoke
                     ? navActiveItemClass
@@ -1277,6 +1314,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               {/* Quản lý gói đăng ký và biên nhận thanh toán */}
               <Link
                 href="/dashboard/premium?tab=manage"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSubscriptionManagement
                     ? navActiveItemClass
@@ -1295,6 +1334,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               {/* 3.1. Lịch sử nghe & Truy vết */}
               <Link
                 href="/dashboard/history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHistory
                     ? navActiveItemClass
@@ -1313,6 +1354,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               {/* 3.2. Lịch sử tìm kiếm */}
               <Link
                 href="/dashboard/search-history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSearchHistory
                     ? navActiveItemClass
@@ -1438,11 +1481,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     if (user) {
                       setIsCreateOpen(true);
                     } else {
-                      window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "register" } }));
+                      requestSidebarLogin();
                     }
                   }}
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
-                  title={user ? "Tạo playlist mới" : "Đăng ký để tạo playlist"}
+                  title={user ? "Tạo playlist mới" : "Đăng nhập để tạo playlist"}
                 >
                   <Plus className={`w-3 h-3 ${navIconClass}`} />
                   <span>Mới</span>
@@ -1459,6 +1502,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     <Link
                       key={pl.id}
                       href={`/dashboard/library?playlistId=${pl.id}`}
+                      onClick={guardSidebarNavigation}
+                      onAuxClick={guardSidebarNavigation}
                       className="w-full group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-white/65 hover:text-white hover:bg-white/[0.05] transition-all"
                     >
                       <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">

@@ -24,6 +24,42 @@ const EMPTY_QUICK_RESULTS = { tracks: [] as Track[] };
 const QUICK_SEARCH_DEBOUNCE_MS = 350;
 const QUICK_SEARCH_MIN_LENGTH = 2;
 
+function resolveQuickCoverUrl(rawUrl?: string | null) {
+  const url = rawUrl?.trim();
+  if (!url) return null;
+  if (url.startsWith("//")) return `https:${url}`;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+
+  const apiOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8088")
+    .replace(/\/$/, "")
+    .replace(/\/api$/i, "");
+  return `${apiOrigin}/${url.replace(/^\/+/, "")}`;
+}
+
+function QuickTrackCover({ track }: { track: Track }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageUrl = resolveQuickCoverUrl(track.imageUrl);
+
+  if (!imageUrl || imageFailed) {
+    return (
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-purple-200">
+        <Music2 className="h-4 w-4" />
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => setImageFailed(true)}
+      className="h-9 w-9 shrink-0 rounded-lg bg-white/[0.06] object-cover"
+    />
+  );
+}
+
 export interface MoodSearchBarProps {
   className?: string;
   isPremium?: boolean;
@@ -340,7 +376,7 @@ export default function MoodSearchBar({
                       })}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${activeSuggestionIndex === index ? "bg-purple-500/20" : "hover:bg-white/[0.06]"}`}
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-purple-200"><Music2 className="h-4 w-4" /></span>
+                      <QuickTrackCover track={track} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-white">{track.name}</span>
                         <span className="block truncate text-xs text-white/45">{track.artistName}</span>
