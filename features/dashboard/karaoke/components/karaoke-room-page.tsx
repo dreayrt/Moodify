@@ -64,7 +64,9 @@ function durationLabel(durationMs: number | null): string {
   return `${Math.floor(durationMs / 60000)}:${String(Math.floor(durationMs / 1000) % 60).padStart(2, "0")}`;
 }
 
-function parseLyricCues(raw: string | null | undefined): { startMs: number; text: string }[] {
+function parseLyricCues(
+  raw: string | null | undefined,
+): { startMs: number; text: string }[] {
   if (!raw) return [];
   const cues: { startMs: number; text: string }[] = [];
   const pattern = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
@@ -76,8 +78,13 @@ function parseLyricCues(raw: string | null | undefined): { startMs: number; text
       const minutes = Number(stamp[1]);
       const seconds = Number(stamp[2]);
       if (seconds > 59) continue;
-      const fraction = Number((stamp[3] ?? "").padEnd(3, "0").slice(0, 3) || "0");
-      cues.push({ startMs: minutes * 60_000 + seconds * 1000 + fraction, text });
+      const fraction = Number(
+        (stamp[3] ?? "").padEnd(3, "0").slice(0, 3) || "0",
+      );
+      cues.push({
+        startMs: minutes * 60_000 + seconds * 1000 + fraction,
+        text,
+      });
     }
   }
   return cues.sort((left, right) => left.startMs - right.startMs);
@@ -91,7 +98,8 @@ function clockLabel(milliseconds: number): string {
 function safeImageSource(imageUrl?: string | null): string | null {
   if (!imageUrl) return null;
   const cleanedUrl = imageUrl.trim().replaceAll("\\", "/");
-  if (cleanedUrl.startsWith("/") && !cleanedUrl.startsWith("//")) return cleanedUrl;
+  if (cleanedUrl.startsWith("/") && !cleanedUrl.startsWith("//"))
+    return cleanedUrl;
   try {
     const url = new URL(cleanedUrl);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
@@ -122,11 +130,12 @@ function Cover({
   const [failedFor, setFailedFor] = useState<string | null>(null);
   const usingProxy = imageSource !== null && proxyAttemptFor === imageSource;
   const imageFailed = imageSource === null || failedFor === imageSource;
-  const visibleImageSource = imageSource && !imageFailed
-    ? usingProxy
-      ? `/api/proxy-image?url=${encodeURIComponent(imageSource)}`
-      : imageSource
-    : null;
+  const visibleImageSource =
+    imageSource && !imageFailed
+      ? usingProxy
+        ? `/api/proxy-image?url=${encodeURIComponent(imageSource)}`
+        : imageSource
+      : null;
 
   return (
     <div
@@ -180,14 +189,25 @@ function RemoteAudioPlayer({
     audio.srcObject = stream;
     audio.muted = muted;
     audio.volume = volume;
-    const routableAudio = audio as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void> };
+    const routableAudio = audio as HTMLAudioElement & {
+      setSinkId?: (deviceId: string) => Promise<void>;
+    };
     if (typeof routableAudio.setSinkId === "function") {
       void routableAudio.setSinkId(outputDeviceId).catch(() => undefined);
     }
     void audio.play().catch(() => undefined);
-    return () => { audio.srcObject = null; };
+    return () => {
+      audio.srcObject = null;
+    };
   }, [muted, outputDeviceId, stream, volume]);
-  return <audio ref={audioRef} autoPlay data-karaoke-room-audio="remote" aria-label={`Micro của thành viên ${userId}`} />;
+  return (
+    <audio
+      ref={audioRef}
+      autoPlay
+      data-karaoke-room-audio="remote"
+      aria-label={`Micro của thành viên ${userId}`}
+    />
+  );
 }
 
 function messageFor(error: unknown): string {
@@ -205,8 +225,10 @@ function isInviteError(error: unknown): boolean {
 }
 
 function isClosedRoomError(error: unknown): boolean {
-  return error instanceof KaraokeRoomApiError &&
-    (error.code === "ROOM_CLOSED" || error.status === 410);
+  return (
+    error instanceof KaraokeRoomApiError &&
+    (error.code === "ROOM_CLOSED" || error.status === 410)
+  );
 }
 
 export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
@@ -217,13 +239,23 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const [snapshotAt, setSnapshotAt] = useState(0);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [clockNow, setClockNow] = useState(() => Date.now());
-  const snapshotGuardRef = useRef({ roomId: numericRoomId, requestStartedAt: 0, playbackVersion: -1 });
+  const snapshotGuardRef = useRef({
+    roomId: numericRoomId,
+    requestStartedAt: 0,
+    playbackVersion: -1,
+  });
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioError, setAudioError] = useState("");
-  const [audioOutputDevices, setAudioOutputDevices] = useState<{ deviceId: string; label: string }[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<
+    { deviceId: string; label: string }[]
+  >([]);
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState("");
-  const [remoteAudioSettings, setRemoteAudioSettings] = useState<Record<string, { muted: boolean; volume: number }>>({});
-  const [selectedMemberAudioId, setSelectedMemberAudioId] = useState<string | null>(null);
+  const [remoteAudioSettings, setRemoteAudioSettings] = useState<
+    Record<string, { muted: boolean; volume: number }>
+  >({});
+  const [selectedMemberAudioId, setSelectedMemberAudioId] = useState<
+    string | null
+  >(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -265,41 +297,65 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     roomClosedRedirectTimerRef.current = window.setTimeout(goToRooms, 3500);
   }, [goToRooms]);
 
-  useEffect(() => () => {
-    if (roomClosedRedirectTimerRef.current !== null) {
-      window.clearTimeout(roomClosedRedirectTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (roomClosedRedirectTimerRef.current !== null) {
+        window.clearTimeout(roomClosedRedirectTimerRef.current);
+      }
+    },
+    [],
+  );
 
-  const applyRoomSnapshot = useCallback((snapshot: KaraokeRoomDetail, requestStartedAt = Date.now()) => {
-    const receivedAt = Date.now();
-    const guard = snapshotGuardRef.current;
-    if (guard.roomId !== numericRoomId) {
-      guard.roomId = numericRoomId;
-      guard.requestStartedAt = 0;
-      guard.playbackVersion = -1;
-    }
-    if (requestStartedAt < guard.requestStartedAt || snapshot.playback.version < guard.playbackVersion) return;
-    guard.requestStartedAt = requestStartedAt;
-    guard.playbackVersion = snapshot.playback.version;
-    setRoom(snapshot);
-    setSnapshotAt(receivedAt);
-    const serverTimeMs = snapshot.playback?.serverTimeMs;
-    if (typeof serverTimeMs === "number" && Number.isFinite(serverTimeMs) && serverTimeMs > 0) {
-      const midpoint = (requestStartedAt + receivedAt) / 2;
-      const offsetSample = serverTimeMs - midpoint;
-      setServerOffsetMs((previous) => previous === 0 ? offsetSample : previous * 0.75 + offsetSample * 0.25);
-    }
-  }, [numericRoomId]);
-  const voice = useMediasoupRoom(numericRoomId, joined && !inviteRequired && !pageError);
+  const applyRoomSnapshot = useCallback(
+    (snapshot: KaraokeRoomDetail, requestStartedAt = Date.now()) => {
+      const receivedAt = Date.now();
+      const guard = snapshotGuardRef.current;
+      if (guard.roomId !== numericRoomId) {
+        guard.roomId = numericRoomId;
+        guard.requestStartedAt = 0;
+        guard.playbackVersion = -1;
+      }
+      if (
+        requestStartedAt < guard.requestStartedAt ||
+        snapshot.playback.version < guard.playbackVersion
+      )
+        return;
+      guard.requestStartedAt = requestStartedAt;
+      guard.playbackVersion = snapshot.playback.version;
+      setRoom(snapshot);
+      setSnapshotAt(receivedAt);
+      const serverTimeMs = snapshot.playback?.serverTimeMs;
+      if (
+        typeof serverTimeMs === "number" &&
+        Number.isFinite(serverTimeMs) &&
+        serverTimeMs > 0
+      ) {
+        const midpoint = (requestStartedAt + receivedAt) / 2;
+        const offsetSample = serverTimeMs - midpoint;
+        setServerOffsetMs((previous) =>
+          previous === 0 ? offsetSample : previous * 0.75 + offsetSample * 0.25,
+        );
+      }
+    },
+    [numericRoomId],
+  );
+  const voice = useMediasoupRoom(
+    numericRoomId,
+    joined && !inviteRequired && !pageError,
+  );
 
   const refreshOutputDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setAudioOutputDevices(devices
-        .filter((device) => device.kind === "audiooutput")
-        .map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Loa ${index + 1}` })));
+      setAudioOutputDevices(
+        devices
+          .filter((device) => device.kind === "audiooutput")
+          .map((device, index) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Loa ${index + 1}`,
+          })),
+      );
     } catch {
       setAudioOutputDevices([]);
     }
@@ -308,8 +364,12 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (!joined) return;
     const devices = navigator.mediaDevices;
-    const onDeviceChange = () => { void refreshOutputDevices(); };
-    const refreshTimer = window.setTimeout(() => { void refreshOutputDevices(); }, 0);
+    const onDeviceChange = () => {
+      void refreshOutputDevices();
+    };
+    const refreshTimer = window.setTimeout(() => {
+      void refreshOutputDevices();
+    }, 0);
     devices?.addEventListener?.("devicechange", onDeviceChange);
     return () => {
       window.clearTimeout(refreshTimer);
@@ -318,9 +378,13 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   }, [joined, refreshOutputDevices, voice.microphoneOn]);
 
   useEffect(() => {
-    const audios = document.querySelectorAll<HTMLAudioElement>("audio[data-karaoke-room-audio]");
+    const audios = document.querySelectorAll<HTMLAudioElement>(
+      "audio[data-karaoke-room-audio]",
+    );
     for (const audio of audios) {
-      const routableAudio = audio as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void> };
+      const routableAudio = audio as HTMLAudioElement & {
+        setSinkId?: (deviceId: string) => Promise<void>;
+      };
       if (typeof routableAudio.setSinkId === "function") {
         void routableAudio.setSinkId(selectedOutputDeviceId).catch(() => {
           setAudioError("Không thể đổi loa đầu ra trên trình duyệt này.");
@@ -331,29 +395,32 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
 
   useEffect(() => pause(), [pause]);
 
-  const refreshRoom = useCallback(async (silent = false) => {
-    if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
-      setPageError("Đường dẫn phòng không hợp lệ.");
-      setLoading(false);
-      return false;
-    }
-    try {
-      const requestStartedAt = Date.now();
-      const snapshot = await fetchKaraokeRoom(numericRoomId);
-      applyRoomSnapshot(snapshot, requestStartedAt);
-      setPageError("");
-      return true;
-    } catch (error) {
-      if (isClosedRoomError(error)) {
-        handleRoomClosed();
+  const refreshRoom = useCallback(
+    async (silent = false) => {
+      if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
+        setPageError("Đường dẫn phòng không hợp lệ.");
+        setLoading(false);
         return false;
       }
-      if (!silent) setPageError(messageFor(error));
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [applyRoomSnapshot, handleRoomClosed, numericRoomId]);
+      try {
+        const requestStartedAt = Date.now();
+        const snapshot = await fetchKaraokeRoom(numericRoomId);
+        applyRoomSnapshot(snapshot, requestStartedAt);
+        setPageError("");
+        return true;
+      } catch (error) {
+        if (isClosedRoomError(error)) {
+          handleRoomClosed();
+          return false;
+        }
+        if (!silent) setPageError(messageFor(error));
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyRoomSnapshot, handleRoomClosed, numericRoomId],
+  );
 
   const enterRoom = useCallback(
     async (code?: string) => {
@@ -407,34 +474,40 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     applyRoomSnapshot(snapshot, requestStartedAt);
   }, [applyRoomSnapshot, inviteCode, numericRoomId]);
 
-  const onRealtimeEvent = useCallback((event: { type: string }) => {
-    if (event.type === "room.closed") {
-      handleRoomClosed();
-      return true;
-    }
-    void refreshRoom();
-    return false;
-  }, [handleRoomClosed, refreshRoom]);
+  const onRealtimeEvent = useCallback(
+    (event: { type: string }) => {
+      if (event.type === "room.closed") {
+        handleRoomClosed();
+        return true;
+      }
+      void refreshRoom();
+      return false;
+    },
+    [handleRoomClosed, refreshRoom],
+  );
   const onSubscribed = useCallback(() => {
     setConnectionError("");
     void refreshRoom();
   }, [refreshRoom]);
-  const onRealtimeError = useCallback((error: Error) => {
-    if (isClosedRoomError(error)) {
-      handleRoomClosed();
-      return;
-    }
-    if (
-      error.message.includes("ROOM_INVITE_REQUIRED") ||
-      error.message.includes("ROOM_INVITE_INVALID")
-    ) {
-      setJoined(false);
-      setInviteRequired(true);
-      setInviteError(error.message);
-      return;
-    }
-    setConnectionError("Đang thử kết nối lại để cập nhật phòng.");
-  }, [handleRoomClosed]);
+  const onRealtimeError = useCallback(
+    (error: Error) => {
+      if (isClosedRoomError(error)) {
+        handleRoomClosed();
+        return;
+      }
+      if (
+        error.message.includes("ROOM_INVITE_REQUIRED") ||
+        error.message.includes("ROOM_INVITE_INVALID")
+      ) {
+        setJoined(false);
+        setInviteRequired(true);
+        setInviteError(error.message);
+        return;
+      }
+      setConnectionError("Đang thử kết nối lại để cập nhật phòng.");
+    },
+    [handleRoomClosed],
+  );
   const { connected } = useKaraokeRoomLive({
     scope: "room",
     roomId: numericRoomId,
@@ -451,7 +524,9 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     const syncRoom = () => {
       if (document.visibilityState !== "visible" || requestInFlight) return;
       requestInFlight = true;
-      void refreshRoom(true).finally(() => { requestInFlight = false; });
+      void refreshRoom(true).finally(() => {
+        requestInFlight = false;
+      });
     };
     const timer = window.setInterval(syncRoom, 1000);
     document.addEventListener("visibilitychange", syncRoom);
@@ -474,12 +549,15 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
 
   const playback = room?.playback;
   const currentTrack = playback?.track;
-  const playingElapsedMs = playback?.status !== "PLAYING"
-    ? 0
-    : playback.serverTimeMs > 0
-      ? Math.max(0, clockNow + serverOffsetMs - playback.serverTimeMs)
-      : Math.max(0, clockNow - snapshotAt);
-  const currentPositionMs = playback ? playback.positionMs + playingElapsedMs : 0;
+  const playingElapsedMs =
+    playback?.status !== "PLAYING"
+      ? 0
+      : playback.serverTimeMs > 0
+        ? Math.max(0, clockNow + serverOffsetMs - playback.serverTimeMs)
+        : Math.max(0, clockNow - snapshotAt);
+  const currentPositionMs = playback
+    ? playback.positionMs + playingElapsedMs
+    : 0;
   const roomScoring = useKaraokeRoomScoring({
     roomId: numericRoomId,
     playbackRunId: playback?.playbackRunId ?? null,
@@ -493,8 +571,12 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   });
 
   useEffect(() => {
-    if (roomScoring.score === null || !roomScoring.scoreSessionId
-        || lastOpenedScoreSessionRef.current === roomScoring.scoreSessionId) return;
+    if (
+      roomScoring.score === null ||
+      !roomScoring.scoreSessionId ||
+      lastOpenedScoreSessionRef.current === roomScoring.scoreSessionId
+    )
+      return;
     lastOpenedScoreSessionRef.current = roomScoring.scoreSessionId;
     setGroupScoreOpen(true);
   }, [roomScoring.score, roomScoring.scoreSessionId]);
@@ -503,7 +585,9 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     if (!groupScoreOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusFrame = window.requestAnimationFrame(() => groupScoreCloseRef.current?.focus());
+    const focusFrame = window.requestAnimationFrame(() =>
+      groupScoreCloseRef.current?.focus(),
+    );
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setGroupScoreOpen(false);
@@ -549,12 +633,20 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
         ? Math.min(targetSeconds, Math.max(0, audio.duration - 0.15))
         : targetSeconds;
       if (Math.abs(audio.currentTime - boundedTarget) > 0.4) {
-        try { audio.currentTime = boundedTarget; } catch {}
+        try {
+          audio.currentTime = boundedTarget;
+        } catch {}
       }
       if (playback.status === "PLAYING" && audioEnabled) {
-        if (audio.paused) void audio.play().then(() => setAudioError("")).catch(() => {
-          setAudioError("Trình duyệt đang chặn âm thanh. Hãy bấm “Bật nghe sân khấu”.");
-        });
+        if (audio.paused)
+          void audio
+            .play()
+            .then(() => setAudioError(""))
+            .catch(() => {
+              setAudioError(
+                "Trình duyệt đang chặn âm thanh. Hãy bấm “Bật nghe sân khấu”.",
+              );
+            });
       } else {
         audio.pause();
       }
@@ -562,7 +654,12 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) syncAndPlay();
     else audio.addEventListener("loadedmetadata", syncAndPlay, { once: true });
     return () => audio.removeEventListener("loadedmetadata", syncAndPlay);
-  }, [audioEnabled, currentPositionMs, currentTrack?.instrumentalUrl, playback]);
+  }, [
+    audioEnabled,
+    currentPositionMs,
+    currentTrack?.instrumentalUrl,
+    playback,
+  ]);
 
   useEffect(() => {
     if (!isRequestOpen) return;
@@ -587,7 +684,9 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       await addKaraokeRoomQueueItem(numericRoomId, selectedTrack.songId);
       setIsRequestOpen(false);
       setSelectedTrack(null);
-      setNotice("Đã thêm bài vào hàng đợi. Chủ phòng có thể bắt đầu phát trên sân khấu.");
+      setNotice(
+        "Đã thêm bài vào hàng đợi. Chủ phòng có thể bắt đầu phát trên sân khấu.",
+      );
       await refreshRoom();
     } catch (error) {
       setNotice(messageFor(error));
@@ -650,23 +749,43 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
     }
   };
 
-  const playbackCommand = async (command: "start" | "pause" | "resume" | "skip") => {
+  const playbackCommand = async (
+    command: "start" | "pause" | "resume" | "skip",
+  ) => {
     if (!room || busy) return;
     setBusy(true);
     try {
       const requestStartedAt = Date.now();
-      const snapshot = await controlKaraokePlayback(numericRoomId, command, room.playback.version);
+      const snapshot = await controlKaraokePlayback(
+        numericRoomId,
+        command,
+        room.playback.version,
+      );
       applyRoomSnapshot(snapshot, requestStartedAt);
-      if ((command === "start" || command === "resume") && audioEnabled && audioRef.current) {
-        void audioRef.current.play().catch(() => setAudioError("Bấm “Bật nghe sân khấu” để cho phép phát nhạc."));
+      if (
+        (command === "start" || command === "resume") &&
+        audioEnabled &&
+        audioRef.current
+      ) {
+        void audioRef.current
+          .play()
+          .catch(() =>
+            setAudioError("Bấm “Bật nghe sân khấu” để cho phép phát nhạc."),
+          );
       }
-      setNotice(command === "skip" ? "Đã chuyển sang bài tiếp theo." : "Đã cập nhật trạng thái sân khấu.");
+      setNotice(
+        command === "skip"
+          ? "Đã chuyển sang bài tiếp theo."
+          : "Đã cập nhật trạng thái sân khấu.",
+      );
     } catch (error) {
       if (error instanceof KaraokeRoomApiError && error.status === 409) {
         await refreshRoom();
-        setNotice(error.code === "PLAYBACK_VERSION_CONFLICT"
-          ? "Phòng vừa có thao tác khác. Đã tải trạng thái mới; hãy thử lại."
-          : messageFor(error));
+        setNotice(
+          error.code === "PLAYBACK_VERSION_CONFLICT"
+            ? "Phòng vừa có thao tác khác. Đã tải trạng thái mới; hãy thử lại."
+            : messageFor(error),
+        );
       } else {
         setNotice(messageFor(error));
       }
@@ -678,12 +797,16 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   const enableRoomAudio = async () => {
     setAudioEnabled(true);
     setAudioError("");
-    const audioElements = document.querySelectorAll<HTMLAudioElement>("audio[data-karaoke-room-audio]");
+    const audioElements = document.querySelectorAll<HTMLAudioElement>(
+      "audio[data-karaoke-room-audio]",
+    );
     for (const audio of audioElements) {
       try {
         await audio.play();
       } catch {
-        setAudioError("Chưa thể bật âm thanh. Hãy kiểm tra trình duyệt hoặc thiết bị đầu ra.");
+        setAudioError(
+          "Chưa thể bật âm thanh. Hãy kiểm tra trình duyệt hoặc thiết bị đầu ra.",
+        );
       }
     }
   };
@@ -700,12 +823,26 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       <main className={styles.page}>
         <div className={styles.pageGlow} aria-hidden="true" />
         <div className={styles.modalBackdrop}>
-          <section className={`${styles.modal} ${styles.roomClosedModal}`} role="alertdialog" aria-modal="true" aria-labelledby="room-closed-title">
-            <span className={styles.roomClosedIcon}><DoorOpen size={25} /></span>
+          <section
+            className={`${styles.modal} ${styles.roomClosedModal}`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="room-closed-title"
+          >
+            <span className={styles.roomClosedIcon}>
+              <DoorOpen size={25} />
+            </span>
             <span className={styles.sectionKicker}>PHÒNG KARAOKE</span>
             <h1 id="room-closed-title">Phòng đã đóng</h1>
-            <p>Chủ phòng đã đóng phòng này. Bạn sẽ được đưa về danh sách phòng trong giây lát.</p>
-            <button type="button" className={styles.modalSubmit} onClick={goToRooms}>
+            <p>
+              Chủ phòng đã đóng phòng này. Bạn sẽ được đưa về danh sách phòng
+              trong giây lát.
+            </p>
+            <button
+              type="button"
+              className={styles.modalSubmit}
+              onClick={goToRooms}
+            >
               Về danh sách phòng <ArrowRight size={17} />
             </button>
           </section>
@@ -833,14 +970,23 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           >
             <DoorOpen size={14} /> Rời phòng
           </button>
-          <span className={styles.visuallyHidden} role="status" aria-live="polite">
-            {connectionError || (connected ? "Dữ liệu đang đồng bộ trực tiếp" : "Đang kết nối…")}{voice.connected ? " · Media đã kết nối" : ""}
+          <span
+            className={styles.visuallyHidden}
+            role="status"
+            aria-live="polite"
+          >
+            {connectionError ||
+              (connected ? "Dữ liệu đang đồng bộ trực tiếp" : "Đang kết nối…")}
+            {voice.connected ? " · Media đã kết nối" : ""}
           </span>
         </div>
       </section>
 
       {room.visibility === "PRIVATE" && room.canManage && room.inviteCode && (
-        <section className={styles.roomInviteCard} aria-label="Mã mời phòng riêng">
+        <section
+          className={styles.roomInviteCard}
+          aria-label="Mã mời phòng riêng"
+        >
           <div className={styles.roomInviteHeader}>
             <div className={styles.roomInviteHeading}>
               <span className={styles.roomInviteIcon} aria-hidden="true">
@@ -848,17 +994,26 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               </span>
               <div>
                 <span className={styles.sectionKicker}>MÃ MỜI PHÒNG RIÊNG</span>
-                <p>Chia sẻ mã này để bạn bè tham gia buổi hát. Bạn có thể sao chép lại bất cứ lúc nào.</p>
+                <p>
+                  Chia sẻ mã này để bạn bè tham gia buổi hát. Bạn có thể sao
+                  chép lại bất cứ lúc nào.
+                </p>
               </div>
             </div>
-            <span className={styles.roomInviteBadge}>Chỉ chủ phòng xem được</span>
+            <span className={styles.roomInviteBadge}>
+              Chỉ chủ phòng xem được
+            </span>
           </div>
           <div className={styles.roomInviteBottom}>
             <div className={styles.roomInviteCodeBox}>
               <span className={styles.roomInviteCodeLabel}>MÃ THAM GIA</span>
               <code className={styles.roomInviteCode}>{room.inviteCode}</code>
             </div>
-            <button type="button" className={styles.roomInviteCopyButton} onClick={() => void copyRoomInviteCode()}>
+            <button
+              type="button"
+              className={styles.roomInviteCopyButton}
+              onClick={() => void copyRoomInviteCode()}
+            >
               {inviteCodeCopied ? <Check size={16} /> : <Copy size={16} />}
               {inviteCodeCopied ? "Đã sao chép" : "Sao chép mã"}
             </button>
@@ -875,7 +1030,12 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
             <div className={styles.stageAura} aria-hidden="true" />
             <div className={styles.stageTopline}>
               <span className={styles.stageTag}>
-                <AudioLines size={13} /> {playback?.status === "PLAYING" ? "SÂN KHẤU ĐANG PHÁT" : playback?.status === "PAUSED" ? "SÂN KHẤU TẠM DỪNG" : "SÂN KHẤU ĐANG CHỜ"}
+                <AudioLines size={13} />{" "}
+                {playback?.status === "PLAYING"
+                  ? "SÂN KHẤU ĐANG PHÁT"
+                  : playback?.status === "PAUSED"
+                    ? "SÂN KHẤU TẠM DỪNG"
+                    : "SÂN KHẤU ĐANG CHỜ"}
               </span>
               <span className={styles.stageRoom}>
                 PHÒNG #{room.id} <span aria-hidden="true">/</span>{" "}
@@ -887,58 +1047,117 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 <Headphones size={30} />
               </span>
               <span className={styles.performerCaption}>TRẠNG THÁI PHÒNG</span>
-              <h2 id="stage-heading">{currentTrack?.title ?? (playback?.status === "PAUSED" ? "Sân khấu đang tạm dừng" : "Sẵn sàng cho buổi hát")}</h2>
-              <p>{currentTrack ? currentTrack.artist || "Đang phát nhạc nền karaoke" : "Bài hát chung và lời đồng bộ sẽ xuất hiện tại đây khi chủ phòng bắt đầu."}</p>
+              <h2 id="stage-heading">
+                {currentTrack?.title ??
+                  (playback?.status === "PAUSED"
+                    ? "Sân khấu đang tạm dừng"
+                    : "Sẵn sàng cho buổi hát")}
+              </h2>
+              <p>
+                {currentTrack
+                  ? currentTrack.artist || "Đang phát nhạc nền karaoke"
+                  : "Bài hát chung và lời đồng bộ sẽ xuất hiện tại đây khi chủ phòng bắt đầu."}
+              </p>
               {currentTrack && lyricCues.length > 0 && (
-                <div className={styles.roomLyrics} aria-live="polite" aria-atomic="true">
+                <div
+                  className={styles.roomLyrics}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
                   <span>{lyricCues[activeLyricIndex - 1]?.text ?? ""}</span>
                   <strong>{lyricCues[activeLyricIndex]?.text ?? "♪"}</strong>
                   <span>{lyricCues[activeLyricIndex + 1]?.text ?? ""}</span>
                 </div>
               )}
-              {currentTrack && !lyricCues.length && currentTrack.lyricsPlain && (
-                <div className={styles.roomLyricsPlain}>{currentTrack.lyricsPlain.split(/\r?\n/).slice(0, 3).join(" · ")}</div>
-              )}
+              {currentTrack &&
+                !lyricCues.length &&
+                currentTrack.lyricsPlain && (
+                  <div className={styles.roomLyricsPlain}>
+                    {currentTrack.lyricsPlain
+                      .split(/\r?\n/)
+                      .slice(0, 3)
+                      .join(" · ")}
+                  </div>
+                )}
             </div>
             <div className={styles.stageSong}>
               <Music2 size={16} aria-hidden="true" />
               <span>
                 <small>{currentTrack ? "ĐANG PHÁT" : "BÀI TIẾP THEO"}</small>
                 <strong>
-                  {currentTrack?.title ?? room.queue[0]?.title ?? "Chưa có bài trong hàng đợi"}
+                  {currentTrack?.title ??
+                    room.queue[0]?.title ??
+                    "Chưa có bài trong hàng đợi"}
                 </strong>
               </span>
             </div>
             <div className={styles.roomPlaybackControls}>
               {room.canManage && playback?.status === "IDLE" && (
-                <button type="button" className={styles.playbackButton} disabled={busy || !room.queue.length} onClick={() => void playbackCommand("start")}>
+                <button
+                  type="button"
+                  className={styles.playbackButton}
+                  disabled={busy || !room.queue.length}
+                  onClick={() => void playbackCommand("start")}
+                >
                   <Play size={15} /> Bắt đầu
                 </button>
               )}
               {room.canManage && playback?.status === "PLAYING" && (
-                <button type="button" className={styles.playbackButton} disabled={busy} onClick={() => void playbackCommand("pause")}>
+                <button
+                  type="button"
+                  className={styles.playbackButton}
+                  disabled={busy}
+                  onClick={() => void playbackCommand("pause")}
+                >
                   <Pause size={15} /> Tạm dừng
                 </button>
               )}
               {room.canManage && playback?.status === "PAUSED" && (
-                <button type="button" className={styles.playbackButton} disabled={busy} onClick={() => void playbackCommand("resume")}>
+                <button
+                  type="button"
+                  className={styles.playbackButton}
+                  disabled={busy}
+                  onClick={() => void playbackCommand("resume")}
+                >
                   <Play size={15} /> Tiếp tục
                 </button>
               )}
               {room.canManage && currentTrack && (
-                <button type="button" className={styles.playbackButton} disabled={busy} onClick={() => void playbackCommand("skip")}>
+                <button
+                  type="button"
+                  className={styles.playbackButton}
+                  disabled={busy}
+                  onClick={() => void playbackCommand("skip")}
+                >
                   <SkipForward size={15} /> Bỏ qua
                 </button>
               )}
-              <button type="button" className={styles.playbackButton} onClick={() => void enableRoomAudio()}>
-                <Volume2 size={15} /> {audioEnabled ? "Âm thanh đã bật" : "Bật nghe sân khấu"}
+              <button
+                type="button"
+                className={styles.playbackButton}
+                onClick={() => void enableRoomAudio()}
+              >
+                <Volume2 size={15} />{" "}
+                {audioEnabled ? "Âm thanh đã bật" : "Bật nghe sân khấu"}
               </button>
             </div>
-            {audioError && <p className={styles.playbackError} role="status">{audioError}</p>}
-            <audio ref={audioRef} preload="auto" data-karaoke-room-audio="instrumental" onEnded={roomScoring.trackEnded} />
+            {audioError && (
+              <p className={styles.playbackError} role="status">
+                {audioError}
+              </p>
+            )}
+            <audio
+              ref={audioRef}
+              preload="auto"
+              data-karaoke-room-audio="instrumental"
+              onEnded={roomScoring.trackEnded}
+            />
             <div className={styles.remoteAudioPlayers} aria-hidden="true">
               {voice.remoteVoices.map((remote) => {
-                const settings = remoteAudioSettings[remote.userId] ?? { muted: false, volume: 1 };
+                const settings = remoteAudioSettings[remote.userId] ?? {
+                  muted: false,
+                  volume: 1,
+                };
                 return (
                   <RemoteAudioPlayer
                     key={remote.userId}
@@ -952,14 +1171,23 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               })}
             </div>
             <div className={styles.stageProgress}>
-              <span>{currentTrack ? clockLabel(currentPositionMs) : "Chưa phát"}</span>
+              <span>
+                {currentTrack ? clockLabel(currentPositionMs) : "Chưa phát"}
+              </span>
               <div className={styles.progressTrack}>
-                <span style={{ width: `${currentTrack?.durationMs ? Math.min(100, currentPositionMs / currentTrack.durationMs * 100) : 0}%` }} />
+                <span
+                  style={{
+                    width: `${currentTrack?.durationMs ? Math.min(100, (currentPositionMs / currentTrack.durationMs) * 100) : 0}%`,
+                  }}
+                />
               </div>
-              <span>{currentTrack ? durationLabel(currentTrack.durationMs) : "--:--"}</span>
+              <span>
+                {currentTrack
+                  ? durationLabel(currentTrack.durationMs)
+                  : "--:--"}
+              </span>
             </div>
           </section>
-
         </div>
 
         <aside
@@ -1052,7 +1280,9 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                   CÙNG CHUNG GIAI ĐIỆU
                 </span>
                 <h2 id="members-heading">Trong phòng</h2>
-                <p className={styles.memberCardHint}>Chọn thành viên để chỉnh âm lượng riêng.</p>
+                <p className={styles.memberCardHint}>
+                  Chọn thành viên để chỉnh âm lượng riêng.
+                </p>
               </div>
               <span className={styles.memberCount}>
                 {room.memberCount}/{room.maxMembers} người
@@ -1062,9 +1292,14 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               {room.members.map((member) => {
                 const backgroundImage = safeImageBackground(member.avatarUrl);
                 const memberId = String(member.userId);
-                const settings = remoteAudioSettings[memberId] ?? { muted: false, volume: 1 };
+                const settings = remoteAudioSettings[memberId] ?? {
+                  muted: false,
+                  volume: 1,
+                };
                 const isSelected = selectedMemberAudioId === memberId;
-                const hasRemoteVoice = voice.remoteVoices.some((remote) => remote.userId === memberId);
+                const hasRemoteVoice = voice.remoteVoices.some(
+                  (remote) => remote.userId === memberId,
+                );
                 const controlsId = `member-audio-controls-${memberId}`;
                 return (
                   <div key={member.userId} className={styles.memberEntry}>
@@ -1075,7 +1310,11 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                       aria-expanded={isSelected}
                       aria-controls={controlsId}
                       aria-label={`Điều chỉnh âm thanh của ${member.name}`}
-                      onClick={() => setSelectedMemberAudioId((current) => current === memberId ? null : memberId)}
+                      onClick={() =>
+                        setSelectedMemberAudioId((current) =>
+                          current === memberId ? null : memberId,
+                        )
+                      }
                     >
                       <span
                         className={styles.memberAvatar}
@@ -1092,7 +1331,10 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                         {member.name}
                         {member.host && <small>Chủ phòng</small>}
                       </span>
-                      <span className={styles.memberAffordance} aria-hidden="true">
+                      <span
+                        className={styles.memberAffordance}
+                        aria-hidden="true"
+                      >
                         <AudioLines size={13} />
                         <span
                           className={`${styles.memberDot} ${voice.speakingUserIds.includes(memberId) ? styles.memberSpeaking : ""}`}
@@ -1100,12 +1342,18 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                       </span>
                     </button>
                     {isSelected && (
-                      <div id={controlsId} className={styles.memberAudioControls} aria-labelledby={`room-member-${memberId}`}>
+                      <div
+                        id={controlsId}
+                        className={styles.memberAudioControls}
+                        aria-labelledby={`room-member-${memberId}`}
+                      >
                         <div className={styles.memberAudioControlHeader}>
                           <span className={styles.memberAudioControlTitle}>
                             <Volume2 size={14} /> Âm lượng của bạn
                           </span>
-                          <span className={styles.memberAudioLevel}>{Math.round(settings.volume * 100)}%</span>
+                          <span className={styles.memberAudioLevel}>
+                            {Math.round(settings.volume * 100)}%
+                          </span>
                         </div>
                         <div className={styles.memberAudioControlRow}>
                           <button
@@ -1113,30 +1361,61 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                             className={styles.memberAudioMute}
                             aria-label={`${settings.muted ? "Bật tiếng" : "Tắt tiếng"} ${member.name} trên thiết bị của bạn`}
                             aria-pressed={settings.muted}
-                            onClick={() => setRemoteAudioSettings((current) => {
-                              const currentSettings = current[memberId] ?? { muted: false, volume: 1 };
-                              return { ...current, [memberId]: { ...currentSettings, muted: !currentSettings.muted } };
-                            })}
+                            onClick={() =>
+                              setRemoteAudioSettings((current) => {
+                                const currentSettings = current[memberId] ?? {
+                                  muted: false,
+                                  volume: 1,
+                                };
+                                return {
+                                  ...current,
+                                  [memberId]: {
+                                    ...currentSettings,
+                                    muted: !currentSettings.muted,
+                                  },
+                                };
+                              })
+                            }
                           >
-                            {settings.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                            {settings.muted ? (
+                              <VolumeX size={15} />
+                            ) : (
+                              <Volume2 size={15} />
+                            )}
                           </button>
                           <label className={styles.memberAudioSlider}>
-                            <span className={styles.visuallyHidden}>Âm lượng của {member.name}</span>
+                            <span className={styles.visuallyHidden}>
+                              Âm lượng của {member.name}
+                            </span>
                             <input
                               type="range"
                               min="0"
                               max="1"
                               step="0.05"
                               value={settings.volume}
-                              onChange={(event) => setRemoteAudioSettings((current) => {
-                                const currentSettings = current[memberId] ?? { muted: false, volume: 1 };
-                                return { ...current, [memberId]: { ...currentSettings, volume: Number(event.target.value) } };
-                              })}
+                              onChange={(event) =>
+                                setRemoteAudioSettings((current) => {
+                                  const currentSettings = current[memberId] ?? {
+                                    muted: false,
+                                    volume: 1,
+                                  };
+                                  return {
+                                    ...current,
+                                    [memberId]: {
+                                      ...currentSettings,
+                                      volume: Number(event.target.value),
+                                    },
+                                  };
+                                })
+                              }
                             />
                           </label>
                         </div>
                         {!hasRemoteVoice && (
-                          <p className={styles.memberAudioHint}>Thành viên chưa bật micro; cài đặt sẽ áp dụng khi họ phát giọng.</p>
+                          <p className={styles.memberAudioHint}>
+                            Thành viên chưa bật micro; cài đặt sẽ áp dụng khi họ
+                            phát giọng.
+                          </p>
                         )}
                       </div>
                     )}
@@ -1161,9 +1440,20 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
         <div className={styles.deviceCopy}>
           <span className={styles.sectionKicker}>TRƯỚC KHI LÊN SÂN KHẤU</span>
           <h2 id="device-heading">Thiết bị âm thanh</h2>
-          <p>{voice.connected ? "Âm thanh phòng đã kết nối. Micro luôn tắt cho đến khi bạn chủ động bật." : "Đang kết nối máy chủ voice mediasoup; micro mặc định tắt."}</p>
-          <p>Phần cao độ từ micro đang bật được ghép vào một điểm chung cho cả phòng sau khi bài hát kết thúc.</p>
-          {voice.voiceError && <p className={styles.micError} role="status">{voice.voiceError}</p>}
+          <p>
+            {voice.connected
+              ? "Âm thanh phòng đã kết nối. Micro luôn tắt cho đến khi bạn chủ động bật."
+              : "Đang kết nối máy chủ voice mediasoup; micro mặc định tắt."}
+          </p>
+          <p>
+            Phần cao độ từ micro đang bật được ghép vào một điểm chung cho cả
+            phòng sau khi bài hát kết thúc.
+          </p>
+          {voice.voiceError && (
+            <p className={styles.micError} role="status">
+              {voice.voiceError}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -1171,22 +1461,44 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           onClick={() => void voice.toggleMicrophone()}
           disabled={!voice.ready || voice.microphoneBusy}
           aria-pressed={voice.microphoneOn}
-          title={!voice.ready ? "Đang kết nối đến mediasoup" : voice.microphoneBusy ? "Đang xử lý micro" : voice.microphoneOn ? "Tắt micro" : "Bật micro cho mọi người trong phòng nghe"}
+          title={
+            !voice.ready
+              ? "Đang kết nối đến mediasoup"
+              : voice.microphoneBusy
+                ? "Đang xử lý micro"
+                : voice.microphoneOn
+                  ? "Tắt micro"
+                  : "Bật micro cho mọi người trong phòng nghe"
+          }
         >
           {voice.microphoneOn ? <MicOff size={16} /> : <Mic2 size={16} />}
-          {!voice.ready ? "Đang kết nối" : voice.microphoneBusy ? "Đang xử lý micro…" : voice.microphoneOn ? "Tắt micro" : "Bật micro"}
+          {!voice.ready
+            ? "Đang kết nối"
+            : voice.microphoneBusy
+              ? "Đang xử lý micro…"
+              : voice.microphoneOn
+                ? "Tắt micro"
+                : "Bật micro"}
         </button>
         <div className={styles.deviceSettings}>
           <label>
             <span>Micro đầu vào</span>
             <select
               value={voice.selectedInputDeviceId}
-              onChange={(event) => void voice.selectInputDevice(event.target.value)}
-              disabled={voice.microphoneBusy || voice.audioInputDevices.length === 0}
+              onChange={(event) =>
+                void voice.selectInputDevice(event.target.value)
+              }
+              disabled={
+                voice.microphoneBusy || voice.audioInputDevices.length === 0
+              }
             >
-              {voice.audioInputDevices.length === 0 && <option value="">Thiết bị mặc định</option>}
+              {voice.audioInputDevices.length === 0 && (
+                <option value="">Thiết bị mặc định</option>
+              )}
               {voice.audioInputDevices.map((device) => (
-                <option value={device.deviceId} key={device.deviceId}>{device.label}</option>
+                <option value={device.deviceId} key={device.deviceId}>
+                  {device.label}
+                </option>
               ))}
             </select>
           </label>
@@ -1194,16 +1506,25 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
             <span>Loa đầu ra</span>
             <select
               value={selectedOutputDeviceId}
-              onChange={(event) => setSelectedOutputDeviceId(event.target.value)}
+              onChange={(event) =>
+                setSelectedOutputDeviceId(event.target.value)
+              }
               disabled={audioOutputDevices.length === 0}
             >
               <option value="">Loa mặc định</option>
-              {audioOutputDevices.filter((device) => device.deviceId).map((device) => (
-                <option value={device.deviceId} key={device.deviceId}>{device.label}</option>
-              ))}
+              {audioOutputDevices
+                .filter((device) => device.deviceId)
+                .map((device) => (
+                  <option value={device.deviceId} key={device.deviceId}>
+                    {device.label}
+                  </option>
+                ))}
             </select>
           </label>
-          <p>Điều chỉnh âm lượng hoặc tắt tiếng từng thành viên chỉ ảnh hưởng thiết bị của bạn.</p>
+          <p>
+            Điều chỉnh âm lượng hoặc tắt tiếng từng thành viên chỉ ảnh hưởng
+            thiết bị của bạn.
+          </p>
         </div>
       </section>
 
@@ -1230,7 +1551,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
           }}
         >
           <div
-            className={styles.modal}
+            className={`${styles.modal} ${styles.requestModal}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="request-title"
@@ -1269,14 +1590,10 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
             <KaraokeTrackCatalog
               selectedSongId={selectedTrack?.songId ?? null}
               onSelect={handleTrackSelect}
-              pageSize={5}
+              pageSize={10}
               compact
             />
-            <div className={styles.modalNotice}>
-              <Volume2 size={16} />
-              Bài được đưa vào hàng đợi chung. Hiện phòng chưa phát beat hoặc
-              micro trực tuyến.
-            </div>
+
             <button
               type="button"
               className={styles.modalSubmit}
@@ -1294,73 +1611,88 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
         </div>
       )}
 
-      {groupScoreOpen && roomScoring.score !== null && typeof document !== "undefined"
+      {groupScoreOpen &&
+      roomScoring.score !== null &&
+      typeof document !== "undefined"
         ? createPortal(
-        <div
-          className={styles.roomScoreBackdrop}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setGroupScoreOpen(false);
-          }}
-        >
-          <section
-            className={styles.roomScoreModal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="room-score-title"
-            aria-describedby="room-score-description"
-          >
-            <button
-              ref={groupScoreCloseRef}
-              type="button"
-              className={styles.roomScoreClose}
-              onClick={() => setGroupScoreOpen(false)}
-              aria-label="Đóng kết quả điểm chung"
-            >
-              <X size={17} />
-            </button>
-            <div className={styles.roomScoreHeading}>
-              <span className={styles.roomScoreMark}><Trophy size={19} strokeWidth={1.8} /></span>
-              <span>KẾT QUẢ PHIÊN HÁT CHUNG</span>
-            </div>
-            <h2 id="room-score-title">Cả phòng đã cùng tỏa sáng</h2>
-            <p className={styles.roomScoreSong} title={roomScoring.scoreSongTitle}>
-              {roomScoring.scoreSongTitle}
-            </p>
             <div
-              className={styles.roomScoreRing}
-              style={{ background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score))}% 100%)` }}
-              role="meter"
-              aria-label="Điểm chung của phòng"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={roomScoring.score}
+              className={styles.roomScoreBackdrop}
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget)
+                  setGroupScoreOpen(false);
+              }}
             >
-              <div className={styles.roomScoreRingCore}>
-                <span>ĐIỂM CHUNG</span>
-                <strong>{roomScoring.score.toFixed(1)}</strong>
-                <small>trên 100</small>
-              </div>
-            </div>
-            <div className={styles.roomScoreTogether}>
-              <Sparkles size={15} aria-hidden="true" />
-              Một bài hát · Một phiên · Một điểm số cho cả phòng
-            </div>
-            <p id="room-score-description" className={styles.roomScoreDescription}>
-              Điểm được tổng hợp từ các phần hát của thành viên bật micro trong bài này.
-            </p>
-            <button
-              ref={groupScoreActionRef}
-              type="button"
-              className={styles.roomScoreAction}
-              onClick={() => setGroupScoreOpen(false)}
-            >
-              Trở lại phòng hát
-              <ArrowRight size={16} />
-            </button>
-          </section>
-        </div>,
-        document.body,
-      ) : null}
+              <section
+                className={styles.roomScoreModal}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="room-score-title"
+                aria-describedby="room-score-description"
+              >
+                <button
+                  ref={groupScoreCloseRef}
+                  type="button"
+                  className={styles.roomScoreClose}
+                  onClick={() => setGroupScoreOpen(false)}
+                  aria-label="Đóng kết quả điểm chung"
+                >
+                  <X size={17} />
+                </button>
+                <div className={styles.roomScoreHeading}>
+                  <span className={styles.roomScoreMark}>
+                    <Trophy size={19} strokeWidth={1.8} />
+                  </span>
+                  <span>KẾT QUẢ PHIÊN HÁT CHUNG</span>
+                </div>
+                <h2 id="room-score-title">Cả phòng đã cùng tỏa sáng</h2>
+                <p
+                  className={styles.roomScoreSong}
+                  title={roomScoring.scoreSongTitle}
+                >
+                  {roomScoring.scoreSongTitle}
+                </p>
+                <div
+                  className={styles.roomScoreRing}
+                  style={{
+                    background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score))}% 100%)`,
+                  }}
+                  role="meter"
+                  aria-label="Điểm chung của phòng"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={roomScoring.score}
+                >
+                  <div className={styles.roomScoreRingCore}>
+                    <span>ĐIỂM CHUNG</span>
+                    <strong>{roomScoring.score.toFixed(1)}</strong>
+                    <small>trên 100</small>
+                  </div>
+                </div>
+                <div className={styles.roomScoreTogether}>
+                  <Sparkles size={15} aria-hidden="true" />
+                  Một bài hát · Một phiên · Một điểm số cho cả phòng
+                </div>
+                <p
+                  id="room-score-description"
+                  className={styles.roomScoreDescription}
+                >
+                  Điểm được tổng hợp từ các phần hát của thành viên bật micro
+                  trong bài này.
+                </p>
+                <button
+                  ref={groupScoreActionRef}
+                  type="button"
+                  className={styles.roomScoreAction}
+                  onClick={() => setGroupScoreOpen(false)}
+                >
+                  Trở lại phòng hát
+                  <ArrowRight size={16} />
+                </button>
+              </section>
+            </div>,
+            document.body,
+          )
+        : null}
     </main>
   );
 }

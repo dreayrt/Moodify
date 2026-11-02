@@ -528,14 +528,37 @@ export async function fetchKaraokeTracks(options?: {
     if (token) headers.Authorization = `Bearer ${token}`;
   } catch {}
 
-  const response = await fetch(`${API_BASE}/karaoke/tracks?${params.toString()}`, {
-    headers,
-    signal: options?.signal,
-    cache: "no-store",
-  });
+  const requestController = new AbortController();
+  let timedOut = false;
+  const abortFromCaller = () => requestController.abort();
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    requestController.abort();
+  }, 10_000);
+  options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  if (options?.signal?.aborted) abortFromCaller();
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/karaoke/tracks?${params.toString()}`, {
+      headers,
+      signal: requestController.signal,
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (timedOut) {
+      throw new Error(
+        "Kho bài Karaoke không phản hồi sau 10 giây. Hãy kiểm tra backend và dịch vụ MongoDB.",
+      );
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    options?.signal?.removeEventListener("abort", abortFromCaller);
+  }
   if (!response.ok) {
     if (response.status === 401) throw new Error("Vui lòng đăng nhập để xem kho bài Karaoke.");
-    throw new Error("Không thể tải kho bài Karaoke.");
+    throw new Error(`Máy chủ kho Karaoke trả về lỗi (HTTP ${response.status}).`);
   }
   return response.json();
 }
