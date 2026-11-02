@@ -5,9 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Crown,
   Check,
-  Sparkles,
   Download,
-  Users,
   ShieldCheck,
   Zap,
   QrCode,
@@ -25,14 +23,11 @@ import SubscriptionManagement from "@/components/dashboard/subscription-manageme
 import {
   fetchServicePackages,
   fetchPackageQuotes,
-  fetchMySubscription,
   subscribePackage,
-  devTogglePremium,
   createCheckoutPayment,
   getPaymentStatus,
   type ServicePackage,
   type PackageQuote,
-  type SubscriptionInfo,
   type CheckoutResponse,
   type PaymentStatusResponse,
 } from "@/lib/api-client";
@@ -43,14 +38,11 @@ export default function PremiumPage() {
 
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [packageQuotes, setPackageQuotes] = useState<PackageQuote[]>([]);
-  const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
-  const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<"1month" | "3months" | "1year">("1month");
 
   // Payment modal state (SePay VietQR)
   const [selectedPkg, setSelectedPkg] = useState<ServicePackage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null);
   const [pollingStatus, setPollingStatus] = useState<"IDLE" | "POLLING" | "SUCCESS" | "EXPIRED" | "ERROR">("IDLE");
@@ -61,38 +53,18 @@ export default function PremiumPage() {
 
   const loadData = async () => {
     try {
-      const [pkgs, sub] = await Promise.all([
-        fetchServicePackages().catch(() => []),
-        fetchMySubscription().catch(() => null),
-      ]);
+      const pkgs = await fetchServicePackages().catch(() => []);
       const quotes = await fetchPackageQuotes().catch(() => []);
       setPackages(pkgs);
-      setSubInfo(sub);
       setPackageQuotes(quotes);
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
   }, []);
-
-  // Quick dev toggle
-  const handleDevToggle = async (enable: boolean, targetPkgId?: number) => {
-    try {
-      setIsProcessing(true);
-      await devTogglePremium(enable, 30, targetPkgId);
-      await loadData();
-      window.dispatchEvent(new CustomEvent("moodify-subscription-updated"));
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi đổi trạng thái");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handleOpenCheckout = async (pkg: ServicePackage) => {
     setSelectedPkg(pkg);
@@ -272,7 +244,7 @@ export default function PremiumPage() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-6 md:py-10 space-y-10">
+    <div className="w-full max-w-6xl mx-auto px-4 py-6 md:py-10 space-y-8">
       {/* Top Banner */}
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-bold tracking-wider uppercase shadow-[0_0_20px_rgba(245,158,11,0.2)]">
@@ -287,107 +259,22 @@ export default function PremiumPage() {
         </p>
       </div>
 
-      {/* Account Status Card & Dev Quick Toggle */}
-      <div className="p-5 rounded-2xl border border-white/10 bg-slate-950/70 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
-              subInfo?.isPremium
-                ? "bg-amber-400/15 border-amber-400/40 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]"
-                : "bg-white/5 border-white/10 text-white/50"
-            }`}
-          >
-            <Crown className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                Trạng thái tài khoản:
-              </p>
-              <span
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                  subInfo?.isPremium
-                    ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
-                    : "bg-white/10 text-white/70"
-                }`}
-              >
-                {subInfo?.isPremium ? subInfo.tier : "FREE"}
-              </span>
-            </div>
-            <p className="text-base font-bold text-white mt-0.5">
-              {subInfo?.packageName || "Tài khoản Miễn phí"}
-              {subInfo?.isPremium && subInfo.daysRemaining > 0 && (
-                <span className="text-xs font-medium text-emerald-400 ml-2">
-                  (Còn {subInfo.daysRemaining} ngày)
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-
-        {/* Dev Quick Tier Switcher */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 self-end md:self-auto">
-          <div className="text-right hidden sm:block">
-            <span className="text-[10.5px] text-white/40 block">Chế độ Test đồ án:</span>
-            <span className="text-xs font-semibold text-purple-300">Chuyển gói tức thì (1-click)</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/[0.05] border border-white/10">
-            <button
-              onClick={() => handleDevToggle(false)}
-              disabled={isProcessing}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                !subInfo?.isPremium
-                  ? "bg-white/20 text-white shadow-sm"
-                  : "text-white/60 hover:text-white"
-              }`}
-              title="Chuyển về tài khoản miễn phí"
-            >
-              Miễn phí (Free)
-            </button>
-            <button
-              onClick={() => handleDevToggle(true, 3)}
-              disabled={isProcessing}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                subInfo?.isPremium && subInfo?.tier !== "FAMILY"
-                  ? "bg-purple-500/40 text-purple-200 border border-purple-400/40 shadow-sm"
-                  : "text-white/60 hover:text-white"
-              }`}
-              title="Kích hoạt Gói VIP Cá Nhân (29K)"
-            >
-              VIP Cá Nhân (29K)
-            </button>
-            <button
-              onClick={() => handleDevToggle(true, 6)}
-              disabled={isProcessing}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                subInfo?.isPremium && subInfo?.tier === "FAMILY"
-                  ? "bg-amber-400/30 text-amber-300 border border-amber-400/40 shadow-sm"
-                  : "text-white/60 hover:text-white"
-              }`}
-              title="Kích hoạt Gói Gia Đình (59K)"
-            >
-              Gia Đình (59K)
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Cycle Selector */}
       <div className="flex justify-center">
-        <div className="inline-flex p-1 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl">
+        <div className="grid w-full max-w-xl grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
           <button
             onClick={() => setCycle("1month")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight transition-all cursor-pointer sm:px-4 sm:text-xs ${
               cycle === "1month"
                 ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
                 : "text-white/60 hover:text-white"
             }`}
           >
-            Hàng Tháng (30 ngày)
+            Hàng Tháng <span className="ml-1 font-medium opacity-70">30 ngày</span>
           </button>
           <button
             onClick={() => setCycle("3months")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`flex min-h-11 flex-wrap items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight transition-all cursor-pointer sm:px-4 sm:text-xs ${
               cycle === "3months"
                 ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
                 : "text-white/60 hover:text-white"
@@ -400,7 +287,7 @@ export default function PremiumPage() {
           </button>
           <button
             onClick={() => setCycle("1year")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`flex min-h-11 flex-wrap items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight transition-all cursor-pointer sm:px-4 sm:text-xs ${
               cycle === "1year"
                 ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
                 : "text-white/60 hover:text-white"
@@ -415,7 +302,7 @@ export default function PremiumPage() {
       </div>
 
       {/* Pricing Cards Grid - 2 Columns (Centered & Balanced) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 max-w-5xl mx-auto">
         {/* Card 1: Gói Cá Nhân FULL */}
         <div className="rounded-3xl border-2 border-purple-500/60 bg-gradient-to-br from-purple-950/40 via-slate-950/90 to-purple-900/20 backdrop-blur-2xl p-7 flex flex-col justify-between shadow-2xl relative group hover:border-purple-400 transition-all">
           <div className="absolute -top-0.5 right-6 px-3 py-1 rounded-b-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-black tracking-wider uppercase shadow-md">
@@ -423,16 +310,11 @@ export default function PremiumPage() {
           </div>
 
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
-                  Trọn Vẹn Đặc Quyền • 1 Người
-                </span>
-                <h3 className="text-2xl font-extrabold text-white mt-0.5">VIP Cá Nhân</h3>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
-                <Sparkles className="w-5 h-5" />
-              </div>
+            <div>
+              <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
+                Trọn Vẹn Đặc Quyền • 1 Người
+              </span>
+              <h3 className="text-2xl font-extrabold text-white mt-0.5">VIP Cá Nhân</h3>
             </div>
 
             {/* Price */}
@@ -513,16 +395,11 @@ export default function PremiumPage() {
           </div>
 
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
-                  Dành Cho 6 Tài Khoản Độc Lập
-                </span>
-                <h3 className="text-2xl font-extrabold text-white mt-0.5">Gói Gia Đình</h3>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
-                <Users className="w-5 h-5" />
-              </div>
+            <div>
+              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
+                Dành Cho 6 Tài Khoản Độc Lập
+              </span>
+              <h3 className="text-2xl font-extrabold text-white mt-0.5">Gói Gia Đình</h3>
             </div>
 
             {/* Price */}

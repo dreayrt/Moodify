@@ -13,7 +13,7 @@ import {
   ChevronDown,
   Disc,
   Settings,
-  Sparkles,
+  Tags,
   Crown,
   Bell,
   Mail,
@@ -1383,7 +1383,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   } font-medium`}
                 >
                   <div className="flex items-center gap-3">
-                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${navIconClass}`} />
+                    <Tags className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`} />
                     <span>Thể loại</span>
                   </div>
                   <ChevronDown
