@@ -5,7 +5,7 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+const rawBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8088").replace(/\/$/, "");
 const API_BASE = rawBase.endsWith("/api") ? rawBase : `${rawBase}/api`;
 
 async function getTrackData(id: string) {
