@@ -30,7 +30,7 @@ function getStoredUser(): { id?: number; role?: string; username?: string } | nu
         username: parsed.username,
       };
     }
-  } catch (_) {}
+  } catch {}
   return null;
 }
 
@@ -61,7 +61,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
     return Boolean(localStorage.getItem(storageKey));
   }, [getStorageKey]);
 
-  const startDriverTour = useCallback((force = false) => {
+  const startDriverTour = useCallback(function startTour(force = false) {
     if (typeof window === "undefined") return;
 
     const storageKey = getStorageKey();
@@ -83,15 +83,15 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
     if (force && driverInstanceRef.current) {
       try {
         driverInstanceRef.current.destroy();
-      } catch (_) {}
+      } catch {}
     }
 
     // Define all steps
     const rawSteps: DriveStep[] = [
       {
         popover: {
-          title: "🎉 Chào mừng bạn đến với Moodify!",
-          description: "Chào mừng bạn gia nhập thế giới âm nhạc cảm xúc Moodify! Dành ra 30 giây cùng khám phá các tính năng đặc sắc để có trải nghiệm nghe nhạc tuyệt vời nhất nhé.",
+          title: "Chào mừng đến với Moodify",
+          description: "Âm nhạc hợp tâm trạng, trải nghiệm theo cách của bạn. Dành 30 giây khám phá những điều thú vị đang chờ bạn nhé!",
           side: "top",
           align: "center",
         },
@@ -99,7 +99,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       {
         element: "#tour-hero-player",
         popover: {
-          title: "💿 Sân khấu Âm nhạc & Đĩa than",
+          title: "Sân khấu âm nhạc của bạn",
           description: "Bấm 'Nghe ngay', thưởng thức đĩa than chuyển động sống động và chế độ Lời bài hát Karaoke (Realtime Lyrics) chạy đồng bộ theo từng câu hát.",
           side: "top",
           align: "center",
@@ -108,7 +108,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       {
         element: "#tour-vibe-filter",
         popover: {
-          title: "🎧 Bộ lọc Vibe & Thể loại",
+          title: "Chọn vibe, tìm đúng gu",
           description: "Lựa chọn nhanh các thể loại âm nhạc phù hợp với tâm trạng: Tất cả, V-Pop, Hip-Hop, Indie, Remix/EDM.",
           side: "bottom",
           align: "start",
@@ -117,7 +117,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       {
         element: "#tour-search-bar",
         popover: {
-          title: "🔍 Tìm kiếm theo Tâm trạng & AI",
+          title: "Tìm nhạc theo cảm xúc",
           description: "Nhập bài hát, ca sĩ hoặc gõ thẳng tâm trạng của bạn (ví dụ: 'buồn muốn khóc', 'chill nhẹ nhàng', 'nạp năng lượng') để Moodify AI gợi ý danh sách nhạc phù hợp.",
           side: "bottom",
           align: "center",
@@ -126,7 +126,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       {
         element: "#tour-sidebar-nav",
         popover: {
-          title: "🧭 Menu Điều hướng",
+          title: "Mọi thứ trong tầm tay",
           description: "Dễ dàng chuyển đổi giữa Trang chủ, Khám phá tìm kiếm chuyên sâu và Thư viện cá nhân của bạn.",
           side: "right",
           align: "start",
@@ -135,7 +135,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       {
         element: "#tour-playlist-section",
         popover: {
-          title: "➕ Danh sách phát (Playlists)",
+          title: "Bộ sưu tập của riêng bạn",
           description: "Tự do tạo danh sách phát của riêng bạn, thêm bài hát yêu thích và cài đặt Công khai hoặc Riêng tư.",
           side: "right",
           align: "start",
@@ -144,7 +144,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       {
         element: "#tour-mascot-profile",
         popover: {
-          title: "✨ Linh vật Đồng hành & Tài khoản",
+          title: "Góc nhỏ mang dấu ấn bạn",
           description: "Gặp gỡ bé linh vật Moodify, đổi giao diện phát sáng VIP, mở cài đặt cá nhân hoặc xem lại hướng dẫn bất cứ lúc nào.",
           side: "bottom",
           align: "end",
@@ -152,8 +152,8 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
       },
       {
         popover: {
-          title: "🚀 Bạn đã sẵn sàng bùng nổ!",
-          description: "Bây giờ bạn đã sẵn sàng thưởng thức những giai điệu tuyệt đỉnh. Bấm 'Khám phá ngay ✨' để bắt đầu cuộc hành trình âm nhạc của bạn!",
+          title: "Sẵn sàng tìm giai điệu của bạn?",
+          description: "Mọi thứ đã sẵn sàng. Hãy để Moodify đồng hành cùng cảm xúc của bạn, bắt đầu từ bài hát đầu tiên.",
           side: "top",
           align: "center",
         },
@@ -178,34 +178,83 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
     isTourActiveRef.current = true;
     console.log(`[MoodifyTour] Launching tour with ${validSteps.length} steps for storageKey=${storageKey}`);
 
+    const finishTour = (tour: ReturnType<typeof driver>) => {
+      // Remember both completion and skipping so the tour does not reopen.
+      isCompletedRef.current = true;
+      try {
+        localStorage.setItem(storageKey, "true");
+      } catch {}
+      tour.destroy();
+    };
+
     const driverObj = driver({
       showProgress: true,
       animate: true,
       smoothScroll: true,
       overlayColor: "#000000",
-      overlayOpacity: 0.88,
+      overlayOpacity: 0.76,
       stagePadding: 8,
       stageRadius: 16,
-      allowClose: false, // Bắt buộc: không cho đóng qua ESC hoặc click ngoài
+      allowClose: false, // Use the explicit skip button to dismiss the tour.
       overlayClickBehavior: "none",
       disableActiveInteraction: true,
       popoverClass: "moodify-tour-popover",
-      progressText: "{{current}} / {{total}}",
+      progressText: "Bước {{current}} / {{total}}",
       nextBtnText: "Tiếp tục →",
       prevBtnText: "← Quay lại",
-      doneBtnText: "Khám phá ngay ✨",
+      doneBtnText: "Khám phá ngay →",
       steps: validSteps,
+      onPopoverRender: (popover, opts) => {
+        const currentIndex = opts.driver.getActiveIndex() ?? 0;
+        const header = document.createElement("div");
+        header.className = "moodify-tour-header";
+        const label = document.createElement("span");
+        label.className = "moodify-tour-label";
+        label.textContent = "MOODIFY · HƯỚNG DẪN";
+
+        const skipButton = document.createElement("button");
+        skipButton.type = "button";
+        skipButton.className = "moodify-tour-skip-btn";
+        skipButton.textContent = "Bỏ qua";
+        skipButton.setAttribute("aria-label", "Bỏ qua hướng dẫn");
+        skipButton.addEventListener("click", () => finishTour(opts.driver));
+        header.append(label, skipButton);
+
+        const icon = document.createElement("div");
+        icon.className = "moodify-tour-icon";
+        icon.setAttribute("aria-hidden", "true");
+        for (let i = 0; i < 5; i++) {
+          icon.appendChild(document.createElement("span"));
+        }
+        popover.wrapper.insertBefore(header, popover.title);
+        popover.wrapper.insertBefore(icon, popover.title);
+
+        const progressTrack = document.createElement("div");
+        progressTrack.className = "moodify-tour-progress-track";
+        progressTrack.setAttribute("aria-hidden", "true");
+        for (let i = 0; i < validSteps.length; i++) {
+          const segment = document.createElement("span");
+          segment.className = i <= currentIndex ? "is-complete" : "";
+          progressTrack.appendChild(segment);
+        }
+
+        const progressDetails = document.createElement("div");
+        progressDetails.className = "moodify-tour-progress-details";
+        const progressCaption = document.createElement("span");
+        progressCaption.textContent = opts.driver.isLastStep()
+          ? "Bắt đầu hành trình của bạn"
+          : "Làm quen với Moodify";
+        progressDetails.append(progressCaption, popover.progress);
+        popover.footer.prepend(progressDetails, progressTrack);
+        // The first step has one clear action; later steps retain back navigation.
+        popover.previousButton.hidden = opts.driver.isFirstStep();
+        if (opts.driver.isFirstStep()) {
+          popover.nextButton.textContent = "Bắt đầu khám phá →";
+        }
+      },
       onDestroyStarted: (_el, _step, opts) => {
         if (opts.driver.isLastStep()) {
-          isCompletedRef.current = true;
-          try {
-            localStorage.setItem(storageKey, "true");
-            console.log(`[MoodifyTour] Tour completed successfully! Saved ${storageKey}=true`);
-          } catch (_) {}
-          opts.driver.destroy();
-        } else {
-          // Bắt buộc hoàn thành: Không cho đóng giữa chừng
-          console.warn("[MoodifyTour] Không thể đóng tour trước khi hoàn thành tất cả các bước.");
+          finishTour(opts.driver);
         }
       },
       onDestroyed: () => {
@@ -216,7 +265,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
           if (!completed) {
             setTimeout(() => {
               if (!isCompletedRef.current && !localStorage.getItem(storageKey)) {
-                startDriverTour(false);
+                startTour(false);
               }
             }, 600);
           }
