@@ -179,6 +179,10 @@ const API_BASE_URL =
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
 
+// Bumped on every clearAuthSession() so async token refreshes that started
+// before a logout cannot write the cleared session back afterwards.
+let authSessionEpoch = 0;
+
 type RequestOptions = {
   body?: unknown;
   keepalive?: boolean;
@@ -320,6 +324,10 @@ export function clearAuthSession() {
   if (typeof window === "undefined") {
     return;
   }
+
+  // Invalidate any in-flight refresh: a response that lands after logout must
+  // never resurrect cookies and keep the middleware bouncing the user back.
+  authSessionEpoch += 1;
 
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
@@ -776,7 +784,12 @@ export async function getValidAccessToken(): Promise<string | null> {
   }
 
   try {
+    const epoch = authSessionEpoch;
     const refreshed = await refresh(session.refreshToken);
+    if (epoch !== authSessionEpoch) {
+      // The user logged out while this refresh was in flight — discard it.
+      return null;
+    }
     saveAuthSession(refreshed);
     return refreshed.accessToken;
   } catch {

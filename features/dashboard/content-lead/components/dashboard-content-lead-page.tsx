@@ -1039,6 +1039,9 @@ export default function ContentLeadDashboardPage() {
         const token = await getValidAccessToken();
         if (!token) {
           if (!cancelled) {
+            // Wipe any stale cookie hint so the middleware cannot bounce the
+            // user straight back to this role dashboard (logout flicker loop).
+            clearAuthSession();
             setAuthState("denied");
             router.replace(HOME_ROUTE);
           }
