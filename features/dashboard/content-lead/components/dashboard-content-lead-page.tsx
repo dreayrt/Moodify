@@ -39,6 +39,7 @@ import {
   getStoredAuthSession,
   getValidAccessToken,
   logout,
+  recordListeningSessionTelemetry,
   updateArtistTrack,
   type ArtistProfileResponse,
   type ArtistTrackResponse,
@@ -740,6 +741,15 @@ export default function ContentLeadDashboardPage() {
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const toastCounterRef = useRef(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  // Revenue/analytics telemetry for studio preview playback. Without a session the
+  // backend never creates listening_history rows, so preview listens were invisible.
+  const previewSessionRef = useRef<{
+    sessionKey: string;
+    trackId: string;
+    accumulatedMs: number;
+    lastPlayTimestamp: number | null;
+    historyId: number | null;
+  } | null>(null);
 
   const addToast = (message: string, type: ToastMessage["type"] = "success") => {
     toastCounterRef.current += 1;
@@ -755,6 +765,39 @@ export default function ContentLeadDashboardPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const reportPreviewSession = (
+    session: NonNullable<typeof previewSessionRef.current>,
+    eventType: string,
+    positionMs: number
+  ) => {
+    void recordListeningSessionTelemetry({
+      sessionKey: session.sessionKey,
+      historyId: session.historyId ?? undefined,
+      trackId: session.trackId,
+      durationMs: Math.max(0, session.accumulatedMs),
+      positionMs: Math.max(0, positionMs),
+      eventType,
+      deviceType: "WEB",
+      source: "OTHER",
+    }).then((res) => {
+      if (res?.success && res.historyId && previewSessionRef.current === session) {
+        previewSessionRef.current.historyId = res.historyId;
+      }
+    });
+  };
+
+  const flushPreviewSession = (eventType: string) => {
+    const session = previewSessionRef.current;
+    if (!session) return;
+    if (session.lastPlayTimestamp) {
+      session.accumulatedMs += Math.max(0, Date.now() - session.lastPlayTimestamp);
+      session.lastPlayTimestamp = null;
+    }
+    previewSessionRef.current = null;
+    const posMs = audioPlayerRef.current ? Math.round(audioPlayerRef.current.currentTime * 1000) : session.accumulatedMs;
+    reportPreviewSession(session, eventType, posMs);
+  };
+
   const startPreviewTrack = (track: ArtistTrack, resetPosition = true) => {
     const audio = audioPlayerRef.current;
     const resolvedUrl = resolveMediaUrl(track.audioUrl);
@@ -768,6 +811,25 @@ export default function ContentLeadDashboardPage() {
       return;
     }
 
+    // Continuing the same track via the play/pause toggle resumes the same telemetry
+    // session; every other start (new track, replay, seek-to-start) is a new session.
+    const resuming =
+      previewSessionRef.current?.trackId === track.id &&
+      audio.src === resolvedUrl &&
+      !resetPosition &&
+      !audio.ended &&
+      (previewSessionRef.current?.accumulatedMs ?? 0) > 0;
+    if (!resuming) {
+      flushPreviewSession("TRACK_CHANGED");
+      previewSessionRef.current = {
+        sessionKey: crypto.randomUUID(),
+        trackId: track.id,
+        accumulatedMs: 0,
+        lastPlayTimestamp: null,
+        historyId: null,
+      };
+    }
+
     if (audio.src !== resolvedUrl) {
       audio.src = resolvedUrl;
       if (resetPosition) {
@@ -779,6 +841,10 @@ export default function ContentLeadDashboardPage() {
 
     void audio.play().then(() => {
       setIsPreviewPlaying(true);
+      const session = previewSessionRef.current;
+      if (!session) return;
+      session.lastPlayTimestamp = Date.now();
+      reportPreviewSession(session, session.accumulatedMs > 0 ? "RESUME" : "PLAY", Math.round(audio.currentTime * 1000));
     }).catch((err) => {
       console.warn("Audio preview playback failed:", err);
       setIsPreviewPlaying(false);
@@ -793,6 +859,7 @@ export default function ContentLeadDashboardPage() {
   };
 
   const stopPreviewTrack = () => {
+    flushPreviewSession("PLAYBACK_STOPPED");
     const audio = audioPlayerRef.current;
     if (audio) {
       audio.pause();
@@ -804,6 +871,18 @@ export default function ContentLeadDashboardPage() {
     setPreviewDuration(0);
     setIsPreviewPlaying(false);
   };
+
+  // Heartbeat mirrors the main player: the backend only accumulates continuous
+  // listening time from progress events at most 15 seconds apart.
+  useEffect(() => {
+    const heartbeat = window.setInterval(() => {
+      const session = previewSessionRef.current;
+      const audio = audioPlayerRef.current;
+      if (!session || !audio || audio.paused || audio.seeking || audio.readyState < 2) return;
+      reportPreviewSession(session, "HEARTBEAT", Math.round(audio.currentTime * 1000));
+    }, 5000);
+    return () => window.clearInterval(heartbeat);
+  }, []);
 
   const seekPreviewBy = (seconds: number) => {
     const audio = audioPlayerRef.current;
@@ -1431,13 +1510,26 @@ export default function ContentLeadDashboardPage() {
           setPreviewCurrentTime(event.currentTarget.currentTime);
         }}
         onPlay={() => setIsPreviewPlaying(true)}
-        onPause={() => setIsPreviewPlaying(false)}
+        onPause={() => {
+          // Fires for every pause path (button, toggle, stop) — settle the
+          // telemetry bookkeeping exactly once per pause.
+          const audio = audioPlayerRef.current;
+          const session = previewSessionRef.current;
+          if (audio && session && session.lastPlayTimestamp) {
+            session.accumulatedMs += Math.max(0, Date.now() - session.lastPlayTimestamp);
+            session.lastPlayTimestamp = null;
+            reportPreviewSession(session, "PAUSE", Math.round(audio.currentTime * 1000));
+          }
+          setIsPreviewPlaying(false);
+        }}
         onEnded={() => {
+          flushPreviewSession("COMPLETE");
           setPlayingTrackId(null);
           setIsPreviewPlaying(false);
           setPreviewCurrentTime(audioPlayerRef.current?.duration || 0);
         }}
         onError={() => {
+          flushPreviewSession("PLAYBACK_STOPPED");
           setPlayingTrackId(null);
           setIsPreviewPlaying(false);
         }}
