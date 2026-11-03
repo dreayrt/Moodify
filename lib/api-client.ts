@@ -1413,6 +1413,7 @@ export async function fetchPackageQuotes(): Promise<PackageQuote[]> {
 export async function fetchMySubscription(): Promise<SubscriptionInfo> {
   const token = await getValidAccessToken();
   const res = await fetch(`${API_BASE}/subscriptions/me`, {
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -1535,6 +1536,7 @@ export async function getPaymentStatus(
 ): Promise<PaymentStatusResponse> {
   const res = await fetch(`${API_BASE}/subscriptions/payment-status/${orderCode}`, {
     method: 'GET',
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
     },
