@@ -486,6 +486,21 @@ export async function logout(refreshToken?: string) {
   });
 }
 
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  token?: string,
+): Promise<void> {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  await requestJson<void>("/api/auth/change-password", {
+    token: validToken,
+    body: { currentPassword, newPassword },
+  });
+}
+
 export async function uploadAvatar(
   accessToken: string,
   file: File,
