@@ -120,16 +120,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (pathname.startsWith("/dashboard/user") && role !== "USER" && role !== "ADMIN") {
-    return NextResponse.redirect(new URL(correctDashboard, request.url));
-  }
-
   if (pathname === "/dashboard/artist" || pathname === "/dashboard/artist/") {
     if (role === "CONTENT_LEAD" || role === "ARTIST") {
       return NextResponse.redirect(new URL("/dashboard/content-lead", request.url));
     }
     return NextResponse.redirect(new URL("/dashboard/search?type=ARTIST", request.url));
   }
+
+  // /dashboard/user is intentionally NOT role-bounced. It is the public guest
+  // dashboard and the post-logout landing zone; redirecting other roles from
+  // here based on the cookie hint raced the client guards and produced the
+  // logout flicker loop (cookie bounces to the role studio, guard without a
+  // session bounces back here, forever). Post-login role routing happens
+  // client-side after the profile is known.
 
   if (
     pathname.startsWith("/dashboard/content-lead") &&
