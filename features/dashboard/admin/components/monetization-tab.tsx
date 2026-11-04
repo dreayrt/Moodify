@@ -505,30 +505,70 @@ export function MonetizationTab({
   const activeSubsCount = subscriptions.filter((s) => s.status === "ACTIVE").length || subscriptions.length;
   const activePackagesCount = packages.filter((p) => p.status === "ACTIVE").length;
 
-  // Revenue Trend Chart Data (VND in Thousands)
+  // Revenue Trend Chart Data (VND in Thousands) - Accurate timeline
   const revenueChartData = React.useMemo(() => {
-    const dayMap: Record<string, { streams: number; completed: number }> = {};
-    transactions.forEach((tx) => {
-      const dateKey = tx.paidAt ? tx.paidAt.split(" ")[0].slice(5) : "Hôm nay";
-      if (!dayMap[dateKey]) dayMap[dateKey] = { streams: 0, completed: 0 };
-      const valK = Math.round(tx.amount / 1000);
-      dayMap[dateKey].streams += valK;
-      if (tx.status === "SUCCESS") {
-        dayMap[dateKey].completed += valK;
+    const dateMap = new Map<string, { streams: number; completed: number }>();
+
+    // Sort transactions by id/order
+    const sortedTx = [...transactions].sort((a, b) => (a.id || 0) - (b.id || 0));
+
+    sortedTx.forEach((tx) => {
+      if (!tx.paidAt) return;
+      const datePart = tx.paidAt.split(" ")[0]; // "dd/MM/yyyy" or "yyyy-MM-dd"
+      let dayKey = "";
+      if (datePart.includes("/")) {
+        const parts = datePart.split("/");
+        dayKey = `${parts[0]}/${parts[1]}`;
+      } else if (datePart.includes("-")) {
+        const parts = datePart.split("-");
+        dayKey = `${parts[2]}/${parts[1]}`;
       }
+      if (!dayKey) return;
+
+      const current = dateMap.get(dayKey) || { streams: 0, completed: 0 };
+      const valK = Math.round((tx.amount || 0) / 1000);
+      current.streams += valK;
+      if (tx.status === "SUCCESS") {
+        current.completed += valK;
+      }
+      dateMap.set(dayKey, current);
     });
 
-    const entries = Object.entries(dayMap);
-    if (entries.length > 0) {
-      return entries.map(([label, val]) => ({
+    const result: { label: string; date: string; streams: number; completed: number }[] = [];
+    dateMap.forEach((val, label) => {
+      result.push({
         label,
         date: label,
         streams: val.streams,
         completed: val.completed,
+      });
+    });
+
+    // Ensure at least 7 continuous data points so InteractiveAreaChart renders smoothly without "Chưa có đủ điểm dữ liệu"
+    if (result.length > 0 && result.length < 7) {
+      const paddingNeeded = 7 - result.length;
+      const padded: typeof result = [];
+      for (let i = paddingNeeded; i >= 1; i--) {
+        padded.push({
+          label: `T-${i}`,
+          date: `T-${i}`,
+          streams: 0,
+          completed: 0,
+        });
+      }
+      return [...padded, ...result];
+    }
+
+    if (result.length === 0) {
+      return ["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => ({
+        label: day,
+        date: day,
+        streams: 0,
+        completed: 0,
       }));
     }
 
-    return [];
+    return result;
   }, [transactions]);
 
   // Package Revenue Distribution Donut (100% Real from Payment Transactions)
@@ -884,7 +924,7 @@ export function MonetizationTab({
       {/* SUBTAB 1: PACKAGES GRID */}
       {activeSubTab === "packages" && (
         <div className="space-y-6 anim-fade-up">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {packages.map((pkg) => {
               const isActive = pkg.status === "ACTIVE";
               const features = parseDescriptionToFeatures(pkg.description);
@@ -892,112 +932,75 @@ export function MonetizationTab({
               return (
                 <div
                   key={pkg.id}
-                  className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-[#12131a] p-5 shadow-xl transition hover:border-[#ff5500]/50 ${
+                  className={`flex flex-col justify-between rounded-xl border bg-[#12131a] p-4 sm:p-5 shadow-lg transition-all hover:border-[#ff5500]/50 ${
                     isActive ? "border-[#222432]" : "border-rose-500/20 opacity-70"
                   }`}
                 >
                   {/* Top info */}
                   <div>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-zinc-400 font-semibold">
-                          {pkg.durationDays} Ngày
-                        </span>
-                        <span className="font-mono text-xs text-zinc-500">
-                          #{pkg.displayOrder}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-mono font-semibold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                          <Crown className="w-2.5 h-2.5" />
-                          {pkg.tierName || (pkg.tierId === "FAMILY" ? "Gia Đình" : pkg.tierId === "INDIVIDUAL_FULL" ? "VIP FULL" : "Tiết Kiệm")}
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[11px] font-mono text-zinc-300 font-semibold">
+                        {pkg.durationDays === 30 ? "30 Ngày" : pkg.durationDays === 365 ? "1 Năm" : `${pkg.durationDays} Ngày`}
+                      </span>
 
                       <button
                         type="button"
                         onClick={() => onTogglePackageStatus(pkg.id)}
-                        className="text-zinc-400 hover:text-white transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-mono transition cursor-pointer hover:bg-white/5"
                         title={isActive ? "Tạm ngưng cung cấp" : "Kích hoạt gói"}
                       >
-                        <span className="inline-flex items-center gap-1.5 font-mono text-xs">
-                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-rose-400"}`} />
-                          <span className={isActive ? "text-zinc-300" : "text-rose-400"}>
-                            {isActive ? "Hoạt động" : "Tạm dừng"}
-                          </span>
+                        <span className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-400" : "bg-rose-400"}`} />
+                        <span className={isActive ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
+                          {isActive ? "Hoạt động" : "Tạm dừng"}
                         </span>
                       </button>
                     </div>
 
-                    <h3 className="mt-4 font-graphik text-xl font-bold text-white tracking-tight">
+                    <h3 className="mt-3 font-graphik text-base sm:text-lg font-bold text-white tracking-tight line-clamp-2 min-h-[2.75rem]" title={pkg.name}>
                       {pkg.name}
                     </h3>
 
                     {/* Price Tag */}
-                    <div className="mt-2.5 flex items-baseline gap-1.5">
+                    <div className="mt-2 flex items-baseline gap-1.5">
                       <span className="font-display text-2xl font-bold text-[#ff5500] tracking-tight">
                         {formatVND(pkg.price)}
                       </span>
                       <span className="text-xs text-zinc-400 font-mono">
-                        / {pkg.durationDays === 30 ? "tháng" : `${pkg.durationDays} ngày`}
+                        / {pkg.durationDays === 30 ? "tháng" : pkg.durationDays === 365 ? "năm" : `${pkg.durationDays} ngày`}
                       </span>
                     </div>
 
                     {/* Active subscribers count badge */}
-                    <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#171822] border border-[#222432] px-3 py-1.5">
-                      <Users className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="font-mono text-xs text-emerald-400 font-semibold">
-                        {pkg.subscribersCount ?? 0}
-                      </span>
-                      <span className="text-xs text-zinc-400">thuê bao đang kích hoạt</span>
+                    <div className="mt-2.5 flex items-center gap-1.5 text-xs text-zinc-400">
+                      <Users className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                      <span className="font-mono text-emerald-400 font-bold">{pkg.subscribersCount ?? 0}</span>
+                      <span>thuê bao đang kích hoạt</span>
                     </div>
 
                     {/* Features list */}
-                    <div className="mt-3.5 border-t border-[#222432] pt-3.5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-mono text-xs uppercase tracking-wider text-zinc-400 font-semibold">
-                          Quyền Lợi Gói ({features.length})
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(pkg)}
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-[#ff5500] hover:underline"
-                          title="Bấm để mở danh sách quyền lợi và thêm quyền lợi mới"
-                        >
-                          <Plus className="h-3 w-3" /> Thêm quyền lợi
-                        </button>
-                      </div>
+                    <div className="mt-3 border-t border-[#222432] pt-3 space-y-1.5">
+                      <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                        Quyền lợi chính
+                      </p>
                       {features.length > 0 ? (
-                        features.slice(0, 4).map((feat, idx) => (
+                        features.slice(0, 3).map((feat, idx) => (
                           <div key={idx} className="flex items-start gap-2 text-xs text-zinc-300">
-                            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff5500] mt-0.5" />
-                            <span className="line-clamp-2">{feat}</span>
+                            <Check className="h-3.5 w-3.5 shrink-0 text-[#ff5500] mt-0.5" />
+                            <span className="line-clamp-2 leading-relaxed">{feat}</span>
                           </div>
                         ))
                       ) : (
-                        <div className="flex items-center justify-between py-1">
-                          <p className="text-xs text-zinc-500 italic">Chưa có quyền lợi chi tiết.</p>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(pkg)}
-                            className="text-xs font-semibold text-[#ff5500] hover:underline"
-                          >
-                            + Thiết lập ngay
-                          </button>
-                        </div>
-                      )}
-                      {features.length > 4 && (
-                        <p className="font-mono text-[10px] text-zinc-500">
-                          +{features.length - 4} đặc quyền khác... (bấm sửa để xem hết)
-                        </p>
+                        <p className="text-xs text-zinc-500 italic py-1">Chưa có quyền lợi chi tiết.</p>
                       )}
                     </div>
                   </div>
 
-                  {/* Actions Footer */}
-                  <div className="mt-6 border-t border-[#222432] pt-4 flex items-center justify-between gap-2">
+                  {/* Actions footer */}
+                  <div className="mt-4 pt-3 border-t border-[#222432] flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(pkg)}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:border-[#ff5500]/40 transition"
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-[#222432] bg-[#171822] px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:border-[#ff5500]/40 transition"
                     >
                       <Settings2 className="h-3.5 w-3.5 text-[#ff5500]" /> Chỉnh Sửa Chi Tiết
                     </button>
@@ -1006,7 +1009,7 @@ export function MonetizationTab({
                       type="button"
                       onClick={() => handleDeletePackage(pkg)}
                       title="Xóa hoặc vô hiệu hóa gói cước này"
-                      className="p-2 rounded-xl border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40 transition"
+                      className="p-2 rounded-lg border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40 transition"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -1818,7 +1821,7 @@ export function MonetizationTab({
                   formData.featureItems.map((feat, idx) => (
                     <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#12131a] text-xs text-white/90 border border-[#222432]/60">
                       <span className="flex items-center gap-2 font-medium">
-                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
+                        <Check className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
                       </span>
                       <button
                         type="button"
@@ -2113,7 +2116,7 @@ export function MonetizationTab({
                   formData.featureItems.map((feat, idx) => (
                     <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#171822] text-xs text-white/90 border border-[#222432]/60">
                       <span className="flex items-center gap-2 font-medium">
-                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
+                        <Check className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
                       </span>
                       <button
                         type="button"

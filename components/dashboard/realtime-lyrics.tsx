@@ -26,12 +26,11 @@ interface RealtimeLyricsProps {
 /**
  * Intelligent Lyric Parser:
  * - Detects standard [mm:ss.xx] LRC format if present.
- * - Otherwise gracefully partitions plain multiline text across duration
- *   weighted by line character & word count for realistic natural singing pace.
+ * - Keeps plain lyrics untimed until real LRC cues are available.
  */
 export function parseLyrics(
   lyricsRaw: string | null | undefined,
-  totalDurationSeconds: number
+  _totalDurationSeconds: number
 ): LyricLine[] {
   if (!lyricsRaw || !lyricsRaw.trim()) return [];
 
@@ -47,6 +46,11 @@ export function parseLyrics(
   const hasLrc = rawLines.some((l) => lrcRegex.test(l));
 
   if (hasLrc) {
+    // Optional [offset:±ms] tag shifts every timestamp (same semantics as the
+    // karaoke parser: the value is added to each timestamp, clamped at 0).
+    const offsetMatch = lyricsRaw.match(/^\s*\[offset:([+-]?\d+)\]\s*$/im);
+    const offsetSec = offsetMatch ? Number(offsetMatch[1]) / 1000 : 0;
+
     const parsed: LyricLine[] = [];
     let idCounter = 0;
     for (const raw of rawLines) {
@@ -56,12 +60,22 @@ export function parseLyrics(
       }
       const match = raw.match(lrcRegex);
       if (match) {
-        const mins = parseInt(match[1], 10);
-        const secs = parseInt(match[2], 10);
-        const ms = match[3] ? parseFloat("0." + match[3]) : 0;
-        const time = mins * 60 + secs + ms;
-        const text = match[4].trim();
-        if (text) {
+        // A line can carry several leading timestamps ([00:36.29][00:53.75]text)
+        // when the same phrase repeats (chorus/hook). Emit one line per stamp.
+        const times: number[] = [];
+        let rest = raw;
+        let tag: RegExpExecArray | null;
+        while ((tag = /^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/.exec(rest))) {
+          const mins = parseInt(tag[1], 10);
+          const secs = parseInt(tag[2], 10);
+          const ms = tag[3] ? parseFloat("0." + tag[3]) : 0;
+          times.push(mins * 60 + secs + ms);
+          rest = rest.slice(tag[0].length);
+        }
+        const text = rest.trim();
+        if (!text || times.length === 0) continue;
+        for (const stamp of times) {
+          const time = Math.max(0, stamp + offsetSec);
           parsed.push({
             id: idCounter++,
             time: Math.round(time * 100) / 100,
@@ -71,6 +85,7 @@ export function parseLyrics(
         }
       }
     }
+    parsed.sort((a, b) => a.time - b.time);
     // Calculate accurate end times based on the next line's start time
     for (let i = 0; i < parsed.length - 1; i++) {
       parsed[i].endTime = parsed[i + 1].time;
@@ -80,40 +95,11 @@ export function parseLyrics(
     }
   }
 
-  // Plain multiline lyrics: Weighted distribution
-  const total = totalDurationSeconds > 10 ? totalDurationSeconds : 210;
-  // Intro delay: between 4s and 12s depending on song length
-  const introDuration = Math.min(10, Math.max(4, total * 0.045));
-  const outroDuration = Math.min(12, Math.max(4, total * 0.05));
-  const singableDuration = Math.max(10, total - introDuration - outroDuration);
-
-  // Calculate proportional weight for each line based on character count & words
-  const weights = rawLines.map((line) => {
-    const charLen = line.length;
-    const words = line.split(/\s+/).length;
-    return Math.max(12, charLen * 0.6 + words * 2.2);
-  });
-  const sumWeights = weights.reduce((acc, w) => acc + w, 0);
-
-  let currTime = introDuration;
-  const lines: LyricLine[] = [];
-
-  for (let i = 0; i < rawLines.length; i++) {
-    const lineDuration = (weights[i] / sumWeights) * singableDuration;
-    const startTime = Math.round(currTime * 100) / 100;
-    const endTime = Math.round((currTime + lineDuration) * 100) / 100;
-
-    lines.push({
-      id: i,
-      time: startTime,
-      endTime,
-      text: rawLines[i],
-    });
-
-    currTime += lineDuration;
-  }
-
-  return lines;
+  // Text-only lyrics have no measured timing. Keep them readable without
+  // inventing an intro delay, highlighting or seek positions.
+  return rawLines.map((text, id) => ({
+    id, time: Number.POSITIVE_INFINITY, endTime: Number.POSITIVE_INFINITY, text,
+  }));
 }
 
 function formatTime(seconds: number): string {
@@ -147,6 +133,8 @@ export default function RealtimeLyrics({
     const rawLyrics = track?.lyricsSynced || track?.lyricsPlain;
     return parseLyrics(rawLyrics, duration || (track?.durationMs ? track.durationMs / 1000 : 210));
   }, [track?.lyricsSynced, track?.lyricsPlain, duration, track?.durationMs]);
+
+  const hasMeasuredTiming = lyrics.some((line) => Number.isFinite(line.time));
 
   // Find active line index
   const activeIndex = useMemo(() => {
@@ -321,7 +309,7 @@ export default function RealtimeLyrics({
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/20 text-purple-200 border border-purple-400/30 tracking-wider uppercase">
                 <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
-                Live Lyrics
+                {hasMeasuredTiming ? "Live Lyrics" : "Lời bài hát"}
               </span>
               <span className="text-[11px] font-manrope text-white/40">
                 {lyrics.length} câu
@@ -410,7 +398,7 @@ export default function RealtimeLyrics({
         }}
       >
         {/* Intro placeholder if song hasn't started first lyric yet */}
-        {activeIndex === -1 && (
+        {hasMeasuredTiming && activeIndex === -1 && (
           <div className="text-center py-6 text-purple-300/60 text-sm font-manrope italic animate-pulse">
             ♪ Giai điệu mở đầu...
           </div>
@@ -428,11 +416,13 @@ export default function RealtimeLyrics({
                   lineRefs.current[idx] = el;
                 }}
                 onClick={() => {
-                  onSeek(line.time);
+                  if (Number.isFinite(line.time)) onSeek(line.time);
                 }}
-                className={`group flex items-start gap-3 cursor-pointer rounded-xl px-3 py-1.5 transition-all duration-300 ${
+                className={`group flex items-start gap-3 ${hasMeasuredTiming ? "cursor-pointer" : "cursor-default"} rounded-xl px-3 py-1.5 transition-all duration-300 ${
                   isActive
                     ? "text-white scale-[1.02] origin-left drop-shadow-[0_0_25px_rgba(244,63,94,0.7)]"
+                    : !hasMeasuredTiming
+                    ? "text-white/75"
                     : isPast
                     ? "text-white/40 hover:text-white/80 hover:bg-white/[0.04]"
                     : "text-white/30 hover:text-white/70 hover:bg-white/[0.04]"
@@ -442,11 +432,11 @@ export default function RealtimeLyrics({
                 <div className="w-5 shrink-0 pt-1 flex items-center justify-center">
                   {isActive ? (
                     <span className="w-2.5 h-2.5 rounded-full bg-pink-400 shadow-[0_0_12px_#f43f5e] animate-pulse" />
-                  ) : (
+                  ) : hasMeasuredTiming ? (
                     <span className="text-[10px] font-mono text-white/20 group-hover:text-purple-300 group-hover:opacity-100 opacity-0 transition-opacity">
                       ▶
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Lyric line text */}
@@ -461,9 +451,9 @@ export default function RealtimeLyrics({
                     {line.text}
                   </p>
                   {/* Subtle timestamp on hover */}
-                  <span className="text-[10px] font-mono text-purple-400/0 group-hover:text-purple-400/80 transition-colors">
+                  {hasMeasuredTiming && <span className="text-[10px] font-mono text-purple-400/0 group-hover:text-purple-400/80 transition-colors">
                     {formatTime(line.time)}
-                  </span>
+                  </span>}
                 </div>
               </div>
             );
@@ -471,7 +461,7 @@ export default function RealtimeLyrics({
         </div>
 
         {/* Outro placeholder */}
-        {activeIndex === lyrics.length - 1 && (
+        {hasMeasuredTiming && activeIndex === lyrics.length - 1 && (
           <div className="text-center py-8 text-purple-300/60 text-sm font-manrope italic">
             ♪ Giai điệu kết thúc...
           </div>

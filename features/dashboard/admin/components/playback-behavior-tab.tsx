@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import {
   Activity,
   ArrowRight,
+  CheckCircle2,
   Clock,
   Compass,
   FastForward,
@@ -19,7 +20,6 @@ import {
   Rewind,
   Search,
   Smartphone,
-  Sparkles,
   TrendingUp,
   User,
   Zap,
@@ -70,7 +70,7 @@ function getEventBadge(type: string) {
     case "COMPLETE":
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 text-[11px] font-mono font-bold text-teal-300">
-          <Sparkles className="h-3 w-3 text-teal-400" /> NGHE TRỌN VẸN
+          <CheckCircle2 className="h-3 w-3 text-teal-400" /> NGHE TRỌN VẸN
         </span>
       );
     default:
@@ -255,7 +255,7 @@ export function PlaybackBehaviorTab({
         <div className="p-4 rounded-xl border border-[#222432] bg-[#12131a] flex flex-col justify-between col-span-2 md:col-span-1">
           <div className="flex items-center justify-between text-zinc-400">
             <span className="font-mono text-[10px] uppercase font-semibold text-teal-400">Nghe Trọn Vẹn</span>
-            <Sparkles className="h-3.5 w-3.5 text-teal-400" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-teal-400" />
           </div>
           <div className="mt-2.5">
             <span className="font-graphik text-2xl font-bold text-white tracking-tight">{completeCount}</span>

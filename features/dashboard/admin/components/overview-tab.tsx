@@ -172,10 +172,10 @@ export function OverviewTab({
     return [
       {
         id: "EMOTION",
-        label: "Cảm Xúc AI",
+        label: "Cảm Xúc",
         value: realSourceCounts.EMOTION,
         color: "#a855f7",
-        icon: Sparkles,
+        icon: Headphones,
       },
       {
         id: "HOME",
@@ -306,7 +306,7 @@ export function OverviewTab({
           <div className="flex flex-col justify-between pt-3 lg:pt-0 lg:px-4">
             <div className="flex items-center justify-between text-zinc-400">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                 <span className="font-mono text-[11px] tracking-wider uppercase font-semibold">
                   Tỷ Lệ Nghe Hết
                 </span>

@@ -780,22 +780,42 @@ function LumenHeroContent() {
     }));
   };
 
-  // Fetch tracks whose MongoDB `genres` array contains any of the target genres in a single unified request.
-  const fetchByGenres = async (genres: string[], size: number = 50): Promise<ApiTrack[]> => {
+  // Fetch tracks whose MongoDB `genres` array contains any of the target genres,
+  // paging through the entire catalog instead of stopping at a single 50-item page.
+  const CATALOG_PAGE_SIZE = 100;
+
+  const fetchAllCatalogTracks = async (params?: { genre?: string }): Promise<ApiTrack[]> => {
+    const first = await fetchTracks({ size: CATALOG_PAGE_SIZE, ...params });
+    const collected: ApiTrack[] = [...first.content];
+    const remainingPages = Math.max((first.totalPages ?? 1) - 1, 0);
+    if (remainingPages > 0) {
+      const rest = await Promise.all(
+        Array.from({ length: remainingPages }, (_, i) =>
+          fetchTracks({ page: i + 1, size: CATALOG_PAGE_SIZE, ...params })
+            .then((r) => r.content)
+            .catch(() => [] as ApiTrack[])
+        )
+      );
+      for (const part of rest) {
+        collected.push(...part);
+      }
+    }
+    return collected;
+  };
+
+  const fetchByGenres = async (genres: string[]): Promise<ApiTrack[]> => {
     try {
       if (activeVibe === "all") {
-        const resp = await fetchTracks({ size });
-        return resp.content;
+        return await fetchAllCatalogTracks();
       }
 
-      const resp = await fetchTracks({ genre: genres.join(","), size });
-      if (resp.content && resp.content.length > 0) {
-        return resp.content;
+      const items = await fetchAllCatalogTracks({ genre: genres.join(",") });
+      if (items.length > 0) {
+        return items;
       }
 
       // If specific genre returned 0 tracks, fallback to general tracks from catalog
-      const fallback = await fetchTracks({ size });
-      return fallback.content;
+      return await fetchAllCatalogTracks();
     } catch (err) {
       console.error("Failed to fetch tracks:", err);
       return [];
@@ -809,7 +829,7 @@ function LumenHeroContent() {
       setTracksLoading(true);
       try {
         const genres = VIBE_TO_GENRES[activeVibe] ?? [activeVibe];
-        const items = await fetchByGenres(genres, 50);
+        const items = await fetchByGenres(genres);
         if (!cancelled) {
           setTracks(mapApiTracks(items));
           setActiveTrackIdx(0);

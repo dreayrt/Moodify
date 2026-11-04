@@ -60,7 +60,7 @@ function getSourceBadge(source: string) {
     case "EMOTION":
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 text-[11px] font-mono font-semibold text-purple-300">
-          <Sparkles className="h-3 w-3 text-purple-400" /> Cảm Xúc (AI)
+          <Headphones className="h-3 w-3 text-purple-400" /> Cảm Xúc
         </span>
       );
     case "SEARCH":
@@ -280,7 +280,7 @@ export function ListeningHistoryTab({
         <div className="p-4 rounded-xl border border-[#222432] bg-[#12131a] flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400">
             <span className="font-mono text-[10px] uppercase font-semibold">Tỷ Lệ Nghe Trọn Vẹn</span>
-            <Sparkles className="h-4 w-4 text-amber-400" />
+            <CheckCircle2 className="h-4 w-4 text-amber-400" />
           </div>
           <div className="mt-2.5">
             <span className="font-graphik text-2xl font-bold text-amber-400 tracking-tight">
