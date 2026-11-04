@@ -36,7 +36,6 @@ import {
   getCurrentUser,
   getStoredAuthSession,
   getValidAccessToken,
-  logout,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
 import {
@@ -408,20 +407,11 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   // Logout Handler
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) return;
     setLoggingOut(true);
-
-    try {
-      const session = getStoredAuthSession();
-      await logout(session?.refreshToken);
-    } catch (err) {
-      console.warn("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      setLoggingOut(false);
-      router.push(HOME_ROUTE);
-    }
+    clearAuthSession();
+    window.location.replace(USER_DASHBOARD_ROUTE);
   };
 
   // ================= BUSINESS ACTIONS =================
