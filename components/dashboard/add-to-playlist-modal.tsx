@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus, Check, Loader2, Music, ListMusic } from "lucide-react";
 import {
   fetchUserPlaylists,
@@ -29,6 +30,9 @@ export default function AddToPlaylistModal({
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Portal ra body: tránh ancestor có transform/-translate-y làm lệch position:fixed
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (isOpen && track) {
@@ -62,7 +66,7 @@ export default function AddToPlaylistModal({
     }
   };
 
-  if (!isOpen || !track) return null;
+  if (!isOpen || !track || !mounted) return null;
 
   const handleAddToPlaylist = async (playlist: Playlist) => {
     if (addingId) return;
@@ -90,7 +94,7 @@ export default function AddToPlaylistModal({
     await handleAddToPlaylist(newPlaylist);
   };
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
         <div
@@ -220,6 +224,7 @@ export default function AddToPlaylistModal({
         onClose={() => setIsCreateOpen(false)}
         onCreated={handlePlaylistCreated}
       />
-    </>
+    </>,
+    document.body
   );
 }
