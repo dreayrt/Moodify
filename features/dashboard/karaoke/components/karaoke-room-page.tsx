@@ -45,6 +45,7 @@ import KaraokeTrackCatalog from "./karaoke-track-catalog";
 import { useKaraokeRoomLive } from "../hooks/use-karaoke-room-live";
 import { useMediasoupRoom } from "../hooks/use-mediasoup-room";
 import { useKaraokeRoomScoring } from "../hooks/use-karaoke-room-scoring";
+import KaraokeScoreDetails from "./karaoke-score-details";
 import styles from "./karaoke-room-page.module.css";
 
 function initials(name: string): string {
@@ -572,14 +573,14 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     if (
-      roomScoring.score === null ||
+      !roomScoring.scoreResult ||
       !roomScoring.scoreSessionId ||
       lastOpenedScoreSessionRef.current === roomScoring.scoreSessionId
     )
       return;
     lastOpenedScoreSessionRef.current = roomScoring.scoreSessionId;
     setGroupScoreOpen(true);
-  }, [roomScoring.score, roomScoring.scoreSessionId]);
+  }, [roomScoring.scoreResult, roomScoring.scoreSessionId]);
 
   useEffect(() => {
     if (!groupScoreOpen) return;
@@ -1612,7 +1613,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       )}
 
       {groupScoreOpen &&
-      roomScoring.score !== null &&
+      roomScoring.scoreResult &&
       typeof document !== "undefined"
         ? createPortal(
             <div
@@ -1654,17 +1655,17 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 <div
                   className={styles.roomScoreRing}
                   style={{
-                    background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score))}% 100%)`,
+                    background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score ?? 0))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score ?? 0))}% 100%)`,
                   }}
-                  role="meter"
+                  role={roomScoring.score === null ? undefined : "meter"}
                   aria-label="Điểm chung của phòng"
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={roomScoring.score}
+                  aria-valuenow={roomScoring.score ?? undefined}
                 >
                   <div className={styles.roomScoreRingCore}>
                     <span>ĐIỂM CHUNG</span>
-                    <strong>{roomScoring.score.toFixed(1)}</strong>
+                    <strong>{roomScoring.score?.toFixed(1) ?? "—"}</strong>
                     <small>trên 100</small>
                   </div>
                 </div>
@@ -1679,6 +1680,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                   Điểm được tổng hợp từ các phần hát của thành viên bật micro
                   trong bài này.
                 </p>
+                {roomScoring.scoreResult && <KaraokeScoreDetails result={roomScoring.scoreResult} mode="room" sessionId={roomScoring.scoreSessionId} capture={roomScoring.scoreCaptureReport} />}
                 <button
                   ref={groupScoreActionRef}
                   type="button"

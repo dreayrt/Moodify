@@ -32,17 +32,19 @@ export function loadFacebookSdk(): Promise<any> {
           appId: FACEBOOK_APP_ID,
           cookie: true,
           xfbml: false,
-          version: "v19.0",
+          version: "v26.0",
         });
         resolve(window.FB);
       } catch (err) {
+        document.getElementById("facebook-jssdk")?.remove();
+        fbSdkPromise = null;
         reject(err);
       }
     };
 
-    if (document.getElementById("facebook-jssdk")) {
-      return;
-    }
+    // A failed script load can leave a dead element behind. Remove it before
+    // retrying so a new login attempt does not wait on a promise that never settles.
+    document.getElementById("facebook-jssdk")?.remove();
 
     const script = document.createElement("script");
     script.id = "facebook-jssdk";
@@ -51,6 +53,7 @@ export function loadFacebookSdk(): Promise<any> {
     script.defer = true;
     script.crossOrigin = "anonymous";
     script.onerror = () => {
+      script.remove();
       fbSdkPromise = null;
       reject(
         new Error(

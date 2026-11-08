@@ -185,6 +185,7 @@ let authSessionEpoch = 0;
 
 type RequestOptions = {
   body?: unknown;
+  extraHeaders?: Record<string, string>;
   keepalive?: boolean;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   token?: string;
@@ -346,6 +347,22 @@ export async function loginWithGoogle(idToken: string) {
   return requestJson<AuthResponse>("/api/auth/google", {
     body: {
       idToken,
+      deviceUuid: device?.deviceUuid,
+      deviceName: device?.deviceName,
+      platform: device?.platform,
+    },
+  });
+}
+
+export async function loginWithGoogleCode(code: string) {
+  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
+  return requestJson<AuthResponse>("/api/auth/google/code", {
+    extraHeaders: { "X-Requested-With": "XmlHttpRequest" },
+    body: {
+      code,
+      codeVerifier: "",
+      redirectUri: typeof window !== "undefined" ? window.location.origin : "",
+      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
       deviceUuid: device?.deviceUuid,
       deviceName: device?.deviceName,
       platform: device?.platform,
@@ -815,7 +832,7 @@ export async function getValidAccessToken(): Promise<string | null> {
 
 async function requestJson<T>(
   path: string,
-  { body, keepalive, method, token }: RequestOptions = {},
+  { body, extraHeaders, keepalive, method, token }: RequestOptions = {},
 ): Promise<T> {
   const fullUrl = `${API_BASE_URL}${path}`;
   const requestMethod = method ?? (body ? "POST" : "GET");
@@ -840,6 +857,7 @@ async function requestJson<T>(
     method: requestMethod,
     headers: {
       "Content-Type": "application/json",
+      ...(extraHeaders ?? {}),
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(currentDeviceUuid ? { "X-Device-Uuid": currentDeviceUuid } : {}),
     },

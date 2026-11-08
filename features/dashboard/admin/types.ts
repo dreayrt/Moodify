@@ -2,6 +2,7 @@ export type AdminTab =
   | "overview"
   | "analytics"
   | "catalog"
+  | "karaoke-resources"
   | "favorites"
   | "history"
   | "users"

@@ -14,7 +14,7 @@ import {
 } from "react";
 
 import { useGoogleLogin } from '@react-oauth/google';
-import { loginWithFacebookSdk } from '@/lib/auth/facebook';
+import { loadFacebookSdk, loginWithFacebookSdk } from '@/lib/auth/facebook';
 import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
@@ -22,7 +22,7 @@ import {
   getStoredAuthSession,
   getValidAccessToken,
   login as loginRequest,
-  loginWithGoogle as loginWithGoogleRequest,
+  loginWithGoogleCode as loginWithGoogleCodeRequest,
   loginWithFacebook as loginWithFacebookRequest,
   logout as logoutRequest,
   register as registerRequest,
@@ -237,6 +237,16 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
 
   const [isHovered, setIsHovered] = useState(false);
 
+  useEffect(() => {
+    if (!isSignInOpen && !isCreateAccountOpen) return;
+
+    // Load the Facebook SDK before the user clicks so FB.login can open its popup
+    // directly from the click gesture instead of waiting for a network request.
+    void loadFacebookSdk().catch((error) => {
+      console.warn("Facebook SDK preload failed:", error);
+    });
+  }, [isSignInOpen, isCreateAccountOpen]);
+
   const prevSlide = () => {
     setActiveIndex((current) => (current - 1 + heroSlides.length) % heroSlides.length);
   };
@@ -425,10 +435,12 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
   };
 
     const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
+    flow: "auth-code",
+    ux_mode: "popup",
+    redirect_uri: typeof window !== "undefined" ? window.location.origin : undefined,
+    onSuccess: async (codeResponse) => {
       try {
-        const token = tokenResponse.access_token;
-        const auth = await loginWithGoogleRequest(token);
+        const auth = await loginWithGoogleCodeRequest(codeResponse.code);
         saveAuthSession(auth);
         const currentUser = await getCurrentUser(auth.accessToken);
         notifyAuthenticated(currentUser);

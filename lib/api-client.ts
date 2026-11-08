@@ -220,7 +220,42 @@ export type KaraokeSessionResponse = {
 
 export type KaraokeScoreResponse = {
   status: string;
-  score: { overall: number } | null;
+  score: { overall: number; pitch?: number; rhythm?: number; coverage?: number } | null;
+  scoring_version?: string;
+  reference_version?: string;
+  request_id?: string;
+  quality?: { status?: string; warnings?: string[] };
+  diagnostics?: {
+    schema_version?: number;
+    flags?: string[];
+    reference_duration_seconds?: number;
+    recording_duration_seconds?: number;
+    reference_voiced_seconds?: number;
+    recording_voiced_seconds?: number;
+    paired_voiced_seconds?: number;
+    rejected_pitch_frames?: number;
+    recording_frame_count?: number;
+    reference_event_count?: number;
+    recording_event_count?: number;
+    rms_dbfs?: number;
+    clipped_fraction?: number;
+    recording_start_offset_ms?: number;
+    capture_latency_ms?: number;
+    median_signed_pitch_error_cents?: number | null;
+    median_absolute_pitch_error_cents?: number | null;
+    pitch_accuracy_when_detected?: number | null;
+    applied_octave_shift_semitones?: number;
+    suggested_latency_adjustment_ms?: number | null;
+    alignment_gain?: number;
+    alignment_search_limit_ms?: number;
+    windows?: Array<{
+      start_seconds: number;
+      end_seconds: number;
+      expected_voiced_seconds: number;
+      coverage: number;
+      pitch: number;
+    }>;
+  };
 };
 
 export type KaraokePitchFeatures = {
@@ -241,7 +276,7 @@ export type KaraokeRoomScoreSession = {
   status: "collecting" | "scoring" | "completed" | "failed";
   ended: boolean;
   participantCount: number;
-  score: { status?: string; score?: { overall: number } | null } | null;
+  score: KaraokeScoreResponse | null;
 };
 
 export type KaraokeRoomPitchSegment = {

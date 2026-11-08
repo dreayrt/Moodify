@@ -102,6 +102,7 @@ import { ModerationTab } from "./moderation-tab";
 import { MonetizationTab } from "./monetization-tab";
 import { LicensingTab } from "./licensing-tab";
 import { NotificationsTab } from "./notifications-tab";
+import { KaraokeResourcesTab } from "./karaoke-resources-tab";
 import { AdminAudioPlayerDock } from "./shared/admin-audio-player-dock";
 
 const HOME_ROUTE = "/dashboard";
@@ -882,6 +883,7 @@ export default function AdminDashboardPage() {
     { key: "users", label: "Người Dùng", count: users.length, icon: Users },
     { key: "monetization", label: "Gói Dịch Vụ", count: packages.length, icon: DollarSign },
     { key: "catalog", label: "Bài Hát", count: tracks.length, icon: Music2 },
+    { key: "karaoke-resources", label: "Tài Nguyên Karaoke", icon: Layers },
     { key: "favorites", label: "Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
     { key: "history", label: "Lịch Sử Nghe", icon: Headphones },
     { key: "moderation", label: "Kiểm Duyệt", count: pendingModerationCount, icon: ShieldCheck },
@@ -1090,6 +1092,7 @@ export default function AdminDashboardPage() {
           )}
 
           {activeTab === "notifications" && <NotificationsTab onToast={addToast} />}
+          {activeTab === "karaoke-resources" && <KaraokeResourcesTab onToast={addToast} />}
         </main>
       </div>
 

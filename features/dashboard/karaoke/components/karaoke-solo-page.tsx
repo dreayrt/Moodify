@@ -24,6 +24,8 @@ import {
   type KaraokeTrackSummary,
 } from "@/lib/api-client";
 import KaraokeTrackCatalog from "./karaoke-track-catalog";
+import KaraokeScoreDetails from "./karaoke-score-details";
+import { captureDiagnostics } from "../capture-diagnostics";
 import styles from "./karaoke-room-page.module.css";
 
 function formatDuration(durationMs: number | null): string {
@@ -193,6 +195,8 @@ export default function KaraokeSoloPage() {
   } | null>(null);
   const activeScoreSessionRef = useRef<KaraokeSessionResponse | null>(null);
   const recordingStartOffsetRef = useRef(0);
+  const captureDiagnosticsRef = useRef<ReturnType<typeof captureDiagnostics> | null>(null);
+  const [scoreReport, setScoreReport] = useState<{ sessionId: string; songId: string; capture: unknown } | null>(null);
   const discardRecordingRef = useRef(false);
   const scoreStartLockRef = useRef(false);
 
@@ -357,7 +361,8 @@ export default function KaraokeSoloPage() {
         features,
       });
       setScoreResult(result);
-      setScoreDialogOpen(Boolean(result.score));
+      setScoreReport({ sessionId: session.sessionId, songId: session.songId, capture: captureDiagnosticsRef.current });
+      setScoreDialogOpen(true);
       setScoreState("completed");
       setScoreMessage(
         result.score
@@ -424,6 +429,7 @@ export default function KaraokeSoloPage() {
       setScoreMessage("Đang xin quyền micro và tạo phiên chấm điểm…");
       setScoreError("");
       setScoreResult(null);
+      setScoreReport(null);
       stopMicCheck();
       audio.pause();
       audio.currentTime = 0;
@@ -500,6 +506,7 @@ export default function KaraokeSoloPage() {
 
         await context.resume();
         await audio.play();
+        captureDiagnosticsRef.current = captureDiagnostics(stream, context);
         recordingStartOffsetRef.current = Math.round(audio.currentTime * 1000);
         processor.port.postMessage({ type: "start" });
         setScoreState("recording");
@@ -1048,7 +1055,7 @@ export default function KaraokeSoloPage() {
           autoSelectFirst={false}
         />
       </section>
-      {scoreDialogOpen && scoreResult?.score && typeof document !== "undefined"
+      {scoreDialogOpen && scoreResult && typeof document !== "undefined"
         ? createPortal(
             <div
               className={styles.scoreModalBackdrop}
@@ -1087,10 +1094,10 @@ export default function KaraokeSoloPage() {
                   </p>
                 )}
                 <div className={styles.scoreModalValue}>
-                  <strong>{overallScore.toFixed(1)}</strong>
+                  <strong>{scoreResult.score ? overallScore.toFixed(1) : "—"}</strong>
                   <span>/ 100</span>
                 </div>
-                <div
+                {scoreResult.score && <div
                   className={styles.scoreModalProgress}
                   role="meter"
                   aria-label="Điểm tổng"
@@ -1099,13 +1106,14 @@ export default function KaraokeSoloPage() {
                   aria-valuenow={scoreProgress}
                 >
                   <span style={{ width: scoreProgress + "%" }} />
-                </div>
+                </div>}
                 <p
                   id="karaoke-score-description"
                   className={styles.scoreModalDescription}
                 >
                   Cảm ơn bạn đã hát cùng Moodify.
                 </p>
+                <KaraokeScoreDetails result={scoreResult} mode="solo" sessionId={scoreReport?.sessionId} songId={scoreReport?.songId} capture={scoreReport?.capture} />
                 <button
                   type="button"
                   className={styles.scoreModalAction}
