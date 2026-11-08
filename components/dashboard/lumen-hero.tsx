@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { BrandLogo } from "@/components/shared/logo-mark";
 import {
   Play,
   Pause,
@@ -43,6 +44,7 @@ import {
 import { usePlayer } from "@/components/dashboard/player-context";
 import { useVipTheme, type ThemeOption } from "@/lib/theme";
 import RealtimeLyrics from "./realtime-lyrics";
+import RecommendationSections from "./recommendation-sections";
 import TrackActionMenu, { TrackInlineActions } from "./track-action-menu";
 import AlbumDetailModal from "./album-detail-modal";
 
@@ -707,7 +709,7 @@ function LumenHeroContent() {
           durationMs: trk.durationMs,
           lyricsPlain: trk.lyricsPlain,
           lyricsSynced: trk.lyricsSynced,
-          audioUrl: trk.audioUrl || (trk.localPath ? `http://158.178.247.33/${trk.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: trk.audioUrl || (trk.localPath ? `https://moodify.click/${trk.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: trk.localPath,
         });
 
@@ -779,46 +781,26 @@ function LumenHeroContent() {
     }));
   };
 
-  // Fetch tracks whose MongoDB `genres` array contains any of the target genres.
-  const fetchByGenres = async (genres: string[], size: number): Promise<ApiTrack[]> => {
-    if (activeVibe === "all") {
-      try {
-        const resp = await fetchTracks({ size: 200 });
+  // Fetch tracks whose MongoDB `genres` array contains any of the target genres in a single unified request.
+  const fetchByGenres = async (genres: string[], size: number = 50): Promise<ApiTrack[]> => {
+    try {
+      if (activeVibe === "all") {
+        const resp = await fetchTracks({ size });
         return resp.content;
-      } catch (err) {
-        console.error("Failed to fetch all tracks:", err);
       }
-    }
 
-    const seen = new Set<string>();
-    const merged: ApiTrack[] = [];
-    await Promise.all(
-      genres.map(async (g) => {
-        try {
-          const resp = await fetchTracks({ genre: g, size });
-          for (const t of resp.content) {
-            if (!seen.has(t.spotifyId)) {
-              seen.add(t.spotifyId);
-              merged.push(t);
-            }
-          }
-        } catch (err) {
-          console.error(`Failed to fetch genre "${g}":`, err);
-        }
-      })
-    );
-
-    // If specific genre returned 0 tracks, fallback to general tracks from catalog
-    if (merged.length === 0) {
-      try {
-        const resp = await fetchTracks({ size: 200 });
+      const resp = await fetchTracks({ genre: genres.join(","), size });
+      if (resp.content && resp.content.length > 0) {
         return resp.content;
-      } catch (err) {
-        console.error("Failed to fetch fallback tracks:", err);
       }
-    }
 
-    return merged;
+      // If specific genre returned 0 tracks, fallback to general tracks from catalog
+      const fallback = await fetchTracks({ size });
+      return fallback.content;
+    } catch (err) {
+      console.error("Failed to fetch tracks:", err);
+      return [];
+    }
   };
 
   // Fetch tracks when vibe changes
@@ -828,7 +810,7 @@ function LumenHeroContent() {
       setTracksLoading(true);
       try {
         const genres = VIBE_TO_GENRES[activeVibe] ?? [activeVibe];
-        const items = await fetchByGenres(genres, 150);
+        const items = await fetchByGenres(genres, 50);
         if (!cancelled) {
           setTracks(mapApiTracks(items));
           setActiveTrackIdx(0);
@@ -949,7 +931,7 @@ function LumenHeroContent() {
           durationMs: t.raw.durationMs,
           lyricsPlain: t.raw.lyricsPlain,
           lyricsSynced: t.raw.lyricsSynced,
-          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `http://158.178.247.33/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.raw.audioUrl || (t.raw.localPath ? `https://moodify.click/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.raw.localPath,
         },
         tracks
@@ -964,7 +946,7 @@ function LumenHeroContent() {
             durationMs: x.raw!.durationMs,
             lyricsPlain: x.raw!.lyricsPlain,
             lyricsSynced: x.raw!.lyricsSynced,
-            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `http://158.178.247.33/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
+            audioUrl: x.raw!.audioUrl || (x.raw!.localPath ? `https://moodify.click/${x.raw!.localPath.replace(/^\/+/, "")}` : undefined),
             localPath: x.raw!.localPath,
           }))
       );
@@ -1406,6 +1388,77 @@ function LumenHeroContent() {
         </div>
       )}
 
+      {/* Editor picks */}
+      <div>
+        <SectionHeader eyebrow="KHÁM PHÁ THƯ VIỆN" title="Từ kho nhạc Moodify" />
+        {editorPicks.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            {editorPicks.map((t, i) => (
+              <EditorPickCard
+                key={t.title}
+                track={t}
+                delay={1000 + i * 80}
+                vipTheme={activeVipTheme}
+                onPlay={() => handlePlayTrack(t)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-white/40 text-sm py-4">Chưa có bài hát tuyển chọn nào.</div>
+        )}
+      </div>
+
+      {/* Hottest in genre */}
+      <div>
+        <SectionHeader eyebrow="TIẾP TỤC KHÁM PHÁ" title={`Thêm nhạc ${active.label}`} />
+        <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start">
+          <div className="flex flex-col gap-1 min-w-0">
+            {[...tracks]
+              .slice(0, 4)
+              .map((t, i) => ({ track: t, originalIndex: i }))
+              .filter((_, i) => i % 2 === 0)
+              .map(({ track, originalIndex }) => (
+                <TrackRow
+                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
+                  track={track}
+                  index={originalIndex}
+                  active={currentTrack?.spotifyId === track.spotifyId}
+                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
+                  onClick={() => handlePlayTrack(track)}
+                />
+              ))}
+          </div>
+          <div className="flex flex-col gap-1 min-w-0">
+            {[...tracks]
+              .slice(0, 4)
+              .map((t, i) => ({ track: t, originalIndex: i }))
+              .filter((_, i) => i % 2 !== 0)
+              .map(({ track, originalIndex }) => (
+                <TrackRow
+                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
+                  track={track}
+                  index={originalIndex}
+                  active={currentTrack?.spotifyId === track.spotifyId}
+                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
+                  onClick={() => handlePlayTrack(track)}
+                />
+              ))}
+          </div>
+        </div>
+        <div className="flex md:hidden flex-col gap-1">
+          {[...tracks].slice(0, 4).map((t, i) => (
+            <TrackRow
+              key={`more-${activeVibe}-${t.spotifyId || i}`}
+              track={t}
+              index={i}
+              active={currentTrack?.spotifyId === t.spotifyId}
+              playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
+              onClick={() => handlePlayTrack(t)}
+            />
+          ))}
+        </div>
+      </div>
+
       {/* ========================================================================= */}
       {/* BOX 4: NGHỆ SĨ VIỆT NAM NỔI BẬT (Featured Artists / Artists to Follow)     */}
       {/* ========================================================================= */}
@@ -1569,6 +1622,19 @@ function LumenHeroContent() {
           })()}
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="mt-16 border-t border-white/10 pt-6 pb-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <BrandLogo className="h-5 w-auto opacity-80" />
+        <div className="text-center sm:text-right">
+          <p className="text-xs text-white/45">
+            © 2026 Moodify — Sản phẩm đồ án tốt nghiệp
+          </p>
+          <p className="text-[11px] text-white/30 mt-1">
+            Spring Boot · Next.js · MongoDB · Python
+          </p>
+        </div>
+      </footer>
 
       {/* Album Detail Modal */}
       <AlbumDetailModal

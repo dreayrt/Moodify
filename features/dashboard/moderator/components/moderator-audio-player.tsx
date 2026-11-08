@@ -11,7 +11,6 @@ import {
   Gauge,
   Activity,
   AlertTriangle,
-  Radio,
   Zap,
 } from "lucide-react";
 import { ModerationTrack } from "../types";
@@ -267,18 +266,9 @@ export function ModeratorAudioPlayer({
         <audio ref={audioRef} />
       )}
 
-      {/* Top Header: Technical Specifications Pill */}
+      {/* Top Header: Audio Review Status */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] px-3 text-[11px] font-medium text-white/80">
-            <Radio className="h-3.5 w-3.5 text-[#ff8b4d]" />
-            <span>{track.audioSpec.format}</span>
-            <span className="text-white/30">•</span>
-            <span>{track.audioSpec.bitrate}</span>
-            <span className="text-white/30">•</span>
-            <span>{track.audioSpec.sampleRate}</span>
-          </div>
-
           {isClipping ? (
             <div className="flex h-7 items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-400">
               <AlertTriangle className="h-3 w-3" />

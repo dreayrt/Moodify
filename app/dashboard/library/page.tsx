@@ -349,7 +349,7 @@ function LibraryContent() {
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
           lyricsSynced: t.lyricsSynced,
-          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.localPath,
         }));
         playTrack(playlistTracks[0], playlistTracks);
@@ -481,7 +481,6 @@ function LibraryContent() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
             )}
           </button>
-
           <button
             onClick={() => setActiveTab("artists")}
             className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer ${
@@ -496,7 +495,6 @@ function LibraryContent() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full" />
             )}
           </button>
-
           <button
             onClick={() => router.push("/dashboard/history")}
             className="pb-3 text-sm font-medium transition-all relative flex items-center gap-2 cursor-pointer text-slate-400 hover:text-cyan-300"

@@ -42,7 +42,7 @@ function resolveMediaUrl(rawUrl?: string | null) {
     return trimmed;
   }
   if (trimmed.startsWith("/")) {
-    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8088").replace(/\/$/, "");
     return `${apiBase}${trimmed}`;
   }
   return undefined;

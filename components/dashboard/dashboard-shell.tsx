@@ -13,7 +13,7 @@ import {
   ChevronDown,
   Disc,
   Settings,
-  Sparkles,
+  Tags,
   Crown,
   Bell,
   Mail,
@@ -22,6 +22,7 @@ import {
   History,
   HelpCircle,
   CreditCard,
+  Mic2,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -51,6 +52,7 @@ import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
 import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
 import { usePlayer } from "./player-context";
+import { HeroCarousel } from "@/features/home/components/hero-carousel";
 
 export type Vibe = {
   id: string;
@@ -872,6 +874,41 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGenresOpen, setIsGenresOpen] = useState(true);
+  const hasPendingSidebarLoginPrompt = useRef(false);
+
+  const requestSidebarLogin = () => {
+    if (userLoading) {
+      hasPendingSidebarLoginPrompt.current = true;
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }),
+    );
+  };
+
+  const guardSidebarNavigation = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (user) return;
+
+    event.preventDefault();
+    requestSidebarLogin();
+  };
+
+  useEffect(() => {
+    if (!hasPendingSidebarLoginPrompt.current || userLoading) return;
+
+    hasPendingSidebarLoginPrompt.current = false;
+    if (user) return;
+
+    // Wait for the guest-only HeroCarousel auth listener to mount.
+    const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }),
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [user, userLoading]);
 
   const refreshPlaylists = async () => {
     try {
@@ -980,6 +1017,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/dashboard" || pathname === "/dashboard/user";
   const isSearch = pathname === "/dashboard/search" || pathname.startsWith("/dashboard/search");
   const isLibrary = pathname.startsWith("/dashboard/library");
+  const isKaraoke = pathname.startsWith("/dashboard/karaoke");
   const isSubscriptionManagement = pathname === "/dashboard/premium" && searchParams.get("tab") === "manage";
   const isHistory = pathname.startsWith("/dashboard/history");
   const isSearchHistory = pathname.startsWith("/dashboard/search-history");
@@ -1044,7 +1082,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* Main Shell Container */}
       <div className="relative z-10 w-full min-h-screen flex flex-col">
         {/* Top Header Bar - Fixed/Sticky SoundCloud Style */}
-        <header className={`sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
+        <header className={`${isKaraoke ? "hidden" : ""} sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
           <div className="flex items-center gap-5 md:gap-7 shrink-0 min-w-0 md:min-w-[200px]">
             <Link
               href="/dashboard"
@@ -1057,6 +1095,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <nav className="flex min-w-0 max-w-[45vw] items-center gap-1.5 overflow-x-auto lg:hidden">
               <Link
                 href="/dashboard"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHome
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1066,7 +1106,21 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 Trang chủ
               </Link>
               <Link
+                href="/dashboard/karaoke"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  isKaraoke
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Karaoke
+              </Link>
+              <Link
                 href="/dashboard/search"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isSearch
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1077,6 +1131,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/library"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isLibrary
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1087,6 +1143,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/premium?tab=manage"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 aria-label="Quản lý gói dịch vụ"
                 title="Quản lý gói dịch vụ"
                 className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
@@ -1099,6 +1157,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isHistory
                     ? "bg-purple-500/20 text-purple-200 border border-purple-400/40 shadow-[0_0_16px_rgba(168,85,247,0.25)]"
@@ -1109,6 +1169,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/dashboard/search-history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 aria-label="Lịch sử tìm kiếm"
                 title="Lịch sử tìm kiếm"
                 className={`shrink-0 px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
@@ -1132,43 +1194,68 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
-            <button
-              type="button"
-              onClick={() => triggerUserTour()}
-              className="p-2 rounded-xl text-white/60 hover:text-purple-300 hover:bg-white/5 transition-all cursor-pointer relative group"
-              title="Xem hướng dẫn sử dụng"
-            >
-              <HelpCircle className="w-[18px] h-[18px] transition-transform group-hover:scale-110" />
-            </button>
+            {userLoading ? (
+              <span className="h-9 w-28 animate-pulse rounded-full border border-white/10 bg-white/5" />
+            ) : user ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => triggerUserTour()}
+                  className="p-2 rounded-xl text-white/60 hover:text-purple-300 hover:bg-white/5 transition-all cursor-pointer relative group"
+                  title="Xem hướng dẫn sử dụng"
+                >
+                  <HelpCircle className="w-[18px] h-[18px] transition-transform group-hover:scale-110" />
+                </button>
 
-            <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
-            <HeaderMessages isPremium={Boolean(subInfo?.isPremium)} />
+                <HeaderNotifications isPremium={Boolean(subInfo?.isPremium)} />
+                <HeaderMessages isPremium={Boolean(subInfo?.isPremium)} />
 
-            <div className="w-px h-5 bg-white/10 mx-0.5 hidden sm:block" />
+                <div className="w-px h-5 bg-white/10 mx-0.5 hidden sm:block" />
 
-            <div id="tour-mascot-profile">
-              <MascotAccountTrigger
-                user={user}
-                loading={userLoading}
-                subInfo={subInfo}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-              />
-            </div>
+                <div id="tour-mascot-profile">
+                  <MascotAccountTrigger
+                    user={user}
+                    loading={userLoading}
+                    subInfo={subInfo}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }))}
+                  className="inline-flex h-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] px-3.5 text-xs font-semibold text-white/80 transition hover:border-purple-300/45 hover:bg-white/[0.08] hover:text-white sm:px-4"
+                >
+                  Đăng nhập
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "register" } }))}
+                  className="inline-flex h-9 items-center justify-center rounded-full bg-gradient-to-r from-fuchsia-500 to-orange-400 px-3.5 text-xs font-bold text-white shadow-[0_5px_20px_rgba(217,70,239,0.22)] transition hover:brightness-110 sm:px-4"
+                >
+                  Đăng ký
+                </button>
+              </>
+            )}
           </div>
         </header>
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
-        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
+        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isKaraoke || isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
               <aside className={`flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden moodify-scroll w-full ${isPre ? "rounded-[18.8px]" : "rounded-[20px]"} backdrop-blur-2xl p-2.5 space-y-3 relative transition-colors duration-300 ${sidebarBgClass}`}>
 
-            {/* Primary Navigation: Trang chủ -> Tìm kiếm -> Thư viện -> Lịch sử -> Thể loại */}
+            {/* Primary Navigation: Trang chủ -> Thư viện -> Karaoke -> Lịch sử -> Thể loại */}
             <div id="tour-sidebar-nav" className="space-y-1">
               {/* 1. Trang chủ */}
               <Link
                 href="/dashboard"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHome
                     ? navActiveItemClass
@@ -1184,27 +1271,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
 
-              {/* 2. Tìm kiếm */}
-              <Link
-                href="/dashboard/search"
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
-                  isSearch
-                    ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Search
-                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
-                    strokeWidth={isSearch ? 2.2 : 1.7}
-                  />
-                  <span>Tìm kiếm</span>
-                </div>
-              </Link>
-
-              {/* 3. Thư viện */}
+              {/* 2. Thư viện */}
               <Link
                 href="/dashboard/library"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isLibrary
                     ? navActiveItemClass
@@ -1220,9 +1291,30 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
 
+              <Link
+                href="/dashboard/karaoke"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                  isKaraoke
+                    ? navActiveItemClass
+                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Mic2
+                    className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`}
+                    strokeWidth={isKaraoke ? 2.2 : 1.7}
+                  />
+                  <span>Karaoke</span>
+                </div>
+              </Link>
+
               {/* Quản lý gói đăng ký và biên nhận thanh toán */}
               <Link
                 href="/dashboard/premium?tab=manage"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSubscriptionManagement
                     ? navActiveItemClass
@@ -1241,6 +1333,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               {/* 3.1. Lịch sử nghe & Truy vết */}
               <Link
                 href="/dashboard/history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isHistory
                     ? navActiveItemClass
@@ -1259,6 +1353,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               {/* 3.2. Lịch sử tìm kiếm */}
               <Link
                 href="/dashboard/search-history"
+                onClick={guardSidebarNavigation}
+                onAuxClick={guardSidebarNavigation}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
                   isSearchHistory
                     ? navActiveItemClass
@@ -1286,7 +1382,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   } font-medium`}
                 >
                   <div className="flex items-center gap-3">
-                    <Sparkles className={`w-[18px] h-[18px] group-hover:scale-110 transition-transform ${navIconClass}`} />
+                    <Tags className={`w-[18px] h-[18px] transition-transform group-hover:scale-110 ${navIconClass}`} />
                     <span>Thể loại</span>
                   </div>
                   <ChevronDown
@@ -1380,9 +1476,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                   DANH SÁCH PHÁT
                 </p>
                 <button
-                  onClick={() => setIsCreateOpen(true)}
+                  onClick={() => {
+                    if (user) {
+                      setIsCreateOpen(true);
+                    } else {
+                      requestSidebarLogin();
+                    }
+                  }}
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
-                  title="Tạo playlist mới"
+                  title={user ? "Tạo playlist mới" : "Đăng nhập để tạo playlist"}
                 >
                   <Plus className={`w-3 h-3 ${navIconClass}`} />
                   <span>Mới</span>
@@ -1399,6 +1501,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                     <Link
                       key={pl.id}
                       href={`/dashboard/library?playlistId=${pl.id}`}
+                      onClick={guardSidebarNavigation}
+                      onAuxClick={guardSidebarNavigation}
                       className="w-full group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-white/65 hover:text-white hover:bg-white/[0.05] transition-all"
                     >
                       <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
@@ -1424,6 +1528,19 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Global Create Playlist Modal */}
+      {!userLoading && !user ? (
+        <HeroCarousel
+          authOnly
+          onAuthenticated={(authenticatedUser) => {
+            setUser(authenticatedUser);
+            setUserLoading(false);
+            void refreshPlaylists();
+            void refreshSubscription();
+            void registerCurrentDevice();
+          }}
+        />
+      ) : null}
+
       <CreatePlaylistModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}

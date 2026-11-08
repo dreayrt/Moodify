@@ -36,7 +36,6 @@ import {
   getCurrentUser,
   getStoredAuthSession,
   getValidAccessToken,
-  logout,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
 import {
@@ -408,20 +407,11 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   // Logout Handler
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) return;
     setLoggingOut(true);
-
-    try {
-      const session = getStoredAuthSession();
-      await logout(session?.refreshToken);
-    } catch (err) {
-      console.warn("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      setLoggingOut(false);
-      router.push(HOME_ROUTE);
-    }
+    clearAuthSession();
+    window.location.replace(USER_DASHBOARD_ROUTE);
   };
 
   // ================= BUSINESS ACTIONS =================
@@ -994,6 +984,13 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/admin/recommendations"
+              className="flex items-center gap-2 rounded-xl border border-[#222432] bg-[#171822] px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-purple-500/50 hover:text-white"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+              <span>Tuyển chọn theo đợt</span>
+            </Link>
             <Link
               href="/dashboard/user"
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#222432] bg-[#171822] text-xs font-semibold text-zinc-300 hover:text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"

@@ -22,7 +22,7 @@ type ModeratorReviewQueueTabProps = {
   onSelectTrack: (track: ModerationTrack) => void;
   onOpenDecisionModal: (
     track: ModerationTrack,
-    actionType: "approve" | "reject" | "needs_revision"
+    actionType: "approve" | "reject"
   ) => void;
 };
 
@@ -252,12 +252,6 @@ export function ModeratorReviewQueueTab({
 
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-white/50">
                     <span>
-                      ISRC:{" "}
-                      <span className="font-mono text-white/80">
-                        {selectedTrack.isrcCode || "N/A"}
-                      </span>
-                    </span>
-                    <span>
                       Hãng đĩa:{" "}
                       <span className="text-white/80">
                         {selectedTrack.label || "Tự phát hành"}
@@ -321,106 +315,81 @@ export function ModeratorReviewQueueTab({
               </div>
             </div>
 
-            {/* Copyright & Technical Profile */}
+            {/* Copyright Profile */}
             <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-              <div className="flex items-center gap-2 border-b border-white/8 pb-3">
-                <ShieldCheck className="h-4 w-4 text-[#ff8b4d]" />
-                <h3 className="text-[13px] font-semibold text-white">
-                  Hồ sơ tác quyền & Kỹ thuật
-                </h3>
-              </div>
-
-                <div className="mt-4 space-y-4">
-                  {/* Copyright License Box */}
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <div className="flex items-center justify-between border-b border-white/6 pb-2.5 mb-3">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="h-4 w-4 text-[#ff8b4d]" />
-                        <h4 className="text-[12px] font-semibold uppercase tracking-wider text-white">
-                          Hồ sơ bản quyền (MySQL song_licenses)
-                        </h4>
-                      </div>
-                      <span className="rounded-full bg-[#ff7a2c]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#ffb488]">
-                        {selectedTrack.licenseType || "DIRECT_LICENSE"}
+              <div className="flex items-center justify-between gap-3 border-b border-white/8 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-[#ff8b4d]" />
+                  <h3 className="text-[13px] font-semibold text-white">
+                    Hồ sơ bản quyền
+                  </h3>
+                </div>
+                {selectedTrack.licenseRecordExists && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {selectedTrack.licenseStatus && (
+                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[11px] font-medium text-white/70">
+                        {selectedTrack.licenseStatus}
                       </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
-                      <div>
-                        <span className="text-white/40">Chủ sở hữu quyền:</span>
-                        <p className="mt-0.5 font-medium text-white">
-                          {selectedTrack.copyrightOwner || "Chưa có chủ sở hữu"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-white/40">Đơn vị phân phối:</span>
-                        <p className="mt-0.5 font-medium text-white">
-                          {selectedTrack.distributorId
-                            ? `Nhà phân phối #${selectedTrack.distributorId}`
-                            : "Nghệ sĩ tự phát hành trực tiếp"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-white/40">Mã hợp đồng:</span>
-                        <p className="mt-0.5 font-mono text-white/90">
-                          {selectedTrack.distributionContractId
-                            ? `#${selectedTrack.distributionContractId}`
-                            : "Không có hợp đồng trung gian"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-white/40">Thời hạn giấy phép:</span>
-                        <p className="mt-0.5 text-white/90">
-                          {selectedTrack.issueDate || "Hôm nay"} →{" "}
-                          {selectedTrack.expiryDate || "Vô thời hạn (Vĩnh viễn)"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {selectedTrack.licenseDocumentUrl && (
-                      <div className="mt-3 pt-3 border-t border-white/6 flex items-center justify-between">
-                        <span className="text-[11px] text-white/50">Chứng từ đính kèm:</span>
-                        <a
-                          href={selectedTrack.licenseDocumentUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#ff8b4d] hover:underline"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                          <span>Xem tệp chứng từ bản quyền</span>
-                        </a>
-                      </div>
                     )}
                   </div>
+                )}
+              </div>
 
-                  {/* Audio Tech Specs */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12px]">
-                    <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3">
-                      <span className="text-[10px] uppercase tracking-wider text-white/40">Mã ISRC</span>
-                      <p className="mt-1 font-mono font-medium text-white">
-                        {selectedTrack.isrcCode || "Chưa đăng ký"}
+              {selectedTrack.licenseRecordExists ? (
+                <div className="mt-4">
+                  <div className="grid grid-cols-1 gap-4 text-[12px] sm:grid-cols-2">
+                    <div>
+                      <span className="text-white/40">Chủ sở hữu quyền</span>
+                      <p className="mt-1 font-medium text-white">
+                        {selectedTrack.copyrightOwner || selectedTrack.artist || "Chưa ghi nhận trong hồ sơ"}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3">
-                      <span className="text-[10px] uppercase tracking-wider text-white/40">Định dạng</span>
+                    <div>
+                      <span className="text-white/40">Đơn vị phân phối</span>
                       <p className="mt-1 font-medium text-white">
-                        {selectedTrack.audioSpec.format}
+                        {selectedTrack.distributorName ||
+                          (selectedTrack.distributorId
+                            ? `Nhà phân phối #${selectedTrack.distributorId}`
+                            : "Không có nhà phân phối liên kết")}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3">
-                      <span className="text-[10px] uppercase tracking-wider text-white/40">Bitrate</span>
-                      <p className="mt-1 font-medium text-white">
-                        {selectedTrack.audioSpec.bitrate}
+                    <div>
+                      <span className="text-white/40">Mã hợp đồng</span>
+                      <p className="mt-1 font-mono font-medium text-white/90">
+                        {selectedTrack.distributionContractCode ||
+                          (selectedTrack.distributionContractId
+                            ? `#${selectedTrack.distributionContractId}`
+                            : "Chưa lưu mã hợp đồng")}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3">
-                      <span className="text-[10px] uppercase tracking-wider text-white/40">Tần số</span>
-                      <p className="mt-1 font-medium text-white">
-                        {selectedTrack.audioSpec.sampleRate}
+                    <div>
+                      <span className="text-white/40">Thời hạn giấy phép</span>
+                      <p className="mt-1 text-white/90">
+                        {selectedTrack.issueDate || "Chưa thiết lập"} → {selectedTrack.expiryDate || "Chưa thiết lập"}
                       </p>
                     </div>
                   </div>
+
+                  {selectedTrack.licenseDocumentUrl && (
+                    <div className="mt-4 flex items-center justify-between border-t border-white/8 pt-3">
+                      <span className="text-[11px] text-white/50">Chứng từ đính kèm</span>
+                      <a
+                        href={selectedTrack.licenseDocumentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#ff8b4d] hover:underline"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>Xem tệp chứng từ bản quyền</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <p className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-5 text-center text-[12px] text-white/50">
+                  Chưa có hồ sơ bản quyền trong cơ sở dữ liệu cho bài hát này.
+                </p>
+              )}
             </div>
 
             {/* Decision Action Bar */}
@@ -440,17 +409,6 @@ export function ModeratorReviewQueueTab({
                 >
                   <XCircle className="h-4 w-4" />
                   <span>Từ chối</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onOpenDecisionModal(selectedTrack, "needs_revision")
-                  }
-                  className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-5 py-2.5 text-[13px] font-medium text-amber-300 transition hover:bg-amber-500 hover:text-black active:scale-95"
-                >
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Yêu cầu sửa</span>
                 </button>
 
                 <button

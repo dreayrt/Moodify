@@ -174,10 +174,14 @@ export type StoredAuthSession = {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8080";
+  "http://localhost:8088";
 
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
+
+// Bumped on every clearAuthSession() so async token refreshes that started
+// before a logout cannot write the cleared session back afterwards.
+let authSessionEpoch = 0;
 
 type RequestOptions = {
   body?: unknown;
@@ -200,23 +204,62 @@ export function getStoredAuthSession(): StoredAuthSession | null {
     const parsed = JSON.parse(rawValue) as StoredAuthSession;
     if (
       typeof parsed.accessToken !== "string" ||
-      typeof parsed.refreshToken !== "string"
+      typeof parsed.refreshToken !== "string" ||
+      typeof parsed.accessTokenExpiresAt !== "number" ||
+      typeof parsed.refreshTokenExpiresAt !== "number"
     ) {
       return null;
     }
 
-    // Auto synchronize cookies if not present yet
-    if (typeof document !== "undefined" && !document.cookie.includes("moodify_token=")) {
+    // Restore only cookies for tokens whose stored lifetime is still active.
+    // Previously this copied an expired access token back into a one-day cookie,
+    // allowing Next middleware to treat an expired session as authenticated.
+    if (typeof document !== "undefined") {
+      const cookieNames = new Set(
+        document.cookie
+          .split(";")
+          .map((cookie) => cookie.trim().split("=", 1)[0]),
+      );
+      const now = Date.now();
+      const accessMaxAge = Math.floor((parsed.accessTokenExpiresAt - now) / 1000);
+      const refreshMaxAge = Math.floor((parsed.refreshTokenExpiresAt - now) / 1000);
       const userRaw = window.localStorage.getItem(USER_STORAGE_KEY);
       let role = "USER";
       if (userRaw) {
         try {
           const userObj = JSON.parse(userRaw);
-          if (userObj.role) role = userObj.role;
+          if (typeof userObj.role === "string") role = userObj.role;
         } catch {}
       }
-      document.cookie = "moodify_token=" + encodeURIComponent(parsed.accessToken) + "; path=/; max-age=86400; SameSite=Lax";
-      document.cookie = "moodify_role=" + encodeURIComponent(role) + "; path=/; max-age=86400; SameSite=Lax";
+
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      if (accessMaxAge > 0 && !cookieNames.has("moodify_token")) {
+        document.cookie =
+          "moodify_token=" +
+          encodeURIComponent(parsed.accessToken) +
+          "; path=/; max-age=" +
+          accessMaxAge +
+          "; SameSite=Lax" +
+          secure;
+      }
+      if (refreshMaxAge > 0 && !cookieNames.has("moodify_refresh")) {
+        document.cookie =
+          "moodify_refresh=" +
+          encodeURIComponent(parsed.refreshToken) +
+          "; path=/; max-age=" +
+          refreshMaxAge +
+          "; SameSite=Lax" +
+          secure;
+      }
+      if ((accessMaxAge > 0 || refreshMaxAge > 0) && !cookieNames.has("moodify_role")) {
+        document.cookie =
+          "moodify_role=" +
+          encodeURIComponent(role) +
+          "; path=/; max-age=" +
+          Math.max(accessMaxAge, refreshMaxAge) +
+          "; SameSite=Lax" +
+          secure;
+      }
     }
 
     return parsed;
@@ -251,10 +294,30 @@ export function saveAuthSession(auth: AuthResponse) {
     }),
   );
 
-  // Synchronize token and role with cookies for Next.js Middleware route protection
-  const maxAge = auth.expiresIn || 86400;
-  document.cookie = "moodify_token=" + encodeURIComponent(auth.accessToken) + "; path=/; max-age=" + maxAge + "; SameSite=Lax";
-  document.cookie = "moodify_role=" + encodeURIComponent(auth.role) + "; path=/; max-age=" + maxAge + "; SameSite=Lax";
+  // Keep access and refresh lifetimes separate so an expired access token is
+  // never mistaken for a live session while a valid refresh session can renew it.
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie =
+    "moodify_token=" +
+    encodeURIComponent(auth.accessToken) +
+    "; path=/; max-age=" +
+    Math.max(0, auth.expiresIn) +
+    "; SameSite=Lax" +
+    secure;
+  document.cookie =
+    "moodify_refresh=" +
+    encodeURIComponent(auth.refreshToken) +
+    "; path=/; max-age=" +
+    Math.max(0, auth.refreshExpiresIn) +
+    "; SameSite=Lax" +
+    secure;
+  document.cookie =
+    "moodify_role=" +
+    encodeURIComponent(auth.role) +
+    "; path=/; max-age=" +
+    Math.max(0, auth.refreshExpiresIn) +
+    "; SameSite=Lax" +
+    secure;
 }
 
 export function clearAuthSession() {
@@ -262,12 +325,18 @@ export function clearAuthSession() {
     return;
   }
 
+  // Invalidate any in-flight refresh: a response that lands after logout must
+  // never resurrect cookies and keep the middleware bouncing the user back.
+  authSessionEpoch += 1;
+
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
 
-  // Clear cookies for Next.js Middleware
-  document.cookie = "moodify_token=; path=/; max-age=0; SameSite=Lax";
-  document.cookie = "moodify_role=; path=/; max-age=0; SameSite=Lax";
+  // Clear current and legacy cookies so old token names cannot keep routes open.
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  for (const name of ["moodify_token", "moodify_refresh", "moodify_role", "accessToken", "token"]) {
+    document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax${secure}`;
+  }
 }
 
 
@@ -417,6 +486,21 @@ export async function logout(refreshToken?: string) {
   });
 }
 
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  token?: string,
+): Promise<void> {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  await requestJson<void>("/api/auth/change-password", {
+    token: validToken,
+    body: { currentPassword, newPassword },
+  });
+}
+
 export async function uploadAvatar(
   accessToken: string,
   file: File,
@@ -531,7 +615,7 @@ export async function getModeratorHistory(token?: string) {
 export async function submitModeratorDecision(
   payload: {
     trackId: string;
-    actionType: "approve" | "reject" | "needs_revision";
+    actionType: "approve" | "reject";
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;
@@ -658,6 +742,7 @@ export async function recordPlatformVisit(payload: {
 
 export async function recordListeningSessionTelemetry(payload: {
   sessionKey: string;
+  queueToken?: string;
   historyId?: number;
   trackId: string;
   durationMs: number;
@@ -714,7 +799,12 @@ export async function getValidAccessToken(): Promise<string | null> {
   }
 
   try {
+    const epoch = authSessionEpoch;
     const refreshed = await refresh(session.refreshToken);
+    if (epoch !== authSessionEpoch) {
+      // The user logged out while this refresh was in flight — discard it.
+      return null;
+    }
     saveAuthSession(refreshed);
     return refreshed.accessToken;
   } catch {
@@ -742,7 +832,7 @@ async function requestJson<T>(
     hasToken: !!authToken,
     hasBody: !!body,
     deviceUuid: currentDeviceUuid,
-    body,
+    bodyFields: body && typeof body === "object" ? Object.keys(body) : [],
   });
 
   const response = await fetch(fullUrl, {

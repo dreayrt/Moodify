@@ -253,6 +253,7 @@ function SearchContent() {
   }, [query, selectedGenre, isMoodMode, loadData, moodSubmissionVersion]);
 
   const handleTabChange = (tab: Tab) => {
+    if (isMoodMode) return;
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.delete("mode");
@@ -359,7 +360,7 @@ function SearchContent() {
         durationMs: track.durationMs,
         lyricsPlain: track.lyricsPlain,
         lyricsSynced: track.lyricsSynced,
-        audioUrl: track.audioUrl || (track.localPath ? `http://158.178.247.33/${track.localPath.replace(/^\/+/, "")}` : undefined),
+        audioUrl: track.audioUrl || (track.localPath ? `https://moodify.click/${track.localPath.replace(/^\/+/, "")}` : undefined),
         localPath: track.localPath,
       },
       tracks.map((t) => ({
@@ -372,7 +373,7 @@ function SearchContent() {
         durationMs: t.durationMs,
         lyricsPlain: t.lyricsPlain,
         lyricsSynced: t.lyricsSynced,
-        audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+        audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
         localPath: t.localPath,
       }))
     );
@@ -392,7 +393,7 @@ function SearchContent() {
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
           lyricsSynced: t.lyricsSynced,
-          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.localPath,
         }));
         playTrack(playlistTracks[0], playlistTracks);
@@ -430,7 +431,7 @@ function SearchContent() {
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
           lyricsSynced: t.lyricsSynced,
-          audioUrl: t.audioUrl || (t.localPath ? `http://158.178.247.33/${t.localPath.replace(/^\/+/, "")}` : undefined),
+          audioUrl: t.audioUrl || (t.localPath ? `https://moodify.click/${t.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.localPath,
         }));
         playTrack(playlistTracks[0], playlistTracks);
@@ -657,8 +658,9 @@ function SearchContent() {
               )}
             </button>
             <button
+              disabled={isMoodMode}
               onClick={() => handleTabChange("artists")}
-              className={`px-4 py-3 text-sm font-medium transition-all relative ${
+              className={`px-4 py-3 text-sm font-medium transition-all relative disabled:cursor-not-allowed disabled:opacity-40 ${
                 currentTab === "artists"
                   ? "text-cyan-400"
                   : "text-slate-400 hover:text-slate-200"
@@ -782,6 +784,7 @@ function SearchContent() {
                   artist={artist}
                   onClick={() => {
                     recordSelectedResult("ARTIST", artist.spotifyId || artist.id);
+                    router.push(`/dashboard/artists/${artist.spotifyId || artist.id}`);
                   }}
                 />
               ))}

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getStoredAuthSession,
   getCurrentUser,
+  getValidAccessToken,
   type UserProfileResponse,
 } from "@/lib/auth-client";
 
@@ -15,14 +15,14 @@ export function useAuth() {
 
   useEffect(() => {
     async function checkAuth() {
-      const session = getStoredAuthSession();
-      if (!session) {
+      const accessToken = await getValidAccessToken();
+      if (!accessToken) {
         setLoading(false);
         return;
       }
 
       try {
-        const userData = await getCurrentUser(session.accessToken);
+        const userData = await getCurrentUser(accessToken);
         setUser(userData);
       } catch (error) {
         console.error("Auth check failed:", error);

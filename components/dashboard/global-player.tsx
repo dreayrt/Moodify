@@ -128,7 +128,7 @@ export function GlobalPlayerBar() {
     }
   };
 
-  if (!currentTrack) {
+  if (pathname?.startsWith("/dashboard/karaoke") || !currentTrack) {
     return null;
   }
 

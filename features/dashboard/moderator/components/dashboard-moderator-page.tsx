@@ -18,7 +18,6 @@ import {
   ModerationTrack,
   ModeratorProfile,
   ToastMessage,
-  ViolationCategory,
 } from "../types";
 import {
   clearAuthSession,
@@ -107,6 +106,14 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
   const waveform = Array.isArray(item.waveform)
     ? item.waveform.filter((point): point is number => typeof point === "number")
     : [];
+  const hasLicenseFieldsFromOlderApi = Boolean(
+    readString(item.copyrightOwner) ||
+      readNumber(item.distributorId) > 0 ||
+      readNumber(item.distributionContractId) > 0 ||
+      readString(item.issueDate) ||
+      readString(item.expiryDate) ||
+      readString(item.licenseDocumentUrl),
+  );
 
   return {
     id: readString(item.id),
@@ -137,9 +144,6 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
     explicitFlagByArtist: readBoolean(item.explicitFlagByArtist),
     lyricsPlain: readString(item.lyricsPlain),
     audioSpec: {
-      format: "MP3 320kbps",
-      sampleRate: "44.1 kHz",
-      bitrate: "320 kbps",
       peakDb: -0.2,
       durationSec: readNumber(item.durationSec, 210),
     },
@@ -151,10 +155,14 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
       audioQualityScore: 95,
       notes: "Bài hát gửi lên từ Nghệ sĩ kèm hồ sơ bản quyền hợp lệ.",
     },
+    licenseRecordExists:
+      item.licenseRecordExists === true || hasLicenseFieldsFromOlderApi,
     licenseType: readString(item.licenseType) || undefined,
     copyrightOwner: readString(item.copyrightOwner) || undefined,
     distributorId: readNumber(item.distributorId) || undefined,
+    distributorName: readString(item.distributorName) || undefined,
     distributionContractId: readNumber(item.distributionContractId) || undefined,
+    distributionContractCode: readString(item.distributionContractCode) || undefined,
     issueDate: readString(item.issueDate) || undefined,
     expiryDate: readString(item.expiryDate) || undefined,
     licenseStatus: readString(item.licenseStatus) || undefined,
@@ -276,10 +284,7 @@ export default function DashboardModeratorPage() {
       }));
     } catch (err) {
       console.warn("Could not fetch moderator history from backend:", err);
-      setHistory([]);
-      if (isAuthFailure(err)) {
-        throw err;
-      }
+      throw err;
     }
   };
 
@@ -361,7 +366,7 @@ export default function DashboardModeratorPage() {
   // Decision modal state
   const [decisionModalOpen, setDecisionModalOpen] = useState(false);
   const [decisionActionType, setDecisionActionType] = useState<
-    "approve" | "reject" | "needs_revision"
+    "approve" | "reject"
   >("approve");
   const [decisionTrack, setDecisionTrack] = useState<ModerationTrack | null>(
     null
@@ -385,7 +390,7 @@ export default function DashboardModeratorPage() {
 
   const handleOpenDecisionModal = (
     track: ModerationTrack,
-    actionType: "approve" | "reject" | "needs_revision"
+    actionType: "approve" | "reject"
   ) => {
     setDecisionTrack(track);
     setDecisionActionType(actionType);
@@ -398,8 +403,7 @@ export default function DashboardModeratorPage() {
     internalNote,
     explicitTag,
   }: {
-    actionType: "approve" | "reject" | "needs_revision";
-    violationCategory?: ViolationCategory;
+    actionType: "approve" | "reject";
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;
@@ -416,28 +420,6 @@ export default function DashboardModeratorPage() {
         internalNote,
         explicitTag,
       }, moderatorToken || undefined);
-
-      await Promise.all([
-        fetchModerationQueue(moderatorToken || undefined),
-        fetchModerationHistory(moderatorToken || undefined),
-      ]);
-
-      if (actionType === "approve") {
-        addToast(
-          `Đã phê duyệt và phát hành bài hát "${trackTitle}" thành công!`,
-          "success"
-        );
-      } else if (actionType === "reject") {
-        addToast(
-          `Đã từ chối bài hát "${trackTitle}". Lịch sử đã được lưu xuống database.`,
-          "error"
-        );
-      } else {
-        addToast(
-          `Đã gửi yêu cầu chỉnh sửa bài hát "${trackTitle}" và lưu lịch sử thẩm định.`,
-          "warning"
-        );
-      }
     } catch (err) {
       console.error("Failed to submit moderator decision to backend:", err);
       addToast(
@@ -445,6 +427,32 @@ export default function DashboardModeratorPage() {
           ? err.message
           : "Không thể lưu quyết định kiểm duyệt xuống database",
         "error"
+      );
+      throw err;
+    }
+
+    if (actionType === "approve") {
+      addToast(
+        `Đã phê duyệt và phát hành bài hát "${trackTitle}" thành công!`,
+        "success"
+      );
+    } else {
+      addToast(
+        `Đã từ chối bài hát "${trackTitle}". Lịch sử đã được lưu xuống database.`,
+        "error"
+      );
+    }
+
+    try {
+      await Promise.all([
+        fetchModerationQueue(moderatorToken || undefined),
+        fetchModerationHistory(moderatorToken || undefined),
+      ]);
+    } catch (err) {
+      console.error("Decision was saved, but moderator data could not refresh:", err);
+      addToast(
+        "Quyết định đã được lưu, nhưng không thể làm mới hàng chờ và lịch sử.",
+        "warning"
       );
     }
   };
@@ -503,7 +511,7 @@ export default function DashboardModeratorPage() {
         };
       case "account":
         return {
-          title: "Tài Khoản & Ca Trực",
+          title: "Tài Khoản",
           subtitle: "Thiết lập định danh kiểm duyệt viên, chứng chỉ năng lực & bảo mật",
         };
     }
@@ -605,7 +613,7 @@ export default function DashboardModeratorPage() {
         </main>
       </div>
 
-      {/* Decision Modal (Approve / Reject / Revision) */}
+      {/* Decision Modal (Approve / Reject) */}
       {decisionTrack && (
         <ModeratorDecisionModal
           isOpen={decisionModalOpen}

@@ -11,6 +11,7 @@ import {
   Save,
   CheckCircle2,
 } from "lucide-react";
+import { changePassword } from "@/lib/auth/auth-client";
 import { ModeratorProfile } from "../types";
 
 type ModeratorAccountTabProps = {
@@ -41,7 +42,7 @@ export function ModeratorAccountTab({
     }, 500);
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword) {
       onShowToast("Vui lòng nhập mật khẩu hiện tại.", "error");
@@ -57,13 +58,20 @@ export function ModeratorAccountTab({
     }
 
     setIsChangingPass(true);
-    setTimeout(() => {
-      setIsChangingPass(false);
+    try {
+      await changePassword(currentPassword, newPassword);
+      onShowToast("Đã đổi mật khẩu thành công!", "success");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      onShowToast("Đã đổi mật khẩu thành công!", "success");
-    }, 600);
+    } catch (err) {
+      onShowToast(
+        err instanceof Error ? err.message : "Đổi mật khẩu thất bại. Vui lòng thử lại.",
+        "error"
+      );
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
