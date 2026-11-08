@@ -1408,57 +1408,6 @@ function LumenHeroContent() {
         )}
       </div>
 
-      {/* Hottest in genre */}
-      <div>
-        <SectionHeader eyebrow="TIẾP TỤC KHÁM PHÁ" title={`Thêm nhạc ${active.label}`} />
-        <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start">
-          <div className="flex flex-col gap-1 min-w-0">
-            {[...tracks]
-              .slice(0, 4)
-              .map((t, i) => ({ track: t, originalIndex: i }))
-              .filter((_, i) => i % 2 === 0)
-              .map(({ track, originalIndex }) => (
-                <TrackRow
-                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
-                  track={track}
-                  index={originalIndex}
-                  active={currentTrack?.spotifyId === track.spotifyId}
-                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(track)}
-                />
-              ))}
-          </div>
-          <div className="flex flex-col gap-1 min-w-0">
-            {[...tracks]
-              .slice(0, 4)
-              .map((t, i) => ({ track: t, originalIndex: i }))
-              .filter((_, i) => i % 2 !== 0)
-              .map(({ track, originalIndex }) => (
-                <TrackRow
-                  key={`more-${activeVibe}-${track.spotifyId || originalIndex}`}
-                  track={track}
-                  index={originalIndex}
-                  active={currentTrack?.spotifyId === track.spotifyId}
-                  playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(track)}
-                />
-              ))}
-          </div>
-        </div>
-        <div className="flex md:hidden flex-col gap-1">
-          {[...tracks].slice(0, 4).map((t, i) => (
-            <TrackRow
-              key={`more-${activeVibe}-${t.spotifyId || i}`}
-              track={t}
-              index={i}
-              active={currentTrack?.spotifyId === t.spotifyId}
-              playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
-              onClick={() => handlePlayTrack(t)}
-            />
-          ))}
-        </div>
-      </div>
-
       {/* ========================================================================= */}
       {/* BOX 4: NGHỆ SĨ VIỆT NAM NỔI BẬT (Featured Artists / Artists to Follow)     */}
       {/* ========================================================================= */}

@@ -1256,10 +1256,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isHome
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1276,10 +1276,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/library"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isLibrary
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1295,10 +1295,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/karaoke"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isKaraoke
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1315,10 +1315,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/premium?tab=manage"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isSubscriptionManagement
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1335,10 +1335,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/history"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isHistory
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1355,10 +1355,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/search-history"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isSearchHistory
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1375,7 +1375,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setIsGenresOpen(!isGenresOpen)}
-                  className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 cursor-pointer ${
+                  className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 cursor-pointer ${
                     isGenresOpen
                       ? "text-white bg-white/[0.04]"
                       : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5"
@@ -1400,12 +1400,12 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                           key={v.id}
                           type="button"
                           onClick={() => handleVibeClick(v.id)}
-                          className={`w-full flex items-center px-3 py-1.5 rounded-lg text-left text-[12px] transition-all duration-150 cursor-pointer ${
+                          className={`w-full flex items-center px-3 py-1.5 rounded-lg text-left text-[13px] transition-all duration-150 cursor-pointer ${
                             isVibeActive
                               ? isPre
                                 ? "bg-amber-400/[0.12] text-[#fff3d4] font-semibold"
                                 : "bg-white/[0.08] text-white font-semibold"
-                              : "text-white/60 hover:text-white hover:bg-white/[0.04] font-medium"
+                              : "text-white/70 hover:text-white hover:bg-white/[0.04] font-semibold"
                           }`}
                         >
                           <span className="truncate">{v.label}</span>
@@ -1472,7 +1472,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             {/* Danh sách phát (Playlists) Section */}
             <div id="tour-playlist-section" className="pt-3 border-t border-white/[0.08]">
               <div className="flex items-center justify-between px-1 mb-2">
-                <p className="text-[10px] tracking-[0.08em] text-white/45 uppercase font-bold">
+                <p className="text-[11px] tracking-[0.08em] text-white/60 uppercase font-bold">
                   DANH SÁCH PHÁT
                 </p>
                 <button
@@ -1508,7 +1508,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                       <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
                         <Music className={`w-3 h-3 ${navIconClass} transition-colors`} />
                       </div>
-                      <span className="text-[12px] truncate group-hover:translate-x-0.5 transition-transform">
+                      <span className="text-[13px] font-medium truncate group-hover:translate-x-0.5 transition-transform">
                         {pl.name}
                       </span>
                     </Link>
