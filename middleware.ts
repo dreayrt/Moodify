@@ -63,8 +63,9 @@ const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isRootPage = pathname === "/";
 
-  if (!pathname.startsWith("/dashboard")) {
+  if (!isRootPage && !pathname.startsWith("/dashboard")) {
     return NextResponse.next();
   }
 
@@ -80,6 +81,14 @@ export function middleware(request: NextRequest) {
   const sessionPayload = accessPayload ?? refreshPayload;
 
   if (!sessionPayload) {
+    if (isRootPage) {
+      const dashboardUrl = new URL("/dashboard/user", request.url);
+      dashboardUrl.search = request.nextUrl.search;
+      const response = NextResponse.redirect(dashboardUrl);
+      clearAuthCookies(response);
+      return response;
+    }
+
     const isPublicDashboard =
       pathname === "/dashboard" ||
       pathname === "/dashboard/" ||
@@ -106,7 +115,9 @@ export function middleware(request: NextRequest) {
   // role cookie so a stale or edited cookie cannot choose the dashboard role.
   const role = sessionPayload.role?.toUpperCase();
   if (!role || !ROLE_DASHBOARD_ROUTES[role]) {
-    const homeUrl = new URL("/", request.url);
+    // An invalid session at / must leave the root instead of redirecting to itself.
+    const homeUrl = new URL(isRootPage ? "/dashboard/user" : "/", request.url);
+    homeUrl.search = request.nextUrl.search;
     const response = NextResponse.redirect(homeUrl);
     clearAuthCookies(response);
     return response;
@@ -114,7 +125,7 @@ export function middleware(request: NextRequest) {
 
   const correctDashboard = ROLE_DASHBOARD_ROUTES[role];
 
-  if (pathname === "/dashboard" || pathname === "/dashboard/") {
+  if (isRootPage || pathname === "/dashboard" || pathname === "/dashboard/") {
     const redirectUrl = new URL(correctDashboard, request.url);
     redirectUrl.search = request.nextUrl.search;
     return NextResponse.redirect(redirectUrl);
@@ -155,5 +166,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/", "/dashboard/:path*"],
 };
