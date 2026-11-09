@@ -314,6 +314,8 @@ export function TrackUploadModal({
     setAcquisitionCostVnd("");
     setCostEvidence("");
     setOcrExtractedFields([]);
+    // A newly attached agreement must not inherit a distributor from the previous upload.
+    setDistributorId("");
     setLicenseDocFile(file);
     setLicenseDocName(file.name);
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -552,7 +554,7 @@ export function TrackUploadModal({
     // Reset license states
     setLicenseType("DIGITAL_STREAMING");
     setCopyrightOwner("Independent Artist");
-    setDistributorId("1");
+    setDistributorId("");
     setDistributionContractCode("");
     setIssueDate(getTodayDateString());
     setExpiryDate(getDefaultExpiryDateString());
