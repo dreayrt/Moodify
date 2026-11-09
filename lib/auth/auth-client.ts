@@ -370,18 +370,6 @@ export async function loginWithGoogleCode(code: string) {
   });
 }
 
-export async function loginWithFacebook(accessToken: string) {
-  const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
-  return requestJson<AuthResponse>("/api/auth/facebook", {
-    body: {
-      accessToken,
-      deviceUuid: device?.deviceUuid,
-      deviceName: device?.deviceName,
-      platform: device?.platform,
-    },
-  });
-}
-
 export async function login(payload: {
   identifier: string;
   password: string;

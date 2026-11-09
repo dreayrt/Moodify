@@ -10,32 +10,17 @@ import {
 export const metadata: Metadata = {
   title: "Hướng dẫn xóa dữ liệu — Moodify",
   description:
-    "Cách yêu cầu Moodify xóa tài khoản và dữ liệu cá nhân của bạn, bao gồm dữ liệu đăng nhập qua Facebook.",
+    "Cách yêu cầu Moodify xóa tài khoản và dữ liệu cá nhân của bạn.",
 };
 
 export default function DataDeletionPage() {
   return (
     <LegalPage
       title="Hướng dẫn xóa dữ liệu"
-      updated="08/11/2026"
+      updated="09/11/2026"
       intro="Bạn có quyền yêu cầu Moodify xóa tài khoản và toàn bộ dữ liệu cá nhân của mình. Dưới đây là các cách thực hiện."
     >
-      <LegalSection heading="1. Xóa dữ liệu khi bạn đã đăng nhập bằng Facebook">
-        <p>
-          Nếu bạn đã dùng Facebook để đăng nhập Moodify và muốn gỡ kết nối kèm yêu cầu xóa
-          dữ liệu:
-        </p>
-        <LegalBulletList
-          items={[
-            "Mở Facebook → Cài đặt & quyền riêng tư → Cài đặt.",
-            "Chọn Ứng dụng và trang web (Apps and websites).",
-            "Tìm và chọn Moodify, sau đó nhấn Gỡ bỏ (Remove).",
-            "Khi được hỏi, chọn tùy chọn Xóa (Delete) để Facebook gửi yêu cầu xóa dữ liệu đến Moodify.",
-          ]}
-        />
-      </LegalSection>
-
-      <LegalSection heading="2. Yêu cầu xóa dữ liệu qua email">
+      <LegalSection heading="1. Yêu cầu xóa dữ liệu qua email">
         <p>
           Gửi email đến{" "}
           <a
@@ -58,7 +43,7 @@ export default function DataDeletionPage() {
         />
       </LegalSection>
 
-      <LegalSection heading="3. Dữ liệu sẽ bị xóa">
+      <LegalSection heading="2. Dữ liệu sẽ bị xóa">
         <LegalBulletList
           items={[
             "Thông tin tài khoản: họ tên, email, tên đăng nhập, số điện thoại, ảnh đại diện.",
@@ -76,7 +61,7 @@ export default function DataDeletionPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="4. Liên hệ hỗ trợ">
+      <LegalSection heading="3. Liên hệ hỗ trợ">
         <p>
           Nếu gặp khó khăn trong quá trình yêu cầu xóa dữ liệu, hãy liên hệ{" "}
           <a

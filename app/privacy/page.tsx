@@ -17,7 +17,7 @@ export default function PrivacyPolicyPage() {
   return (
     <LegalPage
       title="Chính sách quyền riêng tư"
-      updated="08/11/2026"
+      updated="09/11/2026"
       intro="Moodify (moodify.click) là nền tảng phát nhạc trực tuyến cá nhân hóa theo cảm xúc. Chính sách này mô tả dữ liệu chúng tôi thu thập, mục đích sử dụng và quyền của bạn đối với dữ liệu đó khi bạn sử dụng ứng dụng di động và trang web Moodify."
     >
       <LegalSection heading="1. Dữ liệu chúng tôi thu thập">
@@ -25,8 +25,8 @@ export default function PrivacyPolicyPage() {
           items={[
             <>
               <strong>Thông tin tài khoản:</strong> họ tên, email, tên đăng nhập, số điện
-              thoại và ảnh đại diện — do bạn cung cấp khi đăng ký, hoặc nhận từ Google /
-              Facebook khi bạn chọn đăng nhập bằng mạng xã hội (chỉ những trường mà bạn
+              thoại và ảnh đại diện — do bạn cung cấp khi đăng ký, hoặc nhận từ Google
+              khi bạn chọn đăng nhập bằng Google (chỉ những trường mà bạn
               cho phép nhà cung cấp chia sẻ).
             </>,
             <>
@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
       <LegalSection heading="3. Chia sẻ dữ liệu">
         <p>
           Chúng tôi không bán dữ liệu cá nhân. Dữ liệu chỉ được chia sẻ với: nhà cung cấp
-          đăng nhập bên thứ ba (Google, Meta) theo luồng OAuth; nhà cung cấp hạ tầng lưu
+          đăng nhập bên thứ ba (Google) theo luồng OAuth; nhà cung cấp hạ tầng lưu
           trữ và phát nhạc phục vụ vận hành dịch vụ; và cơ quan có thẩm quyền khi pháp luật
           yêu cầu.
         </p>

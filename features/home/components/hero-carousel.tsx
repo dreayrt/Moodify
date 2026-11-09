@@ -14,7 +14,6 @@ import {
 } from "react";
 
 import { useGoogleLogin } from '@react-oauth/google';
-import { loadFacebookSdk, loginWithFacebookSdk } from '@/lib/auth/facebook';
 import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
@@ -23,7 +22,6 @@ import {
   getValidAccessToken,
   login as loginRequest,
   loginWithGoogleCode as loginWithGoogleCodeRequest,
-  loginWithFacebook as loginWithFacebookRequest,
   logout as logoutRequest,
   register as registerRequest,
   saveAuthSession,
@@ -236,16 +234,6 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
   const router = useRouter();
 
   const [isHovered, setIsHovered] = useState(false);
-
-  useEffect(() => {
-    if (!isSignInOpen && !isCreateAccountOpen) return;
-
-    // Load the Facebook SDK before the user clicks so FB.login can open its popup
-    // directly from the click gesture instead of waiting for a network request.
-    void loadFacebookSdk().catch((error) => {
-      console.warn("Facebook SDK preload failed:", error);
-    });
-  }, [isSignInOpen, isCreateAccountOpen]);
 
   const prevSlide = () => {
     setActiveIndex((current) => (current - 1 + heroSlides.length) % heroSlides.length);
@@ -468,27 +456,6 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
     },
   });
 
-  const handleFacebookLogin = async () => {
-    try {
-      const token = await loginWithFacebookSdk();
-      const auth = await loginWithFacebookRequest(token);
-      saveAuthSession(auth);
-      const currentUser = await getCurrentUser(auth.accessToken);
-      notifyAuthenticated(currentUser);
-      setIsSignInOpen(false);
-      setIsCreateAccountOpen(false);
-      router.push(getDashboardPathForRole(currentUser.role));
-    } catch (error) {
-      console.error("Facebook sign-in error:", error);
-      const message = error instanceof Error ? error.message : "Đăng nhập Facebook thất bại";
-      if (isSignInOpen) {
-        setSignInError(message);
-      } else {
-        setCreateAccountError(message);
-      }
-    }
-  };
-
   const handleSignInSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSignInError(null);
@@ -706,7 +673,6 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
           onClose={closeSignIn}
           onSubmit={handleSignInSubmit}
           onGoogleLogin={handleGoogleLogin}
-          onFacebookLogin={handleFacebookLogin}
           onOpenCreateAccount={openCreateAccount}
         />
       ) : null}
@@ -734,7 +700,6 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
           onToggleSuggestedGenre={handleToggleSuggestedGenre}
           onOpenSignIn={openSignIn}
           onGoogleLogin={handleGoogleLogin}
-          onFacebookLogin={handleFacebookLogin}
         />
       ) : null}
     </>
@@ -897,7 +862,6 @@ type SignInModalProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onOpenCreateAccount: () => void;
   onGoogleLogin?: () => void;
-  onFacebookLogin?: () => void;
 };
 
 type CreateAccountModalProps = {
@@ -922,7 +886,6 @@ type CreateAccountModalProps = {
   onToggleSuggestedGenre: (genre: string) => void;
   onOpenSignIn: () => void;
   onGoogleLogin?: () => void;
-  onFacebookLogin?: () => void;
 };
 
 function SignInModal({
@@ -935,7 +898,6 @@ function SignInModal({
   onSubmit,
   onOpenCreateAccount,
   onGoogleLogin,
-  onFacebookLogin,
 }: SignInModalProps) {
   const accountId = useId();
   const passwordId = useId();
@@ -1053,15 +1015,6 @@ function SignInModal({
                 <GoogleIcon />
                 {"Đăng nhập bằng Google"}
               </button>
-
-              <button
-                className="modal-facebook-button flex w-full items-center justify-center gap-3 rounded-[1.2rem] border border-white/12 bg-[linear-gradient(180deg,#1c56d8,#1846af)] px-4 py-3.5 text-sm font-semibold text-white transition hover:brightness-110"
-                type="button"
-                onClick={() => onFacebookLogin?.()}
-              >
-                <FacebookIcon />
-                {"Đăng nhập bằng Facebook"}
-              </button>
             </div>
           </div>
 
@@ -1108,7 +1061,6 @@ function CreateAccountModal({
   onToggleSuggestedGenre,
   onOpenSignIn,
   onGoogleLogin,
-  onFacebookLogin,
 }: CreateAccountModalProps) {
   const fullNameId = useId();
   const usernameId = useId();
@@ -1279,7 +1231,7 @@ function CreateAccountModal({
                 <div className="flex items-center justify-between text-[11px] text-white/45">
                   <span>Hoặc đăng ký nhanh với:</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-2">
                   <button
                     className="modal-google-button flex h-9 items-center justify-center gap-2 rounded-xl border border-white/12 bg-[#121318] px-3 text-xs font-semibold text-white transition hover:bg-[#191b22]"
                     type="button"
@@ -1287,14 +1239,6 @@ function CreateAccountModal({
                   >
                     <GoogleIcon />
                     <span>Google</span>
-                  </button>
-                  <button
-                    className="modal-facebook-button flex h-9 items-center justify-center gap-2 rounded-xl border border-white/12 bg-[linear-gradient(180deg,#1c56d8,#1846af)] px-3 text-xs font-semibold text-white transition hover:brightness-110"
-                    type="button"
-                    onClick={() => onFacebookLogin?.()}
-                  >
-                    <FacebookIcon />
-                    <span>Facebook</span>
                   </button>
                 </div>
 
@@ -1742,17 +1686,6 @@ function GoogleIcon() {
       <path
         d="M12.2 5.89c1.86 0 3.11.78 3.83 1.44l2.8-2.68C17.15 3.08 14.9 2.06 12.2 2.06c-3.98 0-7.36 2.22-9.01 5.42l3.34 2.53c.8-2.39 3.04-4.12 5.67-4.12Z"
         fill="#EA4335"
-      />
-    </svg>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
-      <path
-        d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.03 4.39 11.03 10.12 11.93v-8.44H7.08v-3.5h3.04V9.39c0-3.02 1.78-4.69 4.5-4.69c1.3 0 2.67.24 2.67.24v2.96h-1.5c-1.48 0-1.94.93-1.94 1.88v2.28h3.3l-.53 3.5h-2.77V24C19.61 23.1 24 18.1 24 12.07Z"
-        fill="currentColor"
       />
     </svg>
   );
