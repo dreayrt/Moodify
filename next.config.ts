@@ -17,6 +17,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/downloads/Moodify.ipa",
+        destination: "https://github.com/Kandesfx/moodify-mobile/releases/latest/download/Moodify.ipa",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
     if (!apiBase) {

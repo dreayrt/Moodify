@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { BrandLogo } from "@/components/shared/logo-mark";
+import { AppDownloadFooter } from "@/components/shared/app-download-footer";
 import {
   Play,
   Pause,
@@ -1615,19 +1615,6 @@ function LumenHeroContent() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="mt-16 border-t border-white/10 pt-6 pb-2 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <BrandLogo className="h-5 w-auto opacity-80" />
-        <div className="text-center sm:text-right">
-          <p className="text-xs text-white/45">
-            © 2026 Moodify — Sản phẩm đồ án tốt nghiệp
-          </p>
-          <p className="text-[11px] text-white/30 mt-1">
-            Spring Boot · Next.js · MongoDB · Python
-          </p>
-        </div>
-      </footer>
-
       {/* Album Detail Modal */}
       <AlbumDetailModal
         albumId={selectedAlbumId}
@@ -1643,14 +1630,17 @@ function LumenHeroContent() {
 
 export default function LumenHero() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-24 text-white/60">
-          Đang tải...
-        </div>
-      }
-    >
-      <LumenHeroContent />
-    </Suspense>
+    <>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-24 text-white/60">
+            Đang tải...
+          </div>
+        }
+      >
+        <LumenHeroContent />
+      </Suspense>
+      <AppDownloadFooter />
+    </>
   );
 }

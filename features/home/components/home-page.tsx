@@ -6,7 +6,7 @@ import {
   Play,
 } from "lucide-react";
 
-import { BrandLogo } from "@/components/shared/logo-mark";
+import { AppDownloadFooter } from "@/components/shared/app-download-footer";
 import { HeroCarousel } from "@/features/home/components/hero-carousel";
 
 const HOME_ROUTE = "/";
@@ -115,23 +115,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Minimal Footer */}
-        <footer className="border-t border-white/8 pt-8 pb-4 text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <BrandLogo variant="horizontal" className="h-7 w-auto opacity-75 hover:opacity-100 transition duration-200" />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-white/50">
+        <AppDownloadFooter>
+          <div className="flex flex-wrap items-center gap-6 pb-6 text-xs text-white/50">
             <Link href={HOME_ROUTE} className="hover:text-white transition">Giới thiệu</Link>
             <Link href="/dashboard/content-lead" className="hover:text-white transition">Dành cho nghệ sĩ</Link>
             <Link href={HOME_ROUTE} className="hover:text-white transition">Hỗ trợ</Link>
             <Link href={HOME_ROUTE} className="hover:text-white transition">Điều khoản</Link>
           </div>
 
-          <p className="text-[11px] text-white/35">
-            © 2026 Moodify. Đeo tai nghe vào và tận hưởng thôi!
-          </p>
-        </footer>
+        </AppDownloadFooter>
       </div>
     </main>
   );
