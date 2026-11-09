@@ -24,6 +24,7 @@ export type ContentLeadTrack = {
   albumName?: string;
   explicit?: boolean;
   lyricsPlain?: string;
+  lyricsSynced?: string;
   spotifyId?: string;
   spotifyUrl?: string;
   downloadStatus?: string;
