@@ -10,9 +10,50 @@ type Campaign = { id: string; name: string; revision: number; startsAt: string; 
   priority: number; genres: string[]; targets: { entityType: "TRACK" | "PLAYLIST"; entityId: string }[];
   active: boolean; timezone: string };
 type Readiness = { catalogTracks: number; eligibleTracks: number; publicPlaylists: number;
-  requireActiveLicense: boolean; issues: Record<string, number> };
+  requireActiveLicense: boolean; issues: Record<string, number>; demoCatalog?: boolean; standardEligibleTracks?: number };
 const issueLabels: Record<string, string> = { NOT_PUBLISHED: "Chưa có trạng thái xuất bản hợp lệ", NOT_PUBLIC: "Chưa công khai",
   NOT_APPROVED: "Chưa được duyệt", NO_AUDIO: "Thiếu audio", NO_LICENSE: "Chưa liên kết giấy phép", LICENSE_NOT_EFFECTIVE: "Giấy phép chưa hoặc không còn hiệu lực" };
+
+type Operations = {
+  runtime: { startedAt: string; flags: { enabled: boolean; collaborative: boolean; campaigns: boolean; revision: number }; counters: Record<string, number> };
+  outcomeQueue: { queued: number; capacity: number; circuitOpen: boolean };
+  monitor?: { available: boolean; stale?: boolean; at?: string; alerts?: string[] };
+};
+function RecommendationOperations() {
+  const [value, setValue] = useState<Operations | null>(null);
+  const [error, setError] = useState('');const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = () => recommendationRequest<Operations>('/admin/recommendations/operations', { signal: controller.signal })
+      .then(data => { if (!controller.signal.aborted) { setValue(data);setError(''); } })
+      .catch(failure => { if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : 'Chưa tải được giám sát.'); });
+    void load();const timer = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 30000);
+    return () => { controller.abort();clearInterval(timer); };
+  }, []);
+  const toggle = async () => {
+    if (!value || busy) return;
+    setBusy(true);setError('');
+    try {
+      await recommendationRequest('/admin/recommendations/controls', { method: 'PUT', body: JSON.stringify({
+        enabled: !value.runtime.flags.enabled, collaborative: false, campaigns: false, expectedRevision: value.runtime.flags.revision,
+      }) });
+      setValue(await recommendationRequest<Operations>('/admin/recommendations/operations'));
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Chưa cập nhật được cấu hình.'); }
+    finally { setBusy(false); }
+  };
+  return <section className="space-y-3 rounded-xl border border-white/10 p-5" aria-label="Vận hành đề xuất">
+    <h2 className="text-lg font-semibold text-white">Vận hành đề xuất</h2>
+    {!!error && <p role="alert" className="text-sm text-amber-200">{error}</p>}
+    {value ? <>
+      <p className="text-sm text-white/65">Tạo gợi ý: {value.runtime.flags.enabled ? 'đang bật' : 'tạm dừng'} · CF: {value.runtime.flags.collaborative ? 'bật' : 'tắt'} · Campaign: {value.runtime.flags.campaigns ? 'bật' : 'tắt'}</p>
+      <p className="text-sm text-white/65">Hàng đợi kết quả nghe: {value.outcomeQueue.queued}/{value.outcomeQueue.capacity} · {value.outcomeQueue.circuitOpen ? 'đang ngắt để chờ khôi phục' : 'đang nhận dữ liệu'}</p>
+      <p className="text-sm text-white/65">Giám sát: {!value.monitor?.available ? 'chưa có dữ liệu' : value.monitor.stale ? 'dữ liệu quá hạn' : 'đang cập nhật'}</p>
+      {value.monitor?.alerts?.map(code => <p key={code} className="text-xs text-amber-200">Cảnh báo: {code}</p>)}
+      <button disabled={busy} onClick={() => void toggle()} className="rounded-lg border border-purple-300/30 px-4 py-2 text-sm text-purple-200 disabled:opacity-50">{busy ? 'Đang cập nhật...' : value.runtime.flags.enabled ? 'Tạm dừng tạo gợi ý mới' : 'Bật lại tạo gợi ý'}</button>
+      <p className="text-xs text-white/40">Thay đổi này luôn giữ kiểm tra quyền nội dung. CF và campaign được giữ tắt trong đợt phát hành hiện tại.</p>
+    </> : <p className="text-sm text-white/50">Đang tải trạng thái...</p>}
+  </section>;
+}
 
 export default function RecommendationCampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -71,7 +112,9 @@ export default function RecommendationCampaignsPage() {
     <Link href="/dashboard/admin" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><ArrowLeft size={16} />Quản trị</Link>
     <div><p className="mb-2 text-xs uppercase tracking-widest text-purple-300">Nội dung theo thời điểm</p><h1 className="font-display text-3xl font-bold text-white">Các đợt tuyển chọn</h1><p className="mt-3 max-w-2xl text-sm text-white/50">Đặt lịch nội dung cho mùa, sự kiện và đợt phát hành. Nội dung được phối với sở thích người nghe trong thời gian hiệu lực.</p></div>
     {error && <p role="alert" className="rounded-lg border border-white/15 p-4 text-sm text-white/70">{error}</p>}
+    <RecommendationOperations />
     {readiness && <section className="space-y-3 rounded-xl border border-white/10 p-5" aria-label="Tình trạng kho nhạc"><h2 className="text-lg font-semibold text-white">Tình trạng kho nhạc cho đề xuất</h2>
+      {readiness.demoCatalog && <p className="text-sm text-amber-200/85">Đang phục vụ DEMO · {readiness.standardEligibleTracks ?? 0} bài đủ điều kiện quyền chuẩn.</p>}
       <p className="text-sm text-white/65">{readiness.eligibleTracks}/{readiness.catalogTracks} bài đủ điều kiện đề xuất · {readiness.publicPlaylists} playlist công khai</p>
       {readiness.eligibleTracks === 0 && <p className="text-sm text-amber-200/85">Kho nhạc cần hoàn thiện trạng thái nội dung và quyền phát trước khi tạo gợi ý cho người nghe.</p>}
       <div className="grid gap-2 text-xs text-white/45 sm:grid-cols-2">{Object.entries(readiness.issues).filter(([, count]) => count > 0).map(([code, count]) => <p key={code}>{issueLabels[code] || code}: {count}</p>)}</div>

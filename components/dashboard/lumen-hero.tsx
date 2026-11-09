@@ -1292,33 +1292,7 @@ function LumenHeroContent() {
       {/* ========================================================================= */}
       {/* BOX 1: DÀNH RIÊNG CHO BẠN (Made For You / Based on your listening)        */}
       {/* ========================================================================= */}
-      <div className="anim-fade-up">
-        <SectionHeader
-          eyebrow="MADE FOR YOU"
-          title="Dành riêng cho bạn"
-          subtitle="Giai điệu dựa trên thói quen nghe nhạc gần đây của bạn"
-          onSeeAll={() => handleVibeChange("all")}
-          seeAllText="Khám phá thêm"
-        />
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {(tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath).length >= 6
-            ? tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath)
-            : tracks
-          )
-            .slice(0, 6)
-            .map((t, idx) => (
-              <SquareMusicCard
-                key={`mfy-${t.spotifyId || idx}`}
-                track={t}
-                isCurrent={currentTrack?.spotifyId === t.spotifyId}
-                isPlaying={Boolean(isPlaying && currentTrack?.spotifyId === t.spotifyId)}
-                onPlay={() => handlePlayTrack(t, idx)}
-                vipTheme={activeVipTheme}
-              />
-            ))}
-        </div>
-      </div>
+      <div id="for-you" className="anim-fade-up scroll-mt-24"><RecommendationSections /></div>
 
       {/* ========================================================================= */}
       {/* BOX 2: HÔM NAY NGHE GÌ? - BẢNG XẾP HẠNG TOP HITS (Spotify Charts)          */}

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { prepareRecommendationTrack } from "@/lib/recommendation-client";
 import { Crown, Laptop } from "lucide-react";
 import {
   getTrackStreamUrl,
@@ -51,8 +52,7 @@ function capturePlaybackContext(track?: PlayerTrack | null): NonNullable<PlayerT
 
 function telemetryContext(context: PlayerTrack["playbackContext"]) {
   if (!context) return { source: "OTHER" };
-  const { expiresAt, ...fields } = context;
-  return expiresAt && Date.parse(expiresAt) <= Date.now() ? { ...fields, queueToken: undefined } : fields;
+  return context;
 }
 
 export type RepeatMode = "off" | "all" | "one";
@@ -994,7 +994,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [volume, isMuted]);
 
-  const executePlayTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
+  const playbackValidationRef = useRef(0);
+  const executePlayTrack = useCallback(async (track: PlayerTrack, playlist?: PlayerTrack[]) => {
+    const validation = ++playbackValidationRef.current;
+    if (track.playbackContext?.queueToken || track.playbackContext?.source === "EMOTION") {
+      try {
+        track = await prepareRecommendationTrack(track);
+      } catch (error) {
+        if (validation === playbackValidationRef.current) window.alert(error instanceof Error ? error.message : "Quyền phát gợi ý đã thay đổi. Hãy tải lại gợi ý.");
+        return;
+      }
+      if (validation !== playbackValidationRef.current) return;
+    }
     const attribution = capturePlaybackContext(track);
     track = { ...track, playbackContext: attribution };
     playlist = playlist?.map(item => ({ ...item, playbackContext: item.playbackContext ?? attribution }));
@@ -1236,7 +1247,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     executePlayTrack(track, playlist);
   }, [triggerAd, executePlayTrack]);
 
-  const togglePlay = useCallback(() => {
+  const validateResume = useCallback(async () => {
+    const track = currentTrackRef.current;
+    if (!track?.playbackContext?.queueToken) return true;
+    const generation = sourceGenerationRef.current;
+    try {
+      const ready = await prepareRecommendationTrack(track);
+      if (!ready.playbackContext?.queueToken || generation !== sourceGenerationRef.current ||
+        currentTrackRef.current?.id !== ready.id) return false;
+      currentTrackRef.current = ready;setCurrentTrack(ready);
+      if (listeningSessionRef.current) listeningSessionRef.current.playbackContext = ready.playbackContext;
+      return true;
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Nội dung hoặc quyền phát đã thay đổi.");return false;
+    }
+  }, []);
+
+  const togglePlay = useCallback(async () => {
     if (!audioRef.current || !currentTrack || isAdPlayingRef.current) return;
     if (isPlaying) {
       sourceGenerationRef.current += 1;
@@ -1246,6 +1273,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      if (!await validateResume() || !audioRef.current || isAdPlayingRef.current) return;
       playbackIntentRef.current = true;
       const generation = ++sourceGenerationRef.current;
       const currentSrc = audioRef.current.src;
@@ -1268,7 +1296,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           console.warn("Could not resume audio:", err);
         });
     }
-  }, [isPlaying, currentTrack, clearRetry]);
+  }, [isPlaying, currentTrack, clearRetry, validateResume]);
 
   const pause = useCallback(() => {
     sourceGenerationRef.current += 1;
@@ -1281,8 +1309,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearRetry]);
 
-  const resume = useCallback(() => {
+  const resume = useCallback(async () => {
     if (audioRef.current && currentTrack && !isAdPlayingRef.current) {
+      if (!await validateResume() || !audioRef.current || isAdPlayingRef.current) return;
       playbackIntentRef.current = true;
       const generation = ++sourceGenerationRef.current;
       const currentSrc = audioRef.current.src;
@@ -1303,7 +1332,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           if (generation === sourceGenerationRef.current) console.warn("Could not resume:", err);
         });
     }
-  }, [currentTrack]);
+  }, [currentTrack, validateResume]);
 
   const seek = useCallback((timeSeconds: number) => {
     if (!Number.isFinite(timeSeconds) || isAdPlayingRef.current) return;

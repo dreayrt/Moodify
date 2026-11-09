@@ -24,6 +24,7 @@ export type Track = {
   name: string;
   artistName: string;
   artistSpotifyId: string;
+  artistIds?: string[];
   albumName: string;
   durationMs: number;
   popularity: number;
@@ -910,6 +911,7 @@ export async function addToLibrary(trackSpotifyId: string): Promise<void> {
     }
     throw new Error('Failed to add track to library');
   }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('moodify:recommendation-changed'));
 }
 
 /**
@@ -934,6 +936,7 @@ export async function removeFromLibrary(trackSpotifyId: string): Promise<void> {
     }
     throw new Error('Failed to remove track from library');
   }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('moodify:recommendation-changed'));
 }
 
 /**

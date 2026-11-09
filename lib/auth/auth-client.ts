@@ -184,6 +184,7 @@ const USER_STORAGE_KEY = "moodify.auth.user";
 let authSessionEpoch = 0;
 
 type RequestOptions = {
+  timeoutMs?: number;
   body?: unknown;
   extraHeaders?: Record<string, string>;
   keepalive?: boolean;
@@ -745,9 +746,23 @@ export async function recordPlatformVisit(payload: {
   }
 }
 
-export async function recordListeningSessionTelemetry(payload: {
+const playbackDeliveries = new Map<string, { pending: number; chain: Promise<unknown> }>();
+export function recordListeningSessionTelemetry(payload: Parameters<typeof deliverListeningSessionTelemetry>[0]) {
+  let delivery = playbackDeliveries.get(payload.sessionKey);
+  if (!delivery) { delivery = { pending: 0, chain: Promise.resolve() };playbackDeliveries.set(payload.sessionKey, delivery); }
+  if (delivery.pending >= 12) return Promise.resolve(null);
+  const sampledAt = Date.now();const state = delivery;state.pending++;
+  const request = state.chain.then(() => Date.now() - sampledAt <= 6000 ? deliverListeningSessionTelemetry(payload) : null);
+  state.chain = request.catch(() => null);
+  return request.finally(() => {
+    state.pending--;if (!state.pending && playbackDeliveries.get(payload.sessionKey) === state) playbackDeliveries.delete(payload.sessionKey);
+  });
+}
+
+async function deliverListeningSessionTelemetry(payload: {
   sessionKey: string;
   queueToken?: string;
+  expiresAt?: string;
   historyId?: number;
   trackId: string;
   durationMs: number;
@@ -759,10 +774,18 @@ export async function recordListeningSessionTelemetry(payload: {
   eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "HEARTBEAT" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
 }) {
   try {
+    if (payload.queueToken && Date.parse(payload.expiresAt || "") <= Date.now() + 60000) {
+      const { prepareRecommendationTrack } = await import("@/lib/recommendation-client");
+      const ready = await prepareRecommendationTrack({ id: payload.trackId, spotifyId: payload.trackId,
+        name: "", artistName: "", playbackContext: { source: payload.source || "HOME", sourceId: payload.sourceId,
+          queueToken: payload.queueToken, expiresAt: payload.expiresAt } }, false);
+      payload = { ...payload, queueToken: ready.playbackContext?.queueToken, expiresAt: ready.playbackContext?.expiresAt };
+    }
     const token = await getValidAccessToken();
     const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : undefined;
-    return await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
+    const result = await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
       method: "POST",
+      timeoutMs: 5000,
       token: token ?? undefined,
       body: {
         deviceType: "WEB",
@@ -771,6 +794,10 @@ export async function recordListeningSessionTelemetry(payload: {
         ...payload,
       },
     });
+    if (result.success && typeof window !== 'undefined' && ['COMPLETE','SKIP_NEXT','SKIP_PREVIOUS','TRACK_CHANGED'].includes(payload.eventType || '')) {
+      window.dispatchEvent(new Event('moodify:recommendation-changed'));
+    }
+    return result;
   } catch {
     // Non-blocking telemetry
     return null;
@@ -820,7 +847,7 @@ export async function getValidAccessToken(): Promise<string | null> {
 
 async function requestJson<T>(
   path: string,
-  { body, extraHeaders, keepalive, method, token }: RequestOptions = {},
+  { body, extraHeaders, keepalive, method, token, timeoutMs }: RequestOptions = {},
 ): Promise<T> {
   const fullUrl = `${API_BASE_URL}${path}`;
   const requestMethod = method ?? (body ? "POST" : "GET");
@@ -842,6 +869,7 @@ async function requestJson<T>(
 
   const response = await fetch(fullUrl, {
     keepalive,
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     method: requestMethod,
     headers: {
       "Content-Type": "application/json",
