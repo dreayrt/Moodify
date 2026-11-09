@@ -301,8 +301,12 @@ function LibraryContent() {
       }
     }
     if (!tracks || tracks.length === 0) return;
-    const trackToPlay = tracks[startIndex] || tracks[0];
-    playTrack(trackToPlay, tracks);
+    const playlistTracks = tracks.map(track => ({
+      ...track,
+      playbackContext: { source: "PLAYLIST", sourceId: playlist.id },
+    }));
+    const trackToPlay = playlistTracks[startIndex] || playlistTracks[0];
+    playTrack(trackToPlay, playlistTracks);
   };
 
   // Play liked tracks

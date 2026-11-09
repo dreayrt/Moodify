@@ -427,6 +427,7 @@ function SearchContent() {
           name: t.name,
           artistName: t.artistName,
           albumName: t.albumName || pl.name,
+          playbackContext: { source: "PLAYLIST", sourceId: pl.id },
           imageUrl: t.imageUrl || pl.coverUrl,
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
