@@ -26,7 +26,7 @@ type PeriodType = "7d" | "30d" | "90d" | "all";
 
 interface AudienceDistributionCardProps {
   token: string | null;
-  tracks?: ArtistTrackResponse[];
+  tracks?: Pick<ArtistTrackResponse, "id" | "title">[];
 }
 
 export function AudienceDistributionCard({

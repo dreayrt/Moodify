@@ -68,28 +68,6 @@ export type ArtistTrackResponse = {
   acquisitionCostVnd?: number | null;
 };
 
-export type RevenueTrack = {
-  id: string; title: string; genre: string; coverUrl: string | null;
-  qualifiedPlays: number; pendingPlays: number;
-  grossVnd: number; contentLeadVnd: number; platformVnd: number;
-  acquisitionCostVnd: number | null; lifetimeContentLeadVnd: number;
-  recoupBalanceVnd: number | null;
-};
-
-export type ContentLeadRevenueResponse = {
-  period: "today" | "week" | "month" | "year";
-  fromDate: string; toDate: string; qualifiedPlays: number; pendingPlays: number;
-  grossVnd: number; contentLeadVnd: number; platformVnd: number;
-  trend: Array<{ day: string; contentLeadVnd: number }>;
-  tracks: RevenueTrack[];
-};
-
-export async function getContentLeadRevenue(period: ContentLeadRevenueResponse["period"]): Promise<ContentLeadRevenueResponse> {
-  const token = await getValidAccessToken();
-  if (!token) throw new Error("Vui lòng đăng nhập để xem doanh thu.");
-  return requestJson<ContentLeadRevenueResponse>(`/api/content-lead/me/analytics/revenue?period=${period}`, { token });
-}
-
 export type ArtistAlbumResponse = {
   id: string;
   spotifyId: string;

@@ -1182,7 +1182,7 @@ export function TrackUploadModal({
                       placeholder="OCR sẽ tự điền nếu tài liệu ghi rõ chi phí"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50" />
                     <p className="mt-1 text-[11px] text-white/45">
-                      {costEvidence || "Không có giá rõ ràng trong tài liệu: để trống, báo cáo hoàn vốn sẽ hiển thị chưa đủ dữ liệu."}
+                      {costEvidence || "Để trống nếu tài liệu không ghi rõ chi phí mua quyền."}
                     </p>
                   </div>
                   <div>

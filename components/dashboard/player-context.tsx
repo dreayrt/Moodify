@@ -805,7 +805,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         // Playback restored from persisted state or resumed via togglePlay has no
-        // listening session yet — create one so heartbeats and revenue qualification keep working.
+        // listening session yet — create one so heartbeats keep recording listening history.
         const track = currentTrackRef.current;
         const targetTrackId = track ? (track.id || track.spotifyId) : undefined;
         if (targetTrackId) {

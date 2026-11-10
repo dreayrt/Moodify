@@ -5,17 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
-  Activity,
-  BarChart3,
-  Bell,
   CalendarRange,
-  ChevronRight,
-  CircleDollarSign,
   Download,
-  Flame,
   Heart,
   LogOut,
-  MessageSquare,
   Music2,
   Pause,
   Play,
@@ -23,11 +16,9 @@ import {
   Rewind,
   SkipBack,
   SkipForward,
-  Sparkles,
   Square,
   FastForward,
   UploadCloud,
-  Share2,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { LogoMark } from "@/components/shared/logo-mark";
@@ -53,7 +44,6 @@ import { TrackDeleteModal } from "./track-delete-modal";
 import { TrackUploadModal } from "./track-upload-modal";
 import { ToastNotification } from "./toast-notification";
 import { AudienceDistributionCard } from "./audience-distribution-card";
-import { RevenueAnalyticsDrawer } from "./revenue-analytics-live";
 
 type Stat = {
   key: "plays" | "reposts" | "downloads" | "likes" | "comments";
@@ -556,159 +546,19 @@ function TracksPanel({
 }
 
 
-function StudioFooterBenefits() {
+function StudioFooter() {
   return (
-    <footer className="mt-12 anim-fade-up space-y-6 pt-8 border-t border-white/8" style={{ animationDelay: "600ms" }}>
-      {/* Header: Title & Subtitle */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#ff7a2c]/30 bg-[#ff7a2c]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#ffb488]">
-            <Sparkles className="h-3 w-3 text-[#ff7a2c]" />
-            <span>Đặc quyền đối tác nội dung</span>
-          </div>
-          <h3 className="mt-2.5 font-graphik text-[22px] font-bold text-white tracking-[-0.02em] sm:text-[26px]">
-            Quyền lợi & Chính sách Phụ trách nội dung
-          </h3>
-          <p className="mt-1 text-[13px] text-white/50 max-w-[680px]">
-            Hệ sinh thái phân phối âm nhạc bản quyền, bảo hộ quyền tác giả và tối ưu hóa doanh thu phát hành trên Moodify.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-[12px] text-white/40">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Chính sách áp dụng 2026</span>
-        </div>
+    <footer className="mt-8 flex flex-col items-center justify-between gap-4 rounded-[22px] border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-white/40 sm:flex-row">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <LogoMark className="h-5 w-5" />
+        <span className="font-medium text-white/70">Moodify Content Lead Studio</span>
+        <span>•</span>
+        <span>Bảo hộ bản quyền số & Phát hành âm nhạc</span>
       </div>
-
-      {/* Benefits Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          {
-            icon: CircleDollarSign,
-            title: "Doanh thu trực tiếp 85%",
-            badge: "Chia sẻ cao nhất",
-            body: "Nhận tiền bản quyền trực tiếp từ người nghe với tỉ lệ chi trả lên đến 85%, đối soát định kỳ minh bạch qua cổng thanh toán.",
-          },
-          {
-            icon: Sparkles,
-            title: "Chứng nhận Content Lead & Bản quyền",
-            badge: "Xác thực chính thức",
-            body: "Huy hiệu xác minh độc quyền, ưu tiên phân phối bản phát hành và bảo vệ pháp lý bản quyền tác giả toàn cầu.",
-          },
-          {
-            icon: Activity,
-            title: "Phân tích dữ liệu Real-time & AI",
-            badge: "Insight 24/7",
-            body: "Theo dõi nhân khẩu học thính giả, bản đồ lượt nghe và nhận các phân tích dự đoán từ AI về xu hướng âm nhạc.",
-          },
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <div
-              key={item.title}
-              className="group relative overflow-hidden rounded-[26px] border border-white/8 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-5 sm:p-6 transition-all duration-300 hover:border-[#ff7a2c]/30 hover:bg-white/[0.06] hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-[#ffb488] transition group-hover:scale-105 group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/10">
-                  <Icon className="h-5 w-5" strokeWidth={1.8} />
-                </div>
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-medium text-white/60">
-                  {item.badge}
-                </span>
-              </div>
-              <h4 className="mt-4 font-graphik text-[17px] font-semibold text-white tracking-[-0.01em]">
-                {item.title}
-              </h4>
-              <p className="mt-2 text-[13px] leading-relaxed text-white/55">
-                {item.body}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Bottom Legal / Studio Brand Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[22px] border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-white/40">
-        <div className="flex items-center gap-2.5">
-          <LogoMark className="h-5 w-5" />
-          <span className="font-medium text-white/70">Moodify Content Lead Studio</span>
-          <span>•</span>
-          <span>Bảo hộ bản quyền số & Phát hành âm nhạc</span>
-        </div>
-        <p className="text-[11px] text-white/35">
-          © 2026 Moodify Platform. Mọi quyền được bảo lưu.
-        </p>
-      </div>
+      <p className="text-[11px] text-white/35">
+        © 2026 Moodify Platform. Mọi quyền được bảo lưu.
+      </p>
     </footer>
-  );
-}
-
-function RightRail({
-  token,
-  tracks,
-}: {
-  token: string | null;
-  tracks?: ArtistTrack[];
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="grid gap-5">
-      <AudienceDistributionCard
-        token={token}
-        tracks={tracks as unknown as ArtistTrackResponse[]}
-      />
-
-      <div
-        className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
-        style={{ animationDelay: "980ms" }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">
-              {t("dashboard.artist.analytics.eyebrow")}
-            </p>
-            <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
-              {t("dashboard.artist.actions.title")}
-            </h3>
-          </div>
-          <ChevronRight className="h-5 w-5 text-white/40" strokeWidth={1.7} />
-        </div>
-        <div className="mt-6 space-y-3">
-          {[
-            {
-              icon: Bell,
-              title: "Hoàn thiện bản quyền tác giả",
-              copy: "Đăng ký mã ISRC cho đĩa đơn Midnight Echoes trước ngày phát hành.",
-            },
-            {
-              icon: CircleDollarSign,
-              title: "Doanh thu phát sinh tuần này",
-              copy: "+$842.50 đã sẵn sàng rút về tài khoản ngân hàng liên kết.",
-            },
-            {
-              icon: Flame,
-              title: "Tăng tốc quảng bá đĩa đơn mới",
-              copy: "Gửi bản nghe thử tới 12 Curators danh sách phát hàng đầu trên hệ thống.",
-            },
-          ].map((task, index) => {
-            const Icon = task.icon;
-            return (
-              <div key={`studio-action-${index}`} className="rounded-[20px] border border-white/8 bg-black/20 p-4 hover:bg-white/[0.04] transition">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.05]">
-                    <Icon className="h-[17px] w-[17px] text-white/72" strokeWidth={1.7} />
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-white font-medium">{task.title}</p>
-                    <p className="mt-1 text-[12px] leading-5 text-white/52">{task.copy}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -730,7 +580,6 @@ export default function ContentLeadDashboardPage() {
   const [editingTrack, setEditingTrack] = useState<ArtistTrack | null>(null);
   const [deletingTrack, setDeletingTrack] = useState<ArtistTrack | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isRevenueDrawerOpen, setIsRevenueDrawerOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const [previewTrackId, setPreviewTrackId] = useState<string | null>(null);
@@ -741,7 +590,7 @@ export default function ContentLeadDashboardPage() {
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const toastCounterRef = useRef(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  // Revenue/analytics telemetry for studio preview playback. Without a session the
+  // Listening telemetry for studio preview playback. Without a session the
   // backend never creates listening_history rows, so preview listens were invisible.
   const previewSessionRef = useRef<{
     sessionKey: string;
@@ -1374,25 +1223,6 @@ export default function ContentLeadDashboardPage() {
                 ))}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsRevenueDrawerOpen(true)}
-                className="anim-fade-up group mt-5 flex w-full items-center gap-4 rounded-[22px] border border-white/8 bg-black/20 p-4 text-left transition hover:border-[#ff7a2c]/45 hover:bg-[#ff7a2c]/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a2c]/40"
-                style={{ animationDelay: "620ms" }}
-              >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[18px] border border-white/10 bg-white/[0.04] text-[#ffb488] transition group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/10">
-                  <CircleDollarSign className="h-5 w-5" strokeWidth={1.7} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-medium text-white">{t("dashboard.artist.studio.earnings")}</span>
-                  <span className="mt-0.5 block text-[12px] text-white/45">Theo dõi lượt nghe hợp lệ, doanh thu và tiến độ thu hồi vốn theo từng bài hát</span>
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#ff7a2c]/20 bg-[#ff7a2c]/10 px-3.5 py-1.5 text-[11px] font-medium text-[#ffb488] transition group-hover:border-[#ff7a2c]/40 group-hover:bg-[#ff7a2c]/20">
-                  Xem chi tiết
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-                </span>
-              </button>
-
             </div>
 
             {/* Catalog Section */}
@@ -1446,12 +1276,12 @@ export default function ContentLeadDashboardPage() {
             </div>
           </div>
 
-          <RightRail token={accessToken} tracks={tracks} />
+          <aside className="min-w-0 self-start">
+            <AudienceDistributionCard token={accessToken} tracks={tracks} />
+          </aside>
         </div>
 
-        {/* Footer: Quyền lợi & Chính sách Phụ trách nội dung */}
-        <StudioFooterBenefits />
-    
+        <StudioFooter />
       </div>
 
       {/* Modals & Toasts */}
@@ -1475,12 +1305,6 @@ export default function ContentLeadDashboardPage() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={handleUploadSuccess}
-      />
-
-      <RevenueAnalyticsDrawer
-        isOpen={isRevenueDrawerOpen}
-        onClose={() => setIsRevenueDrawerOpen(false)}
-        tracks={tracks}
       />
 
       <ToastNotification toasts={toasts} onDismiss={dismissToast} />

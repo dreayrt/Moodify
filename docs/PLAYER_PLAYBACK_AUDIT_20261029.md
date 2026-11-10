@@ -58,6 +58,7 @@ npm run test:player
 
 # Nếu dùng Playwright bên ngoài node_modules của dự án:
 # $env:PLAYWRIGHT_MODULE = 'C:\path\to\node_modules\playwright'
+# $env:PLAYWRIGHT_CHROMIUM_EXECUTABLE = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 # npm run test:player
 
 node node_modules/typescript/bin/tsc --noEmit

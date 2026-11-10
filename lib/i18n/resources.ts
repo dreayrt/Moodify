@@ -215,12 +215,10 @@ export const resources = {
           },
           analytics: {
             kpi: "Chỉ số tương tác nội dung",
-            eyebrow: "Gợi ý quản trị nội dung",
           },
           studio: {
             eyebrow: "Phụ trách nội dung",
             insight: "Thông số chuyên sâu",
-            earnings: "Doanh thu",
             fans: "Người hâm mộ",
             benefits: "Quyền lợi",
           },
@@ -278,10 +276,6 @@ export const resources = {
             filterTrackAll: "Tất cả bài hát",
             refresh: "Làm mới dữ liệu",
             loading: "Đang tải dữ liệu tiếp cận...",
-          },
-          actions: {
-            eyebrow: "Hành động studio",
-            title: "Gợi ý tiếp theo",
           },
           notes: {
             trackEnergy: "Track energy",
@@ -518,12 +512,10 @@ export const resources = {
           },
           analytics: {
             kpi: "Content Analytics KPI",
-            eyebrow: "Next Best Actions",
           },
           studio: {
             eyebrow: "Content Lead",
             insight: "Insights",
-            earnings: "Earnings",
             fans: "Fans",
             benefits: "Benefits",
           },
@@ -581,10 +573,6 @@ export const resources = {
             filterTrackAll: "All Catalog Tracks",
             refresh: "Refresh metrics",
             loading: "Loading reach metrics...",
-          },
-          actions: {
-            eyebrow: "Studio actions",
-            title: "Next best moves",
           },
           notes: {
             trackEnergy: "Track energy",
