@@ -412,7 +412,6 @@ function MascotAccountTrigger({
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const { mascot } = useCurrentMascot();
 
@@ -426,20 +425,19 @@ function MascotAccountTrigger({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      const session = getStoredAuthSession();
-      if (session?.refreshToken) {
-        await logout(session.refreshToken);
-      }
-    } catch (err) {
-      console.error("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      router.push("/");
+  const handleLogout = () => {
+    setOpen(false);
+
+    const session = getStoredAuthSession();
+    if (session?.refreshToken) {
+      void logout(session.refreshToken).catch((err) => console.error("Logout error:", err));
     }
+
+    clearAuthSession();
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    // Remount the shared dashboard and its account-dependent state after logout.
+    window.location.replace("/dashboard/user");
   };
 
   const displayName = user?.fullName || user?.username || "Người dùng Moodify";
@@ -584,6 +582,7 @@ function MascotAccountTrigger({
           {/* Logout */}
           <div className="pt-1 border-t border-white/10 mt-1">
             <button
+              type="button"
               onClick={handleLogout}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-red-300 hover:bg-red-500/15 transition-colors cursor-pointer group"
             >
