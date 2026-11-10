@@ -1,24 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
-  CalendarRange,
-  Download,
-  Heart,
   LogOut,
-  Music2,
   Pause,
   Play,
-  Radio,
   Rewind,
   SkipBack,
   SkipForward,
   Square,
   FastForward,
-  UploadCloud,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { LogoMark } from "@/components/shared/logo-mark";
@@ -43,83 +37,12 @@ import { TrackEditModal } from "./track-edit-modal";
 import { TrackDeleteModal } from "./track-delete-modal";
 import { TrackUploadModal } from "./track-upload-modal";
 import { ToastNotification } from "./toast-notification";
-import { AudienceDistributionCard } from "./audience-distribution-card";
-
-type Stat = {
-  key: "plays" | "reposts" | "downloads" | "likes" | "comments";
-  value: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-};
-
-type Release = {
-  title: string;
-  type: string;
-  stage: string;
-  date: string;
-  progress: string;
-  progressWidth: number;
-};
-
 const KEYFRAMES = `
-@keyframes artistFloat {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -10px, 0); }
-}
-
-@keyframes artistPulse {
-  0%, 100% { opacity: 0.45; transform: scale(0.96); }
-  50% { opacity: 0.95; transform: scale(1.02); }
-}
-
-@keyframes artistSheen {
-  0% { transform: translateX(-130%) skewX(-16deg); }
-  100% { transform: translateX(150%) skewX(-16deg); }
-}
-
-@keyframes artistEqualize {
-  0%, 100% { transform: scaleY(0.28); opacity: 0.55; }
-  50% { transform: scaleY(1); opacity: 1; }
-}
-
 @keyframes artistDiscSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 `;
-
-const RELEASES: Release[] = [
-  {
-    title: "Neon Horizon - Extended EP",
-    type: "Phát hành EP (5 bài hát)",
-    stage: "Đang hoàn thiện Master",
-    date: "18/03/2026",
-    progress: "85%",
-    progressWidth: 85,
-  },
-  {
-    title: "Midnight Echoes (Acoustic Version)",
-    type: "Đĩa đơn / Video âm nhạc",
-    stage: "Lên lịch phát hành",
-    date: "25/03/2026",
-    progress: "50%",
-    progressWidth: 50,
-  },
-  {
-    title: "Cyberpunk Tokyo Vinyl Edition",
-    type: "Bản đĩa vật lý (500 bản)",
-    stage: "Đặt trước đợt 1",
-    date: "10/04/2026",
-    progress: "30%",
-    progressWidth: 30,
-  },
-];
-
-const DISTRIBUTION_CHANNELS = [
-  { channel: "Moodify Mobile App", share: "45% lưu lượng", note: "Kênh phát nhạc chính, tỷ lệ hoàn tất 88%" },
-  { channel: "Moodify Web Player", share: "30% lưu lượng", note: "Lưu lượng truy cập máy tính & văn phòng" },
-  { channel: "Playlist & Khám phá AI", share: "15% lưu lượng", note: "Đề xuất thuật toán & Moodify Curated" },
-  { channel: "Đối tác & Nhúng ngoài", share: "10% lưu lượng", note: "Liên kết bên ngoài & chia sẻ mạng xã hội" },
-];
 
 
 
@@ -353,197 +276,6 @@ function PreviewPlayer({
   );
 }
 
-function StatCard({ item, delay }: { item: Stat; delay: number }) {
-  const { t } = useTranslation();
-  const Icon = item.icon;
-
-  return (
-    <div
-      className="anim-fade-up rounded-[22px] border border-white/8 bg-white/[0.04] p-4 md:p-5 shadow-[0_20px_45px_rgba(0,0,0,0.24)]"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.05]">
-          <Icon className="h-[18px] w-[18px] text-white/72" strokeWidth={1.7} />
-        </div>
-      </div>
-      <p className="mt-5 font-graphik text-[28px] font-semibold leading-none tracking-[-0.025em] text-white">
-        {item.value}
-      </p>
-      <p className="mt-2 text-[12px] font-medium tracking-[0.06em] text-white/46">
-        {t(`dashboard.artist.stats.${item.key}`)}
-      </p>
-    </div>
-  );
-}
-
-
-
-
-function TracksPanel({
-  tracks,
-  onEditTrack,
-  onDeleteTrack,
-  onToggleStatus,
-  onToggleVisibility,
-  onCopyLink,
-  playingTrackId,
-  onTogglePlayTrack,
-  onOpenUpload,
-  onShowHistory,
-}: {
-  tracks: ArtistTrack[];
-  onEditTrack: (track: ArtistTrack) => void;
-  onDeleteTrack: (track: ArtistTrack) => void;
-  onToggleStatus: (track: ArtistTrack) => void;
-  onToggleVisibility: (track: ArtistTrack) => void;
-  onCopyLink: (track: ArtistTrack) => void;
-  playingTrackId: string | null;
-  onTogglePlayTrack: (track: ArtistTrack) => void;
-  onOpenUpload: () => void;
-  onShowHistory: () => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="space-y-5">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.8fr)]">
-        <div
-          className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.28)]"
-          style={{ animationDelay: "760ms" }}
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488] uppercase">
-                {t("dashboard.artist.upload.queue")}
-              </p>
-              <h3 className="mt-2 font-graphik text-[28px] font-semibold tracking-[-0.02em] text-white">
-                {t("dashboard.artist.upload.title")}
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={onShowHistory}
-              className="hidden rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/72 transition hover:bg-white/[0.08] hover:text-white md:inline-flex"
-            >
-              {t("dashboard.artist.upload.history")}
-            </button>
-          </div>
-
-          <div
-            onClick={onOpenUpload}
-            className="relative mt-6 overflow-hidden rounded-[26px] border border-dashed border-white/14 bg-[radial-gradient(circle_at_top,_rgba(255,122,44,0.14),_transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 md:p-9 cursor-pointer group transition-all hover:border-[#ff7a2c]/50 hover:bg-white/[0.03]"
-          >
-            <div className="absolute inset-0 opacity-60">
-              <div className="absolute left-[10%] top-5 h-32 w-32 rounded-full bg-[#ff7a2c]/10 blur-3xl" />
-              <div className="absolute bottom-0 right-[10%] h-28 w-28 rounded-full bg-[#8fb4ff]/10 blur-3xl" />
-            </div>
-            <div className="relative flex flex-col items-center text-center">
-              <div className="grid h-16 w-16 place-items-center rounded-[18px] border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] group-hover:scale-110 transition-transform">
-                <UploadCloud className="h-8 w-8 text-white" strokeWidth={1.7} />
-              </div>
-              <p className="mt-5 text-[24px] font-graphik tracking-[-0.03em] text-white group-hover:text-[#ffb488] transition-colors">
-                {t("dashboard.artist.upload.dropTitle")}
-              </p>
-              <p className="mt-2 max-w-xl text-[14px] leading-6 text-white/58">
-                Tải lên bản phối mới nhất (WAV, FLAC, MP3 320kbps) để phân phối trực tiếp tới người nghe trên Moodify.
-              </p>
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenUpload();
-                  }}
-                  className="group/btn relative overflow-hidden rounded-full bg-white px-5 py-3 text-[13px] font-medium text-black transition hover:-translate-y-0.5"
-                >
-                  <span className="relative z-10">{t("dashboard.artist.upload.choose")}</span>
-                  <span
-                    className="absolute inset-0 opacity-0 transition-opacity group-hover/btn:opacity-100"
-                    style={{
-                      background:
-                        "linear-gradient(115deg, transparent 0%, rgba(255,122,44,0.08) 35%, rgba(255,255,255,0.85) 50%, rgba(255,122,44,0.08) 65%, transparent 100%)",
-                      animation: "artistSheen 820ms ease",
-                    }}
-                  />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenUpload();
-                  }}
-                  className="rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-[13px] text-white/74 transition hover:bg-white/[0.08]"
-                >
-                  {t("dashboard.artist.upload.import")}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="anim-fade-up rounded-[28px] border border-white/8 bg-white/[0.04] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
-          style={{ animationDelay: "860ms" }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-[#9ec5ff]">
-                {t("dashboard.artist.release.eyebrow")}
-              </p>
-              <h3 className="mt-2 font-graphik text-[24px] font-semibold tracking-[-0.02em] text-white">
-                {t("dashboard.artist.release.title")}
-              </h3>
-            </div>
-            <CalendarRange className="h-5 w-5 text-white/42" strokeWidth={1.7} />
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {RELEASES.map((release, index) => (
-              <div
-                key={`release-${index}`}
-                className="rounded-[22px] border border-white/8 bg-black/20 p-4 transition hover:border-white/14 hover:bg-white/[0.05]"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[15px] text-white">{release.title}</p>
-                    <p className="mt-1 text-[12px] text-white/48">{release.type}</p>
-                  </div>
-                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/64">
-                    {release.date}
-                  </span>
-                </div>
-                <div className="mt-4 flex items-center justify-between gap-3 text-[12px] text-white/58">
-                  <span>{release.stage}</span>
-                  <span>{release.progress}</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,#ff7a2c_0%,#ffb37a_56%,#dce9ff_100%)]"
-                    style={{ width: `${release.progressWidth}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Interactive Track Catalog Panel */}
-      <TrackCatalogPanel
-        tracks={tracks}
-        onEditTrack={onEditTrack}
-        onDeleteTrack={onDeleteTrack}
-        onToggleStatus={onToggleStatus}
-        onToggleVisibility={onToggleVisibility}
-        onCopyLink={onCopyLink}
-        playingTrackId={playingTrackId}
-        onTogglePlayTrack={onTogglePlayTrack}
-        onOpenUpload={onOpenUpload}
-      />
-    </div>
-  );
-}
 
 
 function StudioFooter() {
@@ -552,8 +284,6 @@ function StudioFooter() {
       <div className="flex flex-wrap items-center gap-2.5">
         <LogoMark className="h-5 w-5" />
         <span className="font-medium text-white/70">Moodify Content Lead Studio</span>
-        <span>•</span>
-        <span>Bảo hộ bản quyền số & Phát hành âm nhạc</span>
       </div>
       <p className="text-[11px] text-white/35">
         © 2026 Moodify Platform. Mọi quyền được bảo lưu.
@@ -573,7 +303,6 @@ export default function ContentLeadDashboardPage() {
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Tracks State & Modals
   const [tracks, setTracks] = useState<ArtistTrack[]>([]);
@@ -932,10 +661,6 @@ export default function ContentLeadDashboardPage() {
     startPreviewTrack(track, previewTrackId !== track.id);
   };
 
-  const handleShowHistory = () => {
-    addToast(`Lịch sử: Đã đồng bộ ${tracks.length} bài hát trong thư viện studio.`, "info");
-  };
-
   const handleLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
@@ -997,7 +722,6 @@ export default function ContentLeadDashboardPage() {
 
         setCurrentUser(profile);
         setAuthState("allowed");
-        setAccessToken(token);
         setCatalogState("loading");
         setCatalogError(null);
 
@@ -1037,22 +761,6 @@ export default function ContentLeadDashboardPage() {
     };
   }, [router]);
 
-  // Dynamic calculated stats from tracks
-  const statsList: Stat[] = useMemo(() => {
-    const totalLikes = tracks.reduce((sum, tr) => sum + tr.likes, 0);
-
-    const formatNum = (num: number) => {
-      if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-      return num.toString();
-    };
-    const downloadedTracks = tracks.filter((tr) => tr.downloadStatus === "completed").length;
-
-    return [
-      { key: "reposts", value: "0", icon: Radio },
-      { key: "downloads", value: formatNum(downloadedTracks), icon: Download },
-      { key: "likes", value: formatNum(totalLikes), icon: Heart },
-    ];
-  }, [tracks]);
 
   const artistDisplayName =
     artistProfile?.name ||
@@ -1093,22 +801,10 @@ export default function ContentLeadDashboardPage() {
   }
 
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#08090d] text-[#f4f2ed]">
+    <section className="min-h-screen bg-[#08090d] bg-[radial-gradient(ellipse_at_top,rgba(255,122,44,0.10),transparent_42%)] text-[#f4f2ed]">
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
 
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,122,44,0.12),_transparent_28%),radial-gradient(circle_at_80%_22%,_rgba(143,180,255,0.1),_transparent_20%),linear-gradient(180deg,#0a0b10_0%,#08090d_100%)]" />
-        <div
-          className="absolute right-[6%] top-28 h-40 w-40 rounded-full bg-[#ff7a2c]/10 blur-3xl"
-          style={{ animation: "artistFloat 8s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute bottom-20 left-[8%] h-56 w-56 rounded-full bg-[#8fb4ff]/8 blur-3xl"
-          style={{ animation: "artistFloat 10s ease-in-out 600ms infinite" }}
-        />
-      </div>
-
-      <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col px-4 pb-10 pt-5 sm:px-6 lg:px-10">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-5 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="flex flex-col gap-4 border-b border-white/[0.06] pb-4 lg:flex-row lg:items-center">
           <div className="anim-fade-up flex flex-wrap items-center gap-4 sm:gap-5">
@@ -1134,8 +830,8 @@ export default function ContentLeadDashboardPage() {
             </div>
           </div>
 
-          <div className="anim-slide-right flex items-center gap-3 lg:ml-auto" style={{ animationDelay: "120ms" }}>
-            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:ml-auto">
+            <div className="flex min-w-0 items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
               <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#ff8b4d,#ffd1b5)] text-black font-semibold">
                 {artistImageUrl && (
                   <img
@@ -1153,12 +849,9 @@ export default function ContentLeadDashboardPage() {
                   return `${parts[0][0] ?? "A"}${parts[parts.length - 1][0] ?? "R"}`.toUpperCase();
                 })()}
               </div>
-              <div>
-                <p className="text-[13px] text-white font-medium">
+              <div className="min-w-0">
+                <p className="max-w-[13rem] truncate text-[13px] font-medium text-white">
                   {artistDisplayName}
-                </p>
-                <p className="mt-0.5 text-[11px] tracking-[0.16em] text-white/42">
-                  {t("dashboard.artist.header.studio")}
                 </p>
               </div>
             </div>
@@ -1176,110 +869,21 @@ export default function ContentLeadDashboardPage() {
           </div>
         </header>
 
-        {/* Main Studio Hub */}
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_340px]">
-          <div className="grid gap-6">
-            <div
-              className="anim-fade-up overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(135deg,rgba(18,19,22,0.96)_0%,rgba(12,13,18,0.9)_58%,rgba(13,17,28,0.94)_100%)] px-5 py-6 shadow-[0_30px_90px_rgba(0,0,0,0.28)] md:px-7 md:py-7"
-              style={{ animationDelay: "260ms" }}
-            >
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#ffb488]">{t("dashboard.artist.studio.eyebrow")}</p>
-                  <div className="mt-4 flex flex-wrap items-end gap-3">
-                    <h2 className="font-graphik text-[38px] leading-none tracking-[-0.05em] text-white sm:text-[48px]">
-                      {artistDisplayName}
-                    </h2>
-                    <p className="pb-1 text-[14px] text-white/52">Phụ trách nội dung</p>
-                  </div>
-                  <p className="mt-4 max-w-[640px] text-[15px] leading-7 text-white/60">
-                    Chào mừng bạn quay lại trung tâm quản lý nội dung số. Quản lý các bản phát hành, theo dõi tương tác của thính giả và tối ưu hóa từng tác phẩm nội dung trên Moodify.
-                  </p>
-                </div>
-
-                <div className="relative mx-auto flex h-[160px] w-[160px] shrink-0 items-center justify-center lg:mr-3">
-                  <div
-                    className="absolute inset-0 rounded-full border border-white/8"
-                    style={{ animation: "artistPulse 5s ease-in-out infinite" }}
-                  />
-                  <div
-                    className="absolute inset-[14px] rounded-full border border-[#ff7a2c]/30"
-                    style={{ animation: "artistPulse 5s ease-in-out 400ms infinite" }}
-                  />
-                  <div
-                    className="absolute inset-[30px] rounded-full bg-[radial-gradient(circle,_rgba(255,122,44,0.24),_rgba(255,122,44,0.04)_60%,_transparent_70%)] blur-sm"
-                    style={{ animation: "artistFloat 7s ease-in-out infinite" }}
-                  />
-                  <div className="relative grid h-[76px] w-[76px] place-items-center rounded-full border border-white/10 bg-white/[0.06] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
-                    <Music2 className="h-8 w-8 text-white" strokeWidth={1.6} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Stats Grid */}
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                {statsList.map((item, index) => (
-                  <StatCard key={item.key} item={item} delay={340 + index * 70} />
-                ))}
-              </div>
-
-            </div>
-
-            {/* Catalog Section */}
-            <div
-              className="anim-fade-up rounded-[30px] border border-white/8 bg-white/[0.03] px-5 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:px-6"
-              style={{ animationDelay: "520ms" }}
-            >
-              <div className="flex items-center justify-between border-b border-white/8 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-[#ff7a2c]/10 text-[#ff7a2c]">
-                    <Music2 className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-graphik text-[16px] font-semibold text-white">
-                      {t("dashboard.artist.tabs.tracks")}
-                    </h3>
-                    <p className="text-[12px] text-white/45">
-                      Quản lý kho bài hát, phát hành và chiến dịch phân phối
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-white/60">
-                  {tracks.length} bài hát
-                </span>
-              </div>
-
-              {catalogState === "loading" && (
-                <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20 px-5 py-4 text-[13px] text-white/58">
-                  Đang tải danh sách bài hát...
-                </div>
-              )}
-              {catalogState === "error" && (
-                <div className="mt-5 rounded-[22px] border border-red-400/20 bg-red-500/10 px-5 py-4 text-[13px] text-red-100">
-                  Không thể tải catalog nội dung: {catalogError}
-                </div>
-              )}
-              <div className="mt-5">
-                <TracksPanel
-                  tracks={tracks}
-                  onEditTrack={handleEditTrack}
-                  onDeleteTrack={handleDeleteTrack}
-                  onToggleStatus={handleToggleStatus}
-                  onToggleVisibility={handleToggleVisibility}
-                  onCopyLink={handleCopyLink}
-                  playingTrackId={playingTrackId}
-                  onTogglePlayTrack={handleTogglePlayTrack}
-                  onOpenUpload={() => setIsUploadModalOpen(true)}
-                  onShowHistory={handleShowHistory}
-                />
-              </div>
-            </div>
-          </div>
-
-          <aside className="min-w-0 self-start">
-            <AudienceDistributionCard token={accessToken} tracks={tracks} />
-          </aside>
-        </div>
+        <main className="mt-6 min-w-0 sm:mt-8">
+          <TrackCatalogPanel
+            tracks={tracks}
+            loading={catalogState === "idle" || catalogState === "loading"}
+            error={catalogError}
+            onEditTrack={handleEditTrack}
+            onDeleteTrack={handleDeleteTrack}
+            onToggleStatus={handleToggleStatus}
+            onToggleVisibility={handleToggleVisibility}
+            onCopyLink={handleCopyLink}
+            playingTrackId={playingTrackId}
+            onTogglePlayTrack={handleTogglePlayTrack}
+            onOpenUpload={() => setIsUploadModalOpen(true)}
+          />
+        </main>
 
         <StudioFooter />
       </div>

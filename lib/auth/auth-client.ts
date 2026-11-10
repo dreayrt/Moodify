@@ -99,50 +99,6 @@ export type ContentLeadTrackResponse = ArtistTrackResponse;
 export type ContentLeadAlbumResponse = ArtistAlbumResponse;
 export type ContentLeadCatalogResponse = ArtistCatalogResponse;
 
-export type AudienceChannelItem = {
-  id: string;
-  channel: string;
-  subtitle: string;
-  streams: number;
-  share: number;
-  shareFormatted: string;
-  uniqueListeners: number;
-  completionRate: number;
-  color: string;
-  icon: string;
-  details?: Record<string, string | number>;
-};
-
-export type AudienceTrendItem = {
-  date: string;
-  label: string;
-  streams: number;
-  mobileStreams: number;
-  webStreams: number;
-  otherStreams: number;
-};
-
-export type AudienceTrackStat = {
-  trackId: string;
-  title: string;
-  coverUrl: string | null;
-  streams: number;
-  completionRate: number;
-  primaryChannel: string;
-};
-
-export type ContentLeadAudienceResponse = {
-  totalReach: number;
-  uniqueListeners: number;
-  avgCompletionRate: number;
-  totalListeningHours: number;
-  growthRate: number;
-  period: "7d" | "30d" | "90d" | "all";
-  selectedTrackId: string | null;
-  channels: AudienceChannelItem[];
-  dailyTrends: AudienceTrendItem[];
-  topTracks: AudienceTrackStat[];
-};
 export type StoredAuthSession = {
   accessToken: string;
   refreshToken: string;
@@ -686,23 +642,6 @@ export async function extractLicenseFromDoc(
 export const updateContentLeadTrack = updateArtistTrack;
 export const deleteContentLeadTrack = deleteArtistTrack;
 
-export async function getContentLeadAudienceAnalytics(
-  accessToken: string,
-  params: { period?: "7d" | "30d" | "90d" | "all"; trackId?: string } = {},
-): Promise<ContentLeadAudienceResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.period) {
-    searchParams.set("period", params.period);
-  }
-  if (params.trackId && params.trackId !== "all") {
-    searchParams.set("trackId", params.trackId);
-  }
-
-  return requestJson<ContentLeadAudienceResponse>(
-    `/api/content-lead/me/analytics/audience-channels?${searchParams.toString()}`,
-    { token: accessToken },
-  );
-}
 
 export async function recordPlatformVisit(payload: {
   targetType?: "TRACK" | "ARTIST" | "GENERAL";
