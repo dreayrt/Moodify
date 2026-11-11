@@ -1029,7 +1029,6 @@ function LumenHeroContent() {
                     : "text-white/60 hover:text-white"
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>Khám phá thể loại</span>
               </button>
             </div>
