@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Headphones } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { BrandLogo, LogoMark } from "@/components/shared/logo-mark";
 import {
   AppDownloadButtons,
@@ -40,18 +40,16 @@ export default function DownloadPage() {
             className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.18),transparent_70%)]"
           />
           <div className="relative mx-auto max-w-lg">
-            <LogoMark
-              variant="icon"
-              className="h-20 w-20 rounded-[22px] shadow-[0_0_60px_rgba(139,92,246,0.16)]"
-              priority
-            />
-            <p className="mt-6 inline-flex items-center gap-2 text-xs font-medium text-violet-300">
-              <Headphones className="h-4 w-4" aria-hidden="true" />
-              Moodify trên di động
-            </p>
+            <div className="flex justify-center">
+              <LogoMark
+                variant="icon"
+                className="h-20 w-20 rounded-[22px] shadow-[0_0_60px_rgba(139,92,246,0.16)]"
+                priority
+              />
+            </div>
             <h1
               id="download-title"
-              className="mt-3 font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl"
+              className="mt-6 font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl"
             >
               Giai điệu của bạn.
               <br />

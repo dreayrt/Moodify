@@ -23,6 +23,7 @@ import {
   HelpCircle,
   CreditCard,
   Mic2,
+  Download,
 } from "lucide-react";
 import {
   getCurrentUser,
@@ -48,6 +49,7 @@ import MoodifyMascot from "./moodify-mascot";
 import UserSettingsModal from "./user-settings-modal";
 import { useCurrentMascot } from "@/lib/mascots";
 import { BrandLogo } from "@/components/shared/logo-mark";
+import { MOBILE_DOWNLOADS } from "@/lib/mobile-downloads";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
 import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
@@ -1081,7 +1083,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* Main Shell Container */}
       <div className="relative z-10 w-full min-h-screen flex flex-col">
         {/* Top Header Bar - Fixed/Sticky SoundCloud Style */}
-        <header className={`${isKaraoke ? "hidden" : ""} sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
+        <header className={`${isKaraoke ? "hidden" : ""} sticky top-0 z-40 w-full flex flex-wrap items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 lg:flex-nowrap ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
           <div className="flex items-center gap-5 md:gap-7 shrink-0 min-w-0 md:min-w-[200px]">
             <Link
               href="/dashboard"
@@ -1192,7 +1194,16 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <div className="hidden md:flex flex-1" />
           )}
 
-          <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
+          <div className="ml-auto flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
+            <Link
+              href={MOBILE_DOWNLOADS.page}
+              aria-label="Tải ứng dụng Moodify"
+              title="Tải ứng dụng Moodify"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-xs font-bold text-white shadow-[0_5px_20px_rgba(139,92,246,0.2)] transition-[filter,box-shadow] hover:brightness-110 hover:shadow-[0_5px_24px_rgba(139,92,246,0.35)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300 xl:w-auto xl:px-4"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden xl:inline">Tải ứng dụng</span>
+            </Link>
             {userLoading ? (
               <span className="h-9 w-28 animate-pulse rounded-full border border-white/10 bg-white/5" />
             ) : user ? (
