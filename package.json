@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:auth": "node --test scripts/test-auth-routing.mjs",
+    "test:account": "node --test scripts/test-moderator-account.mjs",
     "test:lyrics": "node --test scripts/test-lyrics-import.mjs",
     "test:player": "node scripts/test-player-playback.mjs"
   },

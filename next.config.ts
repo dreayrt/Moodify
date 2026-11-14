@@ -27,11 +27,13 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
-    if (!apiBase) {
-      return [];
-    }
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8088")
+      .replace(/\/+$/, "").replace(/\/api$/, "");
     return [
+      {
+        source: "/api/auth/:path*",
+        destination: `${apiBase}/api/auth/:path*`,
+      },
       {
         source: "/uploads/:path*",
         destination: `${apiBase}/uploads/:path*`,

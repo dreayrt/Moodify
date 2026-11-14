@@ -196,6 +196,7 @@ export default function DashboardModeratorPage() {
               fullName: userObj.fullName || userObj.name || INITIAL_MODERATOR_PROFILE.fullName,
               email: userObj.email || INITIAL_MODERATOR_PROFILE.email,
               username: userObj.username || INITIAL_MODERATOR_PROFILE.username,
+              phone: userObj.phone || "",
               avatarUrl: userObj.avatarUrl || INITIAL_MODERATOR_PROFILE.avatarUrl,
               staffId: userObj.id ? `MOD-${userObj.id}` : INITIAL_MODERATOR_PROFILE.staffId,
             };
@@ -311,6 +312,7 @@ export default function DashboardModeratorPage() {
           fullName: currentUser.fullName || prev.fullName,
           email: currentUser.email || prev.email,
           username: currentUser.username || prev.username,
+          phone: currentUser.phone || "",
           avatarUrl: currentUser.avatarUrl || prev.avatarUrl,
           staffId: `MOD-${currentUser.id}`,
         }));

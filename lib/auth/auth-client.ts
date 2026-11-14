@@ -107,8 +107,22 @@ export type StoredAuthSession = {
 };
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8088";
+  (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8088")
+    .replace(/\/+$/, "").replace(/\/api$/, "");
+
+function requestUrl(path: string) {
+  // Forward account requests through Next.js so browsers use the site's origin.
+  // The rewrite retains Authorization/device headers and backend status codes.
+  return typeof window !== "undefined" && path.startsWith("/api/auth/")
+    ? path
+    : `${API_BASE_URL}${path}`;
+}
+
+function cacheUserProfile(profile: UserProfileResponse, epoch: number) {
+  if (typeof window !== "undefined" && epoch === authSessionEpoch && window.localStorage.getItem(STORAGE_KEY)) {
+    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
+  }
+}
 
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
@@ -451,8 +465,23 @@ export async function changePassword(
   }
   await requestJson<void>("/api/auth/change-password", {
     token: validToken,
+    timeoutMs: 15_000,
     body: { currentPassword, newPassword },
   });
+}
+
+export async function updateCurrentUserProfile(payload: { fullName: string; phone: string }) {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  const epoch = authSessionEpoch;
+  const profile = await requestJson<UserProfileResponse>("/api/auth/me", {
+    method: "PATCH",
+    token,
+    timeoutMs: 15_000,
+    body: { fullName: payload.fullName.trim(), phone: payload.phone.trim() },
+  });
+  cacheUserProfile(profile, epoch);
+  return profile;
 }
 
 export async function uploadAvatar(
@@ -462,7 +491,8 @@ export async function uploadAvatar(
   const formData = new FormData();
   formData.append("file", file);
 
-  const fullUrl = `${API_BASE_URL}/api/auth/avatar`;
+  const epoch = authSessionEpoch;
+  const fullUrl = requestUrl("/api/auth/avatar");
   const response = await fetch(fullUrl, {
     method: "POST",
     headers: {
@@ -476,7 +506,9 @@ export async function uploadAvatar(
     throw new Error(errorMsg);
   }
 
-  return (await response.json()) as UserProfileResponse;
+  const profile = (await response.json()) as UserProfileResponse;
+  cacheUserProfile(profile, epoch);
+  return profile;
 }
 
 export async function uploadArtistTrack(
@@ -588,9 +620,12 @@ export async function submitModeratorDecision(
 
 
 export async function getCurrentUser(accessToken: string) {
-  return requestJson<UserProfileResponse>("/api/auth/me", {
+  const epoch = authSessionEpoch;
+  const profile = await requestJson<UserProfileResponse>("/api/auth/me", {
     token: accessToken,
   });
+  cacheUserProfile(profile, epoch);
+  return profile;
 }
 
 export async function getCurrentArtistCatalog(
@@ -781,7 +816,7 @@ async function requestJson<T>(
   path: string,
   { body, extraHeaders, keepalive, method, token, timeoutMs }: RequestOptions = {},
 ): Promise<T> {
-  const fullUrl = `${API_BASE_URL}${path}`;
+  const fullUrl = requestUrl(path);
   const requestMethod = method ?? (body ? "POST" : "GET");
 
   // Auto fallback to getValidAccessToken if token not provided and not a public auth endpoint

@@ -132,7 +132,7 @@ function browserAuth(fetch) {
   };
   const exports = {};
   vm.runInNewContext(authClientCode, {
-    exports, document, process: { env: {} },
+    exports, document, AbortSignal, process: { env: {} },
     console: { log() {}, warn() {}, error() {} },
     require(id) {
       assert.equal(id, "./device-helper");
@@ -189,7 +189,7 @@ test("logout clears the session and leaves immediately even when the API stalls 
       assert.equal(client.getStoredAuthSession(), null);
       assert.equal(requests.length, 1);
       const { url, options } = requests[0];
-      assert.equal(new URL(url).pathname, "/api/auth/logout");
+      assert.equal(new URL(url, origin).pathname, "/api/auth/logout");
       assert.equal(options.method, "POST");
       assert.equal(options.keepalive, true);
       assert.equal(options.headers.Authorization, `Bearer ${auth.accessToken}`);
@@ -206,14 +206,14 @@ test("logout with no local session navigates without trying to refresh tokens", 
   client.logoutAndRedirect();
   assert.deepEqual(navigations, ["/dashboard/user"]);
   assert.equal(requests.length, 1);
-  assert.equal(new URL(requests[0].url).pathname, "/api/auth/logout");
+  assert.equal(new URL(requests[0].url, origin).pathname, "/api/auth/logout");
   assert.equal(requests[0].options.headers.Authorization, undefined);
 });
 
 test("a refresh response arriving after logout cannot restore the session", async () => {
   let finishRefresh;
   const { client, auth, cookies, navigations } = browserAuth((url) => {
-    if (new URL(url).pathname === "/api/auth/refresh") {
+    if (new URL(url, origin).pathname === "/api/auth/refresh") {
       return new Promise((resolve) => { finishRefresh = resolve; });
     }
     return new Promise(() => {});
@@ -229,4 +229,79 @@ test("a refresh response arriving after logout cannot restore the session", asyn
   assert.equal(client.getStoredAuthSession(), null);
   assert.equal(cookies.size, 0);
   assert.deepEqual(navigations, ["/dashboard/user"]);
+});
+
+const savedProfile = {
+  id: 1, fullName: "Tên từ máy chủ", phone: "0901234567", email: "test@example.com",
+  username: "test", role: "MODERATOR", status: "ACTIVE", avatarUrl: "/uploads/avatars/saved.png",
+};
+
+test("profile PATCH uses the same origin and caches only the saved server response", async () => {
+  const { client, auth, storage, requests } = browserAuth(async () => new Response(JSON.stringify(savedProfile)));
+  client.saveAuthSession(auth);
+  const profile = await client.updateCurrentUserProfile({ fullName: "  Tên mới  ", phone: "  0901234567  " });
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "/api/auth/me");
+  assert.equal(requests[0].options.method, "PATCH");
+  assert.equal(requests[0].options.headers.Authorization, `Bearer ${auth.accessToken}`);
+  assert.equal(requests[0].options.headers["X-Device-Uuid"], "test-device");
+  assert.deepEqual(JSON.parse(requests[0].options.body), { fullName: "Tên mới", phone: "0901234567" });
+  assert.equal(profile.fullName, savedProfile.fullName);
+  assert.deepEqual(JSON.parse(storage.get("moodify.auth.user")), savedProfile);
+});
+
+test("failed profile updates preserve the previous saved profile", async () => {
+  const { client, auth, storage } = browserAuth(async () => new Response(
+    JSON.stringify({ message: "Số điện thoại đã được sử dụng." }), { status: 409 }));
+  client.saveAuthSession(auth);
+  const previous = storage.get("moodify.auth.user");
+  await assert.rejects(client.updateCurrentUserProfile({ fullName: "Tên mới", phone: "0901234567" }),
+    { message: "Số điện thoại đã được sử dụng." });
+  assert.equal(storage.get("moodify.auth.user"), previous);
+});
+
+test("profile updates require a live session", async () => {
+  const { client, requests } = browserAuth(() => { throw new Error("must not send"); });
+  await assert.rejects(client.updateCurrentUserProfile({ fullName: "Tên", phone: "" }), /Phiên đăng nhập/);
+  assert.equal(requests.length, 0);
+});
+
+test("a late profile save cannot restore user data after logout", async () => {
+  let finishSave;
+  const { client, auth, storage } = browserAuth(() => new Promise((resolve) => { finishSave = resolve; }));
+  client.saveAuthSession(auth);
+  const saving = client.updateCurrentUserProfile({ fullName: "Tên", phone: "" });
+  await new Promise(setImmediate);
+  client.clearAuthSession();
+  finishSave(new Response(JSON.stringify(savedProfile)));
+  await saving;
+  assert.equal(storage.has("moodify.auth.user"), false);
+});
+
+test("password change uses authenticated same-origin POST and preserves backend errors", async () => {
+  const { client, auth, requests } = browserAuth(async () => new Response(
+    JSON.stringify({ message: "Mật khẩu hiện tại không đúng." }), { status: 400 }));
+  client.saveAuthSession(auth);
+  await assert.rejects(client.changePassword("wrong-current", "new-password"),
+    { message: "Mật khẩu hiện tại không đúng." });
+  assert.equal(requests[0].url, "/api/auth/change-password");
+  assert.equal(requests[0].options.method, "POST");
+  assert.equal(requests[0].options.headers.Authorization, `Bearer ${auth.accessToken}`);
+  assert.deepEqual(JSON.parse(requests[0].options.body), { currentPassword: "wrong-current", newPassword: "new-password" });
+});
+
+test("account proxy works with API origin, /api suffix, and local development defaults", async () => {
+  const configCode = ts.transpileModule(fs.readFileSync(new URL("../next.config.ts", import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  for (const [value, expected] of [["https://api.moodify.click", "https://api.moodify.click"],
+    ["https://api.moodify.click/api/", "https://api.moodify.click"], [undefined, "http://localhost:8088"]]) {
+    const exports = {};
+    vm.runInNewContext(configCode, { exports, process: { env: { NEXT_PUBLIC_API_BASE_URL: value } } });
+    const rewrites = await exports.default.rewrites();
+    assert.equal(rewrites.find((rule) => rule.source === "/api/auth/:path*").destination,
+      `${expected}/api/auth/:path*`);
+    assert.equal(rewrites.find((rule) => rule.source === "/uploads/:path*").destination,
+      `${expected}/uploads/:path*`);
+  }
 });
