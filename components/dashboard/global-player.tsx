@@ -1,27 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Play,
-  Pause,
-  Loader2,
-  SkipBack,
-  SkipForward,
-  Volume2,
-  VolumeX,
-  Heart,
-  Repeat,
-  Repeat1,
-  Shuffle,
-  Music2,
-  Crown,
-  ShieldCheck,
-  Share2,
-  Gauge,
-  ChevronDown,
+  Play, Pause, Loader2, SkipBack, SkipForward, Volume2, VolumeX,
+  Heart, Repeat, Repeat1, Shuffle, Music2, ShieldCheck, Share2,
+  Gauge, ChevronDown, SlidersHorizontal,
 } from "lucide-react";
 import { usePlayer } from "./player-context";
 import { addToLibrary, removeFromLibrary, isTrackInLibrary } from "@/lib/api-client";
@@ -29,82 +15,83 @@ import { useVipTheme } from "@/lib/theme";
 import TrackActionMenu from "./track-action-menu";
 import AdInterstitialBanner from "./ad-interstitial-banner";
 import ShareSongCardModal from "./share-song-card-modal";
+import styles from "./global-player.module.css";
 
 function formatSeconds(sec: number): string {
-  if (!sec || isNaN(sec) || sec < 0) return "0:00";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  if (!Number.isFinite(sec) || sec < 0) return "0:00";
+  return `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toString().padStart(2, "0")}`;
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
 export function GlobalPlayerBar() {
   const pathname = usePathname();
   const {
-    currentTrack,
-    isPlayerBarHidden,
-    setPlayerBarHidden,
-    isPlaying,
-    isBuffering,
-    currentTime,
-    duration,
-    volume,
-    isMuted,
-    isAdPlaying,
-    isPremiumUser,
-    subTier,
-    adReason,
-    playbackRate,
-    isShuffle,
-    repeatMode,
-    togglePlay,
-    seek,
-    setVolume,
-    toggleMute,
-    setPlaybackRate,
-    toggleShuffle,
-    toggleRepeat,
-    nextTrack,
-    prevTrack,
+    currentTrack, isPlayerBarHidden, setPlayerBarHidden, isPlaying, isBuffering,
+    currentTime, duration, volume, isMuted, isAdPlaying, isPremiumUser, subTier,
+    adReason, playbackRate, isShuffle, repeatMode, togglePlay, seek, setVolume,
+    toggleMute, setPlaybackRate, toggleShuffle, toggleRepeat, nextTrack, prevTrack,
   } = usePlayer();
-
   const { vipButtonsEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
   const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
-  const isVipShellActive = Boolean(isPremiumUser) && vipShellEnabled;
-  const currentShellTheme = isVipShellActive ? currentVipTheme : normalTheme;
-
+  const currentShellTheme = isPremiumUser && vipShellEnabled ? currentVipTheme : normalTheme;
+  const accent = isVipButtonsActive ? currentVipTheme.accent : "#c084fc";
   const [liked, setLiked] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const barRef = useRef<HTMLElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
+  const isVisible = Boolean(currentTrack) && !isPlayerBarHidden && !pathname?.startsWith("/dashboard/karaoke");
 
-  // Check liked status when track changes
-  React.useEffect(() => {
-    if (!currentTrack?.spotifyId) return;
-    let cancelled = false;
-    isTrackInLibrary(currentTrack.spotifyId)
-      .then((res) => {
-        if (!cancelled) setLiked(res);
-      })
-      .catch(() => {
-        if (!cancelled) setLiked(false);
-      });
+  // Reserve the actual dock height, including expanded controls and iOS safe area.
+  useEffect(() => {
+    if (!isVisible || !barRef.current) return;
+    const bar = barRef.current;
+    const updateHeight = () => document.documentElement.style.setProperty(
+      "--moodify-player-height", `${Math.ceil(window.innerHeight - bar.getBoundingClientRect().top)}px`,
+    );
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(bar);
+    window.addEventListener("resize", updateHeight);
     return () => {
-      cancelled = true;
+      observer.disconnect();
+      window.removeEventListener("resize", updateHeight);
+      document.documentElement.style.removeProperty("--moodify-player-height");
     };
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (!isOptionsOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOptionsOpen(false);
+        optionsButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isOptionsOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (currentTrack?.spotifyId) {
+      isTrackInLibrary(currentTrack.spotifyId)
+        .then((value) => { if (!cancelled) setLiked(value); })
+        .catch(() => { if (!cancelled) setLiked(false); });
+    }
+    return () => { cancelled = true; };
   }, [currentTrack?.spotifyId]);
 
-  // Listen for global library updates (e.g. liked/unliked from 3-dots menu or search)
-  React.useEffect(() => {
-    const handleLibraryUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<{ trackSpotifyId: string; liked: boolean }>;
-      if (customEvent.detail && currentTrack?.spotifyId && customEvent.detail.trackSpotifyId === currentTrack.spotifyId) {
-        setLiked(customEvent.detail.liked);
+  useEffect(() => {
+    const handleLibraryUpdate = (event: Event) => {
+      const { detail } = event as CustomEvent<{ trackSpotifyId: string; liked: boolean }>;
+      if (detail && currentTrack?.spotifyId && detail.trackSpotifyId === currentTrack.spotifyId) {
+        setLiked(detail.liked);
       }
     };
     window.addEventListener("moodify-library-updated", handleLibraryUpdate);
-    return () => {
-      window.removeEventListener("moodify-library-updated", handleLibraryUpdate);
-    };
+    return () => window.removeEventListener("moodify-library-updated", handleLibraryUpdate);
   }, [currentTrack?.spotifyId]);
 
   const handleToggleLike = async () => {
@@ -112,470 +99,167 @@ export function GlobalPlayerBar() {
     const nextState = !liked;
     setLiked(nextState);
     try {
-      if (nextState) {
-        await addToLibrary(currentTrack.spotifyId);
-      } else {
-        await removeFromLibrary(currentTrack.spotifyId);
-      }
-      window.dispatchEvent(
-        new CustomEvent("moodify-library-updated", {
-          detail: { trackSpotifyId: currentTrack.spotifyId, liked: nextState },
-        })
-      );
+      if (nextState) await addToLibrary(currentTrack.spotifyId);
+      else await removeFromLibrary(currentTrack.spotifyId);
+      window.dispatchEvent(new CustomEvent("moodify-library-updated", {
+        detail: { trackSpotifyId: currentTrack.spotifyId, liked: nextState },
+      }));
     } catch (err) {
       console.error("Failed to toggle like:", err);
       setLiked(!nextState);
     }
   };
 
-  if (pathname?.startsWith("/dashboard/karaoke") || !currentTrack) {
-    return null;
-  }
+  if (pathname?.startsWith("/dashboard/karaoke") || !currentTrack) return null;
 
-  if (isPlayerBarHidden) {
-    return (
-      <>
-        <AdInterstitialBanner />
-        <button
-          type="button"
-          onClick={() => setPlayerBarHidden(false)}
-          className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/90 px-4 py-3 text-sm font-medium text-white shadow-[0_12px_36px_rgba(0,0,0,0.55)] backdrop-blur-xl transition hover:border-purple-400/60 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
-          aria-label="Mở thanh phát nhạc"
-          title={`Mở thanh phát nhạc${isPlaying ? ` — đang phát ${currentTrack.name}` : ""}`}
-        >
-          <span className="relative inline-flex">
-            <Music2 className="h-4 w-4 text-purple-300" />
-            {isPlaying && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />}
-          </span>
-          <span className="hidden sm:inline">Mở trình phát</span>
-        </button>
-        <ShareSongCardModal
-          isOpen={isShareModalOpen}
-          onClose={() => setIsShareModalOpen(false)}
-          track={currentTrack}
-          currentTime={currentTime}
-        />
-      </>
-    );
-  }
-
-  const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
-
-  const handleSeekClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!duration || duration <= 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    seek(ratio * duration);
-  };
+  const progressPercent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
+  const repeatLabel = repeatMode === "off" ? "Tắt" : repeatMode === "all" ? "Toàn bộ" : "Một bài";
+  const isBasicAd = subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED";
 
   return (
     <>
       <AdInterstitialBanner />
-      <div className={`fixed bottom-0 left-0 right-0 z-50 px-4 md:px-8 py-3 pr-12 backdrop-blur-3xl transition-all duration-300 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder}`}>
+      {isPlayerBarHidden ? (
         <button
           type="button"
-          onClick={() => setPlayerBarHidden(true)}
-          className="absolute right-2 top-1.5 z-10 rounded-full p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
-          aria-label="Ẩn thanh phát nhạc"
-          title="Ẩn thanh phát nhạc"
+          onClick={() => setPlayerBarHidden(false)}
+          className={styles.reopen}
+          aria-label="Mở thanh phát nhạc"
+          title={`Mở thanh phát nhạc — ${currentTrack.name}`}
         >
-          <ChevronDown className="h-4 w-4" />
+          <Music2 size={20} style={{ color: accent }} />
+          <span className={styles.reopenText}>{currentTrack.name}</span>
+          {isPlaying && <span className={styles.liveDot} />}
         </button>
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          {/* Track info */}
-          <div className="flex items-center gap-3 w-[220px] md:w-[280px] min-w-0">
-            <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden shrink-0 shadow-lg bg-slate-900 border border-white/10 ring-1 ring-white/5">
-              {isAdPlaying ? (
-                <div className="relative w-full h-full group">
-                  <Image
-                    src={
-                      subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
-                        ? "/images/ads/moodify_brand_ident_art.jpg"
-                        : "/images/ads/moodify_vip_premium_art.jpg"
-                    }
-                    alt="Sponsor Artwork"
-                    fill
-                    sizes="56px"
-                    className="object-cover"
-                    priority
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
-                  <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/80 backdrop-blur-md border border-amber-400/30 text-[8px] font-mono font-bold tracking-wider text-amber-300 uppercase leading-none shadow-sm">
-                    AD
-                  </div>
-                </div>
-              ) : currentTrack.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={currentTrack.imageUrl}
-                  alt={currentTrack.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-950 to-slate-900">
-                  <Music2 className="w-5 h-5 text-purple-400" />
-                </div>
-              )}
-              {isPlaying && !isAdPlaying && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-0.5">
-                  <div
-                    className="w-1 h-3.5 rounded-full animate-pulse"
-                    style={{
-                      backgroundColor: isVipButtonsActive ? currentVipTheme.accent : "#f472b6",
-                    }}
-                  />
-                  <div
-                    className="w-1 h-5 rounded-full animate-pulse delay-75"
-                    style={{
-                      backgroundColor: isVipButtonsActive ? currentVipTheme.accent : "#d8b4fe",
-                    }}
-                  />
-                  <div
-                    className="w-1 h-2.5 rounded-full animate-pulse delay-150"
-                    style={{
-                      backgroundColor: isVipButtonsActive ? currentVipTheme.accent : "#f472b6",
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              {isAdPlaying ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-amber-400/15 text-amber-300 border border-amber-400/30">
-                    TÀI TRỢ
-                  </span>
-                  <h4 className="font-display font-semibold text-white text-sm md:text-base leading-snug tracking-tight truncate">
-                    {subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED"
-                      ? "Moodify Premium"
-                      : "Moodify Studio Sponsor"}
-                  </h4>
-                </div>
-              ) : (
-                <div>
-                  <h4 className="font-display font-semibold text-slate-100 text-sm md:text-base leading-snug tracking-[-0.01em] truncate">
-                    {currentTrack.name}
-                  </h4>
+      ) : (
+        <section
+          ref={barRef}
+          aria-label="Trình phát nhạc"
+          className={`${styles.dock} ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder}`}
+          style={{ "--player-accent": accent } as React.CSSProperties}
+        >
+          <div className={styles.layout}>
+            <div className={styles.track}>
+              <div className={styles.artwork}>
+                {isAdPlaying ? (
+                  <>
+                    <Image
+                      src={isBasicAd ? "/images/ads/moodify_brand_ident_art.jpg" : "/images/ads/moodify_vip_premium_art.jpg"}
+                      alt="Ảnh quảng cáo" fill sizes="56px" className="object-cover" priority
+                    />
+                    <span className={styles.adBadge}>AD</span>
+                  </>
+                ) : currentTrack.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentTrack.imageUrl} alt={currentTrack.name} />
+                ) : <Music2 size={22} style={{ color: accent }} />}
+              </div>
+              <div className={styles.trackText}>
+                <p className={styles.eyebrow}>{isAdPlaying ? "Nội dung tài trợ" : isPlaying ? "Đang phát" : "Đã tạm dừng"}</p>
+                <h4 className={styles.title} title={currentTrack.name}>
+                  {isAdPlaying ? (isBasicAd ? "Moodify Premium" : "Moodify Studio Sponsor") : currentTrack.name}
+                </h4>
+                {!isAdPlaying && (
                   <Link
                     href={`/dashboard/artist/${encodeURIComponent(currentTrack.artistSpotifyId || currentTrack.artistName)}`}
-                    className="text-xs text-slate-400 hover:text-cyan-400 hover:underline leading-tight truncate mt-0.5 block transition-colors"
-                  >
-                    {currentTrack.artistName}
-                  </Link>
+                    className={styles.artist} title={currentTrack.artistName}
+                  >{currentTrack.artistName}</Link>
+                )}
+              </div>
+              <div className={styles.trackActions}>
+                {!isAdPlaying && (
+                  <button type="button" onClick={handleToggleLike} className={styles.iconButton}
+                    aria-label={liked ? "Bỏ thích bài hát" : "Yêu thích bài hát"} aria-pressed={liked}
+                    style={liked ? { color: "#fb7185" } : undefined}>
+                    <Heart size={19} fill={liked ? "currentColor" : "none"} />
+                  </button>
+                )}
+                <button ref={optionsButtonRef} type="button" onClick={() => setIsOptionsOpen(!isOptionsOpen)}
+                  className={`${styles.iconButton} ${styles.optionsToggle}`} aria-label="Tùy chọn trình phát"
+                  aria-expanded={isOptionsOpen} aria-controls="player-options" style={isOptionsOpen ? { color: accent } : undefined}>
+                  <SlidersHorizontal size={19} />
+                </button>
+                <button type="button" onClick={() => setPlayerBarHidden(true)} className={`${styles.iconButton} ${styles.desktopHide}`}
+                  aria-label="Ẩn thanh phát nhạc" title="Ẩn thanh phát nhạc">
+                  <ChevronDown size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.transport}>
+              <div className={styles.playback}>
+                <button type="button" disabled={isAdPlaying} onClick={toggleShuffle} className={styles.iconButton}
+                  aria-label="Phát ngẫu nhiên" aria-pressed={isShuffle} title={`Phát ngẫu nhiên: ${isShuffle ? "Bật" : "Tắt"}`}>
+                  <Shuffle size={18} />
+                </button>
+                <button type="button" disabled={isAdPlaying} onClick={prevTrack} className={styles.iconButton} aria-label="Bài trước">
+                  <SkipBack size={21} fill="currentColor" />
+                </button>
+                <button type="button" disabled={isAdPlaying} onClick={togglePlay}
+                  className={`${styles.playButton} ${isVipButtonsActive ? currentVipTheme.primaryBtnClass : "bg-gradient-to-tr from-purple-500 to-pink-500 text-white"}`}
+                  aria-label={isPlaying ? "Tạm dừng" : "Phát nhạc"} aria-busy={isBuffering}>
+                  {isBuffering ? <Loader2 size={23} className="animate-spin" /> : isPlaying ?
+                    <Pause size={23} fill="currentColor" /> : <Play size={23} fill="currentColor" className="ml-0.5" />}
+                </button>
+                <button type="button" disabled={isAdPlaying} onClick={nextTrack} className={styles.iconButton} aria-label="Bài tiếp theo">
+                  <SkipForward size={21} fill="currentColor" />
+                </button>
+                <button type="button" disabled={isAdPlaying} onClick={toggleRepeat} className={styles.iconButton}
+                  aria-label={`Lặp lại: ${repeatLabel}`} aria-pressed={repeatMode !== "off"} title={`Lặp lại: ${repeatLabel}`}>
+                  {repeatMode === "one" ? <Repeat1 size={18} /> : <Repeat size={18} />}
+                </button>
+              </div>
+              <div className={styles.timeline}>
+                <span>{isAdPlaying ? "QC" : formatSeconds(currentTime)}</span>
+                <div className={styles.seekTrack}>
+                  <div className={styles.seekRail}>
+                    <div className={`${styles.seekFill} ${isVipButtonsActive ? `bg-gradient-to-r ${currentVipTheme.equalizerGradient}` : "bg-gradient-to-r from-purple-500 via-pink-500 to-amber-300"}`}
+                      style={{ width: `${isAdPlaying ? 100 : progressPercent}%` }} />
+                  </div>
+                  <input type="range" min={0} max={duration > 0 ? duration : 0} step={0.1}
+                    value={Math.min(Math.max(0, currentTime), Math.max(0, duration))}
+                    disabled={isAdPlaying || duration <= 0} onChange={(event) => seek(Number(event.target.value))}
+                    aria-label="Tiến độ bài hát" aria-valuetext={`${formatSeconds(currentTime)} trên ${formatSeconds(duration)}`}
+                    className={styles.seekInput} />
+                </div>
+                <span>{isAdPlaying ? "0:15" : formatSeconds(duration)}</span>
+              </div>
+            </div>
+
+            <div id="player-options" className={`${styles.utilities} ${isOptionsOpen ? styles.utilitiesOpen : ""}`}>
+              <label className={styles.speed}>
+                <Gauge size={16} aria-hidden="true" />
+                <span className={styles.optionLabel}>Tốc độ</span>
+                <select aria-label="Tốc độ phát" value={playbackRate} disabled={isAdPlaying}
+                  onChange={(event) => setPlaybackRate(Number(event.target.value))}>
+                  {SPEED_OPTIONS.map((rate) => <option key={rate} value={rate}>{rate}x</option>)}
+                </select>
+              </label>
+              {!isAdPlaying && (
+                <div className={styles.extraActions}>
+                  <TrackActionMenu track={currentTrack} isLiked={liked} onLikeChange={setLiked} className={styles.iconButton} />
+                  <button type="button" onClick={() => setIsShareModalOpen(true)} className={styles.iconButton} aria-label="Chia sẻ bài hát">
+                    <Share2 size={18} />
+                  </button>
                 </div>
               )}
-            </div>
-
-            {!isAdPlaying && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleToggleLike}
-                  className={`p-1.5 rounded-full hover:bg-white/5 transition-colors shrink-0 ${
-                    liked ? "text-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.4)]" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                  aria-label="Like track"
-                >
-                  <Heart className="w-4 h-4" fill={liked ? "currentColor" : "none"} />
+              <div className={styles.volume}>
+                <button type="button" onClick={toggleMute} className={styles.iconButton} aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}>
+                  {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>
-
-                <TrackActionMenu
-                  track={currentTrack}
-                  isLiked={liked}
-                  onLikeChange={setLiked}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setIsShareModalOpen(true)}
-                  className="flex md:hidden text-slate-400 hover:text-purple-300 transition-colors p-1.5 rounded-lg hover:bg-white/5 active:scale-95 cursor-pointer shrink-0"
-                  title="Chia sẻ bài hát"
-                  aria-label="Chia sẻ bài hát"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Center player controls & progress bar */}
-          <div className="flex-1 max-w-2xl flex flex-col items-center gap-1.5">
-            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-              {/* Shuffle Button */}
-              <button
-                type="button"
-                disabled={isAdPlaying}
-                onClick={toggleShuffle}
-                className={`hidden sm:flex items-center justify-center p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-40 relative group ${
-                  isShuffle
-                    ? isVipButtonsActive
-                      ? ""
-                      : "text-purple-400 hover:text-purple-300"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-                style={{
-                  color: isShuffle && isVipButtonsActive ? currentVipTheme.accent : undefined,
-                }}
-                title={isShuffle ? "Phát ngẫu nhiên: BẬT (Bấm để tắt)" : "Phát ngẫu nhiên: TẮT (Bấm để bật)"}
-                aria-label="Shuffle"
-              >
-                <Shuffle className="w-4 h-4" />
-                {isShuffle && (
-                  <span
-                    className="absolute bottom-0 w-1 h-1 rounded-full shadow-sm"
-                    style={{
-                      backgroundColor: isVipButtonsActive ? currentVipTheme.accent : "#c084fc",
-                      boxShadow: `0 0 6px ${isVipButtonsActive ? currentVipTheme.accent : "#c084fc"}`,
-                    }}
-                  />
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={isAdPlaying}
-                onClick={prevTrack}
-                className="text-slate-300 hover:text-white transition-colors p-1 hover:scale-110 active:scale-95 disabled:opacity-40 cursor-pointer"
-                aria-label="Previous track"
-              >
-                <SkipBack className="w-5 h-5 fill-current" />
-              </button>
-
-              <button
-                type="button"
-                disabled={isAdPlaying}
-                onClick={togglePlay}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                  isAdPlaying
-                    ? "bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed"
-                    : isVipButtonsActive
-                    ? `${currentVipTheme.primaryBtnClass} hover:scale-110 active:scale-95`
-                    : "bg-gradient-to-tr from-purple-500 to-pink-500 text-white hover:scale-108 active:scale-95 shadow-[0_4px_20px_rgba(168,85,247,0.5)]"
-                }`}
-                aria-label={isPlaying ? "Pause" : "Play"}
-              >
-                {isBuffering ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : isPlaying ? (
-                  <Pause className="w-5 h-5 fill-current" />
-                ) : (
-                  <Play className="w-5 h-5 fill-current ml-0.5" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={isAdPlaying}
-                onClick={nextTrack}
-                className="text-slate-300 hover:text-white transition-colors p-1 hover:scale-110 active:scale-95 disabled:opacity-40 cursor-pointer"
-                aria-label="Next track"
-              >
-                <SkipForward className="w-5 h-5 fill-current" />
-              </button>
-
-              {/* Repeat Button */}
-              <button
-                type="button"
-                disabled={isAdPlaying}
-                onClick={toggleRepeat}
-                className={`hidden sm:flex items-center justify-center p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-40 relative group ${
-                  repeatMode !== "off"
-                    ? isVipButtonsActive
-                      ? ""
-                      : "text-purple-400 hover:text-purple-300"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-                style={{
-                  color: repeatMode !== "off" && isVipButtonsActive ? currentVipTheme.accent : undefined,
-                }}
-                title={
-                  repeatMode === "off"
-                    ? "Lặp lại: TẮT (Bấm để lặp toàn bộ danh sách)"
-                    : repeatMode === "all"
-                    ? "Lặp lại: TOÀN BỘ (Bấm để lặp 1 bài)"
-                    : "Lặp lại: 1 BÀI (Bấm để tắt lặp)"
-                }
-                aria-label="Repeat"
-              >
-                {repeatMode === "one" ? (
-                  <Repeat1 className="w-4 h-4" />
-                ) : (
-                  <Repeat className="w-4 h-4" />
-                )}
-                {repeatMode !== "off" && (
-                  <span
-                    className="absolute bottom-0 w-1 h-1 rounded-full shadow-sm"
-                    style={{
-                      backgroundColor: isVipButtonsActive ? currentVipTheme.accent : "#c084fc",
-                      boxShadow: `0 0 6px ${isVipButtonsActive ? currentVipTheme.accent : "#c084fc"}`,
-                    }}
-                  />
-                )}
-              </button>
-
-              <div className="hidden sm:block w-px h-4 bg-white/10 mx-0.5" />
-
-              {/* Playback Speed Pill & Dropdown */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsSpeedMenuOpen(!isSpeedMenuOpen)}
-                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1 group ${
-                    playbackRate !== 1
-                      ? isVipButtonsActive
-                        ? "shadow-sm"
-                        : "text-purple-300 bg-purple-500/20 border-purple-400/40 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
-                      : "text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border-white/10"
-                  }`}
-                  style={
-                    playbackRate !== 1 && isVipButtonsActive
-                      ? {
-                          color: currentVipTheme.accent,
-                          borderColor: `${currentVipTheme.accent}50`,
-                          backgroundColor: `${currentVipTheme.accent}20`,
-                          boxShadow: `0 0 10px ${currentVipTheme.accent}30`,
-                        }
-                      : undefined
-                  }
-                  title="Tốc độ phát âm thanh"
-                >
-                  <Gauge className="w-3 h-3 text-current transition-colors" />
-                  <span>{playbackRate}x</span>
-                </button>
-
-                {isSpeedMenuOpen && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-1.5 rounded-2xl bg-slate-900/95 border border-white/15 shadow-[0_10px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col gap-1 z-[100] min-w-[76px]">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 text-center">
-                      Tốc độ
-                    </span>
-                    {SPEED_OPTIONS.map((rate) => (
-                      <button
-                        key={rate}
-                        type="button"
-                        onClick={() => {
-                          setPlaybackRate(rate);
-                          setIsSpeedMenuOpen(false);
-                        }}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition cursor-pointer text-center ${
-                          playbackRate === rate
-                            ? isVipButtonsActive
-                              ? `${currentVipTheme.primaryBtnClass} shadow-sm`
-                              : "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm"
-                            : "text-slate-300 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        {rate}x
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <input type="range" min={0} max={1} step={0.02} value={isMuted ? 0 : volume}
+                  onChange={(event) => setVolume(Number(event.target.value))} aria-label="Âm lượng" />
               </div>
-            </div>
-
-            {/* Scrub bar */}
-            <div className="w-full flex items-center gap-2.5">
-              <span className="text-[11px] font-mono text-slate-400 w-9 text-right select-none">
-                {isAdPlaying ? "QC" : formatSeconds(currentTime)}
-              </span>
-
-              <div
-                onClick={!isAdPlaying ? handleSeekClick : undefined}
-                className={`relative flex-1 h-1.5 rounded-full group py-2 -my-2 flex items-center ${
-                  isAdPlaying ? "bg-amber-500/20 cursor-not-allowed" : "bg-white/15 cursor-pointer"
-                }`}
-              >
-                {/* Progress bar filler */}
-                <div
-                  className={`h-1.5 rounded-full transition-all relative ${
-                    isAdPlaying
-                      ? "bg-gradient-to-r from-amber-500 to-yellow-400 animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.5)]"
-                      : isVipButtonsActive
-                      ? `${currentVipTheme.equalizerGradient} group-hover:h-2`
-                      : "bg-gradient-to-r from-purple-500 via-pink-500 to-amber-300 group-hover:h-2 shadow-[0_0_12px_rgba(244,63,94,0.4)]"
-                  }`}
-                  style={{ width: isAdPlaying ? "100%" : `${progressPercent}%` }}
-                >
-                  {!isAdPlaying && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-opacity" />
-                  )}
-                </div>
-              </div>
-
-              <span className="text-[11px] font-mono text-slate-400 w-9 select-none">
-                {isAdPlaying ? "0:15" : formatSeconds(duration)}
-              </span>
+              <button type="button" onClick={() => { setIsOptionsOpen(false); setPlayerBarHidden(true); }}
+                className={`${styles.iconButton} ${styles.mobileHide}`} aria-label="Ẩn thanh phát nhạc">
+                <ChevronDown size={18} /><span>Thu gọn</span>
+              </button>
+              {isPremiumUser && <span className={styles.vip} style={{ color: accent }}><ShieldCheck size={14} /> VIP</span>}
             </div>
           </div>
-
-          {/* Right side: Story Card Share & Volume & VIP / Test Ad */}
-          <div className="hidden md:flex items-center justify-end gap-2.5 w-[280px]">
-            {/* Share Song Button */}
-            {!isAdPlaying && (
-              <button
-                type="button"
-                onClick={() => setIsShareModalOpen(true)}
-                className="text-slate-400 hover:text-purple-300 transition-colors p-1.5 rounded-lg hover:bg-white/5 active:scale-95 cursor-pointer"
-                title="Chia sẻ bài hát"
-                aria-label="Chia sẻ bài hát"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-            )}
-
-            {isPremiumUser && (
-              <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm transition-all"
-                style={{
-                  backgroundColor: `${isVipButtonsActive ? currentVipTheme.accent : "#eab308"}1a`,
-                  borderColor: `${isVipButtonsActive ? currentVipTheme.accent : "#eab308"}40`,
-                  color: isVipButtonsActive ? currentVipTheme.accent : "#fde047",
-                  borderWidth: 1,
-                }}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>VIP</span>
-              </div>
-            )}
-
-            {/* Volume controls */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={toggleMute}
-                className="text-slate-400 hover:text-purple-300 transition-colors p-1"
-                aria-label={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="w-4 h-4" />
-                ) : (
-                  <Volume2 className="w-4 h-4" />
-                )}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.02"
-                value={isMuted ? 0 : volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-18 h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer"
-                style={{ accentColor: isVipShellActive ? currentShellTheme.playerAccent : "#c084fc" }}
-                aria-label="Volume slider"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Share Song Card / Story Modal */}
-      <ShareSongCardModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        track={currentTrack}
-        currentTime={currentTime}
-      />
+        </section>
+      )}
+      <ShareSongCardModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} track={currentTrack} currentTime={currentTime} />
     </>
   );
 }
