@@ -21,9 +21,8 @@ import {
   deleteArtistTrack,
   getCurrentArtistCatalog,
   getCurrentUser,
-  getStoredAuthSession,
   getValidAccessToken,
-  logout,
+  logoutAndRedirect,
   recordListeningSessionTelemetry,
   updateArtistTrack,
   type ArtistProfileResponse,
@@ -661,28 +660,11 @@ export default function ContentLeadDashboardPage() {
     startPreviewTrack(track, previewTrackId !== track.id);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) return;
     setLoggingOut(true);
-
-    try {
-      const session = getStoredAuthSession();
-      await logout(session?.refreshToken);
-    } catch (err) {
-      console.warn("Logout error (proceeding with local cleanup):", err);
-    } finally {
-      clearAuthSession();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      setLoggingOut(false);
-      router.push(HOME_ROUTE);
-    }
+    logoutAndRedirect();
   };
-
-  useEffect(() => {
-    router.prefetch(HOME_ROUTE);
-    router.prefetch(USER_DASHBOARD_ROUTE);
-  }, [router]);
 
   useEffect(() => {
     let cancelled = false;

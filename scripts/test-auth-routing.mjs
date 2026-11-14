@@ -107,3 +107,126 @@ test("role restrictions on protected dashboards remain enforced", () => {
 test("the public music dashboard remains directly accessible to staff", () => {
   assert.equal(visit("/dashboard/user", { moodify_token: token("ADMIN") }).headers.get("x-middleware-next"), "1");
 });
+
+const authClientSource = fs.readFileSync(new URL("../lib/auth/auth-client.ts", import.meta.url), "utf8");
+const authClientCode = ts.transpileModule(authClientSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText;
+
+function browserAuth(fetch) {
+  const storage = new Map();
+  const cookies = new Map();
+  const requests = [];
+  const navigations = [];
+  const document = {
+    get cookie() {
+      return [...cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+    },
+    set cookie(value) {
+      const [pair, ...attributes] = value.split(";");
+      const separator = pair.indexOf("=");
+      const name = pair.slice(0, separator);
+      if (attributes.some((attribute) => attribute.trim() === "max-age=0")) cookies.delete(name);
+      else cookies.set(name, pair.slice(separator + 1));
+    },
+  };
+  const exports = {};
+  vm.runInNewContext(authClientCode, {
+    exports, document, process: { env: {} },
+    console: { log() {}, warn() {}, error() {} },
+    require(id) {
+      assert.equal(id, "./device-helper");
+      return { getCurrentDeviceUuid: () => "test-device" };
+    },
+    window: {
+      localStorage: {
+        getItem: (name) => storage.get(name) ?? null,
+        setItem: (name, value) => storage.set(name, value),
+        removeItem: (name) => storage.delete(name),
+      },
+      location: {
+        protocol: "https:",
+        replace(destination) {
+          // Session cleanup must already be complete when navigation starts.
+          assert.equal(storage.has("moodify.auth.session"), false);
+          assert.equal(storage.has("moodify.auth.user"), false);
+          assert.equal(storage.has("accessToken"), false);
+          assert.equal(storage.has("refreshToken"), false);
+          assert.equal(cookies.size, 0);
+          navigations.push(destination);
+        },
+      },
+    },
+    fetch(url, options) {
+      requests.push({ url, options });
+      return fetch(url, options);
+    },
+  });
+  const auth = {
+    accessToken: token("CONTENT_LEAD"), refreshToken: token("CONTENT_LEAD", "REFRESH"),
+    expiresIn: 3600, refreshExpiresIn: 86400, userId: 1,
+    fullName: "Test", email: "test@example.com", username: "test", role: "CONTENT_LEAD", status: "ACTIVE",
+  };
+  return { client: exports, auth, storage, cookies, requests, navigations };
+}
+
+test("logout clears the session and leaves immediately even when the API stalls or fails", async (t) => {
+  for (const [name, fetch] of [
+    ["pending API", () => new Promise(() => {})],
+    ["offline", () => Promise.reject(new Error("offline"))],
+    ["server error", async () => new Response("Unavailable", { status: 503 })],
+    ["success", async () => new Response(null, { status: 204 })],
+  ]) {
+    await t.test(name, async () => {
+      const { client, auth, storage, cookies, requests, navigations } = browserAuth(fetch);
+      client.saveAuthSession(auth);
+      for (const name of ["accessToken", "refreshToken"]) storage.set(name, "legacy-token");
+      for (const name of ["accessToken", "token"]) cookies.set(name, "legacy-token");
+
+      client.logoutAndRedirect();
+
+      assert.deepEqual(navigations, ["/dashboard/user"]);
+      assert.equal(client.getStoredAuthSession(), null);
+      assert.equal(requests.length, 1);
+      const { url, options } = requests[0];
+      assert.equal(new URL(url).pathname, "/api/auth/logout");
+      assert.equal(options.method, "POST");
+      assert.equal(options.keepalive, true);
+      assert.equal(options.headers.Authorization, `Bearer ${auth.accessToken}`);
+      assert.deepEqual(JSON.parse(options.body), { refreshToken: auth.refreshToken });
+      // Let rejection handlers run; backend failure must not restore the session.
+      await new Promise(setImmediate);
+      assert.equal(client.getStoredAuthSession(), null);
+    });
+  }
+});
+
+test("logout with no local session navigates without trying to refresh tokens", () => {
+  const { client, requests, navigations } = browserAuth(() => new Promise(() => {}));
+  client.logoutAndRedirect();
+  assert.deepEqual(navigations, ["/dashboard/user"]);
+  assert.equal(requests.length, 1);
+  assert.equal(new URL(requests[0].url).pathname, "/api/auth/logout");
+  assert.equal(requests[0].options.headers.Authorization, undefined);
+});
+
+test("a refresh response arriving after logout cannot restore the session", async () => {
+  let finishRefresh;
+  const { client, auth, cookies, navigations } = browserAuth((url) => {
+    if (new URL(url).pathname === "/api/auth/refresh") {
+      return new Promise((resolve) => { finishRefresh = resolve; });
+    }
+    return new Promise(() => {});
+  });
+  client.saveAuthSession({ ...auth, expiresIn: 0 });
+  const pendingToken = client.getValidAccessToken();
+  assert.equal(typeof finishRefresh, "function");
+
+  client.logoutAndRedirect();
+  finishRefresh(new Response(JSON.stringify(auth), { status: 200 }));
+
+  assert.equal(await pendingToken, null);
+  assert.equal(client.getStoredAuthSession(), null);
+  assert.equal(cookies.size, 0);
+  assert.deepEqual(navigations, ["/dashboard/user"]);
+});

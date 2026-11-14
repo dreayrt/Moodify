@@ -267,6 +267,8 @@ export function clearAuthSession() {
 
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
+  window.localStorage.removeItem("accessToken");
+  window.localStorage.removeItem("refreshToken");
 
   // Clear current and legacy cookies so old token names cannot keep routes open.
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
@@ -424,6 +426,18 @@ export async function logout(refreshToken?: string) {
     token,
     body: tokenToRevoke ? { refreshToken: tokenToRevoke } : undefined,
   });
+}
+
+export function logoutAndRedirect() {
+  if (typeof window === "undefined") return;
+
+  // Send revocation with keepalive before leaving, without waiting for the API.
+  void logout().catch((error) => console.warn("Logout error:", error));
+  clearAuthSession();
+
+  // A document navigation discards prefetched authenticated redirects and
+  // remounts the shared player/layout without the previous account's state.
+  window.location.replace("/dashboard/user");
 }
 
 export async function changePassword(
@@ -605,6 +619,7 @@ export interface OcrExtractLicenseResponse {
   copyrightOwner?: string;
   distributorId?: number;
   distributorName?: string;
+  directLicensing?: boolean;
   contractId?: string;
   issueDate?: string;
   expiryDate?: string;
@@ -771,7 +786,7 @@ async function requestJson<T>(
 
   // Auto fallback to getValidAccessToken if token not provided and not a public auth endpoint
   let authToken = token;
-  if (!authToken && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/register") && !path.startsWith("/api/auth/refresh")) {
+  if (!authToken && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/register") && !path.startsWith("/api/auth/refresh") && path !== "/api/auth/logout") {
     authToken = (await getValidAccessToken()) ?? undefined;
   }
 

@@ -7,9 +7,7 @@ import { useState, useEffect } from "react";
 import {
   getCurrentUser,
   getValidAccessToken,
-  clearAuthSession,
-  getStoredAuthSession,
-  logout,
+  logoutAndRedirect,
   type UserProfileResponse,
 } from "@/lib/auth-client";
 import { fetchUserPlaylists, type Playlist } from "@/lib/api-client";
@@ -48,20 +46,8 @@ export function Sidebar() {
     loadData();
   }, [pathname]);
 
-  const handleLogout = async () => {
-    try {
-      const session = getStoredAuthSession();
-      if (session?.refreshToken) {
-        await logout(session.refreshToken);
-      }
-    } catch (err) {
-      console.warn("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      router.push("/");
-    }
+  const handleLogout = () => {
+    logoutAndRedirect();
   };
 
   const handlePlaylistCreated = (newPlaylist: Playlist) => {

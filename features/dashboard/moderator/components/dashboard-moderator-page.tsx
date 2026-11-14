@@ -20,13 +20,11 @@ import {
   ToastMessage,
 } from "../types";
 import {
-  clearAuthSession,
   getCurrentUser,
   getModeratorHistory,
   getModeratorQueue,
-  getStoredAuthSession,
   getValidAccessToken,
-  logout,
+  logoutAndRedirect,
   submitModeratorDecision,
 } from "@/lib/auth/auth-client";
 
@@ -457,21 +455,8 @@ export default function DashboardModeratorPage() {
     }
   };
 
-  const handleLogout = async () => {
-    addToast("Đang đăng xuất khỏi hệ thống kiểm duyệt...", "info");
-    try {
-      const session = getStoredAuthSession();
-      if (session?.refreshToken) {
-        await logout(session.refreshToken);
-      }
-    } catch (err) {
-      console.warn("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      router.push("/");
-    }
+  const handleLogout = () => {
+    logoutAndRedirect();
   };
 
   const handleRefresh = async () => {

@@ -36,6 +36,7 @@ import {
   getCurrentUser,
   getStoredAuthSession,
   getValidAccessToken,
+  logoutAndRedirect,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
 import {
@@ -411,8 +412,7 @@ export default function AdminDashboardPage() {
   const handleLogout = () => {
     if (loggingOut) return;
     setLoggingOut(true);
-    clearAuthSession();
-    window.location.replace(USER_DASHBOARD_ROUTE);
+    logoutAndRedirect();
   };
 
   // ================= BUSINESS ACTIONS =================

@@ -170,6 +170,8 @@ export function TrackUploadModal({
   const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("");
   const [distributorId, setDistributorId] = useState<string>("");
+  const [ocrDistributorName, setOcrDistributorName] = useState<string | null>(null);
+  const [ocrDirectLicensing, setOcrDirectLicensing] = useState(false);
   const [distributionContractCode, setDistributionContractCode] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>(getTodayDateString());
   const [expiryDate, setExpiryDate] = useState<string>(getDefaultExpiryDateString());
@@ -263,12 +265,20 @@ export function TrackUploadModal({
           setCopyrightOwner(res.copyrightOwner);
           fields.push("copyrightOwner");
         }
-        if (res.distributorId !== undefined && res.distributorId !== null) {
+        setOcrDistributorName(res.distributorName || null);
+        setOcrDirectLicensing(Boolean(res.directLicensing));
+        if (res.directLicensing) {
+          setDistributorId("");
+          fields.push("distributorId");
+        } else if (res.distributorId !== undefined && res.distributorId !== null) {
           setDistributorId(String(res.distributorId));
           fields.push("distributorId");
+        } else {
+          // An unmatched name must not silently become self-distribution.
+          setDistributorId(res.distributorName ? "__unresolved__" : "");
         }
+        setDistributionContractCode(res.contractId || "");
         if (res.contractId) {
-          setDistributionContractCode(res.contractId);
           fields.push("contractId");
         }
         if (res.issueDate) {
@@ -316,6 +326,9 @@ export function TrackUploadModal({
     setOcrExtractedFields([]);
     // A newly attached agreement must not inherit a distributor from the previous upload.
     setDistributorId("");
+    setOcrDistributorName(null);
+    setOcrDirectLicensing(false);
+    setDistributionContractCode("");
     setLicenseDocFile(file);
     setLicenseDocName(file.name);
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -416,6 +429,10 @@ export function TrackUploadModal({
       setStepError("Ngày hết hạn phải từ hôm nay trở đi và không được trước ngày cấp. Nếu giấy phép vô thời hạn, hãy chọn “Vô thời hạn”.");
       return;
     }
+    if (distributorId === "__unresolved__") {
+      setStepError("Đơn vị phân phối đọc từ tài liệu chưa khớp danh sách. Vui lòng chọn đơn vị phân phối phù hợp.");
+      return;
+    }
     if (distributorId && !distributionContractCode.trim()) {
       setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
       return;
@@ -456,9 +473,9 @@ export function TrackUploadModal({
       if (acquisitionCostVnd !== "") formData.append("acquisitionCostVnd", acquisitionCostVnd);
       if (distributorId && distributorId !== "0") {
         formData.append("distributorId", distributorId);
-        if (distributionContractCode.trim()) {
-          formData.append("distributionContractCode", distributionContractCode.trim());
-        }
+      }
+      if (distributionContractCode.trim()) {
+        formData.append("distributionContractCode", distributionContractCode.trim());
       }
       formData.append("issueDate", issueDate);
       if (!isPerpetual && expiryDate) {
@@ -475,7 +492,7 @@ export function TrackUploadModal({
         distributorId: distributorId ? Number(distributorId) : null,
         // This local model field is a database FK; the OCR contract code is a document reference, not an ID.
         distributionContractId: null,
-        distributionContractCode: distributorId ? distributionContractCode.trim() || null : null,
+        distributionContractCode: distributionContractCode.trim() || null,
         licenseType,
         acquisitionCostVnd: savedResponse.acquisitionCostVnd ?? null,
         copyrightOwner: copyrightOwner.trim(),
@@ -552,9 +569,12 @@ export function TrackUploadModal({
     setShowAdvanced(false);
 
     // Reset license states
+    ocrRequestRef.current += 1;
     setLicenseType("DIGITAL_STREAMING");
     setCopyrightOwner("Independent Artist");
     setDistributorId("");
+    setOcrDistributorName(null);
+    setOcrDirectLicensing(false);
     setDistributionContractCode("");
     setIssueDate(getTodayDateString());
     setExpiryDate(getDefaultExpiryDateString());
@@ -1209,17 +1229,33 @@ export function TrackUploadModal({
                       <div className="relative">
                         <select
                           value={distributorId}
-                          onChange={(e) => setDistributorId(e.target.value)}
+                          onChange={(e) => {
+                            setDistributorId(e.target.value);
+                            setOcrDistributorName(null);
+                            setOcrDirectLicensing(false);
+                          }}
                           className="w-full appearance-none rounded-xl border border-white/10 bg-[#17181f] px-3 py-2 text-[13px] text-white outline-none focus:border-[#ff8b4d]/50 transition cursor-pointer"
                         >
+                          {distributorId === "__unresolved__" && (
+                            <option value="__unresolved__" disabled>Chọn đơn vị phân phối phù hợp</option>
+                          )}
+                          {distributorId && distributorId !== "__unresolved__" && !DISTRIBUTOR_OPTIONS.some((dist) => dist.id === distributorId) && (
+                            <option value={distributorId}>{ocrDistributorName || `Đơn vị #${distributorId}`}</option>
+                          )}
                           {DISTRIBUTOR_OPTIONS.map((dist) => (
                             <option key={dist.id} value={dist.id} className="bg-[#121318] text-white">
-                              #{dist.id} - {dist.name}
+                              {dist.id ? `#${dist.id} - ` : ""}{dist.name}
                             </option>
                           ))}
                         </select>
                         <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 pointer-events-none text-white/40" />
                       </div>
+                      {ocrDirectLicensing && (
+                        <p className="mt-1.5 text-[11px] text-emerald-300">Đã nhận diện cấp quyền trực tiếp, không qua đơn vị phân phối.</p>
+                      )}
+                      {distributorId === "__unresolved__" && ocrDistributorName && (
+                        <p className="mt-1.5 text-[11px] text-amber-300">Đã đọc “{ocrDistributorName}”, nhưng chưa khớp đơn vị trong danh sách. Vui lòng chọn lại.</p>
+                      )}
                     </div>
 
                     {/* Distribution Contract ID */}

@@ -18,11 +18,10 @@ import { LogoMark, BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
   getCurrentUser,
-  getStoredAuthSession,
   getValidAccessToken,
   login as loginRequest,
   loginWithGoogleCode as loginWithGoogleCodeRequest,
-  logout as logoutRequest,
+  logoutAndRedirect,
   register as registerRequest,
   saveAuthSession,
   uploadAvatar,
@@ -638,23 +637,7 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
   };
 
   const handleLogout = () => {
-    const submitLogout = async () => {
-      const session = getStoredAuthSession();
-
-      if (session) {
-        try {
-          await logoutRequest(session.refreshToken);
-        } catch {
-          // Stateless backend may already consider the client logged out.
-        }
-      }
-
-      clearAuthSession();
-      setAuthUser(null);
-      setAuthMessage("Bạn đã đăng xuất.");
-    };
-
-    void submitLogout();
+    logoutAndRedirect();
   };
 
   const isSignInComplete =

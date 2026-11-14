@@ -28,9 +28,7 @@ import {
 import {
   getCurrentUser,
   getValidAccessToken,
-  clearAuthSession,
-  getStoredAuthSession,
-  logout,
+  logoutAndRedirect,
   registerCurrentDevice,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
@@ -429,17 +427,7 @@ function MascotAccountTrigger({
 
   const handleLogout = () => {
     setOpen(false);
-
-    const session = getStoredAuthSession();
-    if (session?.refreshToken) {
-      void logout(session.refreshToken).catch((err) => console.error("Logout error:", err));
-    }
-
-    clearAuthSession();
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    // Remount the shared dashboard and its account-dependent state after logout.
-    window.location.replace("/dashboard/user");
+    logoutAndRedirect();
   };
 
   const displayName = user?.fullName || user?.username || "Người dùng Moodify";
