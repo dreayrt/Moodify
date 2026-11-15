@@ -738,15 +738,6 @@ export default function KaraokeSoloPage() {
         </div>
       </section>
 
-      <div className={styles.previewBanner} role="note">
-        <Sparkles size={18} aria-hidden="true" />
-        <span>
-          <strong>Lời chuyển theo mốc câu có sẵn.</strong> Câu hát bám theo thời
-          gian phát nhạc và đổi mềm; bài thiếu mốc LRC sẽ không bị tự đoán thời
-          điểm.
-        </span>
-      </div>
-
       <section className={styles.soloStage} aria-label="Sân khấu karaoke">
         <div className={styles.stageAura} aria-hidden="true" />
         <div className={styles.stageTopline}>
