@@ -542,7 +542,6 @@ function TrackRow({
                 imageUrl: track.cover,
               }
             }
-            onShowLyrics={onClick}
             onClose={() => setIsExpanded(false)}
           />
         </div>

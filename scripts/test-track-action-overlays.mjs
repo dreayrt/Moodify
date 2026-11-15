@@ -46,14 +46,12 @@ window.calls=[];
 const playlist={id:'playlist-1',name:'Nhạc yêu thích',tracks:[]};
 function require(id){
  if(cache[id])return cache[id].exports;
- if(id==='./player-context')return {usePlayer:()=>({playTrack:()=>window.calls.push('play'),addToQueue:()=>window.calls.push('queue')})};
  if(id==='./realtime-lyrics')return {parseLyrics:()=>[]};
  if(id==='@/lib/api-client')return {
-  isTrackInLibrary:async()=>false,addToLibrary:async()=>{},removeFromLibrary:async()=>{},
+  isTrackInLibrary:async()=>false,addToLibrary:async()=>window.calls.push('like'),removeFromLibrary:async()=>window.calls.push('unlike'),
   fetchUserPlaylists:async()=>[playlist],
   addTrackToPlaylist:async(id,trackId)=>{window.calls.push(['add',id,trackId]);return playlist},
-  createPlaylist:async data=>{window.calls.push(['create',data.name]);return {...playlist,id:'new-playlist',name:data.name}},
-  downloadTrackFile:async()=>window.calls.push('download')
+  createPlaylist:async data=>{window.calls.push(['create',data.name]);return {...playlist,id:'new-playlist',name:data.name}}
  };
  const m={exports:{}};cache[id]=m;factories[id](m,m.exports,require);return m.exports;
 }
@@ -63,7 +61,7 @@ function Fixture(){
  return React.createElement('main',{style:{padding:24}},
   React.createElement('h1',null,'Moodify — kiểm tra thao tác bài hát'),
   React.createElement(require('menu').default,{track,isLiked:false}),
-  React.createElement(require('menu').default,{track,isLiked:false,onShowLyrics:()=>window.calls.push('lyrics')}));
+  React.createElement(require('menu').default,{track:{...track,name:'Tên bài hát rất dài để kiểm tra menu trên màn hình điện thoại'},isLiked:false,onRemoveFromPlaylist:()=>window.calls.push('remove')}));
 }
 require('react-dom/client').createRoot(document.getElementById('root')).render(React.createElement(Fixture));
 `;
@@ -83,11 +81,25 @@ try {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1'
     ? route.continue() : route.abort());
   const visibleAction = page.getByTitle('Thêm vào Playlist', { exact: true });
-  for (const [width, height] of [[1440, 900], [390, 844], [812, 375]]) {
+  for (const [width, height] of [[1440, 900], [320, 568], [390, 844], [812, 375]]) {
     await page.setViewportSize({ width, height });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     const trigger = page.getByRole('button', { name: 'Tùy chọn bài hát', exact: true }).first();
     await trigger.click();
+    const panel = page.getByRole('group', { name: 'Thao tác bài hát', exact: true });
+    await panel.waitFor();
+    assert.equal(await panel.getByRole('button').count(), 4, 'only close, like, playlist and Story remain');
+    assert.equal(await panel.getByRole('button', { name: /Xem lời bài hát|Hàng chờ|Tải MP3/i }).count(), 0,
+      'removed actions are absent');
+    const bounds = await panel.locator('..').boundingBox();
+    assert.ok(bounds.x >= 15 && bounds.y >= 15 && bounds.x + bounds.width <= width - 15 && bounds.y + bounds.height <= height - 15,
+      'menu fits the viewport');
+    await page.screenshot({ path: path.join(output, `menu-${width}.png`), animations: 'disabled' });
+    await panel.getByRole('button', { name: /^Yêu thích/ }).click();
+    assert.equal(await panel.getByRole('button', { name: /^Bỏ yêu thích/ }).getAttribute('aria-pressed'), 'true');
+    await panel.getByRole('button', { name: /^Bỏ yêu thích/ }).click();
+    assert.ok(await page.evaluate(() => window.calls.includes('like') && window.calls.includes('unlike')),
+      'like and unlike still reach the API');
     await visibleAction.click();
     const addDialog = page.getByRole('dialog', { name: 'Thêm vào Playlist', exact: true });
     await addDialog.waitFor();
@@ -121,23 +133,23 @@ try {
     }
     await storyDialog.getByRole('button', { name: 'Đóng hộp thoại Story', exact: true }).click();
     await visibleAction.waitFor({ state: 'visible' });
-    await page.getByTitle('Thêm vào danh sách chờ', { exact: true }).click();
-    assert.ok(await page.evaluate(() => window.calls.includes('queue')), 'queue still works');
-    await page.getByRole('button', { name: /Xem Lời Bài Hát/ }).click();
-    assert.equal(await visibleAction.isVisible(), false, 'lyrics action closes menu');
-    assert.ok(await page.evaluate(() => window.calls.includes('play')), 'default lyrics action starts playback');
-    const lyricsTrigger = page.getByRole('button', { name: 'Tùy chọn bài hát', exact: true }).nth(1);
-    await lyricsTrigger.click();
-    await page.getByRole('button', { name: /Xem Lời Bài Hát/ }).click();
-    assert.ok(await page.evaluate(() => window.calls.includes('lyrics')), 'custom lyrics callback runs');
-    assert.equal(await lyricsTrigger.getAttribute('aria-expanded'), 'false', 'custom lyrics closes menu');
+    await page.getByRole('button', { name: 'Đóng tùy chọn', exact: true }).click();
+    const playlistTrigger = page.getByRole('button', { name: 'Tùy chọn bài hát', exact: true }).nth(1);
+    await playlistTrigger.evaluate(el => { el.style.position = 'fixed'; el.style.bottom = '8px'; el.style.right = '8px'; });
+    await playlistTrigger.click();
+    const playlistBounds = await panel.locator('..').boundingBox();
+    assert.ok(playlistBounds.x >= 15 && playlistBounds.y >= 15 && playlistBounds.x + playlistBounds.width <= width - 15 && playlistBounds.y + playlistBounds.height <= height - 15,
+      'menu with optional removal action fits near bottom right');
+    await panel.getByTitle('Xóa khỏi playlist', { exact: true }).click();
+    assert.ok(await page.evaluate(() => window.calls.includes('remove')), 'playlist removal still works');
+    assert.equal(await playlistTrigger.getAttribute('aria-expanded'), 'false', 'removal closes menu');
     await trigger.click();
     await page.keyboard.press('Escape');
     assert.equal(await trigger.getAttribute('aria-expanded'), 'false', 'Escape still dismisses menu');
     await trigger.click();
     await page.mouse.click(width - 5, height - 5);
     assert.equal(await trigger.getAttribute('aria-expanded'), 'false', 'outside click still dismisses menu');
-    console.log(`PASS ${width}x${height}: playlist, create/cancel, Story, queue, lyrics, menu dismissal`);
+    console.log(`PASS ${width}x${height}: three-action layout, favorites, playlist, create/cancel, Story, removal, dismissal`);
   }
   assert.deepEqual(errors, [], 'no browser runtime errors');
 } finally {
