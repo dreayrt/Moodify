@@ -102,6 +102,7 @@ export function TrackInlineActions({
   onShowLyrics,
   onRemoveFromPlaylist,
   onClose,
+  onModalOpenChange,
   className = "",
 }: {
   track: any;
@@ -110,15 +111,23 @@ export function TrackInlineActions({
   onShowLyrics?: () => void;
   onRemoveFromPlaylist?: () => void;
   onClose?: () => void;
+  onModalOpenChange?: (isOpen: boolean) => void;
   className?: string;
 }) {
   const [liked, setLiked] = useState<boolean>(initialLiked ?? false);
   const [copied, setCopied] = useState(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const isModalOpen = isPlaylistModalOpen || isShareModalOpen;
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [heartParticles, setHeartParticles] = useState<{ id: number; left: number }[]>([]);
 
   const { playTrack, addToQueue } = usePlayer();
+
+  // Keep modal state mounted while suspending the menu's backdrop and dismissal.
+  useEffect(() => {
+    onModalOpenChange?.(isModalOpen);
+  }, [isModalOpen, onModalOpenChange]);
 
   const trackSpotifyId = track.spotifyId || track.id || "";
   const trackTitle = track.title || track.name || "Bài hát";
@@ -259,6 +268,7 @@ export function TrackInlineActions({
       };
       playTrack(normalizedTrack);
     }
+    onClose?.();
   };
 
   const handleCopyLink = (e: React.MouseEvent) => {
@@ -273,7 +283,6 @@ export function TrackInlineActions({
     });
   };
 
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownload = async (e: React.MouseEvent) => {
@@ -327,6 +336,7 @@ export function TrackInlineActions({
     <div
       style={{
         animation: "modularEntrance 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        display: isModalOpen ? "none" : undefined,
       }}
       className={`w-full flex flex-col gap-2 select-none ${className}`}
       onClick={(e) => e.stopPropagation()}
@@ -617,6 +627,7 @@ export default function TrackActionMenu({
   iconClassName = "",
 }: TrackActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isChildModalOpen, setIsChildModalOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
 
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -624,7 +635,7 @@ export default function TrackActionMenu({
 
   // Handle outside clicks to close the dropdown
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isChildModalOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -649,7 +660,7 @@ export default function TrackActionMenu({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, isChildModalOpen]);
 
   const handleToggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -698,6 +709,7 @@ export default function TrackActionMenu({
         } ${className}`}
         title={isOpen ? "Đóng tùy chọn" : "Mở rộng tùy chọn bài hát"}
         aria-label="Tùy chọn bài hát"
+        aria-expanded={isOpen}
       >
         <ChevronDown
           className={`w-4 h-4 pointer-events-none transition-transform duration-300 ${iconClassName}`}
@@ -706,7 +718,7 @@ export default function TrackActionMenu({
       </button>
 
       {/* Backdrop catcher */}
-      {isOpen &&
+      {isOpen && !isChildModalOpen &&
         typeof document !== "undefined" &&
         createPortal(
           <div
@@ -738,6 +750,7 @@ export default function TrackActionMenu({
               onShowLyrics={onShowLyrics}
               onRemoveFromPlaylist={onRemoveFromPlaylist}
               onClose={() => setIsOpen(false)}
+              onModalOpenChange={setIsChildModalOpen}
             />
           </div>,
           document.body

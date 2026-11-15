@@ -552,12 +552,13 @@ export default function ShareSongCardModal({
 
   return typeof document !== "undefined"
     ? createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div role="dialog" aria-modal="true" aria-label="Tạo Story bài hát" className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-4xl max-h-[92vh] overflow-hidden rounded-3xl bg-slate-950/95 border border-white/15 shadow-[0_25px_70px_rgba(0,0,0,0.85)] flex flex-col md:flex-row">
             {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
+              aria-label="Đóng hộp thoại Story"
               className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
