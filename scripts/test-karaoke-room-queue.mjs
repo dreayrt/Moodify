@@ -110,13 +110,20 @@ try {
   await page.getByRole("dialog").getByRole("button", { name: /3 Phải 6 Đừng/ }).click();
   assert.ok(await page.getByRole("button", { name: "Bài này đã có trong hàng đợi của bạn" }).isDisabled(), "duplicate own songs are blocked");
   await page.getByRole("dialog").getByRole("button", { name: "Đóng", exact: true }).click();
-  for (const width of [1512, 390, 320]) {
+  const closeNotice = page.getByRole("button", { name: "Đóng thông báo", exact: true });
+  if (await closeNotice.count()) await closeNotice.click();
+  for (const width of [1512, 1040, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
+    await page.locator(".room_queueCard").screenshot({ path: path.join(output, `host-${width}.png`) });
     assert.equal(await page.evaluate(() => {
       const card = document.querySelector('.room_queueCard').getBoundingClientRect();
       return [...document.querySelectorAll('.room_queueItem button')].some(el => {const r=el.getBoundingClientRect();return r.x<card.x || r.right>card.right;});
     }), false, `queue buttons fit at ${width}px`);
-    await page.locator(".room_queueCard").screenshot({ path: path.join(output, `host-${width}.png`) });
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('.room_queueItem')].some(row => {
+      const info = row.querySelector('.room_queueInfo').getBoundingClientRect();
+      const actions = row.querySelector('.room_queueActions').getBoundingClientRect();
+      return info.x < actions.right && info.right > actions.x && info.y < actions.bottom && info.bottom > actions.y;
+    })), false, `song details and actions do not overlap at ${width}px`);
   }
   await page.setViewportSize({ width: 1512, height: 1000 });
   await page.getByRole("button", { name: "Rút Bài hát thứ ba", exact: true }).click();

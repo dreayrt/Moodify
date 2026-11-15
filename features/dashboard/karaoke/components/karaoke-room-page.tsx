@@ -25,6 +25,7 @@ import {
   SkipForward,
   Sparkles,
   Trophy,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -1253,40 +1254,48 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                         · {durationLabel(item.durationMs)}
                       </span>
                     </div>
-                    {room.canManage && (
-                      <div className={styles.queueMoveActions}>
+                    {(item.requestedByMe || room.canManage) && (
+                      <div
+                        className={styles.queueActions}
+                        role="group"
+                        aria-label={`Thao tác với ${item.title}`}
+                      >
+                        {room.canManage && (
+                          <>
+                            <button
+                              type="button"
+                              className={styles.queueMoveIcon}
+                              onClick={() => void moveRequest(item, "UP")}
+                              disabled={busy || index === 0}
+                              aria-label={`Chuyển ${item.title} lên trên`}
+                              title="Chuyển lên trên"
+                            >
+                              <ChevronUp size={16} strokeWidth={1.8} />
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.queueMoveIcon}
+                              onClick={() => void moveRequest(item, "DOWN")}
+                              disabled={busy || index === room.queue.length - 1}
+                              aria-label={`Chuyển ${item.title} xuống dưới`}
+                              title="Chuyển xuống dưới"
+                            >
+                              <ChevronDown size={16} strokeWidth={1.8} />
+                            </button>
+                            <span className={styles.queueActionDivider} aria-hidden="true" />
+                          </>
+                        )}
                         <button
                           type="button"
-                          className={styles.queueMoveIcon}
-                          onClick={() => void moveRequest(item, "UP")}
-                          disabled={busy || index === 0}
-                          aria-label={`Chuyển ${item.title} lên trên`}
-                          title="Chuyển lên trên"
+                          className={styles.queueRemoveIcon}
+                          onClick={() => void removeRequest(item)}
+                          disabled={busy}
+                          aria-label={`Rút ${item.title}`}
+                          title="Rút bài khỏi hàng đợi"
                         >
-                          <ChevronUp size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.queueMoveIcon}
-                          onClick={() => void moveRequest(item, "DOWN")}
-                          disabled={busy || index === room.queue.length - 1}
-                          aria-label={`Chuyển ${item.title} xuống dưới`}
-                          title="Chuyển xuống dưới"
-                        >
-                          <ChevronDown size={16} />
+                          <Trash2 size={14} strokeWidth={1.8} />
                         </button>
                       </div>
-                    )}
-                    {(item.requestedByMe || room.canManage) && (
-                      <button
-                        type="button"
-                        className={styles.queueRemoveIcon}
-                        onClick={() => void removeRequest(item)}
-                        disabled={busy}
-                        aria-label={`Rút ${item.title}`}
-                      >
-                        <X size={15} />
-                      </button>
                     )}
                   </div>
                 ))}
@@ -1312,8 +1321,9 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 <span aria-hidden="true">›</span>
               </button>
               <p className={styles.queueNote}>
-                Bạn có thể thêm nhiều bài hát và rút từng bài bằng nút ×.
-                {room.canManage && " Dùng nút ↑ ↓ để đổi thứ tự phát."}
+                {room.canManage
+                  ? "Thêm bài bạn thích, dùng mũi tên để đổi thứ tự phát."
+                  : "Bạn có thể thêm nhiều bài và rút từng bài trong danh sách."}
               </p>
             </div>
           </section>
