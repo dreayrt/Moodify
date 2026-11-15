@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { AppDownloadFooter } from "@/components/shared/app-download-footer";
 import {
   Play,
   Pause,
@@ -541,7 +542,6 @@ function TrackRow({
                 imageUrl: track.cover,
               }
             }
-            onShowLyrics={onClick}
             onClose={() => setIsExpanded(false)}
           />
         </div>
@@ -666,6 +666,8 @@ function LumenHeroContent() {
   const [hoveredTrackIdx, setHoveredTrackIdx] = useState<number | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
+  const [tracksLoadError, setTracksLoadError] = useState<string | null>(null);
+  const [tracksRetryKey, setTracksRetryKey] = useState(0);
 
   // Determine the track currently in spotlight (hovered > playing > selected by index > first track)
   const activeSelectedTrack =
@@ -780,46 +782,21 @@ function LumenHeroContent() {
     }));
   };
 
-  // Fetch tracks whose MongoDB `genres` array contains any of the target genres,
-  // paging through the entire catalog instead of stopping at a single 50-item page.
-  const CATALOG_PAGE_SIZE = 100;
-
-  const fetchAllCatalogTracks = async (params?: { genre?: string }): Promise<ApiTrack[]> => {
-    const first = await fetchTracks({ size: CATALOG_PAGE_SIZE, ...params });
-    const collected: ApiTrack[] = [...first.content];
-    const remainingPages = Math.max((first.totalPages ?? 1) - 1, 0);
-    if (remainingPages > 0) {
-      const rest = await Promise.all(
-        Array.from({ length: remainingPages }, (_, i) =>
-          fetchTracks({ page: i + 1, size: CATALOG_PAGE_SIZE, ...params })
-            .then((r) => r.content)
-            .catch(() => [] as ApiTrack[])
-        )
-      );
-      for (const part of rest) {
-        collected.push(...part);
-      }
+  // Fetch tracks whose MongoDB `genres` array contains any of the target genres in a single unified request.
+  const fetchByGenres = async (genres: string[], size: number = 50): Promise<ApiTrack[]> => {
+    if (activeVibe === "all") {
+      const resp = await fetchTracks({ size });
+      return resp.content;
     }
-    return collected;
-  };
 
-  const fetchByGenres = async (genres: string[]): Promise<ApiTrack[]> => {
-    try {
-      if (activeVibe === "all") {
-        return await fetchAllCatalogTracks();
-      }
-
-      const items = await fetchAllCatalogTracks({ genre: genres.join(",") });
-      if (items.length > 0) {
-        return items;
-      }
-
-      // If specific genre returned 0 tracks, fallback to general tracks from catalog
-      return await fetchAllCatalogTracks();
-    } catch (err) {
-      console.error("Failed to fetch tracks:", err);
-      return [];
+    const resp = await fetchTracks({ genre: genres.join(","), size });
+    if (resp.content && resp.content.length > 0) {
+      return resp.content;
     }
+
+    // If specific genre returned 0 tracks, fallback to general tracks from catalog
+    const fallback = await fetchTracks({ size });
+    return fallback.content;
   };
 
   // Fetch tracks when vibe changes
@@ -827,6 +804,7 @@ function LumenHeroContent() {
     let cancelled = false;
     (async () => {
       setTracksLoading(true);
+      setTracksLoadError(null);
       try {
         const genres = VIBE_TO_GENRES[activeVibe] ?? [activeVibe];
         const items = await fetchByGenres(genres);
@@ -838,6 +816,7 @@ function LumenHeroContent() {
         console.error("Failed to fetch tracks:", error);
         if (!cancelled) {
           setTracks([]);
+          setTracksLoadError(error instanceof Error ? error.message : "Unknown track loading error");
           setActiveTrackIdx(0);
         }
       } finally {
@@ -849,7 +828,7 @@ function LumenHeroContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeVibe]);
+  }, [activeVibe, tracksRetryKey]);
 
   // Public Albums State
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -983,6 +962,25 @@ function LumenHeroContent() {
   }
 
   if (tracks.length === 0) {
+    if (tracksLoadError) {
+      return (
+        <div className="text-center py-24" role="alert">
+          <div className="text-white/80 text-xl mb-2">Không tải được danh sách nhạc</div>
+          <div className="text-white/50 text-sm mb-4">
+            Hãy kiểm tra backend và kết nối cơ sở dữ liệu, rồi thử lại.
+          </div>
+          <div className="text-white/30 text-xs mb-5">{tracksLoadError}</div>
+          <button
+            type="button"
+            onClick={() => setTracksRetryKey((key) => key + 1)}
+            className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+          >
+            Thử tải lại
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="text-center py-24">
         <div className="text-white/80 text-xl mb-2">Chưa có bài hát nào</div>
@@ -1030,7 +1028,6 @@ function LumenHeroContent() {
                     : "text-white/60 hover:text-white"
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>Khám phá thể loại</span>
               </button>
             </div>
@@ -1293,33 +1290,7 @@ function LumenHeroContent() {
       {/* ========================================================================= */}
       {/* BOX 1: DÀNH RIÊNG CHO BẠN (Made For You / Based on your listening)        */}
       {/* ========================================================================= */}
-      <div className="anim-fade-up">
-        <SectionHeader
-          eyebrow="MADE FOR YOU"
-          title="Dành riêng cho bạn"
-          subtitle="Giai điệu dựa trên thói quen nghe nhạc gần đây của bạn"
-          onSeeAll={() => handleVibeChange("all")}
-          seeAllText="Khám phá thêm"
-        />
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {(tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath).length >= 6
-            ? tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath)
-            : tracks
-          )
-            .slice(0, 6)
-            .map((t, idx) => (
-              <SquareMusicCard
-                key={`mfy-${t.spotifyId || idx}`}
-                track={t}
-                isCurrent={currentTrack?.spotifyId === t.spotifyId}
-                isPlaying={Boolean(isPlaying && currentTrack?.spotifyId === t.spotifyId)}
-                onPlay={() => handlePlayTrack(t, idx)}
-                vipTheme={activeVipTheme}
-              />
-            ))}
-        </div>
-      </div>
+      <div id="for-you" className="anim-fade-up scroll-mt-24"><RecommendationSections /></div>
 
       {/* ========================================================================= */}
       {/* BOX 2: HÔM NAY NGHE GÌ? - BẢNG XẾP HẠNG TOP HITS (Spotify Charts)          */}
@@ -1657,14 +1628,17 @@ function LumenHeroContent() {
 
 export default function LumenHero() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-24 text-white/60">
-          Đang tải...
-        </div>
-      }
-    >
-      <LumenHeroContent />
-    </Suspense>
+    <>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-24 text-white/60">
+            Đang tải...
+          </div>
+        }
+      >
+        <LumenHeroContent />
+      </Suspense>
+      <AppDownloadFooter />
+    </>
   );
 }

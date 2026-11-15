@@ -25,6 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { uploadArtistTrack, extractLicenseFromDoc } from "@/lib/auth/auth-client";
+import { parseLyricsContent, readLyricsFile } from "@/lib/lyrics-import";
 import {
   ArtistTrack,
   LicenseStatus,
@@ -129,6 +130,8 @@ export function TrackUploadModal({
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const lyricsInputRef = useRef<HTMLInputElement>(null);
+  const lyricsRequestRef = useRef(0);
   const licenseDocInputRef = useRef<HTMLInputElement>(null);
   const trackCounterRef = useRef<number>(100);
 
@@ -158,12 +161,17 @@ export function TrackUploadModal({
   const status: TrackStatus = "draft";
   const [visibility, setVisibility] = useState<TrackVisibility>("public");
   const [lyrics, setLyrics] = useState("");
+  const [lyricsFileName, setLyricsFileName] = useState("");
+  const [lyricsError, setLyricsError] = useState<string | null>(null);
+  const [isImportingLyrics, setIsImportingLyrics] = useState(false);
   const [description, setDescription] = useState("");
 
   // Step 2: License Metadata matching MySQL `song_licenses` table
   const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("");
   const [distributorId, setDistributorId] = useState<string>("");
+  const [ocrDistributorName, setOcrDistributorName] = useState<string | null>(null);
+  const [ocrDirectLicensing, setOcrDirectLicensing] = useState(false);
   const [distributionContractCode, setDistributionContractCode] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>(getTodayDateString());
   const [expiryDate, setExpiryDate] = useState<string>(getDefaultExpiryDateString());
@@ -185,6 +193,23 @@ export function TrackUploadModal({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleLyricsImport = async (file: File) => {
+    const requestId = ++lyricsRequestRef.current;
+    setIsImportingLyrics(true);
+    setLyricsError(null);
+    try {
+      const imported = await readLyricsFile(file);
+      if (requestId !== lyricsRequestRef.current) return;
+      setLyrics(imported.content);
+      setLyricsFileName(file.name);
+    } catch (error) {
+      if (requestId !== lyricsRequestRef.current) return;
+      setLyricsError(error instanceof Error ? error.message : "lyricsReadError");
+    } finally {
+      if (requestId === lyricsRequestRef.current) setIsImportingLyrics(false);
+    }
+  };
 
   const handleAudioFile = (file: File) => {
     setAudioFile(file);
@@ -240,12 +265,20 @@ export function TrackUploadModal({
           setCopyrightOwner(res.copyrightOwner);
           fields.push("copyrightOwner");
         }
-        if (res.distributorId !== undefined && res.distributorId !== null) {
+        setOcrDistributorName(res.distributorName || null);
+        setOcrDirectLicensing(Boolean(res.directLicensing));
+        if (res.directLicensing) {
+          setDistributorId("");
+          fields.push("distributorId");
+        } else if (res.distributorId !== undefined && res.distributorId !== null) {
           setDistributorId(String(res.distributorId));
           fields.push("distributorId");
+        } else {
+          // An unmatched name must not silently become self-distribution.
+          setDistributorId(res.distributorName ? "__unresolved__" : "");
         }
+        setDistributionContractCode(res.contractId || "");
         if (res.contractId) {
-          setDistributionContractCode(res.contractId);
           fields.push("contractId");
         }
         if (res.issueDate) {
@@ -291,6 +324,11 @@ export function TrackUploadModal({
     setAcquisitionCostVnd("");
     setCostEvidence("");
     setOcrExtractedFields([]);
+    // A newly attached agreement must not inherit a distributor from the previous upload.
+    setDistributorId("");
+    setOcrDistributorName(null);
+    setOcrDirectLicensing(false);
+    setDistributionContractCode("");
     setLicenseDocFile(file);
     setLicenseDocName(file.name);
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -336,6 +374,14 @@ export function TrackUploadModal({
 
   const handleNextStep = (e: React.MouseEvent | React.FormEvent) => {
     e.preventDefault();
+    if (isImportingLyrics) return;
+    try {
+      parseLyricsContent(lyrics);
+    } catch {
+      setLyricsError("lyricsInvalidLrc");
+      setShowAdvanced(true);
+      return;
+    }
     if (!title || title.trim() === "") {
       setTitle(selectedFileName ? selectedFileName.replace(/\.[^/.]+$/, "") : "Bản phối mới (New Track)");
     }
@@ -350,6 +396,7 @@ export function TrackUploadModal({
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isImportingLyrics) return;
     if (isExtractingOcr) {
       setStepError("Vui lòng chờ OCR đọc xong tài liệu bản quyền.");
       return;
@@ -382,6 +429,10 @@ export function TrackUploadModal({
       setStepError("Ngày hết hạn phải từ hôm nay trở đi và không được trước ngày cấp. Nếu giấy phép vô thời hạn, hãy chọn “Vô thời hạn”.");
       return;
     }
+    if (distributorId === "__unresolved__") {
+      setStepError("Đơn vị phân phối đọc từ tài liệu chưa khớp danh sách. Vui lòng chọn đơn vị phân phối phù hợp.");
+      return;
+    }
     if (distributorId && !distributionContractCode.trim()) {
       setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
       return;
@@ -393,6 +444,7 @@ export function TrackUploadModal({
     const finalTitle = title.trim() || selectedFileName || "Untitled Track";
 
     try {
+      const parsedLyrics = parseLyricsContent(lyrics);
       const formData = new FormData();
       if (audioFile) {
         formData.append("audioFile", audioFile);
@@ -411,7 +463,8 @@ export function TrackUploadModal({
       formData.append("status", status);
       formData.append("visibility", visibility);
       formData.append("explicit", String(explicit));
-      formData.append("lyricsPlain", lyrics.trim());
+      formData.append("lyricsPlain", parsedLyrics.lyricsPlain);
+      formData.append("lyricsSynced", parsedLyrics.lyricsSynced);
       formData.append("description", description.trim());
 
       // License Info
@@ -420,9 +473,9 @@ export function TrackUploadModal({
       if (acquisitionCostVnd !== "") formData.append("acquisitionCostVnd", acquisitionCostVnd);
       if (distributorId && distributorId !== "0") {
         formData.append("distributorId", distributorId);
-        if (distributionContractCode.trim()) {
-          formData.append("distributionContractCode", distributionContractCode.trim());
-        }
+      }
+      if (distributionContractCode.trim()) {
+        formData.append("distributionContractCode", distributionContractCode.trim());
       }
       formData.append("issueDate", issueDate);
       if (!isPerpetual && expiryDate) {
@@ -439,7 +492,7 @@ export function TrackUploadModal({
         distributorId: distributorId ? Number(distributorId) : null,
         // This local model field is a database FK; the OCR contract code is a document reference, not an ID.
         distributionContractId: null,
-        distributionContractCode: distributorId ? distributionContractCode.trim() || null : null,
+        distributionContractCode: distributionContractCode.trim() || null,
         licenseType,
         acquisitionCostVnd: savedResponse.acquisitionCostVnd ?? null,
         copyrightOwner: copyrightOwner.trim(),
@@ -466,7 +519,8 @@ export function TrackUploadModal({
         albumName: albumName.trim() || undefined,
         featuredArtists: featuredArtists.trim() || undefined,
         explicit,
-        lyricsPlain: lyrics.trim() || undefined,
+        lyricsPlain: parsedLyrics.lyricsPlain || undefined,
+        lyricsSynced: parsedLyrics.lyricsSynced || undefined,
         description: description.trim() || undefined,
         license: songLicense,
         moderationStatus: "pending",
@@ -507,13 +561,20 @@ export function TrackUploadModal({
     setExplicit(false);
     setVisibility("public");
     setLyrics("");
+    lyricsRequestRef.current += 1;
+    setLyricsFileName("");
+    setLyricsError(null);
+    setIsImportingLyrics(false);
     setDescription("");
     setShowAdvanced(false);
 
     // Reset license states
+    ocrRequestRef.current += 1;
     setLicenseType("DIGITAL_STREAMING");
     setCopyrightOwner("Independent Artist");
-    setDistributorId("1");
+    setDistributorId("");
+    setOcrDistributorName(null);
+    setOcrDirectLicensing(false);
     setDistributionContractCode("");
     setIssueDate(getTodayDateString());
     setExpiryDate(getDefaultExpiryDateString());
@@ -602,10 +663,8 @@ export function TrackUploadModal({
 
             <button
               type="button"
-              onClick={() => {
-                setStepError(null);
-                setCurrentStep(2);
-              }}
+              onClick={handleNextStep}
+              disabled={isImportingLyrics}
               className={`flex items-center justify-center gap-2 py-2.5 px-4 font-medium transition border-b-2 ${
                 currentStep === 2
                   ? "border-[#ff7a2c] text-[#ffb488] bg-[#ff7a2c]/5"
@@ -907,13 +966,32 @@ export function TrackUploadModal({
                     {showAdvanced && (
                       <div className="p-3 pt-0 space-y-2.5 border-t border-white/6 animate-in fade-in duration-200">
                         <div>
-                          <label className="block text-[10px] font-medium text-white/50 mb-1">
-                            {t("dashboard.artist.trackCatalog.modal.lyrics")}
-                          </label>
+                          <div className="flex items-center justify-between gap-2 py-2">
+                            <label htmlFor="track-upload-lyrics" className="text-[10px] font-medium text-white/50">
+                              {t("dashboard.artist.trackCatalog.modal.lyrics")}
+                            </label>
+                            <button type="button" disabled={isImportingLyrics}
+                              onClick={() => lyricsInputRef.current?.click()}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-[#ff8b4d]/30 bg-[#ff8b4d]/10 px-2.5 py-1.5 text-[11px] font-medium text-[#ffb488] hover:bg-[#ff8b4d]/20 disabled:opacity-50 transition">
+                              {isImportingLyrics ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                              {t(`dashboard.artist.trackCatalog.modal.${isImportingLyrics ? "lyricsImporting" : "lyricsImport"}`)}
+                            </button>
+                            <input ref={lyricsInputRef} type="file" accept=".txt,.lrc" className="hidden"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                event.target.value = "";
+                                if (file) void handleLyricsImport(file);
+                              }} />
+                          </div>
+                          <p className="mb-2 text-[10px] text-white/40">{t("dashboard.artist.trackCatalog.modal.lyricsImportHint")}</p>
+                          {lyricsFileName && <p role="status" className="mb-2 break-all text-[11px] text-emerald-400">{t("dashboard.artist.trackCatalog.modal.lyricsImported", { name: lyricsFileName })}</p>}
+                          {lyricsError && <p role="alert" className="mb-2 text-[11px] text-red-400">{t(`dashboard.artist.trackCatalog.modal.${lyricsError}`)}</p>}
                           <textarea
-                            rows={2}
+                            id="track-upload-lyrics"
+                            rows={4}
                             value={lyrics}
-                            onChange={(e) => setLyrics(e.target.value)}
+                            disabled={isImportingLyrics}
+                            onChange={(e) => { setLyrics(e.target.value); setLyricsFileName(""); setLyricsError(null); }}
                             placeholder={t("dashboard.artist.trackCatalog.modal.lyricsPlaceholder")}
                             className="w-full resize-none rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-[11px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50 transition"
                           />
@@ -957,6 +1035,7 @@ export function TrackUploadModal({
                 </button>
                 <button
                   type="submit"
+                  disabled={isImportingLyrics}
                   className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e64] px-5 py-2 text-[12px] font-semibold text-black shadow-[0_8px_20px_rgba(255,122,44,0.3)] hover:brightness-110 active:scale-95 transition"
                 >
                   <span>Tiếp theo</span>
@@ -1123,7 +1202,7 @@ export function TrackUploadModal({
                       placeholder="OCR sẽ tự điền nếu tài liệu ghi rõ chi phí"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50" />
                     <p className="mt-1 text-[11px] text-white/45">
-                      {costEvidence || "Không có giá rõ ràng trong tài liệu: để trống, báo cáo hoàn vốn sẽ hiển thị chưa đủ dữ liệu."}
+                      {costEvidence || "Để trống nếu tài liệu không ghi rõ chi phí mua quyền."}
                     </p>
                   </div>
                   <div>
@@ -1150,17 +1229,33 @@ export function TrackUploadModal({
                       <div className="relative">
                         <select
                           value={distributorId}
-                          onChange={(e) => setDistributorId(e.target.value)}
+                          onChange={(e) => {
+                            setDistributorId(e.target.value);
+                            setOcrDistributorName(null);
+                            setOcrDirectLicensing(false);
+                          }}
                           className="w-full appearance-none rounded-xl border border-white/10 bg-[#17181f] px-3 py-2 text-[13px] text-white outline-none focus:border-[#ff8b4d]/50 transition cursor-pointer"
                         >
+                          {distributorId === "__unresolved__" && (
+                            <option value="__unresolved__" disabled>Chọn đơn vị phân phối phù hợp</option>
+                          )}
+                          {distributorId && distributorId !== "__unresolved__" && !DISTRIBUTOR_OPTIONS.some((dist) => dist.id === distributorId) && (
+                            <option value={distributorId}>{ocrDistributorName || `Đơn vị #${distributorId}`}</option>
+                          )}
                           {DISTRIBUTOR_OPTIONS.map((dist) => (
                             <option key={dist.id} value={dist.id} className="bg-[#121318] text-white">
-                              #{dist.id} - {dist.name}
+                              {dist.id ? `#${dist.id} - ` : ""}{dist.name}
                             </option>
                           ))}
                         </select>
                         <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 pointer-events-none text-white/40" />
                       </div>
+                      {ocrDirectLicensing && (
+                        <p className="mt-1.5 text-[11px] text-emerald-300">Đã nhận diện cấp quyền trực tiếp, không qua đơn vị phân phối.</p>
+                      )}
+                      {distributorId === "__unresolved__" && ocrDistributorName && (
+                        <p className="mt-1.5 text-[11px] text-amber-300">Đã đọc “{ocrDistributorName}”, nhưng chưa khớp đơn vị trong danh sách. Vui lòng chọn lại.</p>
+                      )}
                     </div>
 
                     {/* Distribution Contract ID */}
@@ -1251,7 +1346,7 @@ export function TrackUploadModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || isExtractingOcr}
+                  disabled={isSubmitting || isExtractingOcr || isImportingLyrics}
                   className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e64] px-5 py-2 text-[12px] font-semibold text-black shadow-[0_8px_20px_rgba(255,122,44,0.3)] hover:brightness-110 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (

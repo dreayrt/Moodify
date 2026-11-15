@@ -8,6 +8,8 @@ import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronUp,
+  ChevronDown,
   AudioLines,
   Check,
   Copy,
@@ -23,6 +25,7 @@ import {
   SkipForward,
   Sparkles,
   Trophy,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -37,6 +40,7 @@ import {
   leaveKaraokeRoom,
   KaraokeRoomApiError,
   removeKaraokeRoomQueueItem,
+  moveKaraokeRoomQueueItem,
   type KaraokeRoomDetail,
   type KaraokeRoomQueueItem,
   type KaraokeTrackSummary,
@@ -45,6 +49,7 @@ import KaraokeTrackCatalog from "./karaoke-track-catalog";
 import { useKaraokeRoomLive } from "../hooks/use-karaoke-room-live";
 import { useMediasoupRoom } from "../hooks/use-mediasoup-room";
 import { useKaraokeRoomScoring } from "../hooks/use-karaoke-room-scoring";
+import KaraokeScoreDetails from "./karaoke-score-details";
 import styles from "./karaoke-room-page.module.css";
 
 function initials(name: string): string {
@@ -211,6 +216,14 @@ function RemoteAudioPlayer({
 }
 
 function messageFor(error: unknown): string {
+  if (error instanceof KaraokeRoomApiError) {
+    if (error.code === "QUEUE_TRACK_ALREADY_REQUESTED")
+      return "Bạn đã thêm bài này vào hàng đợi. Hãy chọn thêm bài khác.";
+    if (error.code === "ROOM_HOST_REQUIRED")
+      return "Chỉ chủ phòng mới có thể đổi thứ tự bài hát.";
+    if (error.code === "QUEUE_ITEM_NOT_FOUND")
+      return "Bài hát này không còn trong hàng đợi. Hãy tải lại danh sách.";
+  }
   return error instanceof Error
     ? error.message
     : "Không thể tải dữ liệu phòng.";
@@ -572,14 +585,14 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     if (
-      roomScoring.score === null ||
+      !roomScoring.scoreResult ||
       !roomScoring.scoreSessionId ||
       lastOpenedScoreSessionRef.current === roomScoring.scoreSessionId
     )
       return;
     lastOpenedScoreSessionRef.current = roomScoring.scoreSessionId;
     setGroupScoreOpen(true);
-  }, [roomScoring.score, roomScoring.scoreSessionId]);
+  }, [roomScoring.scoreResult, roomScoring.scoreSessionId]);
 
   useEffect(() => {
     if (!groupScoreOpen) return;
@@ -671,14 +684,16 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   }, [isRequestOpen]);
 
   const selectedTrackTitle = selectedTrack?.title ?? "";
-  const myQueueItem = room?.queue.find((item) => item.requestedByMe);
+  const selectedTrackAlreadyQueued = !!selectedTrack && room?.queue.some(
+    (item) => item.requestedByMe && item.trackId === selectedTrack.songId,
+  );
   const handleTrackSelect = useCallback(
     (track: KaraokeTrackSummary) => setSelectedTrack(track),
     [],
   );
 
   const addRequest = async () => {
-    if (!selectedTrack || busy) return;
+    if (!selectedTrack || selectedTrackAlreadyQueued || busy) return;
     setBusy(true);
     try {
       await addKaraokeRoomQueueItem(numericRoomId, selectedTrack.songId);
@@ -704,6 +719,21 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       await refreshRoom();
     } catch (error) {
       setNotice(messageFor(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const moveRequest = async (item: KaraokeRoomQueueItem, direction: "UP" | "DOWN") => {
+    if (busy || !room?.canManage) return;
+    setBusy(true);
+    try {
+      await moveKaraokeRoomQueueItem(numericRoomId, item.id, direction);
+      await refreshRoom();
+      setNotice(`Đã chuyển “${item.title}” ${direction === "UP" ? "lên trên" : "xuống dưới"}.`);
+    } catch (error) {
+      setNotice(messageFor(error));
+      await refreshRoom();
     } finally {
       setBusy(false);
     }
@@ -1225,15 +1255,47 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                       </span>
                     </div>
                     {(item.requestedByMe || room.canManage) && (
-                      <button
-                        type="button"
-                        className={styles.queueRemoveIcon}
-                        onClick={() => void removeRequest(item)}
-                        disabled={busy}
-                        aria-label={`Rút ${item.title}`}
+                      <div
+                        className={styles.queueActions}
+                        role="group"
+                        aria-label={`Thao tác với ${item.title}`}
                       >
-                        <X size={15} />
-                      </button>
+                        {room.canManage && (
+                          <>
+                            <button
+                              type="button"
+                              className={styles.queueMoveIcon}
+                              onClick={() => void moveRequest(item, "UP")}
+                              disabled={busy || index === 0}
+                              aria-label={`Chuyển ${item.title} lên trên`}
+                              title="Chuyển lên trên"
+                            >
+                              <ChevronUp size={16} strokeWidth={1.8} />
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.queueMoveIcon}
+                              onClick={() => void moveRequest(item, "DOWN")}
+                              disabled={busy || index === room.queue.length - 1}
+                              aria-label={`Chuyển ${item.title} xuống dưới`}
+                              title="Chuyển xuống dưới"
+                            >
+                              <ChevronDown size={16} strokeWidth={1.8} />
+                            </button>
+                            <span className={styles.queueActionDivider} aria-hidden="true" />
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.queueRemoveIcon}
+                          onClick={() => void removeRequest(item)}
+                          disabled={busy}
+                          aria-label={`Rút ${item.title}`}
+                          title="Rút bài khỏi hàng đợi"
+                        >
+                          <Trash2 size={14} strokeWidth={1.8} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1245,16 +1307,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 <span>Chọn một bài từ kho Karaoke để thêm vào đây.</span>
               </div>
             )}
-            {myQueueItem ? (
-              <button
-                type="button"
-                className={styles.removeButton}
-                onClick={() => void removeRequest(myQueueItem)}
-                disabled={busy}
-              >
-                Rút lượt hát của tôi <X size={15} />
-              </button>
-            ) : (
+            <div className={styles.queueFooter}>
               <button
                 type="button"
                 className={styles.primaryButton}
@@ -1264,10 +1317,15 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 }}
                 disabled={busy}
               >
-                <Plus size={18} /> Đăng ký lượt hát{" "}
+                <Plus size={18} /> Thêm bài hát{" "}
                 <span aria-hidden="true">›</span>
               </button>
-            )}
+              <p className={styles.queueNote}>
+                {room.canManage
+                  ? "Thêm bài bạn thích, dùng mũi tên để đổi thứ tự phát."
+                  : "Bạn có thể thêm nhiều bài và rút từng bài trong danh sách."}
+              </p>
+            </div>
           </section>
 
           <section
@@ -1598,13 +1656,15 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               type="button"
               className={styles.modalSubmit}
               onClick={() => void addRequest()}
-              disabled={busy || !selectedTrack}
+              disabled={busy || !selectedTrack || selectedTrackAlreadyQueued}
             >
               {busy
                 ? "Đang thêm…"
-                : selectedTrack
-                  ? "Thêm vào hàng đợi"
-                  : "Chọn bài hát"}
+                : selectedTrackAlreadyQueued
+                  ? "Bài này đã có trong hàng đợi của bạn"
+                  : selectedTrack
+                    ? "Thêm vào hàng đợi"
+                    : "Chọn bài hát"}
               <ArrowLeft size={17} className={styles.submitArrow} />
             </button>
           </div>
@@ -1612,7 +1672,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       )}
 
       {groupScoreOpen &&
-      roomScoring.score !== null &&
+      roomScoring.scoreResult &&
       typeof document !== "undefined"
         ? createPortal(
             <div
@@ -1654,17 +1714,17 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 <div
                   className={styles.roomScoreRing}
                   style={{
-                    background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score))}% 100%)`,
+                    background: `conic-gradient(from -90deg, #f1b4dc 0 ${Math.max(0, Math.min(100, roomScoring.score ?? 0))}%, rgba(255,255,255,.09) ${Math.max(0, Math.min(100, roomScoring.score ?? 0))}% 100%)`,
                   }}
-                  role="meter"
+                  role={roomScoring.score === null ? undefined : "meter"}
                   aria-label="Điểm chung của phòng"
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={roomScoring.score}
+                  aria-valuenow={roomScoring.score ?? undefined}
                 >
                   <div className={styles.roomScoreRingCore}>
                     <span>ĐIỂM CHUNG</span>
-                    <strong>{roomScoring.score.toFixed(1)}</strong>
+                    <strong>{roomScoring.score?.toFixed(1) ?? "—"}</strong>
                     <small>trên 100</small>
                   </div>
                 </div>
@@ -1679,6 +1739,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                   Điểm được tổng hợp từ các phần hát của thành viên bật micro
                   trong bài này.
                 </p>
+                {roomScoring.scoreResult && <KaraokeScoreDetails result={roomScoring.scoreResult} mode="room" sessionId={roomScoring.scoreSessionId} capture={roomScoring.scoreCaptureReport} />}
                 <button
                   ref={groupScoreActionRef}
                   type="button"

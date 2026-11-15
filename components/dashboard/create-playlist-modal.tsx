@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Music2, Sparkles, Image as ImageIcon, Loader2, Globe, Lock } from "lucide-react";
 import { createPlaylist, type Playlist } from "@/lib/api-client";
 
@@ -45,8 +46,11 @@ export default function CreatePlaylistModal({
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Portal ra body: tránh ancestor có transform/-translate-y làm lệch position:fixed
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,15 +87,16 @@ export default function CreatePlaylistModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Tạo danh sách phát mới" className="fixed inset-0 z-[10010] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl"
+        className="relative w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label="Đóng hộp thoại tạo Playlist"
           disabled={loading}
           className="absolute right-4 top-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
         >
@@ -277,6 +282,7 @@ export default function CreatePlaylistModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

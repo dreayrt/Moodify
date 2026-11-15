@@ -30,17 +30,18 @@ export default function AdInterstitialBanner() {
   return (
     <aside
       aria-label="Thông báo phát quảng cáo và nhận diện thương hiệu"
-      className="fixed inset-x-0 bottom-24 z-50 px-4 flex justify-center pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+      style={{ maxHeight: "calc(100dvh - var(--moodify-player-height, 0px) - 24px)", overflowY: "auto" }}
+      className="fixed inset-x-0 bottom-[calc(var(--moodify-player-height,0px)+12px)] z-50 px-2 sm:px-4 flex items-start justify-center pointer-events-none animate-in fade-in slide-in-from-bottom-4 transition-[opacity,transform] duration-500"
     >
       {/* Outer Shell: Double-Bezel Architectural Frame */}
-      <div className="relative w-full max-w-xl rounded-3xl p-[1px] bg-gradient-to-b from-white/20 via-white/10 to-transparent shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-2xl overflow-hidden">
+      <div className="relative w-full max-w-xl shrink-0 rounded-3xl p-[1px] bg-gradient-to-b from-white/20 via-white/10 to-transparent shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-2xl overflow-hidden pointer-events-auto">
         {/* Ambient Studio Lighting Mesh */}
         <div className="absolute -top-16 -left-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -right-12 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Inner Core */}
         <div className="relative rounded-[calc(1.5rem-1px)] bg-[#090a0f]/95 p-4 sm:p-5 flex flex-col gap-3.5 border border-white/5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             {/* Visual Artwork & Content */}
             <div className="flex items-center gap-3.5 min-w-0">
               {/* Art-Directed Squircle Vinyl/Headphones Frame */}
@@ -100,7 +101,7 @@ export default function AdInterstitialBanner() {
             </div>
 
             {/* Tactile Button Actions */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-between gap-2 shrink-0">
               {/* Nút bỏ qua có đếm ngược: CHỈ hiển thị cho tài khoản VIP Tiết Kiệm */}
               {isSaverVip ? (
                 canSkip ? (
@@ -108,7 +109,7 @@ export default function AdInterstitialBanner() {
                     type="button"
                     onClick={() => skipAd()}
                     style={{ color: "#ffffff", backgroundColor: "rgba(255, 255, 255, 0.16)" }}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold hover:bg-white/25 border border-white/30 active:scale-95 transition-all shadow-md cursor-pointer shrink-0"
+                    className="inline-flex min-h-11 items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold hover:bg-white/25 border border-white/30 active:scale-95 transition-all shadow-md cursor-pointer shrink-0"
                     title="Bỏ qua quảng cáo"
                   >
                     <SkipForward className="w-3.5 h-3.5 text-amber-300" />
@@ -119,7 +120,7 @@ export default function AdInterstitialBanner() {
                     type="button"
                     disabled
                     style={{ color: "#ffffff", backgroundColor: "#1e2230" }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-white/20 shadow-sm cursor-not-allowed select-none shrink-0"
+                    className="inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-white/20 shadow-sm cursor-not-allowed select-none shrink-0"
                     title={`Bỏ qua sau ${skipCountdown} giây`}
                   >
                     <SkipForward className="w-3.5 h-3.5 text-slate-400" />
@@ -153,7 +154,7 @@ export default function AdInterstitialBanner() {
                 href="/dashboard/premium"
                 onClick={() => skipAd(true)}
                 style={{ color: "#090a0f", backgroundColor: "#f59e0b" }}
-                className="inline-flex items-center gap-1.5 pl-3.5 pr-2 py-1.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-xs font-bold active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(245,158,11,0.35)] group cursor-pointer shrink-0"
+                className="inline-flex min-h-11 items-center gap-1.5 pl-3.5 pr-2 py-1.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-xs font-bold active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(245,158,11,0.35)] group cursor-pointer shrink-0"
                 title={isBasicUpsell ? "Nâng cấp lên gói FULL" : "Nâng cấp tài khoản VIP"}
               >
                 <span style={{ color: "#090a0f" }} className="font-bold tracking-tight">

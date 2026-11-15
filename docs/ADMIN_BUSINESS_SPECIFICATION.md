@@ -280,7 +280,7 @@ Quản lý tính pháp lý của âm nhạc được phát hành trên Moodify, 
    - Thông tin liên hệ, người đại diện, trạng thái hợp tác (`ACTIVE | INACTIVE`).
 2. **Quản lý Hợp đồng phân phối (`distribution_contracts`)**:
    - Quản lý mã hợp đồng, tiêu đề, ngày ký kết, ngày hiệu lực và ngày đáo hạn.
-   - Cấu hình **Tỷ lệ chia sẻ doanh thu (`revenue_share` %)**: Tỷ lệ phần trăm doanh thu từ lượt stream hoặc gói dịch vụ được chia lại cho đối tác.
+   - Lưu **Tỷ lệ chia sẻ theo hợp đồng (`revenue_share` %)** như dữ liệu thỏa thuận với đối tác; không tự tính hoặc ghi nhận tiền từ lượt nghe.
    - Đính kèm liên kết file văn bản hợp đồng số hóa (`document_url` PDF).
    - Cảnh báo các hợp đồng sắp hết hạn (30 ngày trước ngày hết hiệu lực).
 3. **Quản lý Giấy phép bài hát (`song_licenses`)**:

@@ -11,6 +11,7 @@ import {
   Save,
   CheckCircle2,
 } from "lucide-react";
+import { changePassword, getValidAccessToken, updateCurrentUserProfile, uploadAvatar, type UserProfileResponse } from "@/lib/auth/auth-client";
 import { ModeratorProfile } from "../types";
 
 type ModeratorAccountTabProps = {
@@ -19,30 +20,66 @@ type ModeratorAccountTabProps = {
   onShowToast: (message: string, type: "success" | "info" | "error") => void;
 };
 
+function accountError(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    if (error.message === "Failed to fetch" || error.name === "TimeoutError" || error.name === "AbortError") {
+      return "Không nhận được phản hồi từ máy chủ. Vui lòng kiểm tra kết nối và thử lại.";
+    }
+    return error.message;
+  }
+  return fallback;
+}
+
 export function ModeratorAccountTab({
   profile,
   onUpdateProfile,
   onShowToast,
 }: ModeratorAccountTabProps) {
-  const [formData, setFormData] = useState<ModeratorProfile>(profile);
+  const [draft, setDraft] = useState<Partial<Pick<ModeratorProfile, "fullName" | "phone">>>({});
+  const formData = { ...profile, ...draft };
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingPass, setIsChangingPass] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setTimeout(() => {
-      onUpdateProfile(formData);
-      setIsSaving(false);
-      onShowToast("Cập nhật thông tin tài khoản thành công!", "success");
-    }, 500);
+  const applySavedProfile = (saved: UserProfileResponse) => {
+    const updated = {
+      ...profile,
+      id: String(saved.id),
+      fullName: saved.fullName,
+      username: saved.username,
+      email: saved.email,
+      phone: saved.phone || "",
+      avatarUrl: saved.avatarUrl || profile.avatarUrl,
+    };
+    setDraft({});
+    onUpdateProfile(updated);
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving || isUploadingAvatar) return;
+    if (!formData.fullName.trim()) {
+      onShowToast("Vui lòng nhập họ và tên.", "error");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const saved = await updateCurrentUserProfile({ fullName: formData.fullName, phone: formData.phone });
+      applySavedProfile(saved);
+      onShowToast("Cập nhật thông tin tài khoản thành công!", "success");
+    } catch (error) {
+      onShowToast(accountError(error, "Không thể lưu thông tin tài khoản."), "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isChangingPass) return;
     if (!currentPassword) {
       onShowToast("Vui lòng nhập mật khẩu hiện tại.", "error");
       return;
@@ -57,21 +94,42 @@ export function ModeratorAccountTab({
     }
 
     setIsChangingPass(true);
-    setTimeout(() => {
-      setIsChangingPass(false);
+    try {
+      await changePassword(currentPassword, newPassword);
+      onShowToast("Đã đổi mật khẩu thành công!", "success");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      onShowToast("Đã đổi mật khẩu thành công!", "success");
-    }, 600);
+    } catch (err) {
+      onShowToast(
+        accountError(err, "Đổi mật khẩu thất bại. Vui lòng thử lại."),
+        "error"
+      );
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const fakeUrl = URL.createObjectURL(file);
-      setFormData((prev) => ({ ...prev, avatarUrl: fakeUrl }));
-      onShowToast("Đã chọn ảnh đại diện mới. Bấm Lưu để hoàn tất.", "info");
+    e.target.value = "";
+    if (!file || isUploadingAvatar || isSaving) return;
+    if (!file.type.startsWith("image/")) {
+      onShowToast("Vui lòng chọn tệp hình ảnh.", "error");
+      return;
+    }
+    setIsUploadingAvatar(true);
+    try {
+      const token = await getValidAccessToken();
+      if (!token) throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      const saved = await uploadAvatar(token, file);
+      const savedAvatarUrl = saved.avatarUrl || profile.avatarUrl;
+      onUpdateProfile({ ...profile, avatarUrl: savedAvatarUrl });
+      onShowToast("Đã lưu ảnh đại diện mới.", "success");
+    } catch (error) {
+      onShowToast(accountError(error, "Không thể lưu ảnh đại diện."), "error");
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -97,6 +155,7 @@ export function ModeratorAccountTab({
                   id="avatar-upload"
                   type="file"
                   accept="image/*"
+                  disabled={isUploadingAvatar || isSaving}
                   onChange={handleAvatarChange}
                   className="hidden"
                 />
@@ -132,7 +191,7 @@ export function ModeratorAccountTab({
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center">
               <p className="font-display text-lg font-bold text-white">
-                {formData.totalReviewed}
+                {profile.totalReviewed}
               </p>
               <p className="text-[10px] uppercase tracking-wider text-white/40">
                 Tổng bài đã duyệt
@@ -140,7 +199,7 @@ export function ModeratorAccountTab({
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center">
               <p className="font-display text-lg font-bold text-emerald-400">
-                {formData.approvalRate}%
+                {profile.approvalRate}%
               </p>
               <p className="text-[10px] uppercase tracking-wider text-white/40">
                 Tỷ lệ chấp thuận
@@ -148,7 +207,7 @@ export function ModeratorAccountTab({
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center">
               <p className="font-display text-lg font-bold text-[#ff8b4d]">
-                {formData.avgReviewTimeMin}m
+                {profile.avgReviewTimeMin}m
               </p>
               <p className="text-[10px] uppercase tracking-wider text-white/40">
                 Thời gian TB/bài
@@ -170,6 +229,7 @@ export function ModeratorAccountTab({
           </div>
 
           <form onSubmit={handleProfileSubmit} className="mt-5 space-y-4">
+            <p className="text-[12px] text-white/50">Tên tài khoản và email do quản trị viên quản lý.</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-[12px] font-medium text-white/70">
@@ -179,8 +239,9 @@ export function ModeratorAccountTab({
                   type="text"
                   required
                   value={formData.fullName}
+                  disabled={isSaving}
                   onChange={(e) =>
-                    setFormData({ ...formData, fullName: e.target.value })
+                    setDraft((previous) => ({ ...previous, fullName: e.target.value }))
                   }
                   className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white focus:border-[#ff7a2c] focus:outline-none"
                 />
@@ -194,9 +255,7 @@ export function ModeratorAccountTab({
                   type="text"
                   required
                   value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
+                  readOnly
                   className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white focus:border-[#ff7a2c] focus:outline-none"
                 />
               </div>
@@ -213,9 +272,7 @@ export function ModeratorAccountTab({
                     type="email"
                     required
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    readOnly
                     className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2.5 pl-10 pr-3.5 text-[13px] text-white focus:border-[#ff7a2c] focus:outline-none"
                   />
                 </div>
@@ -229,10 +286,10 @@ export function ModeratorAccountTab({
                   <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
                   <input
                     type="text"
-                    required
                     value={formData.phone}
+                    disabled={isSaving}
                     onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
+                      setDraft((previous) => ({ ...previous, phone: e.target.value }))
                     }
                     className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2.5 pl-10 pr-3.5 text-[13px] text-white focus:border-[#ff7a2c] focus:outline-none"
                   />
@@ -269,7 +326,7 @@ export function ModeratorAccountTab({
             <div className="mt-6 flex justify-end">
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || isUploadingAvatar}
                 className="flex items-center gap-2 rounded-full bg-[#ff7a2c] px-6 py-2.5 text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(255,122,44,0.3)] transition hover:bg-[#ff8f50] active:scale-95 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
@@ -296,6 +353,8 @@ export function ModeratorAccountTab({
                 </label>
                 <input
                   type="password"
+                  autoComplete="current-password"
+                  disabled={isChangingPass}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="••••••••"
@@ -309,6 +368,8 @@ export function ModeratorAccountTab({
                 </label>
                 <input
                   type="password"
+                  autoComplete="new-password"
+                  disabled={isChangingPass}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Tối thiểu 6 ký tự"
@@ -322,6 +383,8 @@ export function ModeratorAccountTab({
                 </label>
                 <input
                   type="password"
+                  autoComplete="new-password"
+                  disabled={isChangingPass}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Nhập lại mật khẩu mới"

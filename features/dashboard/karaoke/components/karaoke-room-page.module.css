@@ -174,12 +174,27 @@
 .disabledButton { display: flex; align-items: center; justify-content: center; gap: 7px; flex: 0 0 auto; padding: 11px 13px; border: 1px solid rgba(234, 198, 237, 0.1); border-radius: 10px; background: rgba(255, 255, 255, 0.04); color: #77717f; font-size: 10px; font-weight: 700; cursor: not-allowed; }
 
 .queueCard, .membersCard { border-radius: 21px; padding: 23px 20px; }
-.queueCard { min-height: 320px; display: flex; flex-direction: column; }
+.queueCard { width: 100%; min-width: 0; min-height: 320px; display: flex; flex-direction: column; container-type: inline-size; }
 .cardHeader { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 18px; }
 .cardHeader h2 { margin: 3px 0 0; font-size: 21px; }
 .countBadge { flex: 0 0 auto; padding: 6px 9px; border: 1px solid rgba(209, 166, 226, 0.2); border-radius: 999px; color: #dfb8ed; background: rgba(164, 95, 196, 0.1); font-size: 10px; font-weight: 800; }
 .queueList { display: flex; flex-direction: column; gap: 7px; flex: 1; }
-.queueItem { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 8px; border: 1px solid rgba(229, 210, 239, 0.06); border-radius: 13px; background: rgba(255, 255, 255, 0.025); }
+.queueFooter { margin-top: 18px; }
+.queueActions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; padding: 3px; border: 1px solid rgba(216, 190, 233, 0.11); border-radius: 11px; background: rgba(12, 10, 19, 0.28); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025); }
+.queueMoveIcon, .queueRemoveIcon { display: grid; flex: 0 0 auto; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #c3afcf; cursor: pointer; transition: color .16s ease, background .16s ease; }
+.queueMoveIcon:hover:not(:disabled) { color: #f5e6ff; background: rgba(190, 145, 213, 0.14); }
+.queueRemoveIcon:hover:not(:disabled) { color: #ffb5c5; background: rgba(220, 108, 134, 0.13); }
+.queueMoveIcon:disabled, .queueRemoveIcon:disabled { opacity: 0.24; cursor: default; }
+.queueMoveIcon:focus-visible, .queueRemoveIcon:focus-visible { outline: 2px solid #dfb8ed; outline-offset: -2px; }
+.queueActionDivider { width: 1px; height: 16px; margin: 0 3px; background: rgba(216, 190, 233, 0.13); }
+.queueItem { display: grid; grid-template-columns: 18px 39px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-width: 0; padding: 12px 10px; border: 1px solid rgba(229, 210, 239, 0.07); border-radius: 14px; background: rgba(255, 255, 255, 0.025); }
+@container (max-width: 360px) {
+  .queueItem { grid-template-columns: 16px 39px minmax(0, 1fr); row-gap: 10px; }
+  .queueActions { grid-column: 2 / -1; justify-self: end; }
+}
+@media (pointer: coarse) {
+  .queueMoveIcon, .queueRemoveIcon { width: 40px; height: 40px; }
+}
 .myQueueItem { border-color: rgba(210, 143, 218, 0.38); background: rgba(184, 100, 187, 0.09); }
 .queueNumber { flex: 0 0 22px; color: #837a91; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .queueInfo { min-width: 0; flex: 1; }
@@ -193,7 +208,7 @@
 .primaryButton:hover, .modalSubmit:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(186, 83, 159, 0.31); }
 .removeButton { border: 1px solid rgba(225, 158, 205, 0.22); color: #e8b8d6; background: rgba(152, 76, 126, 0.09); }
 .removeButton:hover { background: rgba(152, 76, 126, 0.17); }
-.queueNote { display: flex; align-items: flex-start; gap: 6px; margin: 11px 0 0; color: #888092; font-size: 9px; line-height: 1.5 !important; }
+.queueNote { margin: 11px 0 0; color: #9d90a8; font-size: 10px; line-height: 1.6 !important; }
 .queueNote svg { flex: 0 0 auto; margin-top: 1px; }
 .membersCard { min-height: 165px; }
 .memberCardHint { margin: 4px 0 0; color: #9c91a5; font-size: 9px; }
@@ -437,8 +452,6 @@
 .queueEmpty svg { color: #b58ac6; }
 .queueEmpty strong { color: #e9dff0; font-size: 12px; }
 .queueEmpty span { max-width: 210px; line-height: 1.5; }
-.queueRemoveIcon { display: grid; flex: 0 0 29px; place-items: center; width: 29px; height: 29px; border: 1px solid rgba(239, 141, 154, 0.18); border-radius: 8px; background: rgba(173, 63, 84, 0.08); color: #e5a6b2; cursor: pointer; }
-.queueRemoveIcon:disabled { opacity: 0.5; cursor: wait; }
 .memberName { display: flex; min-width: 0; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memberName small { margin-top: 2px; color: #a995b3; font-size: 8px; }
 .submitArrow { transform: rotate(180deg); }
@@ -525,7 +538,8 @@
   flex-direction: column;
   align-items: center;
   width: min(100%, 430px);
-  overflow: hidden;
+  max-height: 90dvh;
+  overflow: hidden auto;
   padding: 34px 32px 28px;
   border: 1px solid rgba(221, 194, 228, 0.2);
   border-radius: 23px;

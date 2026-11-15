@@ -20,13 +20,11 @@ import {
   ToastMessage,
 } from "../types";
 import {
-  clearAuthSession,
   getCurrentUser,
   getModeratorHistory,
   getModeratorQueue,
-  getStoredAuthSession,
   getValidAccessToken,
-  logout,
+  logoutAndRedirect,
   submitModeratorDecision,
 } from "@/lib/auth/auth-client";
 
@@ -198,6 +196,7 @@ export default function DashboardModeratorPage() {
               fullName: userObj.fullName || userObj.name || INITIAL_MODERATOR_PROFILE.fullName,
               email: userObj.email || INITIAL_MODERATOR_PROFILE.email,
               username: userObj.username || INITIAL_MODERATOR_PROFILE.username,
+              phone: userObj.phone || "",
               avatarUrl: userObj.avatarUrl || INITIAL_MODERATOR_PROFILE.avatarUrl,
               staffId: userObj.id ? `MOD-${userObj.id}` : INITIAL_MODERATOR_PROFILE.staffId,
             };
@@ -313,6 +312,7 @@ export default function DashboardModeratorPage() {
           fullName: currentUser.fullName || prev.fullName,
           email: currentUser.email || prev.email,
           username: currentUser.username || prev.username,
+          phone: currentUser.phone || "",
           avatarUrl: currentUser.avatarUrl || prev.avatarUrl,
           staffId: `MOD-${currentUser.id}`,
         }));
@@ -457,21 +457,8 @@ export default function DashboardModeratorPage() {
     }
   };
 
-  const handleLogout = async () => {
-    addToast("Đang đăng xuất khỏi hệ thống kiểm duyệt...", "info");
-    try {
-      const session = getStoredAuthSession();
-      if (session?.refreshToken) {
-        await logout(session.refreshToken);
-      }
-    } catch (err) {
-      console.warn("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      router.push("/");
-    }
+  const handleLogout = () => {
+    logoutAndRedirect();
   };
 
   const handleRefresh = async () => {

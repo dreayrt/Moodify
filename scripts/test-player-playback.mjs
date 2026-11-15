@@ -1,10 +1,10 @@
 /* Mount the real PlayerProvider in isolated Chromium. API/media doubles never contact application data.
  * Uses the installed React/TypeScript; provide playwright with NODE_PATH or PLAYWRIGHT_MODULE.
+ * PLAYWRIGHT_CHROMIUM_EXECUTABLE optionally selects an existing Chromium/Chrome binary.
  * PLAYER_SOURCE optionally points to a before-fix copy to reproduce the regression.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import http from 'node:http';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -39,11 +39,12 @@ const api={FREE_ENTITLEMENTS:free,resolveTrackAudioUrl:t=>location.origin+'/audi
 const auth={recordPlatformVisit:()=>{},recordListeningSessionTelemetry:payload=>{
  window.telemetry.push(payload);
  if(window.deferTelemetry) return new Promise(resolve=>window.deferredTelemetry.push({payload,resolve}));
- return Promise.resolve({success:true,historyId:window.telemetry.length});
+ return Promise.resolve({success:true,historyId:window.telemetry.length,qualified:false});
 },pingDeviceStatus:async()=>{},revokeOtherDevices:async()=>{}};
 function require(id){
  if(id==='@/lib/api-client')return api;
  if(id==='@/lib/auth/auth-client')return auth;
+ if(id==='@/lib/recommendation-client')return {prepareRecommendationTrack:async track=>track};
  if(id==='next/image')return ()=>null;
  if(id==='lucide-react')return {Crown:()=>null,Laptop:()=>null};
  if(cache[id])return cache[id].exports;
@@ -78,20 +79,23 @@ function wave(seconds) {
   buffer.write('data',36);buffer.writeUInt32LE(length,40);return buffer;
 }
 const audioBytes=wave(8);
-const server=http.createServer((req,res)=>{
-  if(req.url==='/bundle.js'){res.setHeader('Content-Type','application/javascript');res.end(bundle);return;}
-  if(req.url.startsWith('/audio/')){res.setHeader('Content-Type','audio/wav');res.end(audioBytes);return;}
-  res.setHeader('Content-Type','text/html');res.end('<!doctype html><div id="root"></div><script src="/bundle.js"></script>');
-});
 async function run() {
-  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--autoplay-policy=no-user-gesture-required']});
   const passed=[];
-  const base=`http://127.0.0.1:${server.address().port}`;
+  const base='https://player-fixture.test';
   const step=async(page,fn)=>{await page.evaluate(fn);await page.waitForTimeout(30);};
   async function check(name,callback,{native=false,saved=null,strict=false}={}) {
     const context=await browser.newContext(); const page=await context.newPage();
     try {
+      // Serve fixture requests in-process, including native audio, without a listening port.
+      await context.route('**/*', route => {
+        const url = new URL(route.request().url());
+        if (url.origin !== base) return route.abort();
+        if (url.pathname === '/bundle.js') return route.fulfill({contentType:'application/javascript',body:bundle});
+        if (url.pathname.startsWith('/audio/')) return route.fulfill({contentType:'audio/wav',body:audioBytes});
+        return route.fulfill({contentType:'text/html',body:'<!doctype html><div id="root"></div><script src="/bundle.js"></script>'});
+      });
+      page.on('pageerror', error => console.error(error));
       if(saved)await page.addInitScript(value=>localStorage.setItem('moodify_playback_state',JSON.stringify(value)),saved);
       await page.goto(base+'/?native='+(native?'1':'0')+'&strict='+(strict?'1':'0'));
       await page.waitForFunction(()=>window.player?.isPremiumUser);
@@ -262,4 +266,4 @@ async function run() {
     console.log(JSON.stringify({passed:passed.length,checks:passed}));
   } finally {await browser.close();}
 }
-run().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>server.close());
+run().catch(error=>{console.error(error);process.exitCode=1;});

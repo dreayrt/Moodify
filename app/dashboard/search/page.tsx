@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Music, Sparkles, AudioLines, HeartPulse, Disc, ListMusic, Users } from "lucide-react";
+import { X, Music, AudioLines, HeartPulse, Disc, ListMusic, Users } from "lucide-react";
 import {
   fetchTracks,
   fetchArtists,
@@ -427,6 +427,7 @@ function SearchContent() {
           name: t.name,
           artistName: t.artistName,
           albumName: t.albumName || pl.name,
+          playbackContext: { source: "PLAYLIST", sourceId: pl.id },
           imageUrl: t.imageUrl || pl.coverUrl,
           durationMs: t.durationMs,
           lyricsPlain: t.lyricsPlain,
@@ -446,7 +447,6 @@ function SearchContent() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-5 h-5 text-cyan-400" />
             <span className="text-xs font-semibold uppercase tracking-[0.06em] text-cyan-400">
               Khám Phá & Tìm Kiếm
             </span>

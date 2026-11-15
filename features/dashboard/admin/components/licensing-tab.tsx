@@ -20,6 +20,7 @@ import {
   ToggleRight,
   X,
 } from "lucide-react";
+import { getBackendFileUrl } from "@/lib/api-client";
 import { DistributionContract, Distributor, SongLicense } from "../types";
 import { ModalPortal } from "./shared/modal-portal";
 
@@ -350,13 +351,14 @@ export function LicensingTab({
                   <th className="py-4 px-3">Chủ sở hữu tác quyền</th>
                   <th className="py-4 px-3">Nhà phân phối</th>
                   <th className="py-4 px-3">Thời hạn</th>
-                  <th className="py-4 pl-3 pr-6 text-right">Trạng thái</th>
+                  <th className="py-4 px-3 text-right">Trạng thái</th>
+                  <th className="py-4 pl-3 pr-6">Hồ sơ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222432]/60 text-zinc-300">
                 {licenses.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-zinc-500 font-mono text-xs">
+                    <td colSpan={7} className="py-8 text-center text-zinc-500 font-mono text-xs">
                       Chưa có giấy phép bản quyền nào được ghi nhận.
                     </td>
                   </tr>
@@ -375,7 +377,7 @@ export function LicensingTab({
                       <td className="py-3.5 px-3 text-[12px] text-zinc-400 font-mono">
                         {lic.issueDate} ➜ {lic.expiryDate}
                       </td>
-                      <td className="py-3.5 pl-3 pr-6 text-right">
+                      <td className="py-3.5 px-3 text-right">
                         <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium">
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${
@@ -386,6 +388,22 @@ export function LicensingTab({
                             {lic.status}
                           </span>
                         </span>
+                      </td>
+                      <td className="py-3.5 pl-3 pr-6 whitespace-nowrap">
+                        {lic.documentUrl?.trim() ? (
+                          <a
+                            href={getBackendFileUrl(lic.documentUrl.trim())}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Mở hồ sơ bản quyền của ${lic.trackTitle} trong thẻ mới`}
+                            className="inline-flex items-center gap-1.5 font-medium text-[#ff8b4d] hover:underline"
+                          >
+                            {/\.pdf(?:[?#]|$)/i.test(lic.documentUrl.trim()) ? "Xem PDF" : "Xem tài liệu"}
+                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          </a>
+                        ) : (
+                          <span className="text-zinc-500">Chưa có tài liệu</span>
+                        )}
                       </td>
                     </tr>
                   ))

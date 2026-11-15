@@ -23,13 +23,12 @@ import {
   HelpCircle,
   CreditCard,
   Mic2,
+  Download,
 } from "lucide-react";
 import {
   getCurrentUser,
   getValidAccessToken,
-  clearAuthSession,
-  getStoredAuthSession,
-  logout,
+  logoutAndRedirect,
   registerCurrentDevice,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
@@ -48,12 +47,12 @@ import MoodifyMascot from "./moodify-mascot";
 import UserSettingsModal from "./user-settings-modal";
 import { useCurrentMascot } from "@/lib/mascots";
 import { BrandLogo } from "@/components/shared/logo-mark";
+import { MOBILE_DOWNLOADS } from "@/lib/mobile-downloads";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
 import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
 import { usePlayer } from "./player-context";
 import { HeroCarousel } from "@/features/home/components/hero-carousel";
-import UserFeatureHighlights from "@/features/dashboard/user/components/user-feature-highlights";
 
 export type Vibe = {
   id: string;
@@ -413,7 +412,6 @@ function MascotAccountTrigger({
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const { mascot } = useCurrentMascot();
 
@@ -427,20 +425,9 @@ function MascotAccountTrigger({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      const session = getStoredAuthSession();
-      if (session?.refreshToken) {
-        await logout(session.refreshToken);
-      }
-    } catch (err) {
-      console.error("Logout error:", err);
-    } finally {
-      clearAuthSession();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      router.push("/");
-    }
+  const handleLogout = () => {
+    setOpen(false);
+    logoutAndRedirect();
   };
 
   const displayName = user?.fullName || user?.username || "Người dùng Moodify";
@@ -585,6 +572,7 @@ function MascotAccountTrigger({
           {/* Logout */}
           <div className="pt-1 border-t border-white/10 mt-1">
             <button
+              type="button"
               onClick={handleLogout}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/90 hover:text-red-300 hover:bg-red-500/15 transition-colors cursor-pointer group"
             >
@@ -1083,7 +1071,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* Main Shell Container */}
       <div className="relative z-10 w-full min-h-screen flex flex-col">
         {/* Top Header Bar - Fixed/Sticky SoundCloud Style */}
-        <header className={`${isKaraoke ? "hidden" : ""} sticky top-0 z-40 w-full flex items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
+        <header className={`${isKaraoke ? "hidden" : ""} sticky top-0 z-40 w-full flex flex-wrap items-center justify-between gap-4 px-5 md:px-[35px] py-2.5 md:py-3 backdrop-blur-3xl transition-colors duration-300 shadow-xl shadow-black/40 lg:flex-nowrap ${currentShellTheme.playerBg} ${currentShellTheme.playerBorder.replace(/border-t/g, 'border-b').replace(/0_-/g, '0_')}`}>
           <div className="flex items-center gap-5 md:gap-7 shrink-0 min-w-0 md:min-w-[200px]">
             <Link
               href="/dashboard"
@@ -1194,7 +1182,16 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <div className="hidden md:flex flex-1" />
           )}
 
-          <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
+          <div className="ml-auto flex items-center justify-end gap-2 sm:gap-3 shrink-0 min-w-0 md:min-w-[200px]">
+            <Link
+              href={MOBILE_DOWNLOADS.page}
+              aria-label="Tải ứng dụng Moodify"
+              title="Tải ứng dụng Moodify"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-xs font-bold text-white shadow-[0_5px_20px_rgba(139,92,246,0.2)] transition-[filter,box-shadow] hover:brightness-110 hover:shadow-[0_5px_24px_rgba(139,92,246,0.35)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300 xl:w-auto xl:px-4"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden xl:inline">Tải ứng dụng</span>
+            </Link>
             {userLoading ? (
               <span className="h-9 w-28 animate-pulse rounded-full border border-white/10 bg-white/5" />
             ) : user ? (
@@ -1244,7 +1241,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Unified 2-Column Grid: Left Rail + Main Right Content */}
-        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isKaraoke || isPlayerBarHidden ? "pb-6" : "pb-[140px]"}`}>
+        <div className={`flex-1 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 lg:gap-10 mt-5 md:mt-6 px-5 md:px-[35px] transition-[padding-bottom] duration-300 ${isKaraoke || isPlayerBarHidden ? "pb-6" : "pb-[calc(var(--moodify-player-height,140px)+24px)]"}`}>
           {/* Left Rail (Visible on lg+) - Fixed & Vertically Centered with Dynamic LED Chroma Aura */}
           <div className="hidden lg:block w-[240px] shrink-0">
             <div className={`!fixed left-1.5 sm:left-2 md:left-2.5 top-[calc(50vh-8px)] -translate-y-1/2 z-30 w-[240px] max-h-[calc(100vh-170px)] flex flex-col ${isPre ? "p-[1.2px]" : "p-0"} rounded-[20px] ${sidebarFrameClass}`}>
@@ -1257,10 +1254,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isHome
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1277,10 +1274,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/library"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isLibrary
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1296,10 +1293,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/karaoke"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isKaraoke
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1316,10 +1313,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/premium?tab=manage"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isSubscriptionManagement
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1336,10 +1333,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/history"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isHistory
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1356,10 +1353,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 href="/dashboard/search-history"
                 onClick={guardSidebarNavigation}
                 onAuxClick={guardSidebarNavigation}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                   isSearchHistory
                     ? navActiveItemClass
-                    : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-medium"
+                    : "text-white/75 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5 font-semibold"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -1376,7 +1373,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setIsGenresOpen(!isGenresOpen)}
-                  className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 cursor-pointer ${
+                  className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 cursor-pointer ${
                     isGenresOpen
                       ? "text-white bg-white/[0.04]"
                       : "text-white/70 hover:text-white hover:bg-white/[0.05] hover:translate-x-0.5"
@@ -1401,12 +1398,12 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                           key={v.id}
                           type="button"
                           onClick={() => handleVibeClick(v.id)}
-                          className={`w-full flex items-center px-3 py-1.5 rounded-lg text-left text-[12px] transition-all duration-150 cursor-pointer ${
+                          className={`w-full flex items-center px-3 py-1.5 rounded-lg text-left text-[13px] transition-all duration-150 cursor-pointer ${
                             isVibeActive
                               ? isPre
                                 ? "bg-amber-400/[0.12] text-[#fff3d4] font-semibold"
                                 : "bg-white/[0.08] text-white font-semibold"
-                              : "text-white/60 hover:text-white hover:bg-white/[0.04] font-medium"
+                              : "text-white/70 hover:text-white hover:bg-white/[0.04] font-semibold"
                           }`}
                         >
                           <span className="truncate">{v.label}</span>
@@ -1473,7 +1470,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             {/* Danh sách phát (Playlists) Section */}
             <div id="tour-playlist-section" className="pt-3 border-t border-white/[0.08]">
               <div className="flex items-center justify-between px-1 mb-2">
-                <p className="text-[10px] tracking-[0.08em] text-white/45 uppercase font-bold">
+                <p className="text-[11px] tracking-[0.08em] text-white/60 uppercase font-bold">
                   DANH SÁCH PHÁT
                 </p>
                 <button
@@ -1509,7 +1506,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
                       <div className="w-5 h-5 rounded-md bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
                         <Music className={`w-3 h-3 ${navIconClass} transition-colors`} />
                       </div>
-                      <span className="text-[12px] truncate group-hover:translate-x-0.5 transition-transform">
+                      <span className="text-[13px] font-medium truncate group-hover:translate-x-0.5 transition-transform">
                         {pl.name}
                       </span>
                     </Link>
@@ -1524,11 +1521,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           {/* Right Column: Page Content */}
           <div className="min-w-0 flex-1">
             {children}
-            {isHome && user ? (
-              <div className="mt-8">
-                <UserFeatureHighlights />
-              </div>
-            ) : null}
           </div>
         </div>
       </div>

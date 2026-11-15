@@ -24,6 +24,16 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Verify recommendations stay on Home
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import assert from "node:assert/strict";
+            const home = readFileSync("components/dashboard/lumen-hero.tsx", "utf8");
+            assert.match(home, /<RecommendationSections\s*\/>/);
+            assert.match(home, /id="for-you"/);
+          '
+
       - name: Next.js Production Build
         run: npx next build --webpack
         env:
@@ -51,8 +61,7 @@ jobs:
             echo "🚀 Starting Frontend CI/CD deployment to Google Cloud VM on main..."
             cd /opt/moodify/frontend
             git fetch origin main
-            git checkout main
-            git reset --hard origin/main
+            git checkout --detach ${{ github.sha }}
             cd /opt/moodify
             docker compose build moodify-frontend
             docker compose up -d --no-deps moodify-frontend

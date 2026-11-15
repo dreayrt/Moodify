@@ -2,16 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
-import { Play, ListMusic, Music2, Loader2, RefreshCw, X, ArrowUpRight } from "lucide-react";
+import { Play, ListMusic, Music2, Loader2, RefreshCw, X } from "lucide-react";
 import { usePlayer } from "./player-context";
 import { createRecommendationQueue, fetchRecommendationHome, queuePlayerTracks,
   recommendationFeedback, recordRecommendationEvent, rememberRecommendation,
-  type RecommendationHome, type RecommendationItem } from "@/lib/recommendation-client";
+  fetchFollowedArtists, artistRecommendationFeedback, RecommendationError, recommendationExpiresSoon, type RecommendationHome, type RecommendationItem } from "@/lib/recommendation-client";
 
-function RecommendationCard({ item, onPlay, onOpen, onHide, busy }: {
-  item: RecommendationItem; onPlay: () => void; onOpen: () => void; onHide: () => void; busy: boolean;
+function RecommendationCard({ item, onPlay, onOpen, onHide, onNotInterested, onArtist, followed, busy }: {
+  item: RecommendationItem; onPlay: () => void; onOpen: () => void; onHide: () => void; onNotInterested: () => void; onArtist: (id: string, action: "FOLLOW" | "HIDE", enabled: boolean) => void; followed: Set<string>; busy: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
   const recorded = useRef(false);
@@ -46,16 +45,24 @@ function RecommendationCard({ item, onPlay, onOpen, onHide, busy }: {
     <button onClick={onOpen} className="block max-w-full truncate text-left text-sm font-semibold text-white hover:text-purple-200" title={item.title}>{item.title}</button>
     <p className="mt-1 truncate text-xs text-white/50">{item.entityType === "TRACK" ? item.subtitle : `${item.trackCount} bài hát`}</p>
     <p className="mt-2 line-clamp-2 min-h-8 text-[11px] leading-4 text-white/35">{item.reason}</p>
+    {item.entityType === 'TRACK' && <button disabled={busy} onClick={onNotInterested} className="mt-2 text-xs text-white/45 hover:text-white/80">Không quan tâm</button>}
+    {(item.track?.artistIds?.[0] || item.track?.artistSpotifyId) && <div className="mt-2 flex flex-wrap gap-3 text-xs text-purple-200">
+      <button disabled={busy} onClick={() => { const id = item.track!.artistIds?.[0] || item.track!.artistSpotifyId!; onArtist(id,"FOLLOW",!followed.has(id)); }}>
+        {followed.has(item.track.artistIds?.[0] || item.track.artistSpotifyId!) ? "Bỏ theo dõi" : "Theo dõi nghệ sĩ"}
+      </button>
+      <button disabled={busy} onClick={() => onArtist(item.track!.artistIds?.[0] || item.track!.artistSpotifyId!,"HIDE",true)}>Ẩn nghệ sĩ</button>
+    </div>}
   </article>;
 }
 
 export default function RecommendationSections() {
+  const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [home, setHome] = useState<RecommendationHome | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [lastHidden, setLastHidden] = useState<RecommendationItem | null>(null);
+  const [lastHidden, setLastHidden] = useState<{ item: RecommendationItem; feedbackType: 'HIDE' | 'NOT_INTERESTED' } | null>(null);
   const router = useRouter();
   const { playTrack } = usePlayer();
 
@@ -65,7 +72,17 @@ export default function RecommendationSections() {
     finally { if (!signal?.aborted) setLoading(false); }
   }, []);
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => { clearTimeout(timer);timer = setTimeout(() => { if (document.visibilityState === 'visible') void load(); }, 400); };
+    window.addEventListener('moodify:recommendation-changed', refresh);
+    window.addEventListener('moodify-artist-followed', refresh);
+    window.addEventListener('moodify-library-updated', refresh);
+    return () => { clearTimeout(timer);window.removeEventListener('moodify:recommendation-changed', refresh);
+      window.removeEventListener('moodify-artist-followed', refresh);window.removeEventListener('moodify-library-updated', refresh); };
+  }, [load]);
+  useEffect(() => {
     const controller = new AbortController();
+    void fetchFollowedArtists().then(ids => { if (!controller.signal.aborted) setFollowed(new Set(ids)); }).catch(() => {});
     fetchRecommendationHome(controller.signal).then(result => {
       if (!controller.signal.aborted) { setHome(result); setLoading(false); }
     }).catch(failure => {
@@ -77,7 +94,20 @@ export default function RecommendationSections() {
   const play = async (item: RecommendationItem) => {
     setBusy(item.itemId); setError(null);
     try {
-      const queue = await createRecommendationQueue(item);
+      let current = item;
+      const refresh = async () => {
+        const fresh = await fetchRecommendationHome();setHome(fresh);
+        const replacement = fresh.sections.flatMap(section => section.items).find(candidate => candidate.entityType === item.entityType && candidate.entityId === item.entityId);
+        if (!replacement) throw new Error("Nội dung đã thay đổi. Hãy chọn một gợi ý mới.");
+        return replacement;
+      };
+      if (!home || recommendationExpiresSoon(home.expiresAt)) current = await refresh();
+      let queue;
+      try { queue = await createRecommendationQueue(current); }
+      catch (failure) {
+        if (!(failure instanceof RecommendationError) || failure.code !== "RECOMMENDATION_TOKEN_EXPIRED") throw failure;
+        queue = await createRecommendationQueue(await refresh());
+      }
       const tracks = queuePlayerTracks(queue);
       if (tracks.length === 0) throw new Error("Chưa có bài đủ điều kiện để phát trong danh sách này.");
       playTrack(tracks[0], tracks);
@@ -90,17 +120,24 @@ export default function RecommendationSections() {
     rememberRecommendation(item);
     router.push(`/dashboard/recommendations/${encodeURIComponent(item.entityId)}?type=${item.entityType}&item=${item.itemId}`);
   };
-  const hide = async (item: RecommendationItem) => {
+  const hide = async (item: RecommendationItem, feedbackType: 'HIDE' | 'NOT_INTERESTED' = 'HIDE') => {
     try {
-      await recommendationFeedback(item, true);
-      setHidden(prior => new Set([...prior, `${item.entityType}:${item.entityId}`])); setLastHidden(item);
+      await recommendationFeedback(item, true, feedbackType);
+      setHidden(prior => new Set([...prior, `${item.entityType}:${item.entityId}`])); setLastHidden({ item, feedbackType });
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Chưa thể lưu lựa chọn."); }
+  };
+  const artist = async (id: string, action: "FOLLOW" | "HIDE", enabled: boolean) => {
+    try {
+      await artistRecommendationFeedback(id, action, enabled);
+      setFollowed(new Set(await fetchFollowedArtists()));
+      await load();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Chưa thể lưu sở thích nghệ sĩ."); }
   };
   const undo = async () => {
     if (!lastHidden) return;
     try {
-      await recommendationFeedback(lastHidden, false);
-      setHidden(prior => { const next = new Set(prior); next.delete(`${lastHidden.entityType}:${lastHidden.entityId}`); return next; });
+      await recommendationFeedback(lastHidden.item, false, lastHidden.feedbackType);
+      setHidden(prior => { const next = new Set(prior); next.delete(`${lastHidden.item.entityType}:${lastHidden.item.entityId}`); return next; });
       setLastHidden(null);
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Chưa thể hoàn tác."); }
   };
@@ -109,19 +146,21 @@ export default function RecommendationSections() {
     {error && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 p-4 text-sm text-white/60">
       <span>{error}</span><button onClick={() => { setLoading(true); setError(null); void load(); }} className="flex items-center gap-2 text-purple-300"><RefreshCw size={14} />Thử lại</button>
     </div>}
-    {lastHidden && <div role="status" className="flex items-center gap-3 text-xs text-white/60"><span>Đã ẩn {lastHidden.title}.</span><button onClick={() => void undo()} className="text-purple-300 underline">Hoàn tác</button></div>}
+    {lastHidden && <div role="status" className="flex items-center gap-3 text-xs text-white/60"><span>Đã ẩn {lastHidden.item.title}.</span><button onClick={() => void undo()} className="text-purple-300 underline">Hoàn tác</button></div>}
     {loading && !home && <div className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Đang tải gợi ý">{[0,1,2,3].map(i => <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-white/5" />)}</div>}
-    {home?.sections.map(section => {
+    {home?.sections.toSorted((a,b) => ["for_you","personal_mixes","playlists_for_you","trending","campaigns"].indexOf(a.id) - ["for_you","personal_mixes","playlists_for_you","trending","campaigns"].indexOf(b.id)).map(section => {
       const items = section.items.filter(item => !hidden.has(`${item.entityType}:${item.entityId}`));
       if (!items.length) return null;
       return <section key={section.id} aria-labelledby={`rec-${section.id}`}>
         <div className="mb-4 flex items-end justify-between gap-3">
           <div><h2 id={`rec-${section.id}`} className="font-display text-xl font-bold text-white md:text-2xl">{section.title}</h2><p className="mt-1 text-xs text-white/45">{section.description}</p></div>
-          {section.id === "personal_mixes" && <Link href="/dashboard/recommendations" className="flex shrink-0 items-center gap-1 text-xs text-purple-300">Bản phối của tôi<ArrowUpRight size={14} /></Link>}
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{items.map(item => <RecommendationCard key={item.itemId} item={item} busy={busy === item.itemId} onPlay={() => void play(item)} onOpen={() => open(item)} onHide={() => void hide(item)} />)}</div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{items.map(item => <RecommendationCard key={item.itemId} item={item} followed={followed} onArtist={(id, action, enabled) => void artist(id,action,enabled)} busy={busy === item.itemId} onPlay={() => void play(item)} onOpen={() => open(item)} onHide={() => void hide(item)} onNotInterested={() => void hide(item,'NOT_INTERESTED')} />)}</div>
       </section>;
     })}
-    {home && !home.sections.some(section => section.items.length) && <p className="py-4 text-sm text-white/50">Chưa có nội dung phù hợp để đề xuất. Bạn có thể tiếp tục khám phá thư viện nhạc.</p>}
+    {home && !home.sections.some(section => section.items.length) && <section>
+      <h2 className="font-display text-xl font-bold text-white md:text-2xl">Dành cho bạn</h2>
+      <p className="mt-2 text-sm text-white/50">{home.availabilityStatus === "NO_ELIGIBLE_CATALOG" ? "Đề xuất đang chờ kho nhạc đủ quyền phát hành." : "Chưa có nội dung phù hợp. Hãy điều chỉnh sở thích hoặc quay lại sau."}</p>
+    </section>}
   </div>;
 }

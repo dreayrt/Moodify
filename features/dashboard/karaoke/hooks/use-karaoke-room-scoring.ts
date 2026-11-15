@@ -10,7 +10,9 @@ import {
   type KaraokePitchFeatures,
   type KaraokeRoomPitchSegment,
   type KaraokeRoomScoreSession,
+  type KaraokeScoreResponse,
 } from "@/lib/api-client";
+import { captureDiagnostics } from "../capture-diagnostics";
 
 type CaptureSummary = {
   duration_seconds: number;
@@ -69,6 +71,14 @@ export function useKaraokeRoomScoring(input: {
   const [watchedSessionIds, setWatchedSessionIds] = useState<string[]>([]);
   const [scoringStatus, setScoringStatus] = useState<KaraokeRoomScoreSession["status"] | "idle">("idle");
   const [score, setScore] = useState<number | null>(null);
+  const [scoreResult, setScoreResult] = useState<KaraokeScoreResponse | null>(null);
+  const captureReportsRef = useRef(new Map<string, unknown[]>());
+  const [scoreCaptureReport, setScoreCaptureReport] = useState<unknown[]>([]);
+
+  const recordResult = useCallback((session: KaraokeRoomScoreSession) => {
+    setScoreResult(session.score);
+    setScoreCaptureReport(captureReportsRef.current.get(session.playbackRunId) ?? []);
+  }, []);
   const [scoreSessionId, setScoreSessionId] = useState("");
   const [scoreSongTitle, setScoreSongTitle] = useState("");
   const [scoreError, setScoreError] = useState("");
@@ -163,7 +173,8 @@ export function useKaraokeRoomScoring(input: {
         const finished = await finishKaraokeRoomScoreSession(run.roomId, session.sessionId);
         setScoringStatus(finished.status);
         const overall = scoreFromSession(finished);
-        if (overall !== null) {
+        if (overall !== null || (finished.status === "completed" && finished.score)) {
+          recordResult(finished);
           setScore(overall);
           setScoreSessionId(finished.sessionId);
           setScoreSongTitle(input.songTitle ?? "Bài hát trong phòng");
@@ -171,7 +182,8 @@ export function useKaraokeRoomScoring(input: {
       } else {
         setScoringStatus(session.status);
         const overall = scoreFromSession(session);
-        if (overall !== null) {
+        if (overall !== null || (session.status === "completed" && session.score)) {
+          recordResult(session);
           setScore(overall);
           setScoreSessionId(session.sessionId);
           setScoreSongTitle(input.songTitle ?? "Bài hát trong phòng");
@@ -182,7 +194,7 @@ export function useKaraokeRoomScoring(input: {
     } finally {
       run.closed = true;
     }
-  }, [input.songTitle, stopCapture]);
+  }, [input.songTitle, recordResult, stopCapture]);
 
   useEffect(() => {
     if (!input.enabled || !input.playbackRunId || !input.songId || !input.durationMs) return;
@@ -219,7 +231,8 @@ export function useKaraokeRoomScoring(input: {
       setWatchedSessionIds((current) => current.includes(session.sessionId) ? current : [...current, session.sessionId]);
       setScoringStatus(session.status);
       const overall = scoreFromSession(session);
-      if (overall !== null) {
+      if (overall !== null || (session.status === "completed" && session.score)) {
+        recordResult(session);
         setScore(overall);
         setScoreSessionId(session.sessionId);
         setScoreSongTitle(input.songTitle ?? "Bài hát trong phòng");
@@ -235,7 +248,7 @@ export function useKaraokeRoomScoring(input: {
       else discardRun(next);
       runRef.current = null;
     };
-  }, [discardRun, finishRun, input.durationMs, input.enabled, input.playbackRunId, input.roomId, input.songId, input.songTitle]);
+  }, [discardRun, finishRun, recordResult, input.durationMs, input.enabled, input.playbackRunId, input.roomId, input.songId, input.songTitle]);
 
   useEffect(() => {
     const run = runRef.current;
@@ -257,6 +270,7 @@ export function useKaraokeRoomScoring(input: {
 
     const stream = input.microphoneStream;
     const offsetMs = Math.max(0, Math.min(run.durationMs, input.positionMs));
+    const preparationStartedAt = performance.now();
     run.captureStarting = true;
     void (async () => {
       let context: AudioContext | null = null;
@@ -317,6 +331,16 @@ export function useKaraokeRoomScoring(input: {
           return;
         }
         run.activeCapture = capture;
+        const reports = captureReportsRef.current.get(run.runId) ?? [];
+        reports.push({ ...captureDiagnostics(stream, context), segment_offset_ms: offsetMs,
+          preparation_ms: Math.round(performance.now() - preparationStartedAt),
+          latest_room_position_ms: run.lastPositionMs });
+        captureReportsRef.current.set(run.runId, reports.slice(-100));
+        // Keep only recent runs; the report describes this browser's microphone.
+        if (captureReportsRef.current.size > 10) {
+          const oldest = captureReportsRef.current.keys().next().value;
+          if (oldest !== undefined) captureReportsRef.current.delete(oldest);
+        }
         processor.port.postMessage({ type: "start" });
         setCapturing(true);
       } catch (error) {
@@ -342,7 +366,8 @@ export function useKaraokeRoomScoring(input: {
             setScoringStatus(session.status);
           }
           const overall = scoreFromSession(session);
-          if (overall !== null) {
+          if (overall !== null || (session.status === "completed" && session.score)) {
+            recordResult(session);
             setScore(overall);
             setScoreSessionId(id);
             setScoreSongTitle(watchedTitlesRef.current.get(id) ?? "Bài hát trong phòng");
@@ -357,7 +382,7 @@ export function useKaraokeRoomScoring(input: {
     const timer = window.setInterval(() => void refresh(), 2500);
     void refresh();
     return () => { stopped = true; window.clearInterval(timer); };
-  }, [input.roomId, watchedSessionIds]);
+  }, [input.roomId, recordResult, watchedSessionIds]);
 
   const trackEnded = useCallback(() => {
     const run = runRef.current;
@@ -367,5 +392,5 @@ export function useKaraokeRoomScoring(input: {
     }
   }, [finishRun]);
 
-  return { score, scoreSessionId, scoreSongTitle, scoringStatus, scoreError, capturing, trackEnded };
+  return { score, scoreResult, scoreCaptureReport, scoreSessionId, scoreSongTitle, scoringStatus, scoreError, capturing, trackEnded };
 }

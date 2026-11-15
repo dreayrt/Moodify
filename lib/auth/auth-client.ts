@@ -68,28 +68,6 @@ export type ArtistTrackResponse = {
   acquisitionCostVnd?: number | null;
 };
 
-export type RevenueTrack = {
-  id: string; title: string; genre: string; coverUrl: string | null;
-  qualifiedPlays: number; pendingPlays: number;
-  grossVnd: number; contentLeadVnd: number; platformVnd: number;
-  acquisitionCostVnd: number | null; lifetimeContentLeadVnd: number;
-  recoupBalanceVnd: number | null;
-};
-
-export type ContentLeadRevenueResponse = {
-  period: "today" | "week" | "month" | "year";
-  fromDate: string; toDate: string; qualifiedPlays: number; pendingPlays: number;
-  grossVnd: number; contentLeadVnd: number; platformVnd: number;
-  trend: Array<{ day: string; contentLeadVnd: number }>;
-  tracks: RevenueTrack[];
-};
-
-export async function getContentLeadRevenue(period: ContentLeadRevenueResponse["period"]): Promise<ContentLeadRevenueResponse> {
-  const token = await getValidAccessToken();
-  if (!token) throw new Error("Vui lòng đăng nhập để xem doanh thu.");
-  return requestJson<ContentLeadRevenueResponse>(`/api/content-lead/me/analytics/revenue?period=${period}`, { token });
-}
-
 export type ArtistAlbumResponse = {
   id: string;
   spotifyId: string;
@@ -121,50 +99,6 @@ export type ContentLeadTrackResponse = ArtistTrackResponse;
 export type ContentLeadAlbumResponse = ArtistAlbumResponse;
 export type ContentLeadCatalogResponse = ArtistCatalogResponse;
 
-export type AudienceChannelItem = {
-  id: string;
-  channel: string;
-  subtitle: string;
-  streams: number;
-  share: number;
-  shareFormatted: string;
-  uniqueListeners: number;
-  completionRate: number;
-  color: string;
-  icon: string;
-  details?: Record<string, string | number>;
-};
-
-export type AudienceTrendItem = {
-  date: string;
-  label: string;
-  streams: number;
-  mobileStreams: number;
-  webStreams: number;
-  otherStreams: number;
-};
-
-export type AudienceTrackStat = {
-  trackId: string;
-  title: string;
-  coverUrl: string | null;
-  streams: number;
-  completionRate: number;
-  primaryChannel: string;
-};
-
-export type ContentLeadAudienceResponse = {
-  totalReach: number;
-  uniqueListeners: number;
-  avgCompletionRate: number;
-  totalListeningHours: number;
-  growthRate: number;
-  period: "7d" | "30d" | "90d" | "all";
-  selectedTrackId: string | null;
-  channels: AudienceChannelItem[];
-  dailyTrends: AudienceTrendItem[];
-  topTracks: AudienceTrackStat[];
-};
 export type StoredAuthSession = {
   accessToken: string;
   refreshToken: string;
@@ -173,14 +107,34 @@ export type StoredAuthSession = {
 };
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:8088";
+  (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8088")
+    .replace(/\/+$/, "").replace(/\/api$/, "");
+
+function requestUrl(path: string) {
+  // Forward account requests through Next.js so browsers use the site's origin.
+  // The rewrite retains Authorization/device headers and backend status codes.
+  return typeof window !== "undefined" && path.startsWith("/api/auth/")
+    ? path
+    : `${API_BASE_URL}${path}`;
+}
+
+function cacheUserProfile(profile: UserProfileResponse, epoch: number) {
+  if (typeof window !== "undefined" && epoch === authSessionEpoch && window.localStorage.getItem(STORAGE_KEY)) {
+    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
+  }
+}
 
 const STORAGE_KEY = "moodify.auth.session";
 const USER_STORAGE_KEY = "moodify.auth.user";
 
+// Bumped on every clearAuthSession() so async token refreshes that started
+// before a logout cannot write the cleared session back afterwards.
+let authSessionEpoch = 0;
+
 type RequestOptions = {
+  timeoutMs?: number;
   body?: unknown;
+  extraHeaders?: Record<string, string>;
   keepalive?: boolean;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   token?: string;
@@ -321,8 +275,14 @@ export function clearAuthSession() {
     return;
   }
 
+  // Invalidate any in-flight refresh: a response that lands after logout must
+  // never resurrect cookies and keep the middleware bouncing the user back.
+  authSessionEpoch += 1;
+
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
+  window.localStorage.removeItem("accessToken");
+  window.localStorage.removeItem("refreshToken");
 
   // Clear current and legacy cookies so old token names cannot keep routes open.
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
@@ -345,11 +305,15 @@ export async function loginWithGoogle(idToken: string) {
   });
 }
 
-export async function loginWithFacebook(accessToken: string) {
+export async function loginWithGoogleCode(code: string) {
   const device = typeof window !== "undefined" ? getDeviceIdentity() : null;
-  return requestJson<AuthResponse>("/api/auth/facebook", {
+  return requestJson<AuthResponse>("/api/auth/google/code", {
+    extraHeaders: { "X-Requested-With": "XmlHttpRequest" },
     body: {
-      accessToken,
+      code,
+      codeVerifier: "",
+      redirectUri: typeof window !== "undefined" ? window.location.origin : "",
+      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
       deviceUuid: device?.deviceUuid,
       deviceName: device?.deviceName,
       platform: device?.platform,
@@ -478,6 +442,48 @@ export async function logout(refreshToken?: string) {
   });
 }
 
+export function logoutAndRedirect() {
+  if (typeof window === "undefined") return;
+
+  // Send revocation with keepalive before leaving, without waiting for the API.
+  void logout().catch((error) => console.warn("Logout error:", error));
+  clearAuthSession();
+
+  // A document navigation discards prefetched authenticated redirects and
+  // remounts the shared player/layout without the previous account's state.
+  window.location.replace("/dashboard/user");
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  token?: string,
+): Promise<void> {
+  const validToken = token || (await getValidAccessToken());
+  if (!validToken) {
+    throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  await requestJson<void>("/api/auth/change-password", {
+    token: validToken,
+    timeoutMs: 15_000,
+    body: { currentPassword, newPassword },
+  });
+}
+
+export async function updateCurrentUserProfile(payload: { fullName: string; phone: string }) {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  const epoch = authSessionEpoch;
+  const profile = await requestJson<UserProfileResponse>("/api/auth/me", {
+    method: "PATCH",
+    token,
+    timeoutMs: 15_000,
+    body: { fullName: payload.fullName.trim(), phone: payload.phone.trim() },
+  });
+  cacheUserProfile(profile, epoch);
+  return profile;
+}
+
 export async function uploadAvatar(
   accessToken: string,
   file: File,
@@ -485,7 +491,8 @@ export async function uploadAvatar(
   const formData = new FormData();
   formData.append("file", file);
 
-  const fullUrl = `${API_BASE_URL}/api/auth/avatar`;
+  const epoch = authSessionEpoch;
+  const fullUrl = requestUrl("/api/auth/avatar");
   const response = await fetch(fullUrl, {
     method: "POST",
     headers: {
@@ -499,7 +506,9 @@ export async function uploadAvatar(
     throw new Error(errorMsg);
   }
 
-  return (await response.json()) as UserProfileResponse;
+  const profile = (await response.json()) as UserProfileResponse;
+  cacheUserProfile(profile, epoch);
+  return profile;
 }
 
 export async function uploadArtistTrack(
@@ -611,9 +620,12 @@ export async function submitModeratorDecision(
 
 
 export async function getCurrentUser(accessToken: string) {
-  return requestJson<UserProfileResponse>("/api/auth/me", {
+  const epoch = authSessionEpoch;
+  const profile = await requestJson<UserProfileResponse>("/api/auth/me", {
     token: accessToken,
   });
+  cacheUserProfile(profile, epoch);
+  return profile;
 }
 
 export async function getCurrentArtistCatalog(
@@ -642,6 +654,7 @@ export interface OcrExtractLicenseResponse {
   copyrightOwner?: string;
   distributorId?: number;
   distributorName?: string;
+  directLicensing?: boolean;
   contractId?: string;
   issueDate?: string;
   expiryDate?: string;
@@ -679,23 +692,6 @@ export async function extractLicenseFromDoc(
 export const updateContentLeadTrack = updateArtistTrack;
 export const deleteContentLeadTrack = deleteArtistTrack;
 
-export async function getContentLeadAudienceAnalytics(
-  accessToken: string,
-  params: { period?: "7d" | "30d" | "90d" | "all"; trackId?: string } = {},
-): Promise<ContentLeadAudienceResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.period) {
-    searchParams.set("period", params.period);
-  }
-  if (params.trackId && params.trackId !== "all") {
-    searchParams.set("trackId", params.trackId);
-  }
-
-  return requestJson<ContentLeadAudienceResponse>(
-    `/api/content-lead/me/analytics/audience-channels?${searchParams.toString()}`,
-    { token: accessToken },
-  );
-}
 
 export async function recordPlatformVisit(payload: {
   targetType?: "TRACK" | "ARTIST" | "GENERAL";
@@ -717,9 +713,23 @@ export async function recordPlatformVisit(payload: {
   }
 }
 
-export async function recordListeningSessionTelemetry(payload: {
+const playbackDeliveries = new Map<string, { pending: number; chain: Promise<unknown> }>();
+export function recordListeningSessionTelemetry(payload: Parameters<typeof deliverListeningSessionTelemetry>[0]) {
+  let delivery = playbackDeliveries.get(payload.sessionKey);
+  if (!delivery) { delivery = { pending: 0, chain: Promise.resolve() };playbackDeliveries.set(payload.sessionKey, delivery); }
+  if (delivery.pending >= 12) return Promise.resolve(null);
+  const sampledAt = Date.now();const state = delivery;state.pending++;
+  const request = state.chain.then(() => Date.now() - sampledAt <= 6000 ? deliverListeningSessionTelemetry(payload) : null);
+  state.chain = request.catch(() => null);
+  return request.finally(() => {
+    state.pending--;if (!state.pending && playbackDeliveries.get(payload.sessionKey) === state) playbackDeliveries.delete(payload.sessionKey);
+  });
+}
+
+async function deliverListeningSessionTelemetry(payload: {
   sessionKey: string;
   queueToken?: string;
+  expiresAt?: string;
   historyId?: number;
   trackId: string;
   durationMs: number;
@@ -731,10 +741,18 @@ export async function recordListeningSessionTelemetry(payload: {
   eventType?: "PLAY" | "PAUSE" | "RESUME" | "SEEK" | "HEARTBEAT" | "SKIP_NEXT" | "SKIP_PREVIOUS" | "COMPLETE" | string;
 }) {
   try {
+    if (payload.queueToken && Date.parse(payload.expiresAt || "") <= Date.now() + 60000) {
+      const { prepareRecommendationTrack } = await import("@/lib/recommendation-client");
+      const ready = await prepareRecommendationTrack({ id: payload.trackId, spotifyId: payload.trackId,
+        name: "", artistName: "", playbackContext: { source: payload.source || "HOME", sourceId: payload.sourceId,
+          queueToken: payload.queueToken, expiresAt: payload.expiresAt } }, false);
+      payload = { ...payload, queueToken: ready.playbackContext?.queueToken, expiresAt: ready.playbackContext?.expiresAt };
+    }
     const token = await getValidAccessToken();
     const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : undefined;
-    return await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
+    const result = await requestJson<{ success: boolean; historyId?: number }>("/api/analytics/listening-session", {
       method: "POST",
+      timeoutMs: 5000,
       token: token ?? undefined,
       body: {
         deviceType: "WEB",
@@ -743,6 +761,10 @@ export async function recordListeningSessionTelemetry(payload: {
         ...payload,
       },
     });
+    if (result.success && typeof window !== 'undefined' && ['COMPLETE','SKIP_NEXT','SKIP_PREVIOUS','TRACK_CHANGED'].includes(payload.eventType || '')) {
+      window.dispatchEvent(new Event('moodify:recommendation-changed'));
+    }
+    return result;
   } catch {
     // Non-blocking telemetry
     return null;
@@ -776,7 +798,12 @@ export async function getValidAccessToken(): Promise<string | null> {
   }
 
   try {
+    const epoch = authSessionEpoch;
     const refreshed = await refresh(session.refreshToken);
+    if (epoch !== authSessionEpoch) {
+      // The user logged out while this refresh was in flight — discard it.
+      return null;
+    }
     saveAuthSession(refreshed);
     return refreshed.accessToken;
   } catch {
@@ -787,14 +814,14 @@ export async function getValidAccessToken(): Promise<string | null> {
 
 async function requestJson<T>(
   path: string,
-  { body, keepalive, method, token }: RequestOptions = {},
+  { body, extraHeaders, keepalive, method, token, timeoutMs }: RequestOptions = {},
 ): Promise<T> {
-  const fullUrl = `${API_BASE_URL}${path}`;
+  const fullUrl = requestUrl(path);
   const requestMethod = method ?? (body ? "POST" : "GET");
 
   // Auto fallback to getValidAccessToken if token not provided and not a public auth endpoint
   let authToken = token;
-  if (!authToken && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/register") && !path.startsWith("/api/auth/refresh")) {
+  if (!authToken && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/register") && !path.startsWith("/api/auth/refresh") && path !== "/api/auth/logout") {
     authToken = (await getValidAccessToken()) ?? undefined;
   }
 
@@ -809,9 +836,11 @@ async function requestJson<T>(
 
   const response = await fetch(fullUrl, {
     keepalive,
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     method: requestMethod,
     headers: {
       "Content-Type": "application/json",
+      ...(extraHeaders ?? {}),
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(currentDeviceUuid ? { "X-Device-Uuid": currentDeviceUuid } : {}),
     },

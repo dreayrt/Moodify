@@ -19,7 +19,6 @@ import {
   RotateCcw,
   Copy,
   Radio,
-  Music,
   AlertCircle,
   Plus,
 } from "lucide-react";
@@ -32,6 +31,8 @@ import {
 
 type TrackCatalogPanelProps = {
   tracks: ArtistTrack[];
+  loading: boolean;
+  error: string | null;
   onEditTrack: (track: ArtistTrack) => void;
   onDeleteTrack: (track: ArtistTrack) => void;
   onToggleStatus: (track: ArtistTrack) => void;
@@ -44,6 +45,8 @@ type TrackCatalogPanelProps = {
 
 export function TrackCatalogPanel({
   tracks,
+  loading,
+  error,
   onEditTrack,
   onDeleteTrack,
   onToggleStatus,
@@ -54,6 +57,7 @@ export function TrackCatalogPanel({
   onOpenUpload,
 }: TrackCatalogPanelProps) {
   const { t } = useTranslation();
+  const catalogReady = !loading && !error;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<TrackFilterStatus>("all");
@@ -162,39 +166,74 @@ export function TrackCatalogPanel({
   };
 
   return (
-    <div
-      className="anim-fade-up rounded-[28px] border border-white/8 bg-[#121316] p-5 md:p-6 shadow-[0_28px_80px_rgba(0,0,0,0.24)]"
-      style={{ animationDelay: "940ms" }}
+    <section
+      aria-labelledby="studio-catalog-title"
+      aria-busy={loading}
+      className="min-w-0 rounded-[24px] border border-white/8 bg-[#121316] p-3.5 shadow-[0_24px_60px_rgba(0,0,0,0.24)] sm:p-6"
     >
-      {/* Top Header */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-[11px] tracking-[0.24em] text-[#ffb488] uppercase">
-            {t("dashboard.artist.trackCatalog.eyebrow")}
-          </p>
-          <h3 className="mt-2 font-graphik text-[26px] tracking-[-0.03em] text-white">
-            {t("dashboard.artist.trackCatalog.title")}
-          </h3>
-          <p className="mt-2 max-w-[560px] text-[14px] leading-6 text-white/52">
-            {t("dashboard.artist.trackCatalog.description")}
-          </p>
-        </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h2 id="studio-catalog-title" className="font-graphik text-[26px] font-semibold tracking-[-0.03em] text-white sm:text-[30px]">
+          {t("dashboard.artist.trackCatalog.title")}
+        </h2>
+        <button
+          type="button"
+          onClick={onOpenUpload}
+          className="inline-flex w-full min-h-[44px] sm:w-auto items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e58] px-5 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(255,122,44,0.25)] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] whitespace-nowrap shrink-0 transition cursor-pointer"
+        >
+          <Plus className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+          <span>{t("dashboard.artist.trackCatalog.uploadTrack")}</span>
+        </button>
+      </div>
 
-        {/* Search, Filter & Upload Action Group */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <label className="flex min-h-[44px] items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 focus-within:border-[#ff8b4d]/40 focus-within:bg-white/[0.07] transition">
+      <div className="mt-5 flex flex-col gap-3 border-t border-white/8 pt-4 lg:flex-row lg:items-center lg:justify-between">
+        {catalogReady && (
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "all" as TrackFilterStatus, labelKey: "all", count: counts.all },
+              { key: "draft" as TrackFilterStatus, labelKey: "draft", count: counts.draft },
+              { key: "published" as TrackFilterStatus, labelKey: "published", count: counts.published },
+            ].map(({ key, labelKey, count }) => {
+              const isActive = statusFilter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setStatusFilter(key)}
+                  className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium whitespace-nowrap transition active:scale-95 ${
+                    isActive
+                      ? "border-[#ff8b4d]/40 bg-[#ff8b4d]/15 text-[#ffb488] shadow-[0_0_20px_rgba(255,122,44,0.12)]"
+                      : "border-white/10 bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white"
+                  }`}
+                >
+                  <span>{t(`dashboard.artist.trackCatalog.filters.${labelKey}`)}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                      isActive ? "bg-[#ff8b4d]/30 text-white" : "bg-white/10 text-white/50"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {/* Search and filter */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+          <label className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 focus-within:border-[#ff8b4d]/40 focus-within:bg-white/[0.07] transition">
             <Search className="h-4 w-4 text-white/42 shrink-0" strokeWidth={1.7} />
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label={t("dashboard.artist.trackCatalog.searchLabel")}
               placeholder={t("dashboard.artist.trackCatalog.searchPlaceholder")}
-              className="w-[180px] sm:w-[210px] bg-transparent text-[13px] text-white outline-none placeholder:text-white/36"
+              className="w-full min-w-0 sm:w-[210px] bg-transparent text-[13px] text-white outline-none placeholder:text-white/36"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm("")}
+                aria-label={t("dashboard.artist.trackCatalog.clearSearch")}
                 className="rounded-full p-0.5 text-white/40 hover:bg-white/10 hover:text-white transition shrink-0"
               >
                 <X className="h-3.5 w-3.5" />
@@ -206,6 +245,7 @@ export function TrackCatalogPanel({
           <div className="relative shrink-0" ref={filterMenuRef}>
             <button
               type="button"
+              aria-expanded={isFilterMenuOpen}
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
               className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border px-4 text-[12px] font-medium whitespace-nowrap shrink-0 transition ${
                 hasActiveAdvancedFilter
@@ -222,7 +262,7 @@ export function TrackCatalogPanel({
 
             {/* Filter Popover Content */}
             {isFilterMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 z-40 w-72 rounded-2xl border border-white/12 bg-[#171821] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 top-full mt-2 z-40 w-[min(18rem,calc(100vw-3.5rem))] rounded-2xl border border-white/12 bg-[#171821] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between pb-3 border-b border-white/8">
                   <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-white/70">
                     {t("dashboard.artist.trackCatalog.filter")}
@@ -298,66 +338,32 @@ export function TrackCatalogPanel({
               </div>
             )}
           </div>
-
-          {/* Upload Track Button */}
-          <button
-            type="button"
-            onClick={onOpenUpload}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff7a2c] to-[#ff9e58] px-5 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(255,122,44,0.25)] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] whitespace-nowrap shrink-0 transition cursor-pointer"
-          >
-            <Plus className="h-4 w-4 shrink-0" strokeWidth={2.2} />
-            <span className="whitespace-nowrap">{t("dashboard.artist.trackCatalog.uploadTrack", "Tải lên bài hát mới")}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Tabs (All / Draft / Published) */}
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/6 pt-4">
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: "all" as TrackFilterStatus, labelKey: "all", count: counts.all },
-            { key: "draft" as TrackFilterStatus, labelKey: "draft", count: counts.draft },
-            { key: "published" as TrackFilterStatus, labelKey: "published", count: counts.published },
-          ].map(({ key, labelKey, count }) => {
-            const isActive = statusFilter === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setStatusFilter(key)}
-                className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium whitespace-nowrap transition active:scale-95 ${
-                  isActive
-                    ? "border-[#ff8b4d]/40 bg-[#ff8b4d]/15 text-[#ffb488] shadow-[0_0_20px_rgba(255,122,44,0.12)]"
-                    : "border-white/10 bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white"
-                }`}
-              >
-                <span>{t(`dashboard.artist.trackCatalog.filters.${labelKey}`)}</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                    isActive ? "bg-[#ff8b4d]/30 text-white" : "bg-white/10 text-white/50"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
         </div>
       </div>
 
       {/* Tracks Table / Catalog List */}
-      <div className="mt-5 rounded-[22px] border border-white/8 bg-black/20">
+      <div className="mt-4 rounded-[18px] border border-white/8 bg-black/20">
         {/* Table Header */}
-        <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(120px,0.7fr)_minmax(120px,0.7fr)_minmax(130px,0.8fr)_110px] gap-4 border-b border-white/8 bg-white/[0.03] px-5 py-3.5 text-[11px] tracking-[0.16em] text-white/42 uppercase md:grid">
-          <span>{t("dashboard.artist.trackCatalog.columns.track")}</span>
-          <span>{t("dashboard.artist.trackCatalog.columns.status")}</span>
-          <span>{t("dashboard.artist.trackCatalog.columns.visibility")}</span>
-          <span>{t("dashboard.artist.trackCatalog.columns.updatedAt")}</span>
-          <span className="text-right">{t("dashboard.artist.trackCatalog.columns.actions")}</span>
-        </div>
+        {catalogReady && filteredTracks.length > 0 && (
+          <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(112px,0.8fr)_minmax(100px,0.7fr)_minmax(120px,0.8fr)_112px] gap-4 rounded-t-[18px] border-b border-white/8 bg-white/[0.03] px-5 py-3.5 text-[11px] tracking-[0.12em] text-white/55 uppercase lg:grid">
+            <span>{t("dashboard.artist.trackCatalog.columns.track")}</span>
+            <span>{t("dashboard.artist.trackCatalog.columns.status")}</span>
+            <span>{t("dashboard.artist.trackCatalog.columns.visibility")}</span>
+            <span>{t("dashboard.artist.trackCatalog.columns.updatedAt")}</span>
+            <span className="text-right">{t("dashboard.artist.trackCatalog.columns.actions")}</span>
+          </div>
+        )}
 
-        {/* Empty State */}
-        {filteredTracks.length === 0 ? (
+        {loading ? (
+          <p role="status" className="p-6 text-sm text-white/60">
+            {t("dashboard.artist.trackCatalog.loading")}
+          </p>
+        ) : error ? (
+          <div role="alert" className="p-6 text-sm text-red-200">
+            <p className="font-medium">{t("dashboard.artist.trackCatalog.loadError")}</p>
+            <p className="mt-1 break-words text-red-200/70">{error}</p>
+          </div>
+        ) : filteredTracks.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-white/[0.04] border border-white/8 text-white/40 mb-3">
               <ListMusic className="h-8 w-8" />
@@ -389,10 +395,10 @@ export function TrackCatalogPanel({
               return (
                 <div
                   key={track.id}
-                  className="group relative grid gap-4 px-4 py-4 transition-colors hover:bg-white/[0.04] md:grid-cols-[minmax(260px,1.5fr)_minmax(120px,0.7fr)_minmax(120px,0.7fr)_minmax(130px,0.8fr)_110px] md:items-center md:px-5"
+                  className="group relative grid grid-cols-2 items-center gap-3 px-3 py-4 transition-colors hover:bg-white/[0.04] sm:px-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(112px,0.8fr)_minmax(100px,0.7fr)_minmax(120px,0.8fr)_112px] lg:gap-4"
                 >
                   {/* Column 1: Track Title + Artwork + Play Button */}
-                  <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="col-span-2 flex min-w-0 items-center gap-3.5 lg:col-span-1">
                     <div
                       className="relative grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border border-white/12 shadow-sm overflow-hidden group/art cursor-pointer"
                       style={{
@@ -526,7 +532,7 @@ export function TrackCatalogPanel({
                   </div>
 
                   {/* Column 5: Action Buttons */}
-                  <div className="flex items-center justify-start gap-1.5 md:justify-end">
+                  <div className="flex items-center justify-end gap-1.5">
                     {/* Edit Button */}
                     <button
                       type="button"
@@ -699,13 +705,14 @@ export function TrackCatalogPanel({
         )}
       </div>
 
-      {/* Catalog Summary Footer */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-2 text-[12px] text-white/44">
-        <span>
-          Đang hiển thị <strong className="text-white/80">{filteredTracks.length}</strong> / {tracks.length} bài hát
-        </span>
-        <span>Bộ xử lý âm thanh Studio v2.4 • Moodify</span>
-      </div>
-    </div>
+      {catalogReady && (
+        <p className="mt-4 px-1 text-[12px] text-white/55">
+          {t("dashboard.artist.trackCatalog.trackCount", {
+            shown: filteredTracks.length,
+            total: tracks.length,
+          })}
+        </p>
+      )}
+    </section>
   );
 }
