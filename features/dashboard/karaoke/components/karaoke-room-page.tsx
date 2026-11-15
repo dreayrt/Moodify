@@ -8,6 +8,8 @@ import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronUp,
+  ChevronDown,
   AudioLines,
   Check,
   Copy,
@@ -37,6 +39,7 @@ import {
   leaveKaraokeRoom,
   KaraokeRoomApiError,
   removeKaraokeRoomQueueItem,
+  moveKaraokeRoomQueueItem,
   type KaraokeRoomDetail,
   type KaraokeRoomQueueItem,
   type KaraokeTrackSummary,
@@ -212,6 +215,14 @@ function RemoteAudioPlayer({
 }
 
 function messageFor(error: unknown): string {
+  if (error instanceof KaraokeRoomApiError) {
+    if (error.code === "QUEUE_TRACK_ALREADY_REQUESTED")
+      return "Bạn đã thêm bài này vào hàng đợi. Hãy chọn thêm bài khác.";
+    if (error.code === "ROOM_HOST_REQUIRED")
+      return "Chỉ chủ phòng mới có thể đổi thứ tự bài hát.";
+    if (error.code === "QUEUE_ITEM_NOT_FOUND")
+      return "Bài hát này không còn trong hàng đợi. Hãy tải lại danh sách.";
+  }
   return error instanceof Error
     ? error.message
     : "Không thể tải dữ liệu phòng.";
@@ -672,14 +683,16 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   }, [isRequestOpen]);
 
   const selectedTrackTitle = selectedTrack?.title ?? "";
-  const myQueueItem = room?.queue.find((item) => item.requestedByMe);
+  const selectedTrackAlreadyQueued = !!selectedTrack && room?.queue.some(
+    (item) => item.requestedByMe && item.trackId === selectedTrack.songId,
+  );
   const handleTrackSelect = useCallback(
     (track: KaraokeTrackSummary) => setSelectedTrack(track),
     [],
   );
 
   const addRequest = async () => {
-    if (!selectedTrack || busy) return;
+    if (!selectedTrack || selectedTrackAlreadyQueued || busy) return;
     setBusy(true);
     try {
       await addKaraokeRoomQueueItem(numericRoomId, selectedTrack.songId);
@@ -705,6 +718,21 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       await refreshRoom();
     } catch (error) {
       setNotice(messageFor(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const moveRequest = async (item: KaraokeRoomQueueItem, direction: "UP" | "DOWN") => {
+    if (busy || !room?.canManage) return;
+    setBusy(true);
+    try {
+      await moveKaraokeRoomQueueItem(numericRoomId, item.id, direction);
+      await refreshRoom();
+      setNotice(`Đã chuyển “${item.title}” ${direction === "UP" ? "lên trên" : "xuống dưới"}.`);
+    } catch (error) {
+      setNotice(messageFor(error));
+      await refreshRoom();
     } finally {
       setBusy(false);
     }
@@ -1225,6 +1253,30 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                         · {durationLabel(item.durationMs)}
                       </span>
                     </div>
+                    {room.canManage && (
+                      <div className={styles.queueMoveActions}>
+                        <button
+                          type="button"
+                          className={styles.queueMoveIcon}
+                          onClick={() => void moveRequest(item, "UP")}
+                          disabled={busy || index === 0}
+                          aria-label={`Chuyển ${item.title} lên trên`}
+                          title="Chuyển lên trên"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.queueMoveIcon}
+                          onClick={() => void moveRequest(item, "DOWN")}
+                          disabled={busy || index === room.queue.length - 1}
+                          aria-label={`Chuyển ${item.title} xuống dưới`}
+                          title="Chuyển xuống dưới"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
+                    )}
                     {(item.requestedByMe || room.canManage) && (
                       <button
                         type="button"
@@ -1246,16 +1298,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 <span>Chọn một bài từ kho Karaoke để thêm vào đây.</span>
               </div>
             )}
-            {myQueueItem ? (
-              <button
-                type="button"
-                className={styles.removeButton}
-                onClick={() => void removeRequest(myQueueItem)}
-                disabled={busy}
-              >
-                Rút lượt hát của tôi <X size={15} />
-              </button>
-            ) : (
+            <div className={styles.queueFooter}>
               <button
                 type="button"
                 className={styles.primaryButton}
@@ -1265,10 +1308,14 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
                 }}
                 disabled={busy}
               >
-                <Plus size={18} /> Đăng ký lượt hát{" "}
+                <Plus size={18} /> Thêm bài hát{" "}
                 <span aria-hidden="true">›</span>
               </button>
-            )}
+              <p className={styles.queueNote}>
+                Bạn có thể thêm nhiều bài hát và rút từng bài bằng nút ×.
+                {room.canManage && " Dùng nút ↑ ↓ để đổi thứ tự phát."}
+              </p>
+            </div>
           </section>
 
           <section
@@ -1599,13 +1646,15 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
               type="button"
               className={styles.modalSubmit}
               onClick={() => void addRequest()}
-              disabled={busy || !selectedTrack}
+              disabled={busy || !selectedTrack || selectedTrackAlreadyQueued}
             >
               {busy
                 ? "Đang thêm…"
-                : selectedTrack
-                  ? "Thêm vào hàng đợi"
-                  : "Chọn bài hát"}
+                : selectedTrackAlreadyQueued
+                  ? "Bài này đã có trong hàng đợi của bạn"
+                  : selectedTrack
+                    ? "Thêm vào hàng đợi"
+                    : "Chọn bài hát"}
               <ArrowLeft size={17} className={styles.submitArrow} />
             </button>
           </div>

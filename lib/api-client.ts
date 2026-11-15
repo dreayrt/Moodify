@@ -669,6 +669,13 @@ export function removeKaraokeRoomQueueItem(roomId: number, itemId: number): Prom
   return karaokeRoomRequest<void>(`/karaoke/rooms/${roomId}/queue/${itemId}`, { method: "DELETE" });
 }
 
+export function moveKaraokeRoomQueueItem(roomId: number, itemId: number, direction: "UP" | "DOWN"): Promise<void> {
+  return karaokeRoomRequest<void>(`/karaoke/rooms/${roomId}/queue/${itemId}/position`, {
+    method: "PUT",
+    body: { direction },
+  });
+}
+
 export function closeKaraokeRoom(roomId: number): Promise<void> {
   return karaokeRoomRequest<void>(`/karaoke/rooms/${roomId}/close`, { method: "POST" });
 }
