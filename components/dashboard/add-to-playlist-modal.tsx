@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Plus, Check, Loader2, Music, ListMusic } from "lucide-react";
 import {
@@ -34,37 +34,49 @@ export default function AddToPlaylistModal({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Parent thường tạo object `track` mới ở mỗi lần render → dùng key ổn định
+  // để effect không chạy lại (gây fetch lặp vô hạn) khi parent re-render.
+  const trackKey = track ? track.spotifyId || track.id || "" : "";
+  const trackRef = useRef<Track | null>(track);
+  trackRef.current = track;
+
   useEffect(() => {
-    if (isOpen && track) {
-      loadPlaylists();
-      setAddedIds(new Set());
-      setError(null);
-    }
-  }, [isOpen, track]);
+    if (!isOpen || !trackKey) return;
+    let cancelled = false;
 
-  const loadPlaylists = async () => {
+    setAddedIds(new Set());
+    setError(null);
     setLoading(true);
-    try {
-      const data = await fetchUserPlaylists();
-      setPlaylists(data);
 
-      // Check which playlists already have this track
-      if (track) {
-        const alreadyIn = new Set<string>();
-        data.forEach((p) => {
-          if (p.tracks?.some((t) => t.spotifyId === track.spotifyId || t.id === track.id)) {
-            alreadyIn.add(p.id);
-          }
-        });
-        setAddedIds(alreadyIn);
+    (async () => {
+      try {
+        const data = await fetchUserPlaylists();
+        if (cancelled) return;
+        setPlaylists(data);
+
+        const current = trackRef.current;
+        if (current) {
+          const alreadyIn = new Set<string>();
+          data.forEach((p) => {
+            if (p.tracks?.some((t) => t.spotifyId === current.spotifyId || t.id === current.id)) {
+              alreadyIn.add(p.id);
+            }
+          });
+          setAddedIds(alreadyIn);
+        }
+      } catch (err: any) {
+        if (cancelled) return;
+        console.error("Failed to load user playlists:", err);
+        setError("Không thể tải danh sách phát. Vui lòng đăng nhập hoặc thử lại.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (err: any) {
-      console.error("Failed to load user playlists:", err);
-      setError("Không thể tải danh sách phát. Vui lòng đăng nhập.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, trackKey]);
 
   if (!isOpen || !track || !mounted) return null;
 
