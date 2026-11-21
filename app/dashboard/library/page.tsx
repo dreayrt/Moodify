@@ -75,7 +75,7 @@ function LibraryContent() {
   const [likedAlbums, setLikedAlbums] = useState<Album[]>([]);
   const [loadingAlbums, setLoadingAlbums] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
-  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
+  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | string | null>(null);
 
   // Followed artists state
   const [followedArtists, setFollowedArtists] = useState<FollowedArtist[]>([]);
@@ -375,7 +375,7 @@ function LibraryContent() {
     }
   };
 
-  const handleDeleteAlbum = async (albumId: number) => {
+  const handleDeleteAlbum = async (albumId: number | string) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa album này không?")) return;
     try {
       await deleteAlbum(albumId);
@@ -868,7 +868,7 @@ function LibraryContent() {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "liked" ? (
           /* VIEW 3: LIKED SONGS TAB */
           <div className="space-y-6 animate-in fade-in duration-200">
             {/* Liked Songs Hero Banner */}
@@ -966,7 +966,7 @@ function LibraryContent() {
               </>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* VIEW 3: ALBUMS TAB VIEW */}
         {!selectedPlaylist && activeTab === "albums" && (

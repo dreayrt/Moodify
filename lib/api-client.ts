@@ -1747,7 +1747,7 @@ export async function clearMyListeningHistory(): Promise<{ success: boolean; del
 // ============================================================================
 
 export type Album = {
-  id: number;
+  id: number | string;
   title: string;
   description: string | null;
   coverUrl: string;

@@ -81,7 +81,7 @@ function SearchContent() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
+  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | string | null>(null);
   const [loading, setLoading] = useState(false);
   const [moodInfo, setMoodInfo] = useState<EmotionInfo | null>(null);
   const [moodError, setMoodError] = useState<string | null>(null);

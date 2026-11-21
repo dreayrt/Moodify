@@ -299,6 +299,7 @@ export type FavoriteRecord = {
   userEmail: string;
   userAvatar: string | null;
   type: "SONG" | "ARTIST" | "ALBUM";
+  source?: "LIBRARY" | "LEGACY_SONG" | "FAVORITE_ARTISTS" | "FAVORITE_ALBUMS" | string;
   targetId: string;
   targetTitle: string;
   targetSubtitle?: string;

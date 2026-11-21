@@ -558,11 +558,15 @@ export async function fetchAdminFavoritesLeaderboard(
 
 export async function deleteAdminFavorite(
   id: number,
-  type?: "SONG" | "ARTIST" | "ALBUM"
+  type?: "SONG" | "ARTIST" | "ALBUM",
+  source?: string
 ): Promise<{ success: boolean; message: string }> {
-  const qs = type ? `?type=${encodeURIComponent(type)}` : "";
+  const q = new URLSearchParams();
+  if (type) q.set("type", type);
+  if (source) q.set("source", source);
+  const qs = q.toString();
   return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/favorites/${id}${qs}`,
+    `/api/admin/favorites/${id}${qs ? `?${qs}` : ""}`,
     {
       method: "DELETE",
     }
