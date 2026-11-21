@@ -355,8 +355,11 @@ export function useKaraokeRoomScoring(input: {
   useEffect(() => {
     if (!watchedSessionIds.length) return;
     let stopped = false;
+    let inFlight = false;
     const refresh = async () => {
-      await Promise.all(watchedSessionIds.map(async (id) => {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      try { await Promise.all(watchedSessionIds.map(async (id) => {
         if (["completed", "failed"].includes(watchedStatusesRef.current.get(id) ?? "collecting")) return;
         try {
           const session = await fetchKaraokeRoomScoreSession(input.roomId, id);
@@ -377,7 +380,7 @@ export function useKaraokeRoomScoring(input: {
         } catch {
           // Realtime reconnects and the next poll will retry the shared result lookup.
         }
-      }));
+      })); } finally { inFlight = false; }
     };
     const timer = window.setInterval(() => void refresh(), 2500);
     void refresh();

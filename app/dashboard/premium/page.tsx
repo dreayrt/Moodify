@@ -23,7 +23,6 @@ import SubscriptionManagement from "@/components/dashboard/subscription-manageme
 import {
   fetchServicePackages,
   fetchPackageQuotes,
-  subscribePackage,
   createCheckoutPayment,
   getPaymentStatus,
   type ServicePackage,

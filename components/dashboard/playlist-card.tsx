@@ -1,5 +1,7 @@
 "use client";
 
+import CoverImage from "./cover-image";
+
 import { ListMusic, Play, Music, Lock, Globe } from "lucide-react";
 import { Playlist } from "@/lib/api-client";
 import { useState } from "react";
@@ -32,7 +34,7 @@ export default function PlaylistCard({
       <div>
         {/* Cover Art */}
         <div className="relative mb-3 aspect-square rounded-lg overflow-hidden bg-slate-800 shadow-md">
-          <img
+          <CoverImage sizes="(max-width: 640px) 40vw, 240px"
             src={displayCover}
             alt={playlist.name}
             onError={() => setImgError(true)}

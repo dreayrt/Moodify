@@ -1,5 +1,7 @@
 "use client";
 
+import CoverImage from "./cover-image";
+
 import { Users, Play } from "lucide-react";
 import { Artist } from "@/lib/api-client";
 import { useState } from "react";
@@ -35,7 +37,7 @@ export default function ArtistCard({ artist, onClick }: ArtistCardProps) {
       {/* Artist image */}
       <div className="relative mb-4 aspect-square rounded-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900">
         {artist.imageUrl ? (
-          <img
+          <CoverImage sizes="(max-width: 640px) 40vw, 180px"
             src={artist.imageUrl}
             alt={artist.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

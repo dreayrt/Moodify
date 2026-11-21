@@ -4,10 +4,10 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight, SkipForward, Disc3, Sparkles } from "lucide-react";
-import { usePlayer } from "./player-context";
+import { usePlayerState } from "./player-context";
 
 export default function AdInterstitialBanner() {
-  const { isAdPlaying, adSecondsRemaining, adTotalDuration, skipAd, subTier, adReason } = usePlayer();
+  const { isAdPlaying, adSecondsRemaining, adTotalDuration, skipAd, subTier, adReason } = usePlayerState();
 
   if (!isAdPlaying) {
     return null;

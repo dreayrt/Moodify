@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { readAgreementDetails } from "@/lib/agreement-details";
 import {
   RotateCcw,
   Clock,
@@ -165,6 +166,7 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
     expiryDate: readString(item.expiryDate) || undefined,
     licenseStatus: readString(item.licenseStatus) || undefined,
     licenseDocumentUrl: resolveMediaUrl(readString(item.licenseDocumentUrl)),
+    agreementDetails: readAgreementDetails(item.agreementDetails),
     audioFeatures:
       item.audioFeatures && typeof item.audioFeatures === "object"
         ? {
@@ -300,7 +302,16 @@ export default function DashboardModeratorPage() {
         const currentUser = await getCurrentUser(token);
         const normalizedRole = (currentUser.role || "").trim().toLowerCase();
         if (normalizedRole !== "moderator") {
-          throw new Error("Tài khoản hiện tại không có quyền truy cập khu vực kiểm duyệt.");
+          if (normalizedRole === "admin") {
+            router.replace("/dashboard/admin");
+            return;
+          }
+          if (normalizedRole === "content_lead" || normalizedRole === "artist") {
+            router.replace("/dashboard/content-lead");
+            return;
+          }
+          router.replace("/dashboard/user");
+          return;
         }
 
         if (isCancelled) return;
@@ -335,7 +346,7 @@ export default function DashboardModeratorPage() {
             : "Không thể xác thực phiên kiểm duyệt. Vui lòng đăng nhập lại.",
           "error",
         );
-        router.push("/dashboard");
+        router.replace("/dashboard/user");
       }
     };
 
@@ -402,11 +413,13 @@ export default function DashboardModeratorPage() {
     rejectionReason,
     internalNote,
     explicitTag,
+    rightsVerified,
   }: {
     actionType: "approve" | "reject";
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;
+    rightsVerified?: boolean;
   }) => {
     if (!decisionTrack) return;
 
@@ -419,6 +432,7 @@ export default function DashboardModeratorPage() {
         rejectionReason,
         internalNote,
         explicitTag,
+    rightsVerified,
       }, moderatorToken || undefined);
     } catch (err) {
       console.error("Failed to submit moderator decision to backend:", err);

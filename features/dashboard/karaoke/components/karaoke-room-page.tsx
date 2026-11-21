@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { usePlayer } from "@/components/dashboard/player-context";
+import { usePlayerState } from "@/components/dashboard/player-context";
 import {
   addKaraokeRoomQueueItem,
   closeKaraokeRoom,
@@ -245,7 +245,7 @@ function isClosedRoomError(error: unknown): boolean {
 }
 
 export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
-  const { pause } = usePlayer();
+  const { pause } = usePlayerState();
   const router = useRouter();
   const numericRoomId = Number(roomId);
   const [room, setRoom] = useState<KaraokeRoomDetail | null>(null);
@@ -337,6 +337,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       guard.playbackVersion = snapshot.playback.version;
       setRoom(snapshot);
       setSnapshotAt(receivedAt);
+      setClockNow(receivedAt);
       const serverTimeMs = snapshot.playback?.serverTimeMs;
       if (
         typeof serverTimeMs === "number" &&
@@ -556,9 +557,10 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
   }, [notice]);
 
   useEffect(() => {
+    if (room?.playback?.status !== "PLAYING") return;
     const timer = window.setInterval(() => setClockNow(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [room?.playback?.status]);
 
   const playback = room?.playback;
   const currentTrack = playback?.track;
@@ -623,7 +625,7 @@ export default function KaraokeRoomPage({ roomId }: { roomId: string }) {
       document.body.style.overflow = previousOverflow;
     };
   }, [groupScoreOpen]);
-  const lyricCues = parseLyricCues(currentTrack?.lyricsSynced);
+  const lyricCues = useMemo(() => parseLyricCues(currentTrack?.lyricsSynced), [currentTrack?.lyricsSynced]);
   let activeLyricIndex = -1;
   for (let index = 0; index < lyricCues.length; index += 1) {
     if (lyricCues[index].startMs <= currentPositionMs) activeLyricIndex = index;

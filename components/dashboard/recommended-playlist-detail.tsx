@@ -9,21 +9,13 @@ import { addTrackToPlaylist, fetchPlaylistById, type Track } from "@/lib/api-cli
 import { copyPersonalizedMix, createRecommendationQueue, fetchPersonalizedMix,
   fetchPlaylistContinuation, queuePlayerTracks, recalledRecommendation, refreshPersonalizedMix,
   type RecommendationItem, type PersonalizedMix } from "@/lib/recommendation-client";
-import { usePlayer } from "./player-context";
+import { usePlayerState } from "./player-context";
 
 type Detail = { id: string; name: string; description: string | null; imageUrl: string | null;
   tracks: Track[]; versionId: string | null; personalized: boolean; generatedAt?: string; refreshDueAt?: string };
 
 function detailFromMix(mix: PersonalizedMix): Detail {
   return { ...mix, personalized: true };
-}
-
-async function loadPlaylistDetail(id: string, personalized: boolean): Promise<{ detail: Detail; suggestions: RecommendationItem[] }> {
-  if (personalized) return { detail: detailFromMix(await fetchPersonalizedMix(id)), suggestions: [] };
-  const playlist = await fetchPlaylistById(id);
-  const next = await fetchPlaylistContinuation(id).catch(() => null);
-  return { detail: { ...playlist, imageUrl: playlist.coverUrl, personalized: false, versionId: playlist.updatedAt },
-    suggestions: next?.sections.flatMap(section => section.items) ?? [] };
 }
 
 export default function RecommendedPlaylistDetail({ id }: { id: string }) {
@@ -37,24 +29,33 @@ export default function RecommendedPlaylistDetail({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const copyRequest = useRef<string | null>(null);
-  const { playTrack, currentTrack, isPlaying } = usePlayer();
+  const { playTrack, currentTrack, isPlaying } = usePlayerState();
 
+  const requestRef = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const { signal } = controller;
     try {
-      const result = await loadPlaylistDetail(id, personalized);
-      setDetail(result.detail); setSuggestions(result.suggestions);
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Chưa thể tải playlist."); }
-    finally { setLoading(false); }
+      const next = personalized ? detailFromMix(await fetchPersonalizedMix(id, signal)) : await fetchPlaylistById(id, signal).then(playlist => ({
+        ...playlist, imageUrl: playlist.coverUrl, personalized: false, versionId: playlist.updatedAt,
+      }));
+      if (signal.aborted) return;
+      setDetail(next); setLoading(false); setSuggestions([]);
+      // Recommendations are optional; a slow or failed continuation never blocks playback.
+      if (!personalized) {
+        const continuation = await fetchPlaylistContinuation(id, signal).catch(() => null);
+        if (!signal.aborted) setSuggestions(continuation?.sections.flatMap(section => section.items) ?? []);
+      }
+    } catch (failure) {
+      if (!signal.aborted) setError(failure instanceof Error ? failure.message : "Chưa thể tải playlist.");
+    } finally { if (!signal.aborted) setLoading(false); }
   }, [id, personalized]);
   useEffect(() => {
-    let cancelled = false;
-    loadPlaylistDetail(id, personalized).then(result => {
-      if (!cancelled) { setDetail(result.detail); setSuggestions(result.suggestions); setLoading(false); }
-    }).catch(failure => {
-      if (!cancelled) { setError(failure instanceof Error ? failure.message : "Chưa thể tải playlist."); setLoading(false); }
-    });
-    return () => { cancelled = true; };
-  }, [id, personalized]);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => { window.clearTimeout(timer); requestRef.current?.abort(); };
+  }, [load]);
 
   const play = async (trackId?: string) => {
     if (!detail) return;
@@ -101,7 +102,7 @@ export default function RecommendedPlaylistDetail({ id }: { id: string }) {
   };
 
   return <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 md:px-8">
-    <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><ArrowLeft size={16} />Khám phá nhạc</Link>
+    <Link href="/dashboard#for-you" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><ArrowLeft size={16} />Trang chủ</Link>
     {loading && !detail && <div className="flex items-center gap-3 py-16 text-white/55"><Loader2 className="animate-spin" />Đang tải playlist...</div>}
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 p-4 text-sm text-white/70"><span>{error}</span><button onClick={() => { setLoading(true); setError(null); void load(); }} className="text-purple-300">Tải lại</button></div>}
     {notice && <p role="status" className="text-sm text-purple-200">{notice} <Link className="underline" href="/dashboard/library">Mở thư viện</Link></p>}
@@ -119,7 +120,7 @@ export default function RecommendedPlaylistDetail({ id }: { id: string }) {
           </div>
         </div>
       </section>
-      <section aria-label="Danh sách bài hát"><div className="space-y-1">{detail.tracks.map((track, index) => <button key={track.id} onClick={() => void play(track.id)} disabled={!!busy} className="group flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/5 disabled:opacity-60">
+      <section aria-label="Danh sách bài hát"><div className="space-y-1">{detail.tracks.map((track, index) => <button key={track.id} onClick={() => void play(track.id)} disabled={!!busy} className="catalog-row-deferred group flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/5 disabled:opacity-60">
         <span className="w-6 shrink-0 text-center text-xs text-white/35">{currentTrack?.id === track.id && isPlaying ? <span className="text-purple-300">♫</span> : index + 1}</span>
         {track.imageUrl && <Image alt="" src={track.imageUrl} width={40} height={40} unoptimized className="h-10 w-10 rounded object-cover" />}
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white/90">{track.name}</span><span className="mt-1 block truncate text-xs text-white/45">{track.artistName}</span></span>

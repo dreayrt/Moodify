@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -14,7 +14,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { usePlayer } from "@/components/dashboard/player-context";
+import { usePlayerState } from "@/components/dashboard/player-context";
 import {
   startKaraokeSession,
   submitKaraokePitchFeatures,
@@ -26,6 +26,7 @@ import {
 import KaraokeTrackCatalog from "./karaoke-track-catalog";
 import KaraokeScoreDetails from "./karaoke-score-details";
 import { captureDiagnostics } from "../capture-diagnostics";
+import { createLiveNumber, type LiveNumber } from "@/lib/live-number";
 import styles from "./karaoke-room-page.module.css";
 
 function formatDuration(durationMs: number | null): string {
@@ -151,18 +152,37 @@ function microphoneError(error: unknown): string {
   return "Không thể mở micro. Hãy kiểm tra thiết bị và quyền truy cập của trình duyệt.";
 }
 
+function SoloProgress({ clock, duration, disabled, onSeek }: { clock: LiveNumber; duration: number; disabled: boolean; onSeek: (time: number) => void }) {
+  const time = useSyncExternalStore(clock.subscribe, clock.getSnapshot, clock.getServerSnapshot);
+  return <><span className={styles.playbackClock}>{formatClock(time)}</span>
+    <input className={styles.seekSlider} type="range" min={0} max={duration > 0 ? duration : 1} step={0.1}
+      value={Math.min(time, duration || 0)} disabled={disabled} aria-label="Tua bài hát"
+      onChange={event => onSeek(Number(event.currentTarget.value))} />
+    <span className={styles.playbackClock}>{formatClock(duration)}</span></>;
+}
+
+function SoloMicMeter({ meter }: { meter: LiveNumber }) {
+  const level = useSyncExternalStore(meter.subscribe, meter.getSnapshot, meter.getServerSnapshot);
+  return <div className={styles.micMeterRow}><span>Mức âm</span>
+    <div className={styles.micMeter} role="meter" aria-label="Mức tín hiệu micro" aria-valuemin={0} aria-valuemax={100} aria-valuenow={level}>
+      <span style={{ transform: `scaleX(${level / 100})` }} />
+    </div><span>{level > 5 ? "Có tín hiệu" : "Hãy nói hoặc hát"}</span></div>;
+}
+
 export default function KaraokeSoloPage() {
-  const { pause } = usePlayer();
+  const { pause } = usePlayerState();
   const [song, setSong] = useState<KaraokeTrackSummary | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [clock] = useState(() => createLiveNumber());
+  const setCurrentTime = clock.set;
   const [activeLyricIndex, setActiveLyricIndex] = useState(-1);
   const [duration, setDuration] = useState(0);
   const [playbackError, setPlaybackError] = useState("");
   const [micState, setMicState] = useState<
     "idle" | "requesting" | "active" | "error"
   >("idle");
-  const [micLevel, setMicLevel] = useState(0);
+  const [meter] = useState(() => createLiveNumber());
+  const setMicLevel = meter.set;
   const [micMessage, setMicMessage] = useState("");
   const [micError, setMicError] = useState("");
   const [scoreState, setScoreState] = useState<KaraokeScoreState>("idle");
@@ -318,7 +338,7 @@ export default function KaraokeSoloPage() {
       setMicMessage("");
       setMicError("");
     }
-  }, []);
+  }, [setMicLevel]);
 
   const finishScoring = useCallback(async () => {
     const processor = pitchProcessorRef.current;
@@ -532,7 +552,7 @@ export default function KaraokeSoloPage() {
         scoreStartLockRef.current = false;
       }
     },
-    [discardActiveRecording, stopMicCheck],
+    [discardActiveRecording, stopMicCheck, setCurrentTime],
   );
 
   useEffect(() => {
@@ -554,7 +574,7 @@ export default function KaraokeSoloPage() {
     };
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
-  }, [isPlaying, song?.songId, syncedLyrics]);
+  }, [isPlaying, song?.songId, syncedLyrics, setCurrentTime]);
 
   const requestPlayback = useCallback((audio: HTMLAudioElement) => {
     void audio.play().catch((error: unknown) => {
@@ -614,7 +634,7 @@ export default function KaraokeSoloPage() {
         requestPlayback(audio);
       }
     },
-    [beginScoring, discardActiveRecording, requestPlayback, scoreState],
+    [beginScoring, discardActiveRecording, requestPlayback, scoreState, setCurrentTime],
   );
 
   const togglePlayback = useCallback(() => {
@@ -672,6 +692,11 @@ export default function KaraokeSoloPage() {
       let lastUpdate = 0;
       const sampleInput = () => {
         if (!micStreamRef.current) return;
+        const now = performance.now();
+        if (now - lastUpdate < 100) {
+          micAnimationRef.current = window.requestAnimationFrame(sampleInput);
+          return;
+        }
         analyser.getByteTimeDomainData(samples);
         let squaredTotal = 0;
         for (let index = 0; index < samples.length; index += 1) {
@@ -682,7 +707,6 @@ export default function KaraokeSoloPage() {
           100,
           Math.round(Math.sqrt(squaredTotal / samples.length) * 330),
         );
-        const now = performance.now();
         if (now - lastUpdate >= 100) {
           setMicLevel(level);
           lastUpdate = now;
@@ -702,7 +726,7 @@ export default function KaraokeSoloPage() {
       setMicLevel(0);
       setMicError(microphoneError(error));
     }
-  }, []);
+  }, [setMicLevel]);
 
   useEffect(() => {
     pause();
@@ -859,36 +883,15 @@ export default function KaraokeSoloPage() {
                 ? "Tạm dừng"
                 : "Phát"}
           </button>
-          <span className={styles.playbackClock}>
-            {formatClock(currentTime)}
-          </span>
-          <input
-            className={styles.seekSlider}
-            type="range"
-            min={0}
-            max={totalDuration > 0 ? totalDuration : 1}
-            step={0.1}
-            value={Math.min(currentTime, totalDuration || 0)}
-            disabled={
-              !song ||
-              totalDuration <= 0 ||
-              scoreState === "preparing" ||
-              scoreState === "recording" ||
-              scoreState === "uploading"
-            }
-            aria-label="Tua bài hát"
-            onChange={(event) => {
-              const time = Number(event.currentTarget.value);
+          <SoloProgress clock={clock} duration={totalDuration}
+            disabled={!song || totalDuration <= 0 || ["preparing", "recording", "uploading"].includes(scoreState)}
+            onSeek={time => {
               setCurrentTime(time);
               if (audioRef.current) {
                 audioRef.current.currentTime = time;
                 setActiveLyricIndex(findLyricLineAtTime(syncedLyrics, time));
               }
-            }}
-          />
-          <span className={styles.playbackClock}>
-            {formatClock(totalDuration)}
-          </span>
+            }} />
         </div>
         {playbackError && (
           <p className={styles.playbackError} role="alert">
@@ -911,7 +914,7 @@ export default function KaraokeSoloPage() {
           onPause={() => setIsPlaying(false)}
           onEnded={() => {
             setIsPlaying(false);
-            setCurrentTime(audioRef.current?.currentTime ?? currentTime);
+            setCurrentTime(audioRef.current?.currentTime ?? clock.getSnapshot());
             if (pitchProcessorRef.current && activeScoreSessionRef.current) {
               setScoreMessage("Bài hát đã kết thúc. Đang hoàn tất bản thu…");
               void finishScoring();
@@ -987,20 +990,7 @@ export default function KaraokeSoloPage() {
             </p>
           )}
           {micState === "active" && (
-            <div className={styles.micMeterRow}>
-              <span>Mức âm</span>
-              <div
-                className={styles.micMeter}
-                role="meter"
-                aria-label="Mức tín hiệu micro"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={micLevel}
-              >
-                <span style={{ transform: "scaleX(" + micLevel / 100 + ")" }} />
-              </div>
-              <span>{micLevel > 5 ? "Có tín hiệu" : "Hãy nói hoặc hát"}</span>
-            </div>
+            <SoloMicMeter meter={meter} />
           )}
         </div>
         <button

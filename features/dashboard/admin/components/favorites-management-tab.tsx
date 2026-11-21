@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { AdminCoverImage } from "./shared/admin-cover-image";
+import { ModalPortal } from "./shared/modal-portal";
+
+import type { AdminPreviewTrack } from "../types";
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Heart,
   Search,
@@ -16,9 +21,9 @@ import {
   ChevronRight,
   User as UserIcon,
   Flame,
+  AlertTriangle,
 } from "lucide-react";
 import {
-  CatalogTrack,
   FavoriteLeaderboardItem,
   FavoriteRecord,
 } from "../types";
@@ -28,10 +33,27 @@ import {
   deleteAdminFavorite,
 } from "@/lib/api/admin-client";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
+  "http://localhost:8088";
+
+function resolveUserAvatar(url?: string | null): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("data:")) {
+    return trimmed;
+  }
+  return trimmed.startsWith("/") ? `${API_BASE_URL}${trimmed}` : `${API_BASE_URL}/${trimmed}`;
+}
+
+function favoriteRowKey(fav: FavoriteRecord): string {
+  return `${fav.type}:${fav.source ?? "default"}:${fav.id}`;
+}
+
 type FavoritesManagementTabProps = {
-  previewTrack: CatalogTrack | null;
+  previewTrack: AdminPreviewTrack | null;
   isPlayingPreview: boolean;
-  onTogglePreview: (track: CatalogTrack) => void;
+  onTogglePreview: (track: AdminPreviewTrack) => void;
   onToast: (message: string, type?: "success" | "error" | "info" | "warning") => void;
 };
 
@@ -46,7 +68,14 @@ export function FavoritesManagementTab({
   const [leaderboard, setLeaderboard] = useState<FavoriteLeaderboardItem[]>([]);
   const [activeType, setActiveType] = useState<"SONG" | "ARTIST" | "ALBUM">("SONG");
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(new Set());
+
+  const leaderboardReqRef = useRef(0);
+  const listReqRef = useRef(0);
 
   // Search & Pagination
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,17 +97,37 @@ export function FavoritesManagementTab({
   }, [searchQuery]);
 
   // Load Leaderboard
-  useEffect(() => {
-    fetchAdminFavoritesLeaderboard(activeType)
-      .then(setLeaderboard)
-      .catch((err) => {
-        console.error("Fetch leaderboard error:", err);
-      });
+  const loadLeaderboard = useCallback(async () => {
+    const reqId = ++leaderboardReqRef.current;
+    setLeaderboardLoading(true);
+    setLeaderboardError(null);
+    try {
+      const data = await fetchAdminFavoritesLeaderboard(activeType);
+      if (leaderboardReqRef.current !== reqId) return;
+      setLeaderboard(Array.isArray(data) ? data : []);
+    } catch (err: unknown) {
+      if (leaderboardReqRef.current !== reqId) return;
+      console.error("Fetch leaderboard error:", err);
+      const msg = err instanceof Error ? err.message : "Không thể tải bảng xếp hạng yêu thích.";
+      setLeaderboardError(msg);
+      setLeaderboard([]);
+    } finally {
+      if (leaderboardReqRef.current === reqId) {
+        setLeaderboardLoading(false);
+      }
+    }
   }, [activeType]);
+
+  useEffect(() => {
+    setLeaderboard([]);
+    loadLeaderboard();
+  }, [loadLeaderboard]);
 
   // Load Favorites Data
   const loadFavoritesData = useCallback(async () => {
+    const reqId = ++listReqRef.current;
     setLoading(true);
+    setListError(null);
     try {
       const res = await fetchAdminFavorites({
         type: activeType,
@@ -86,13 +135,18 @@ export function FavoritesManagementTab({
         page: currentPage,
         size: pageSize,
       });
-      setFavorites(res.items);
-      setTotalItems(res.total);
+      if (listReqRef.current !== reqId) return;
+      setFavorites(Array.isArray(res.items) ? res.items : []);
+      setTotalItems(typeof res.total === "number" ? res.total : 0);
     } catch (err: unknown) {
+      if (listReqRef.current !== reqId) return;
       const msg = err instanceof Error ? err.message : "Không thể tải danh sách yêu thích.";
+      setListError(msg);
       onToast(msg, "error");
     } finally {
-      setLoading(false);
+      if (listReqRef.current === reqId) {
+        setLoading(false);
+      }
     }
   }, [activeType, debouncedQuery, currentPage, onToast]);
 
@@ -103,21 +157,38 @@ export function FavoritesManagementTab({
   // Handler for delete
   const handleConfirmDelete = async () => {
     if (!deletingFavorite) return;
-    setDeletingId(deletingFavorite.id);
+    const rowKey = favoriteRowKey(deletingFavorite);
+    setDeletingKey(rowKey);
     try {
-      await deleteAdminFavorite(deletingFavorite.id);
-      setFavorites((prev) => prev.filter((f) => f.id !== deletingFavorite.id));
+      await deleteAdminFavorite(
+        deletingFavorite.id,
+        deletingFavorite.type || activeType,
+        deletingFavorite.source
+      );
+      const isLastItemOnNonFirstPage = favorites.length === 1 && currentPage > 0;
+      setFavorites((prev) => prev.filter((f) => favoriteRowKey(f) !== rowKey));
       setTotalItems((prev) => Math.max(0, prev - 1));
       onToast(`Đã xóa lượt yêu thích của ${deletingFavorite.userName}`, "success");
       setDeletingFavorite(null);
+      if (isLastItemOnNonFirstPage) {
+        setCurrentPage((p) => Math.max(0, p - 1));
+      }
       // refresh leaderboard
-      fetchAdminFavoritesLeaderboard(activeType).then(setLeaderboard).catch(() => {});
+      void loadLeaderboard();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Thao tác xóa thất bại.";
       onToast(msg, "error");
     } finally {
-      setDeletingId(null);
+      setDeletingKey(null);
     }
+  };
+
+  const handleSelectType = (nextType: "SONG" | "ARTIST" | "ALBUM") => {
+    if (nextType === activeType) return;
+    setFavorites([]);
+    setListError(null);
+    setCurrentPage(0);
+    setActiveType(nextType);
   };
 
   const handleResetFilters = () => {
@@ -163,7 +234,28 @@ export function FavoritesManagementTab({
         </div>
 
         {/* Horizontal Scroll Leaderboard Cards */}
-        {leaderboard.length === 0 ? (
+        {leaderboardLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div
+                key={n}
+                className="h-56 rounded-xl border border-[#222432] bg-[#171822] animate-pulse"
+              />
+            ))}
+          </div>
+        ) : leaderboardError ? (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-5 text-center">
+            <AlertTriangle className="h-6 w-6 text-rose-400 mx-auto mb-2" />
+            <p className="text-xs font-medium text-rose-200">{leaderboardError}</p>
+            <button
+              type="button"
+              onClick={() => void loadLeaderboard()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/25 transition cursor-pointer"
+            >
+              <RotateCcw className="h-3 w-3" /> Thử lại
+            </button>
+          </div>
+        ) : leaderboard.length === 0 ? (
           <div className="py-6 text-center text-xs text-zinc-500 font-mono">
             Chưa có bảng xếp hạng cho mục này
           </div>
@@ -175,11 +267,11 @@ export function FavoritesManagementTab({
 
               return (
                 <div
-                  key={item.targetId}
+                  key={`${item.type}:${item.targetId}`}
                   className="group relative rounded-xl border border-[#222432] bg-[#171822] hover:border-[#ff5500]/50 p-3 transition-all flex flex-col justify-between"
                 >
                   <div className="relative aspect-square rounded-lg overflow-hidden bg-black/40 mb-3">
-                    <img
+                    <AdminCoverImage
                       src={item.targetCoverUrl}
                       alt={item.targetTitle}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
@@ -195,26 +287,13 @@ export function FavoritesManagementTab({
                         onClick={() =>
                           onTogglePreview({
                             id: item.targetId,
-                            spotifyId: item.targetId,
+
                             title: item.targetTitle,
-                            artist: item.targetSubtitle || "Moodify Artist",
-                            album: "Single",
-                            genre: "V-Pop",
-                            duration: "3:30",
+                            artist: item.targetSubtitle || "Chưa có thông tin nghệ sĩ",
+
                             coverUrl: item.targetCoverUrl,
                             audioUrl: item.audioUrl,
-                            plays: 5000,
-                            likes: Number(item.favoriteCount),
-                            status: "published",
-                            moderationScore: 90,
-                            bpm: 120,
-                            energy: 0.7,
-                            danceability: 0.6,
-                            valence: 0.5,
-                            acousticness: 0.2,
-                            keySignature: "C Major",
-                            vibeCategory: "Chill",
-                            createdAt: "2026-09-01",
+
                           })
                         }
                         className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition"
@@ -258,10 +337,7 @@ export function FavoritesManagementTab({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setActiveType("SONG");
-              setCurrentPage(0);
-            }}
+            onClick={() => handleSelectType("SONG")}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition ${
               activeType === "SONG"
                 ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/20"
@@ -273,10 +349,7 @@ export function FavoritesManagementTab({
 
           <button
             type="button"
-            onClick={() => {
-              setActiveType("ARTIST");
-              setCurrentPage(0);
-            }}
+            onClick={() => handleSelectType("ARTIST")}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition ${
               activeType === "ARTIST"
                 ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/20"
@@ -288,10 +361,7 @@ export function FavoritesManagementTab({
 
           <button
             type="button"
-            onClick={() => {
-              setActiveType("ALBUM");
-              setCurrentPage(0);
-            }}
+            onClick={() => handleSelectType("ALBUM")}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition ${
               activeType === "ALBUM"
                 ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/20"
@@ -356,6 +426,19 @@ export function FavoritesManagementTab({
             />
           ))}
         </div>
+      ) : listError ? (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-10 text-center">
+          <AlertTriangle className="mx-auto h-9 w-9 text-rose-400 mb-3" />
+          <h3 className="text-base font-bold text-white">Không thể tải danh sách yêu thích</h3>
+          <p className="mt-1 text-xs text-rose-200/90 max-w-md mx-auto">{listError}</p>
+          <button
+            type="button"
+            onClick={() => void loadFavoritesData()}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/20 px-4 py-2 text-xs font-semibold text-rose-100 hover:bg-rose-500/30 transition cursor-pointer"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Thử lại
+          </button>
+        </div>
       ) : favorites.length === 0 ? (
         <div className="rounded-xl border border-[#222432] bg-[#12131a] p-12 text-center">
           <Heart className="mx-auto h-10 w-10 text-zinc-600 mb-3" />
@@ -379,28 +462,38 @@ export function FavoritesManagementTab({
               </thead>
               <tbody className="divide-y divide-white/5">
                 {favorites.map((fav) => {
+                  const rowKey = favoriteRowKey(fav);
                   const isPlayingThis =
                     isPlayingPreview && previewTrack?.id === fav.targetId;
 
                   return (
                     <tr
-                      key={fav.id}
+                      key={rowKey}
                       className="hover:bg-white/[0.02] transition-colors group"
                     >
                       {/* User */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          {fav.userAvatar ? (
-                            <img
-                              src={fav.userAvatar}
-                              alt={fav.userName}
-                              className="h-8 w-8 rounded-full object-cover border border-white/10"
-                            />
-                          ) : (
-                            <div className="grid h-8 w-8 place-items-center rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 font-mono font-bold text-xs">
-                              {fav.userName.slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
+                          {(() => {
+                            const avatarSrc = resolveUserAvatar(fav.userAvatar);
+                            if (avatarSrc && !brokenAvatars.has(rowKey)) {
+                              return (
+                                <img
+                                  src={avatarSrc}
+                                  alt={fav.userName}
+                                  onError={() =>
+                                    setBrokenAvatars((prev) => new Set(prev).add(rowKey))
+                                  }
+                                  className="h-8 w-8 rounded-full object-cover border border-white/10"
+                                />
+                              );
+                            }
+                            return (
+                              <div className="grid h-8 w-8 place-items-center rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 font-mono font-bold text-xs">
+                                {(fav.userName || "U").slice(0, 2).toUpperCase()}
+                              </div>
+                            );
+                          })()}
                           <div className="min-w-0">
                             <p className="font-bold text-white truncate">{fav.userName}</p>
                             <p className="text-[11px] font-mono text-zinc-400 truncate">
@@ -414,7 +507,7 @@ export function FavoritesManagementTab({
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
                           <div className="relative group/play shrink-0">
-                            <img
+                            <AdminCoverImage
                               src={fav.targetCoverUrl}
                               alt={fav.targetTitle}
                               className="h-9 w-9 rounded object-cover border border-white/10"
@@ -425,26 +518,13 @@ export function FavoritesManagementTab({
                                 onClick={() =>
                                   onTogglePreview({
                                     id: fav.targetId,
-                                    spotifyId: fav.targetId,
+
                                     title: fav.targetTitle,
-                                    artist: fav.targetSubtitle || "Moodify Artist",
-                                    album: "Single",
-                                    genre: "V-Pop",
-                                    duration: "3:30",
+                                    artist: fav.targetSubtitle || "Chưa có thông tin nghệ sĩ",
+
                                     coverUrl: fav.targetCoverUrl,
                                     audioUrl: fav.audioUrl,
-                                    plays: 5000,
-                                    likes: 500,
-                                    status: "published",
-                                    moderationScore: 90,
-                                    bpm: 120,
-                                    energy: 0.7,
-                                    danceability: 0.6,
-                                    valence: 0.5,
-                                    acousticness: 0.2,
-                                    keySignature: "C Major",
-                                    vibeCategory: "Chill",
-                                    createdAt: "2026-09-01",
+
                                   })
                                 }
                                 className="absolute inset-0 grid place-items-center bg-black/60 rounded text-[#ff5500] opacity-0 group-hover/play:opacity-100 transition"
@@ -497,9 +577,9 @@ export function FavoritesManagementTab({
                       <td className="py-3 px-4 text-right">
                         <button
                           type="button"
-                          disabled={deletingId === fav.id}
+                          disabled={deletingKey === rowKey}
                           onClick={() => setDeletingFavorite(fav)}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition disabled:opacity-50"
                           title="Xóa lượt thích"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -543,41 +623,45 @@ export function FavoritesManagementTab({
 
       {/* Confirm Delete Modal */}
       {deletingFavorite && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 backdrop-blur-sm p-4 anim-fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-[#0e131d] p-6 shadow-2xl">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-rose-500/10 border border-rose-500/20">
-                <Trash2 className="h-5 w-5" />
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] grid place-items-center bg-black/80 backdrop-blur-sm p-4 anim-fade-in">
+            <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-[#0e131d] p-6 shadow-2xl">
+              <div className="flex items-center gap-3 text-rose-400">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Xóa lượt yêu thích</h3>
+                  <p className="text-xs text-zinc-400">Xóa bản ghi này khỏi cơ sở dữ liệu MySQL.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Xóa lượt yêu thích</h3>
-                <p className="text-xs text-zinc-400">Xóa bản ghi này khỏi cơ sở dữ liệu MySQL.</p>
+
+              <div className="mt-4 rounded-xl border border-white/5 bg-black/40 p-3 text-xs text-zinc-300">
+                <p className="font-semibold text-white">Người dùng: {deletingFavorite.userName}</p>
+                <p className="text-zinc-400 mt-1">Đã thích: {deletingFavorite.targetTitle}</p>
               </div>
-            </div>
 
-            <div className="mt-4 rounded-xl border border-white/5 bg-black/40 p-3 text-xs text-zinc-300">
-              <p className="font-semibold text-white">Người dùng: {deletingFavorite.userName}</p>
-              <p className="text-zinc-400 mt-1">Đã thích: {deletingFavorite.targetTitle}</p>
-            </div>
-
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingFavorite(null)}
-                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500"
-              >
-                Xác nhận xóa
-              </button>
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={deletingKey !== null}
+                  onClick={() => setDeletingFavorite(null)}
+                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingKey !== null}
+                  onClick={handleConfirmDelete}
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-50 cursor-pointer"
+                >
+                  {deletingKey !== null ? "Đang xóa..." : "Xác nhận xóa"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

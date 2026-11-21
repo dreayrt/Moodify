@@ -7,6 +7,7 @@ import {
   listKaraokeJobs, listKaraokeResources, publishKaraokeVersion, retryKaraokeJob,
   type KaraokeResource, type KaraokeVersion, type ProcessingJob, type ResourceDetail, type ResourceList,
 } from "@/lib/api/admin-karaoke-client";
+import { ModalPortal } from "./shared/modal-portal";
 import s from "./karaoke-resources-tab.module.css";
 
 type Props = { onToast: (message: string, type?: "success" | "error" | "info" | "warning") => void };
@@ -39,14 +40,26 @@ export function KaraokeResourcesTab({ onToast }: Props) {
   useEffect(() => {
     let disposed = false, inFlight = false;
     const refresh = async () => {
-      if (inFlight) return; inFlight = true;
+      if (inFlight || disposed) return; inFlight = true;
       try { const result = await load(); if (!disposed) { setData(result.resources); if (result.tasks) setJobs(result.tasks); setError(""); } }
       catch (e) { if (!disposed) setError(message(e)); }
       finally { inFlight = false; if (!disposed) setLoading(false); }
     };
+    const onInvalidated = () => { disposed = true; };
+    window.addEventListener("moodify:admin-session-invalidated", onInvalidated);
     const initial = setTimeout(() => { setLoading(true); void refresh(); }, 0);
-    const timer = setInterval(() => { setTick(Date.now()); void refresh(); }, 5000);
-    return () => { disposed = true; clearTimeout(initial); clearInterval(timer); };
+    const timer = setInterval(() => {
+      if (!disposed && document.visibilityState === "visible") {
+        setTick(Date.now());
+        void refresh();
+      }
+    }, 5000);
+    return () => {
+      disposed = true;
+      clearTimeout(initial);
+      clearInterval(timer);
+      window.removeEventListener("moodify:admin-session-invalidated", onInvalidated);
+    };
   }, [load]);
   useEffect(() => () => { if (ownedUrl.current) URL.revokeObjectURL(ownedUrl.current); }, []);
   useEffect(() => {
@@ -125,16 +138,16 @@ export function KaraokeResourcesTab({ onToast }: Props) {
     </section>
     <p className={s.note}>Xử lý bằng CPU có thể mất nhiều thời gian. Bạn có thể rời trang và quay lại theo dõi. Kết quả chỉ được sử dụng sau khi quản trị viên duyệt.</p>
 
-    {creating && <div className={s.backdrop}><section className={`${s.dialog} ${s.create}`} role="dialog" aria-modal="true" aria-labelledby="create-karaoke-title"><div className={s.dialogHead}><h2 id="create-karaoke-title">Tạo tác vụ tách nhạc</h2><button disabled={busy} aria-label="Đóng" onClick={() => setCreating(false)}><X size={19} /></button></div>
+    {creating && <ModalPortal><div className={s.backdrop}><section className={`${s.dialog} ${s.create}`} role="dialog" aria-modal="true" aria-labelledby="create-karaoke-title"><div className={s.dialogHead}><h2 id="create-karaoke-title">Tạo tác vụ tách nhạc</h2><button disabled={busy} aria-label="Đóng" onClick={() => setCreating(false)}><X size={19} /></button></div>
       <div className={s.dialogBody}><label className={s.field}>Tìm bài hát<input value={createSearch} onChange={e => setCreateSearch(e.target.value)} placeholder="Nhập tên bài hát hoặc ca sĩ..." /></label>
       {choiceError && <p className={s.failure}>{choiceError}</p>}<div className={s.choices}>{choices.map(t => <button key={t.songId} data-selected={choice?.songId === t.songId} onClick={() => setChoice(t)}><span><strong>{t.title}</strong><small>{t.artist}</small></span><span>{choice?.songId === t.songId ? <CheckCircle2 size={17} /> : t.sourceAvailable ? "Có nguồn" : "Cần tải nguồn"}</span></button>)}</div>
       {choice && <p className={s.selected}>Đã chọn: <strong>{choice.title}</strong> · {choice.artist}</p>}
       <label className={s.field}>File nguồn thay thế (tùy chọn)<input type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aac" onChange={e => setFile(e.target.files?.[0])} /><small>Dùng nguồn có sẵn nếu không chọn file. MP3, WAV, FLAC, M4A, OGG, AAC · tối đa 128 MiB · 30 phút.</small></label>
       <div className={s.info}><strong>Đầu ra: Nhạc nền + Vocal + Dữ liệu cao độ</strong><p>Mô hình Mel-Band RoFormer Karaoke · Xử lý CPU trên máy chủ. Kết quả sẽ chờ bạn nghe thử và duyệt.</p></div></div>
       <div className={s.dialogFoot}><button disabled={busy} onClick={() => setCreating(false)}>Đóng</button><button className={s.primary} disabled={busy || !choice || (!choice.sourceAvailable && !file) || (file?.size ?? 0) > 128 * 1024 ** 2 || choice?.status === "running"} onClick={async () => { if (choice && await act(() => createKaraokeJob(choice.songId, file), "Đã xếp hàng tác vụ tách nhạc.")) { setCreating(false); setView("active"); setPage(0); } }}>{busy ? <Loader2 size={16} className={s.spin} /> : <Plus size={16} />}Bắt đầu tách</button></div>
-    </section></div>}
+    </section></div></ModalPortal>}
 
-    {detail && <div className={s.backdrop}><section className={s.dialog} role="dialog" aria-modal="true" aria-labelledby="karaoke-detail-title"><div className={s.dialogHead}><div><h2 id="karaoke-detail-title">{detail.title}</h2><small>{detail.artist}</small></div><button aria-label="Đóng chi tiết" disabled={busy} onClick={() => { detailRequest.current++; stopPreview(); setDetail(undefined); }}><X size={19} /></button></div>
+    {detail && <ModalPortal><div className={s.backdrop}><section className={s.dialog} role="dialog" aria-modal="true" aria-labelledby="karaoke-detail-title"><div className={s.dialogHead}><div><h2 id="karaoke-detail-title">{detail.title}</h2><small>{detail.artist}</small></div><button aria-label="Đóng chi tiết" disabled={busy} onClick={() => { detailRequest.current++; stopPreview(); setDetail(undefined); }}><X size={19} /></button></div>
       <div className={s.dialogBody}>{detail.versions.length === 0 ? <div className={s.empty}><Music2 size={28} /><strong>Bài hát chưa có tài nguyên karaoke</strong><span>Tạo tác vụ để chuẩn bị nhạc nền và vocal.</span></div> : <>
         <label className={s.field}>Phiên bản tài nguyên<select value={selectedVersion} onChange={e => { stopPreview(); setSelectedVersion(e.target.value); }}>{detail.versions.map(v => <option key={v.assetVersion} value={v.assetVersion}>{v.assetVersion} · {v.assetVersion === detail.publishedVersion ? "Đang sử dụng" : v.publishedAt || v.status === "ready" ? "Phiên bản trước" : "Chờ duyệt"} · {date(v.createdAt)}</option>)}</select></label>
         <div className={s.previewButtons}><button disabled={previewLoading} onClick={() => void listen("source", version)}>Nghe bản gốc</button><button disabled={!version?.assets?.instrumental || previewLoading} onClick={() => void listen("instrumental", version)}>Nghe nhạc nền</button><button disabled={!version?.assets?.vocals || previewLoading} onClick={() => void listen("vocals", version)}>Nghe vocal</button></div>
@@ -145,6 +158,6 @@ export function KaraokeResourcesTab({ onToast }: Props) {
         <p className={s.note}>Người tạo: {version?.createdBy ?? "Quy trình chuẩn bị trước đây"} · {date(version?.createdAt)}{version?.publishedBy ? ` · Lần xuất bản gần nhất: ${version.publishedBy} · ${date(version.publishedAt)}` : ""}</p>
       </>}{!!detail.jobs?.length && <div className={s.files}><div><strong>Nhật ký xử lý gần đây</strong><button disabled={busy} onClick={() => void openDetail(detail.songId)}><RefreshCw size={13} />Cập nhật</button></div>{detail.jobs.map(j => <div key={j.id}><span><strong>{j.sourceName} · {j.status === "completed" && j.publishedAt ? "Đã xuất bản" : labels[j.status] ?? j.status}</strong><small>{j.createdBy} · {date(j.createdAt)}</small>{j.events?.map((event, index) => <small key={index}>{date(event.at)} · {labels[event.stage] ?? event.stage}</small>)}{j.error && <small className={s.failure}>{j.error}</small>}</span></div>)}</div>}</div>
       <div className={s.dialogFoot}><button disabled={busy} onClick={() => { stopPreview(); setDetail(undefined); newJob(data?.items.find(t => t.songId === detail.songId) ?? { songId: detail.songId, title: detail.title, artist: detail.artist, sourceAvailable: detail.sourceAvailable, status: "missing" }); }}>Tạo lần tách mới</button>{version && <button className={s.primary} disabled={busy || selectedVersion === detail.publishedVersion} onClick={async () => { if (await act(() => publishKaraokeVersion(detail.songId, selectedVersion), "Đã xuất bản phiên bản tài nguyên karaoke.")) { const result = await getKaraokeResource(detail.songId); setDetail(result); } }}><CheckCircle2 size={16} />{selectedVersion === detail.publishedVersion ? "Đang sử dụng" : version.publishedAt || version.status === "ready" ? "Khôi phục phiên bản này" : "Xuất bản cho karaoke"}</button>}</div>
-    </section></div>}
+    </section></div></ModalPortal>}
   </div>;
 }

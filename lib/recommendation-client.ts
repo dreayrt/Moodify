@@ -32,9 +32,19 @@ export class RecommendationError extends Error {
   constructor(public status: number, message: string, public code?: string) { super(message); }
 }
 
+function emitRecommendationAdminSessionInvalidated(reason: "UNAUTHORIZED" | "DEVICE_REVOKED", message: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("moodify:admin-session-invalidated", { detail: { reason, message } }));
+}
+
 export async function recommendationRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getValidAccessToken();
-  if (!token) throw new RecommendationError(401, "Vui lòng đăng nhập để xem gợi ý của bạn.");
+  if (!token) {
+    if (path.startsWith("/admin/")) {
+      emitRecommendationAdminSessionInvalidated("UNAUTHORIZED", "Phiên đăng nhập quản trị viên đã hết hạn.");
+    }
+    throw new RecommendationError(401, "Vui lòng đăng nhập để xem gợi ý của bạn.");
+  }
   const response = await fetch(`${API}${path}`, {
     ...options, signal: options.signal ?? AbortSignal.timeout(10000), cache: "no-store",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`,
@@ -46,12 +56,33 @@ export async function recommendationRequest<T>(path: string, options: RequestIni
       response.status === 429 ? "Bạn vừa làm mới bản phối. Hãy thử lại sau vài phút." :
       response.status === 404 ? "Nội dung này không còn khả dụng hoặc bạn chưa có quyền xem." :
       body.message || "Chưa thể tải nội dung. Vui lòng thử lại.";
+    if (path.startsWith("/admin/")) {
+      if (response.status === 401) {
+        emitRecommendationAdminSessionInvalidated("UNAUTHORIZED", message);
+      } else if (response.status === 403 && body?.error === "DEVICE_REVOKED") {
+        emitRecommendationAdminSessionInvalidated("DEVICE_REVOKED", message);
+      }
+    }
     throw new RecommendationError(response.status, message, body.code);
   }
   return response.json() as Promise<T>;
 }
 
-export const fetchRecommendationHome = (signal?: AbortSignal) => recommendationRequest<RecommendationHome>("/recommendations/home", { signal });
+export const fetchRecommendationHome = (signalOrGenre?: AbortSignal | string | null, signal?: AbortSignal) => {
+  let genre: string | null | undefined;
+  let actualSignal: AbortSignal | undefined;
+  if (typeof signalOrGenre === "string") {
+    genre = signalOrGenre;
+    actualSignal = signal;
+  } else if (signalOrGenre === null) {
+    genre = undefined;
+    actualSignal = signal;
+  } else {
+    actualSignal = signalOrGenre;
+  }
+  const query = genre && genre !== "ALL" ? `?genre=${encodeURIComponent(genre)}` : "";
+  return recommendationRequest<RecommendationHome>(`/recommendations/home${query}`, { signal: actualSignal });
+};
 export const fetchPersonalizedMix = (id: string, signal?: AbortSignal) => recommendationRequest<PersonalizedMix>(`/me/personalized-playlists/${encodeURIComponent(id)}`, { signal });
 export const refreshPersonalizedMix = (id: string) => recommendationRequest<PersonalizedMix>(`/me/personalized-playlists/${encodeURIComponent(id)}/refresh`, { method: "POST" });
 export const copyPersonalizedMix = (id: string, versionId: string, requestId: string) => recommendationRequest<Playlist>(

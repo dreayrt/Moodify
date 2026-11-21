@@ -9,12 +9,13 @@ import {
   Heart, Repeat, Repeat1, Shuffle, Music2, ShieldCheck, Share2,
   Gauge, ChevronDown, SlidersHorizontal,
 } from "lucide-react";
-import { usePlayer } from "./player-context";
+import { usePlayerState, usePlaybackTime } from "./player-context";
 import { addToLibrary, removeFromLibrary, isTrackInLibrary } from "@/lib/api-client";
 import { useVipTheme } from "@/lib/theme";
 import TrackActionMenu from "./track-action-menu";
 import AdInterstitialBanner from "./ad-interstitial-banner";
-import ShareSongCardModal from "./share-song-card-modal";
+import dynamic from "next/dynamic";
+const ShareSongCardModal = dynamic(() => import("./share-song-card-modal"));
 import styles from "./global-player.module.css";
 
 function formatSeconds(sec: number): string {
@@ -28,10 +29,10 @@ export function GlobalPlayerBar() {
   const pathname = usePathname();
   const {
     currentTrack, isPlayerBarHidden, setPlayerBarHidden, isPlaying, isBuffering,
-    currentTime, duration, volume, isMuted, isAdPlaying, isPremiumUser, subTier,
-    adReason, playbackRate, isShuffle, repeatMode, togglePlay, seek, setVolume,
+    volume, isMuted, isAdPlaying, isPremiumUser, subTier,
+    adReason, playbackRate, isShuffle, repeatMode, togglePlay, setVolume,
     toggleMute, setPlaybackRate, toggleShuffle, toggleRepeat, nextTrack, prevTrack,
-  } = usePlayer();
+  } = usePlayerState();
   const { vipButtonsEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
   const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
   const currentShellTheme = isPremiumUser && vipShellEnabled ? currentVipTheme : normalTheme;
@@ -112,7 +113,6 @@ export function GlobalPlayerBar() {
 
   if (pathname?.startsWith("/dashboard/karaoke") || !currentTrack) return null;
 
-  const progressPercent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
   const repeatLabel = repeatMode === "off" ? "Tắt" : repeatMode === "all" ? "Toàn bộ" : "Một bài";
   const isBasicAd = subTier === "INDIVIDUAL_BASIC" || adReason === "BASIC_DAILY_LIMIT_EXCEEDED";
 
@@ -209,21 +209,7 @@ export function GlobalPlayerBar() {
                   {repeatMode === "one" ? <Repeat1 size={18} /> : <Repeat size={18} />}
                 </button>
               </div>
-              <div className={styles.timeline}>
-                <span>{isAdPlaying ? "QC" : formatSeconds(currentTime)}</span>
-                <div className={styles.seekTrack}>
-                  <div className={styles.seekRail}>
-                    <div className={`${styles.seekFill} ${isVipButtonsActive ? `bg-gradient-to-r ${currentVipTheme.equalizerGradient}` : "bg-gradient-to-r from-purple-500 via-pink-500 to-amber-300"}`}
-                      style={{ width: `${isAdPlaying ? 100 : progressPercent}%` }} />
-                  </div>
-                  <input type="range" min={0} max={duration > 0 ? duration : 0} step={0.1}
-                    value={Math.min(Math.max(0, currentTime), Math.max(0, duration))}
-                    disabled={isAdPlaying || duration <= 0} onChange={(event) => seek(Number(event.target.value))}
-                    aria-label="Tiến độ bài hát" aria-valuetext={`${formatSeconds(currentTime)} trên ${formatSeconds(duration)}`}
-                    className={styles.seekInput} />
-                </div>
-                <span>{isAdPlaying ? "0:15" : formatSeconds(duration)}</span>
-              </div>
+              <PlaybackProgress />
             </div>
 
             <div id="player-options" className={`${styles.utilities} ${isOptionsOpen ? styles.utilitiesOpen : ""}`}>
@@ -259,7 +245,39 @@ export function GlobalPlayerBar() {
           </div>
         </section>
       )}
-      <ShareSongCardModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} track={currentTrack} currentTime={currentTime} />
+      {isShareModalOpen && <CurrentSongShare onClose={() => setIsShareModalOpen(false)} />}
     </>
   );
+}
+
+function PlaybackProgress() {
+  const currentTime = usePlaybackTime();
+  const { duration, seek, isAdPlaying, isPremiumUser } = usePlayerState();
+  const { vipButtonsEnabled, currentVipTheme } = useVipTheme();
+  const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
+  const progressPercent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
+  return (
+              <div className={styles.timeline}>
+                <span>{isAdPlaying ? "QC" : formatSeconds(currentTime)}</span>
+                <div className={styles.seekTrack}>
+                  <div className={styles.seekRail}>
+                    <div className={`${styles.seekFill} ${isVipButtonsActive ? `bg-gradient-to-r ${currentVipTheme.equalizerGradient}` : "bg-gradient-to-r from-purple-500 via-pink-500 to-amber-300"}`}
+                      style={{ width: `${isAdPlaying ? 100 : progressPercent}%` }} />
+                  </div>
+                  <input type="range" min={0} max={duration > 0 ? duration : 0} step={0.1}
+                    value={Math.min(Math.max(0, currentTime), Math.max(0, duration))}
+                    disabled={isAdPlaying || duration <= 0} onChange={(event) => seek(Number(event.target.value))}
+                    aria-label="Tiến độ bài hát" aria-valuetext={`${formatSeconds(currentTime)} trên ${formatSeconds(duration)}`}
+                    className={styles.seekInput} />
+                </div>
+                <span>{isAdPlaying ? "0:15" : formatSeconds(duration)}</span>
+              </div>
+  );
+}
+
+function CurrentSongShare({ onClose }: { onClose: () => void }) {
+  const { currentTrack } = usePlayerState();
+  const currentTime = usePlaybackTime();
+  if (!currentTrack) return null;
+  return <ShareSongCardModal isOpen onClose={onClose} track={currentTrack} currentTime={currentTime} />;
 }

@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { usePlayer } from "./player-context";
+import { usePlayerState } from "./player-context";
 import { useCurrentMascot, getMascotUrls, getMascotById } from "@/lib/mascots";
 
 // Dynamic import with ssr: false to guarantee clean client-only mounting
 const MascotComponent = dynamic(
-  () => import("page-mascot").then((mod) => mod.Mascot),
+  () => import("./mascot/mascot").then((mod) => mod.Mascot),
   {
     ssr: false,
     loading: () => (
@@ -37,7 +37,7 @@ export default function MoodifyMascot({
 }: MoodifyMascotProps) {
   const [mounted, setMounted] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
-  const { isPlaying } = usePlayer();
+  const { isPlaying } = usePlayerState();
   const currentMascotState = useCurrentMascot();
 
   useEffect(() => {

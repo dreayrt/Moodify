@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { driver, DriveStep } from "driver.js";
 import "driver.js/dist/driver.css";
 import "./user-tour.css";
+import { takePendingUserTour } from "@/lib/user-tour-trigger";
 import type { UserProfileResponse } from "@/lib/auth-client";
 
 interface UserTourGuideProps {
@@ -12,11 +13,7 @@ interface UserTourGuideProps {
   userLoading: boolean;
 }
 
-export function triggerUserTour() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("moodify-start-tour"));
-  }
-}
+export { triggerUserTour } from "@/lib/user-tour-trigger";
 
 function getStoredUser(): { id?: number; role?: string; username?: string } | null {
   if (typeof window === "undefined") return null;
@@ -280,6 +277,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
   // Handle manual trigger (Help button) and expose reset helper in console
   useEffect(() => {
     const handleStartTour = () => {
+      takePendingUserTour();
       startDriverTour(true);
     };
 
@@ -297,6 +295,7 @@ export default function UserTourGuide({ user, userLoading }: UserTourGuideProps)
     }
 
     window.addEventListener("moodify-start-tour", handleStartTour);
+    if (takePendingUserTour()) startDriverTour(true);
     return () => {
       window.removeEventListener("moodify-start-tour", handleStartTour);
     };

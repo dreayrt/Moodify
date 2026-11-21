@@ -25,6 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { uploadArtistTrack, extractLicenseFromDoc } from "@/lib/auth/auth-client";
+import { AGREEMENT_FIELDS, AGREEMENT_GROUPS, readAgreementDetails, type AgreementDetails } from "@/lib/agreement-details";
 import { parseLyricsContent, readLyricsFile } from "@/lib/lyrics-import";
 import {
   ArtistTrack,
@@ -63,43 +64,15 @@ const LICENSE_TYPES: Array<{
     badge: "Phổ biến nhất",
   },
   {
-    value: "EXCLUSIVE_LICENSE",
-    label: "Exclusive License",
-    desc: "Bản quyền độc quyền phát hành và phân phối toàn cầu",
-    badge: "Độc quyền",
-  },
-  {
-    value: "MASTER_LICENSE",
-    label: "Master License",
-    desc: "Quyền sở hữu bản ghi âm gốc (Master Recording Rights)",
-    badge: "Bản ghi gốc",
-  },
-  {
-    value: "DIRECT_LICENSE",
-    label: "Direct License",
-    desc: "Cấp phép trực tiếp từ nghệ sĩ độc lập (Independent Creator)",
-    badge: "Nghệ sĩ tự do",
-  },
-  {
-    value: "NON_EXCLUSIVE",
-    label: "Non-Exclusive License",
-    desc: "Bản quyền không độc quyền (phát hành tự do trên nhiều nền tảng)",
-    badge: "Tự do",
-  },
-  {
-    value: "STREAMING_PENDING",
-    label: "Streaming Pending",
-    desc: "Đang trong tiến trình chờ xét duyệt hồ sơ cấp phép phát hành",
-    badge: "Chờ xét duyệt",
+    value: "DEMO_SIMULATED",
+    label: "Dữ liệu mô phỏng",
+    desc: "Hồ sơ thử nghiệm, không xác nhận quyền khai thác thương mại. Chỉ phát trong chế độ demo.",
+    badge: "Mô phỏng",
   },
 ];
 
 const DISTRIBUTOR_OPTIONS = [
   { id: "", name: "Không qua đơn vị phân phối (Tự phát hành độc lập)", share: "100%" },
-  { id: "1", name: "Moodify Direct Distribution (Nội bộ)", share: "85%" },
-  { id: "2", name: "DistroKid Music Group", share: "Đối tác" },
-  { id: "3", name: "TuneCore Digital Media", share: "Đối tác" },
-  { id: "4", name: "Universal / Sony Music Publishing", share: "Hãng đĩa" },
 ];
 
 function createTrackId(counter: number): string {
@@ -169,6 +142,7 @@ export function TrackUploadModal({
   // Step 2: License Metadata matching MySQL `song_licenses` table
   const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("");
+  const [agreementDetails, setAgreementDetails] = useState<AgreementDetails>({});
   const [distributorId, setDistributorId] = useState<string>("");
   const [ocrDistributorName, setOcrDistributorName] = useState<string | null>(null);
   const [ocrDirectLicensing, setOcrDirectLicensing] = useState(false);
@@ -249,6 +223,9 @@ export function TrackUploadModal({
       if (requestId !== ocrRequestRef.current) return;
       if (res && res.success) {
         const fields: string[] = [];
+        const extractedAgreement = readAgreementDetails(res.agreementDetails);
+        setAgreementDetails(extractedAgreement);
+        fields.push(...Object.keys(extractedAgreement));
         if (res.licenseType) {
           setLicenseType(res.licenseType);
           fields.push("licenseType");
@@ -324,6 +301,8 @@ export function TrackUploadModal({
     setAcquisitionCostVnd("");
     setCostEvidence("");
     setOcrExtractedFields([]);
+    setAgreementDetails({});
+    setCopyrightOwner("");
     // A newly attached agreement must not inherit a distributor from the previous upload.
     setDistributorId("");
     setOcrDistributorName(null);
@@ -433,7 +412,7 @@ export function TrackUploadModal({
       setStepError("Đơn vị phân phối đọc từ tài liệu chưa khớp danh sách. Vui lòng chọn đơn vị phân phối phù hợp.");
       return;
     }
-    if (distributorId && !distributionContractCode.trim()) {
+    if (!distributionContractCode.trim()) {
       setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
       return;
     }
@@ -470,6 +449,10 @@ export function TrackUploadModal({
       // License Info
       formData.append("licenseType", licenseType);
       formData.append("copyrightOwner", copyrightOwner.trim());
+      const submittedAgreement = readAgreementDetails(agreementDetails);
+      if (Object.keys(submittedAgreement).length) {
+        formData.append("agreementDetails", JSON.stringify(submittedAgreement));
+      }
       if (acquisitionCostVnd !== "") formData.append("acquisitionCostVnd", acquisitionCostVnd);
       if (distributorId && distributorId !== "0") {
         formData.append("distributorId", distributorId);
@@ -571,7 +554,8 @@ export function TrackUploadModal({
     // Reset license states
     ocrRequestRef.current += 1;
     setLicenseType("DIGITAL_STREAMING");
-    setCopyrightOwner("Independent Artist");
+    setCopyrightOwner("");
+    setAgreementDetails({});
     setDistributorId("");
     setOcrDistributorName(null);
     setOcrDirectLicensing(false);
@@ -1174,35 +1158,34 @@ export function TrackUploadModal({
                       </label>
                     </div>
                     <div className="relative">
-                      <input
-                        type="text"
+                      <select
                         required
-                        list="license-types-suggestions"
                         value={licenseType}
                         onChange={(e) => setLicenseType(e.target.value)}
-                        placeholder="Ví dụ: DIGITAL_STREAMING hoặc EXCLUSIVE - Độc quyền phân phối..."
                         className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50 focus:bg-white/[0.07] transition"
-                      />
-                      <datalist id="license-types-suggestions">
+                      >
                         {LICENSE_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
                             {type.label} ({type.badge})
                           </option>
                         ))}
-                      </datalist>
+                      </select>
+                      {licenseType === "DEMO_SIMULATED" && (
+                        <p className="mt-2 text-xs text-amber-200">Hồ sơ mô phỏng không xác nhận quyền thương mại. Chi phí thực tế được ghi nhận bằng 0 và chỉ được phát trong chế độ demo.</p>
+                      )}
                     </div>
                   </div>
 
                   {/* Copyright Owner */}
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                      Chi phí mua quyền bài hát (VND)
+                      Chi phí khai báo trong tài liệu (VND)
                     </label>
-                    <input type="number" min="0" step="1" value={acquisitionCostVnd} readOnly
+                    <input type="number" min="0" step="1" value={acquisitionCostVnd} onChange={(e) => setAcquisitionCostVnd(e.target.value)}
                       placeholder="OCR sẽ tự điền nếu tài liệu ghi rõ chi phí"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50" />
                     <p className="mt-1 text-[11px] text-white/45">
-                      {costEvidence || "Để trống nếu tài liệu không ghi rõ chi phí mua quyền."}
+                      {costEvidence || "Để trống nếu tài liệu không ghi rõ chi phí. Số tiền khai báo chỉ được ghi nhận là chi phí thực tế sau khi xác minh hồ sơ quyền thật."}
                     </p>
                   </div>
                   <div>
@@ -1320,6 +1303,32 @@ export function TrackUploadModal({
                     </div>
                   </div>
 
+                  <section className="space-y-4 border-t border-white/10 pt-4" aria-labelledby="agreement-details-heading">
+                    <div>
+                      <h3 id="agreement-details-heading" className="text-sm font-semibold text-white">Thông tin các bên và lịch ký</h3>
+                      <p className="mt-1 text-xs text-white/55">Không bắt buộc. Kiểm tra nội dung OCR điền và sửa nếu cần.</p>
+                    </div>
+                    {AGREEMENT_GROUPS.map((group) => (
+                      <fieldset key={group} className="grid gap-3 sm:grid-cols-2" disabled={isExtractingOcr}>
+                        <legend className="mb-2 text-xs font-semibold text-white/80">{group}</legend>
+                        {AGREEMENT_FIELDS.filter((field) => field.group === group).map(({ key, label, maxLength }) => (
+                          <label key={key} className={`space-y-1 ${key.endsWith("Address") ? "sm:col-span-2" : ""}`}>
+                            <span className="block text-xs text-white/65">{label}</span>
+                            <input
+                              type={key === "plannedSigningDate" ? "date" : "text"}
+                              value={agreementDetails[key] ?? ""}
+                              maxLength={maxLength}
+                              onChange={(event) => {
+                                const value = event.currentTarget.value;
+                                setAgreementDetails((previous) => ({ ...previous, [key]: value }));
+                              }}
+                              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-[#ff8b4d]/50 [color-scheme:dark]"
+                            />
+                          </label>
+                        ))}
+                      </fieldset>
+                    ))}
+                  </section>
                 </div>
 
               </div>

@@ -1,12 +1,15 @@
 "use client";
 
+import CoverImage from "./cover-image";
+
 import { Heart, Play, Clock, ListPlus, Share2 } from "lucide-react";
 import { Track } from "@/lib/api-client";
 import { useState } from "react";
 import Link from "next/link";
-import AddToPlaylistModal from "./add-to-playlist-modal";
+import dynamic from "next/dynamic";
+const AddToPlaylistModal = dynamic(() => import("./add-to-playlist-modal"));
 import TrackActionMenu from "./track-action-menu";
-import ShareSongCardModal from "./share-song-card-modal";
+const ShareSongCardModal = dynamic(() => import("./share-song-card-modal"));
 
 const MOOD_FEATURE_LABELS: Record<string, string> = {
   valence: "Độ tích cực",
@@ -80,7 +83,7 @@ export default function TrackCard({
 
   return (
     <div
-      className="group relative rounded-lg border border-slate-800/50 bg-slate-900/40 p-4 transition-all hover:bg-slate-900/60 hover:border-slate-700"
+      className="track-card-deferred group relative rounded-lg border border-slate-800/50 bg-slate-900/40 p-4 transition-all hover:bg-slate-900/60 hover:border-slate-700"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -89,7 +92,7 @@ export default function TrackCard({
         <div className="relative flex-shrink-0">
           <div className="h-16 w-16 rounded-md bg-slate-800 overflow-hidden">
             {resolvedCover && !imgError ? (
-              <img
+              <CoverImage sizes="64px"
                 src={resolvedCover}
                 alt={track.name || track.albumName || "Track cover"}
                 className="h-full w-full object-cover"
@@ -246,28 +249,18 @@ export default function TrackCard({
       </div>
 
       {/* Add To Playlist Modal */}
-      <AddToPlaylistModal
+      {showPlaylistModal && <AddToPlaylistModal
         track={track}
         isOpen={showPlaylistModal}
         onClose={() => setShowPlaylistModal(false)}
-      />
+      />}
 
       {/* Share Song Card Modal */}
-      <ShareSongCardModal
+      {showShareModal && <ShareSongCardModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
-        track={{
-          id: track.id,
-          spotifyId: track.spotifyId,
-          name: track.name,
-          artistName: track.artistName,
-          albumName: track.albumName,
-          imageUrl: track.imageUrl,
-          durationMs: track.durationMs,
-          lyricsPlain: track.lyricsPlain,
-          lyricsSynced: track.lyricsSynced,
-        }}
-      />
+        track={track}
+      />}
     </div>
   );
 }

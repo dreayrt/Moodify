@@ -10,7 +10,6 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useOptionalPlayer } from "./player-context";
 import {
   fetchTracks,
   recordMySearchHistory,
@@ -75,7 +74,6 @@ export interface MoodSearchBarProps {
 
 export default function MoodSearchBar({
   className = "",
-  isPremium,
   size = "md",
   autoFocus = false,
   value,
@@ -87,10 +85,9 @@ export default function MoodSearchBar({
 }: MoodSearchBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const player = useOptionalPlayer();
 
-  // Determine VIP status (prop takes precedence, then player context)
-  const isVip = isPremium !== undefined ? isPremium : Boolean(player?.isPremiumUser);
+  // The backend verifies the active account.
+  const canUseMood = true;
 
   const isControlledValue = value !== undefined;
   const isControlledMood = controlledMoodMode !== undefined;
@@ -110,8 +107,8 @@ export default function MoodSearchBar({
   }
 
   const effectiveSearchValue = isControlledValue ? value : internalSearchValue;
-  // Mood mode is only allowed if user is VIP
-  const effectiveIsMood = isVip && (isControlledMood ? controlledMoodMode : internalMoodMode);
+  // Mood has no subscription gate.
+  const effectiveIsMood = canUseMood && (isControlledMood ? controlledMoodMode : internalMoodMode);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [quickResults, setQuickResults] = useState(EMPTY_QUICK_RESULTS);
@@ -182,7 +179,7 @@ export default function MoodSearchBar({
   };
 
   const handleToggleMood = () => {
-    if (!isVip) return;
+    if (!canUseMood) return;
     const nextMood = !effectiveIsMood;
     setQuickResults(EMPTY_QUICK_RESULTS);
     setQuickSearchStatus("idle");
@@ -401,8 +398,8 @@ export default function MoodSearchBar({
         )}
       </form>
 
-      {/* Separate Toggle Button (CHỈ HIỂN THỊ KHI TÀI KHOẢN VIP) */}
-      {isVip && (
+      {/* Separate Toggle Button (Dành cho mọi tài khoản đang hoạt động) */}
+      {canUseMood && (
         <button
           type="button"
           onClick={handleToggleMood}
@@ -417,8 +414,8 @@ export default function MoodSearchBar({
           }`}
           title={
             effectiveIsMood
-              ? "Chế độ Mood VIP: Đang BẬT (Bấm để tắt)"
-              : "Chế độ Mood VIP: Đang TẮT (Bấm để bật)"
+              ? "Chế độ Mood: Đang BẬT (Bấm để tắt)"
+              : "Chế độ Mood: Đang TẮT (Bấm để bật)"
           }
           aria-pressed={effectiveIsMood}
         >

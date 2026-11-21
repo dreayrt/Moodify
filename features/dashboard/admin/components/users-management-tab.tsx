@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Copy,
   ExternalLink,
   Filter,
   Key,
@@ -34,6 +35,8 @@ import { fetchAdminUserDevices } from "@/lib/api/admin-client";
 type UsersManagementTabProps = {
   users: AdminUser[];
   devices: UserDevice[];
+  currentAdminId?: number;
+  currentAdminUsername?: string;
   onBanUser: (userId: number, reason: string, duration: string) => void;
   onUnbanUser: (userId: number) => void;
   onChangeUserRole: (
@@ -42,8 +45,12 @@ type UsersManagementTabProps = {
     extra?: { staffCode?: string; artistSpotifyId?: string }
   ) => void;
   onRevokeDevice: (deviceId: number) => void;
-  onResetPassword?: (userId: number) => void;
-  onUpdateProfile?: (userId: number, data: { fullName?: string; email?: string; phone?: string }) => void;
+  onRevokeAllUserDevices?: (userId: number) => Promise<void> | void;
+  onResetPassword?: (userId: number) => Promise<string | null> | string | null | void;
+  onUpdateProfile?: (
+    userId: number,
+    data: { fullName?: string; email?: string; phone?: string }
+  ) => Promise<{ ok: boolean; error?: string } | void> | void;
   onCreateUser?: (data: {
     username: string;
     fullName: string;
@@ -52,16 +59,19 @@ type UsersManagementTabProps = {
     role: AdminUserRole;
     status: AdminUserStatus;
     password?: string;
-  }) => void;
+  }) => Promise<{ ok: boolean; error?: string } | void> | void;
 };
 
 export function UsersManagementTab({
   users,
   devices,
+  currentAdminId,
+  currentAdminUsername,
   onBanUser,
   onUnbanUser,
   onChangeUserRole,
   onRevokeDevice,
+  onRevokeAllUserDevices,
   onResetPassword,
   onUpdateProfile,
   onCreateUser,
@@ -74,22 +84,28 @@ export function UsersManagementTab({
   const [inspectingUser, setInspectingUser] = useState<AdminUser | null>(null);
   const [isEditProfileMode, setIsEditProfileMode] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState({ fullName: "", email: "", phone: "" });
+  const [editProfileError, setEditProfileError] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const [selectedUserForBan, setSelectedUserForBan] = useState<AdminUser | null>(null);
   const [banReason, setBanReason] = useState("");
-  const [banDuration, setBanDuration] = useState("Vĩnh viễn");
 
   const [selectedUserForRole, setSelectedUserForRole] = useState<AdminUser | null>(null);
   const [targetRole, setTargetRole] = useState<AdminUserRole>("MODERATOR");
-  const [staffCodeInput, setStaffCodeInput] = useState("");
   const [artistSpotifyIdInput, setArtistSpotifyIdInput] = useState("");
 
   const [selectedUserForDevices, setSelectedUserForDevices] = useState<AdminUser | null>(null);
+  const [revokingAllDevices, setRevokingAllDevices] = useState(false);
+
   const [selectedUserForResetPassword, setSelectedUserForResetPassword] = useState<AdminUser | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
+  const [copiedTempPassword, setCopiedTempPassword] = useState(false);
 
   // Create User Modal State
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [newUserData, setNewUserData] = useState({
     username: "",
     fullName: "",
@@ -106,7 +122,7 @@ export function UsersManagementTab({
       u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.phone || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.artistSpotifyId && u.artistSpotifyId.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesRole = roleFilter === "ALL" || u.role === roleFilter;
@@ -132,7 +148,6 @@ export function UsersManagementTab({
   const handleOpenBanModal = (user: AdminUser) => {
     setSelectedUserForBan(user);
     setBanReason("");
-    setBanDuration("Vĩnh viễn");
   };
 
   const handleConfirmBan = () => {
@@ -140,7 +155,7 @@ export function UsersManagementTab({
     onBanUser(
       selectedUserForBan.id,
       banReason.trim() || "Vi phạm quy chế và tiêu chuẩn cộng đồng nền tảng",
-      banDuration
+      "Vĩnh viễn"
     );
     setSelectedUserForBan(null);
     if (inspectingUser?.id === selectedUserForBan.id) {
@@ -151,15 +166,17 @@ export function UsersManagementTab({
   const handleOpenRoleModal = (user: AdminUser) => {
     setSelectedUserForRole(user);
     setTargetRole(user.role === "USER" ? "MODERATOR" : user.role);
-    setStaffCodeInput(user.staffCode || `STAFF-VN-${Math.floor(100 + Math.random() * 900)}`);
-    setArtistSpotifyIdInput(user.artistSpotifyId || `artist_${Date.now()}`);
+    setArtistSpotifyIdInput(user.artistSpotifyId || "");
   };
 
   const handleConfirmRoleChange = () => {
     if (!selectedUserForRole) return;
+    const cleanArtistId = artistSpotifyIdInput.trim();
     onChangeUserRole(selectedUserForRole.id, targetRole, {
-      staffCode: targetRole === "MODERATOR" ? staffCodeInput : undefined,
-      artistSpotifyId: (targetRole === "CONTENT_LEAD" || targetRole === "ARTIST") ? artistSpotifyIdInput : undefined,
+      artistSpotifyId:
+        (targetRole === "CONTENT_LEAD" || targetRole === "ARTIST") && cleanArtistId
+          ? cleanArtistId
+          : undefined,
     });
     setSelectedUserForRole(null);
     if (inspectingUser?.id === selectedUserForRole.id) {
@@ -167,19 +184,44 @@ export function UsersManagementTab({
     }
   };
 
-  const handleConfirmResetPassword = () => {
-    if (!selectedUserForResetPassword) return;
-    if (onResetPassword) {
-      onResetPassword(selectedUserForResetPassword.id);
+  const handleOpenResetPasswordModal = (user: AdminUser) => {
+    setResetTempPassword(null);
+    setCopiedTempPassword(false);
+    setResettingPassword(false);
+    setSelectedUserForResetPassword(user);
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (!selectedUserForResetPassword || resettingPassword) return;
+    setResettingPassword(true);
+    try {
+      const tempPw = onResetPassword ? await onResetPassword(selectedUserForResetPassword.id) : null;
+      if (typeof tempPw === "string" && tempPw.length > 0) {
+        setResetTempPassword(tempPw);
+      } else {
+        setSelectedUserForResetPassword(null);
+      }
+    } finally {
+      setResettingPassword(false);
     }
-    setSelectedUserForResetPassword(null);
+  };
+
+  const handleRevokeAllDevices = async () => {
+    if (!selectedUserForDevices || !onRevokeAllUserDevices || revokingAllDevices) return;
+    setRevokingAllDevices(true);
+    try {
+      await onRevokeAllUserDevices(selectedUserForDevices.id);
+      setActiveUserDevices((prev) => prev.map((d) => ({ ...d, status: "REVOKED" })));
+    } finally {
+      setRevokingAllDevices(false);
+    }
   };
 
   const handleOpenCreateUser = () => {
     setCreateUserError(null);
     setIsCreateUserModalOpen(true);
     setNewUserData({
-      username: `user_${Math.floor(1000 + Math.random() * 9000)}`,
+      username: "",
       fullName: "",
       email: "",
       phone: "",
@@ -189,35 +231,79 @@ export function UsersManagementTab({
     });
   };
 
-  const handleSaveCreateUser = () => {
-    if (!newUserData.username.trim() || !newUserData.fullName.trim() || !newUserData.email.trim()) {
+  const handleSaveCreateUser = async () => {
+    const username = newUserData.username.trim();
+    const fullName = newUserData.fullName.trim();
+    const email = newUserData.email.trim();
+    if (!username || !fullName || !email) {
       setCreateUserError("Vui lòng điền đầy đủ Tên đăng nhập, Họ tên và Email.");
       return;
     }
-    if (onCreateUser) {
-      onCreateUser(newUserData);
+    setCreateUserError(null);
+    setCreatingUser(true);
+    try {
+      const payload = {
+        ...newUserData,
+        username,
+        fullName,
+        email,
+        phone: newUserData.phone.trim(),
+      };
+      const res = onCreateUser ? await onCreateUser(payload) : undefined;
+      if (res && !res.ok) {
+        setCreateUserError(res.error || "Không thể tạo người dùng.");
+        return;
+      }
+      setNewUserData({
+        username: "",
+        fullName: "",
+        email: "",
+        phone: "",
+        role: "USER",
+        status: "ACTIVE",
+        password: "",
+      });
+      setIsCreateUserModalOpen(false);
+    } finally {
+      setCreatingUser(false);
     }
-    setIsCreateUserModalOpen(false);
   };
 
   const handleStartEditProfile = (user: AdminUser) => {
+    setEditProfileError(null);
     setIsEditProfileMode(true);
     setEditProfileForm({
       fullName: user.fullName,
       email: user.email,
-      phone: user.phone || "",
+      phone: !user.phone || user.phone === "Chưa cập nhật" ? "" : user.phone,
     });
   };
 
-  const handleSaveProfileEdit = () => {
+  const handleSaveProfileEdit = async () => {
     if (!inspectingUser) return;
-    if (onUpdateProfile) {
-      onUpdateProfile(inspectingUser.id, editProfileForm);
+    const fullName = editProfileForm.fullName.trim();
+    const email = editProfileForm.email.trim();
+    const phone = editProfileForm.phone.trim();
+    if (!fullName || !email) {
+      setEditProfileError("Họ tên và Email không được để trống.");
+      return;
     }
-    setInspectingUser((prev) =>
-      prev ? { ...prev, ...editProfileForm } : null
-    );
-    setIsEditProfileMode(false);
+    setEditProfileError(null);
+    setSavingProfile(true);
+    try {
+      const payload = { fullName, email, phone };
+      const res = onUpdateProfile ? await onUpdateProfile(inspectingUser.id, payload) : undefined;
+      if (res && !res.ok) {
+        setEditProfileError(res.error || "Không thể cập nhật hồ sơ người dùng.");
+        return;
+      }
+      setInspectingUser((prev) =>
+        prev ? { ...prev, ...payload } : null
+      );
+      setIsEditProfileMode(false);
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const [activeUserDevices, setActiveUserDevices] = useState<UserDevice[]>([]);
@@ -396,7 +482,7 @@ export function UsersManagementTab({
                 <th className="py-3.5 px-3">Liên Hệ</th>
                 <th className="py-3.5 px-3">Vai Trò</th>
                 <th className="py-3.5 px-3">Trạng Thái</th>
-                <th className="py-3.5 px-3">Mã Định Danh / Code</th>
+                <th className="py-3.5 px-3">Mã Nghệ Sĩ</th>
                 <th className="py-3.5 px-3">Thiết Bị</th>
                 <th className="py-3.5 pl-3 pr-5 text-right">Thao Tác</th>
               </tr>
@@ -411,7 +497,11 @@ export function UsersManagementTab({
               ) : (
                 paginatedUsers.map((user) => {
                   const isBanned = user.status === "BANNED";
-                  const isCurrentUser = user.username === "admin01";
+                  const isCurrentUser = Boolean(
+                    (currentAdminId && user.id === currentAdminId) ||
+                    (currentAdminUsername &&
+                      user.username.toLowerCase() === currentAdminUsername.trim().toLowerCase())
+                  );
 
                   return (
                     <tr
@@ -445,7 +535,7 @@ export function UsersManagementTab({
                       {/* Contact */}
                       <td className="py-3 px-3">
                         <p className="text-zinc-200 truncate max-w-[170px]">{user.email}</p>
-                        <p className="font-mono text-[10px] text-zinc-400">{user.phone}</p>
+                        <p className="font-mono text-[10px] text-zinc-400">{user.phone || "Chưa cập nhật"}</p>
                       </td>
 
                       {/* Role */}
@@ -492,15 +582,11 @@ export function UsersManagementTab({
                         </span>
                       </td>
 
-                      {/* Spotify ID / Staff Code */}
+                      {/* Spotify Artist ID */}
                       <td className="py-3 px-3 font-mono text-[11px]">
                         {user.artistSpotifyId ? (
-                          <span className="text-zinc-300">
+                          <span className="text-zinc-300" title={user.artistSpotifyId}>
                             {user.artistSpotifyId.substring(0, 12)}...
-                          </span>
-                        ) : user.staffCode ? (
-                          <span className="text-teal-400 font-medium">
-                            {user.staffCode}
                           </span>
                         ) : (
                           <span className="text-zinc-600">-</span>
@@ -542,9 +628,9 @@ export function UsersManagementTab({
                             {/* Reset Password Button */}
                             <button
                               type="button"
-                              onClick={() => setSelectedUserForResetPassword(user)}
+                              onClick={() => handleOpenResetPasswordModal(user)}
                               className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 font-mono text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition"
-                              title="Đặt lại mật khẩu về 123456"
+                              title="Cấp mật khẩu tạm ngẫu nhiên và thu hồi phiên"
                             >
                               Reset MK
                             </button>
@@ -654,12 +740,21 @@ export function UsersManagementTab({
                     <span className="font-bold text-white text-xs">Chỉnh Sửa Hồ Sơ Người Dùng</span>
                     <button
                       type="button"
-                      onClick={() => setIsEditProfileMode(false)}
-                      className="text-zinc-400 hover:text-white text-xs"
+                      disabled={savingProfile}
+                      onClick={() => {
+                        setEditProfileError(null);
+                        setIsEditProfileMode(false);
+                      }}
+                      className="text-zinc-400 hover:text-white text-xs disabled:opacity-50"
                     >
                       Hủy
                     </button>
                   </div>
+                  {editProfileError && (
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] font-sans text-rose-300">
+                      {editProfileError}
+                    </div>
+                  )}
                   <div>
                     <label className="text-[11px] text-zinc-400 block mb-1">Họ và Tên</label>
                     <input
@@ -689,10 +784,11 @@ export function UsersManagementTab({
                   </div>
                   <button
                     type="button"
-                    onClick={handleSaveProfileEdit}
-                    className="w-full mt-2 rounded-xl bg-[#ff5500] py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
+                    disabled={savingProfile}
+                    onClick={() => void handleSaveProfileEdit()}
+                    className="w-full mt-2 rounded-xl bg-[#ff5500] py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Lưu Thay Đổi Hồ Sơ
+                    {savingProfile ? "Đang lưu thay đổi..." : "Lưu Thay Đổi Hồ Sơ"}
                   </button>
                 </div>
               ) : (
@@ -735,55 +831,68 @@ export function UsersManagementTab({
             </div>
 
             {/* Bottom Actions */}
-            <div className="pt-6 border-t border-[#222432] space-y-2.5">
-              {!isEditProfileMode && (
-                <button
-                  type="button"
-                  onClick={() => handleStartEditProfile(inspectingUser)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#222432] bg-[#171822] py-2.5 text-xs font-semibold text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"
-                >
-                  <UserCog className="h-4 w-4 text-[#ff5500]" /> Chỉnh Sửa Thông Tin Cá Nhân
-                </button>
-              )}
+            {(() => {
+              const isInspectingSelf = Boolean(
+                (currentAdminId && inspectingUser.id === currentAdminId) ||
+                (currentAdminUsername &&
+                  inspectingUser.username.toLowerCase() === currentAdminUsername.trim().toLowerCase())
+              );
+              return (
+                <div className="pt-6 border-t border-[#222432] space-y-2.5">
+                  {!isEditProfileMode && (
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditProfile(inspectingUser)}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#222432] bg-[#171822] py-2.5 text-xs font-semibold text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"
+                    >
+                      <UserCog className="h-4 w-4 text-[#ff5500]" /> Chỉnh Sửa Thông Tin Cá Nhân
+                    </button>
+                  )}
 
-              <button
-                type="button"
-                onClick={() => setSelectedUserForResetPassword(inspectingUser)}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-xs font-mono font-bold text-amber-300 hover:bg-amber-500/20 transition"
-              >
-                <Key className="h-4 w-4" /> Đặt Lại Mật Khẩu (123456)
-              </button>
+                  {isInspectingSelf ? (
+                    <div className="rounded-xl border border-purple-500/25 bg-purple-500/10 px-3 py-2.5 text-[11px] font-mono text-purple-300 text-center">
+                      Tài khoản quản trị đang đăng nhập (không thể tự khóa, tự đổi vai trò hoặc đặt lại mật khẩu tạm).
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenResetPasswordModal(inspectingUser)}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-xs font-mono font-bold text-amber-300 hover:bg-amber-500/20 transition"
+                      >
+                        <Key className="h-4 w-4" /> Đặt Lại Mật Khẩu Tạm Ngẫu Nhiên
+                      </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  handleOpenRoleModal(inspectingUser);
-                }}
-                className="w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition"
-              >
-                Thay Đổi Vai Trò (Role)
-              </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRoleModal(inspectingUser)}
+                        className="w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition"
+                      >
+                        Thay Đổi Vai Trò (Role)
+                      </button>
 
-              {inspectingUser.status !== "BANNED" ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleOpenBanModal(inspectingUser);
-                  }}
-                  className="w-full rounded-xl bg-rose-500/20 border border-rose-500/30 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition"
-                >
-                  Khóa Tài Khoản Này
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onUnbanUser(inspectingUser.id)}
-                  className="w-full rounded-xl bg-emerald-500/20 border border-emerald-500/30 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition"
-                >
-                  Mở Khóa Phục Hồi Quyền Truy Cập
-                </button>
-              )}
-            </div>
+                      {inspectingUser.status !== "BANNED" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBanModal(inspectingUser)}
+                          className="w-full rounded-xl bg-rose-500/20 border border-rose-500/30 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition"
+                        >
+                          Khóa Tài Khoản Này
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onUnbanUser(inspectingUser.id)}
+                          className="w-full rounded-xl bg-emerald-500/20 border border-emerald-500/30 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition"
+                        >
+                          Mở Khóa Phục Hồi Quyền Truy Cập
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </ModalPortal>
@@ -811,25 +920,8 @@ export function UsersManagementTab({
                 <p className="text-[12px] text-white/50 font-mono">@{selectedUserForBan.username} · {selectedUserForBan.email}</p>
               </div>
 
-              {/* Ban Duration */}
-              <div>
-                <label className="block text-[12px] font-medium text-white/70 mb-1.5">Thời hạn khóa</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["7 Ngày", "30 Ngày", "Vĩnh viễn"].map((dur) => (
-                    <button
-                      key={dur}
-                      type="button"
-                      onClick={() => setBanDuration(dur)}
-                      className={`rounded-[12px] border p-2 text-center text-[12px] font-medium transition ${
-                        banDuration === dur
-                          ? "border-rose-400 bg-rose-500/20 text-rose-300 font-semibold"
-                          : "border-white/8 bg-white/[0.02] text-white/60 hover:bg-white/[0.06]"
-                      }`}
-                    >
-                      {dur}
-                    </button>
-                  ))}
-                </div>
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-[11px] font-mono text-rose-200 leading-relaxed">
+                Tài khoản bị khóa sẽ bị thu hồi toàn bộ phiên đăng nhập đang hoạt động và không thể đăng nhập lại cho đến khi quản trị viên mở khóa.
               </div>
 
               {/* Ban Reason */}
@@ -908,31 +1000,27 @@ export function UsersManagementTab({
                 </div>
               </div>
 
-              {targetRole === "MODERATOR" && (
-                <div>
-                  <label className="block text-[12px] font-medium text-white/70 mb-1">Mã nhân viên (Staff Code)</label>
-                  <input
-                    type="text"
-                    value={staffCodeInput}
-                    onChange={(e) => setStaffCodeInput(e.target.value)}
-                    placeholder="VD: STAFF-VN-009"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] p-2.5 text-[13px] text-white outline-none focus:border-[#ff5500] font-mono"
-                  />
-                </div>
-              )}
-
               {(targetRole === "CONTENT_LEAD" || targetRole === "ARTIST") && (
                 <div>
-                  <label className="block text-[12px] font-medium text-white/70 mb-1">Mã Định Danh Nội Dung (Content Lead / Artist Code)</label>
+                  <label className="block text-[12px] font-medium text-white/70 mb-1">
+                    Mã Nghệ Sĩ liên kết (tùy chọn)
+                  </label>
                   <input
                     type="text"
                     value={artistSpotifyIdInput}
                     onChange={(e) => setArtistSpotifyIdInput(e.target.value)}
-                    placeholder="VD: content_lead_01"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] p-2.5 text-[13px] text-white outline-none focus:border-[#ff5500] font-mono"
+                    placeholder="Để trống sẽ tự động tạo hồ sơ Nghệ sĩ mới"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] p-2.5 text-[13px] text-white placeholder:text-zinc-500 outline-none focus:border-[#ff5500] font-mono"
                   />
+                  <p className="mt-1 text-[11px] font-mono text-zinc-400">
+                    Nếu bỏ trống, hệ thống sẽ tự tạo hồ sơ Artist trong MongoDB và đăng ký quyền tải nhạc cho tài khoản này.
+                  </p>
                 </div>
               )}
+
+              <p className="text-[11px] font-mono text-amber-300/90">
+                Khi thay đổi vai trò, toàn bộ phiên đăng nhập cũ của tài khoản sẽ bị thu hồi để áp dụng quyền mới.
+              </p>
             </div>
 
             <div className="mt-6 flex justify-end gap-2.5">
@@ -962,7 +1050,7 @@ export function UsersManagementTab({
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
             <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
-              <h3 className="font-graphik text-[17px] font-semibold text-white">Thiết Bị Nghe Ngoại Tuyến</h3>
+              <h3 className="font-graphik text-[17px] font-semibold text-white">Phiên Đăng Nhập &amp; Thiết Bị</h3>
               <button
                 type="button"
                 onClick={() => setSelectedUserForDevices(null)}
@@ -973,7 +1061,7 @@ export function UsersManagementTab({
             </div>
 
             <p className="mt-3 text-[12px] text-white/50">
-              Danh sách thiết bị di động của <strong>{selectedUserForDevices.fullName}</strong> đã kích hoạt nghe offline:
+              Danh sách phiên đăng nhập đang hoạt động của <strong>{selectedUserForDevices.fullName}</strong> trên Web, Android, iOS hoặc Admin:
             </p>
 
             <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
@@ -1013,11 +1101,21 @@ export function UsersManagementTab({
               )}
             </div>
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex items-center gap-2.5">
+              {onRevokeAllUserDevices && activeUserDevices.some((d) => d.status === "ACTIVE") && (
+                <button
+                  type="button"
+                  disabled={revokingAllDevices}
+                  onClick={() => void handleRevokeAllDevices()}
+                  className="flex-1 rounded-xl border border-rose-500/30 bg-rose-500/15 py-2.5 text-xs font-mono font-semibold text-rose-300 hover:bg-rose-500/25 disabled:opacity-50 transition cursor-pointer"
+                >
+                  {revokingAllDevices ? "Đang thu hồi..." : "Thu hồi tất cả phiên"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedUserForDevices(null)}
-                className="w-full rounded-xl bg-white/10 py-2.5 text-xs font-medium text-white hover:bg-white/15"
+                className="flex-1 rounded-xl bg-white/10 py-2.5 text-xs font-medium text-white hover:bg-white/15 cursor-pointer"
               >
                 Đóng
               </button>
@@ -1038,7 +1136,9 @@ export function UsersManagementTab({
               </div>
               <div>
                 <h3 className="font-graphik text-lg font-bold text-white">Đặt Lại Mật Khẩu</h3>
-                <p className="font-mono text-xs text-white/50">Khôi phục mật khẩu mặc định cho người dùng</p>
+                <p className="font-mono text-xs text-white/50">
+                  {resetTempPassword ? "Mật khẩu tạm đã được cấp" : "Tạo mật khẩu tạm ngẫu nhiên & thu hồi phiên"}
+                </p>
               </div>
             </div>
 
@@ -1047,26 +1147,66 @@ export function UsersManagementTab({
               <p className="font-mono text-xs text-white/50">@{selectedUserForResetPassword.username} · {selectedUserForResetPassword.email}</p>
             </div>
 
-            <p className="text-sm text-white/70 leading-relaxed">
-              Mật khẩu của tài khoản này sẽ được đặt lại về mật khẩu mặc định của hệ thống:{" "}
-              <strong className="text-amber-300 font-mono">123456</strong> (đã được mã hóa an toàn BCrypt trên hệ thống).
-            </p>
+            {resetTempPassword ? (
+              <div className="space-y-3">
+                <p className="text-xs font-mono text-emerald-300">
+                  Mật khẩu mới đã được mã hóa lưu vào hệ thống và toàn bộ phiên đăng nhập cũ đã bị thu hồi. Hãy sao chép mật khẩu tạm dưới đây để gửi cho người dùng:
+                </p>
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+                  <code className="font-mono text-base font-bold tracking-wider text-amber-300 select-all">
+                    {resetTempPassword}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(resetTempPassword);
+                      setCopiedTempPassword(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-black hover:bg-amber-400 transition cursor-pointer"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copiedTempPassword ? "Đã chép" : "Sao chép"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-white/70 leading-relaxed">
+                Hệ thống sẽ sinh một <strong className="text-amber-300 font-mono">mật khẩu tạm ngẫu nhiên 10 ký tự</strong> (mã hóa BCrypt) và thu hồi toàn bộ phiên đăng nhập hiện tại của tài khoản này.
+              </p>
+            )}
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setSelectedUserForResetPassword(null)}
-                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-white/60 hover:bg-white/5"
-              >
-                Hủy Bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmResetPassword}
-                className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-black hover:bg-amber-400 shadow-lg shadow-amber-500/20"
-              >
-                Xác Nhận Đặt Lại (123456)
-              </button>
+              {resetTempPassword ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUserForResetPassword(null);
+                    setResetTempPassword(null);
+                  }}
+                  className="rounded-xl bg-[#ff5500] px-5 py-2 text-xs font-bold text-white hover:bg-[#ff6a1a] cursor-pointer"
+                >
+                  Hoàn Tất &amp; Đóng
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={resettingPassword}
+                    onClick={() => setSelectedUserForResetPassword(null)}
+                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-white/60 hover:bg-white/5"
+                  >
+                    Hủy Bỏ
+                  </button>
+                  <button
+                    type="button"
+                    disabled={resettingPassword}
+                    onClick={() => void handleConfirmResetPassword()}
+                    className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-black hover:bg-amber-400 shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    {resettingPassword ? "Đang tạo mật khẩu..." : "Xác Nhận Đặt Lại"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1121,7 +1261,7 @@ export function UsersManagementTab({
                     type="text"
                     value={newUserData.fullName}
                     onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
-                    placeholder="Nguyễn Văn A"
+                    placeholder="Lâm Phước Thuận"
                     className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
@@ -1192,17 +1332,22 @@ export function UsersManagementTab({
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222432]">
               <button
                 type="button"
-                onClick={() => setIsCreateUserModalOpen(false)}
-                className="rounded-full border border-[#222432] px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-[#171822] transition"
+                disabled={creatingUser}
+                onClick={() => {
+                  setCreateUserError(null);
+                  setIsCreateUserModalOpen(false);
+                }}
+                className="rounded-full border border-[#222432] px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-[#171822] transition disabled:opacity-50"
               >
                 Hủy Bỏ
               </button>
               <button
                 type="button"
-                onClick={handleSaveCreateUser}
-                className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] shadow-lg shadow-[#ff5500]/25 active:scale-[0.98] transition cursor-pointer"
+                disabled={creatingUser}
+                onClick={() => void handleSaveCreateUser()}
+                className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-semibold text-white hover:bg-[#ff6a1a] shadow-lg shadow-[#ff5500]/25 active:scale-[0.98] transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Tạo Người Dùng
+                {creatingUser ? "Đang tạo tài khoản..." : "Tạo Người Dùng"}
               </button>
             </div>
           </div>

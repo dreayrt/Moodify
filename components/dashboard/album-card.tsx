@@ -1,5 +1,7 @@
 "use client";
 
+import CoverImage from "./cover-image";
+
 import { Disc, Play, Heart, Music, Calendar } from "lucide-react";
 import { Album } from "@/lib/api-client";
 import { useState } from "react";
@@ -36,7 +38,7 @@ export default function AlbumCard({
       <div>
         {/* Cover Art with Vinyl aesthetic */}
         <div className="relative mb-3 aspect-square rounded-lg overflow-hidden bg-slate-800 shadow-md">
-          <img
+          <CoverImage sizes="(max-width: 640px) 40vw, 240px"
             src={displayCover}
             alt={album.title}
             onError={() => setImgError(true)}

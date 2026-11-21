@@ -61,14 +61,14 @@ export function LicensingTab({
   // Create Contract Modal State
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [contractForm, setContractForm] = useState({
-    distributorId: distributors.length > 0 ? distributors[0].id : 1,
+    distributorId: distributors.length > 0 ? distributors[0].id : 0,
     title: "",
-    contractCode: `CTR-VN-${Math.floor(1000 + Math.random() * 9000)}`,
+    contractCode: "",
     signedDate: new Date().toISOString().split("T")[0],
     effectiveFrom: new Date().toISOString().split("T")[0],
-    effectiveTo: "2028-12-31",
+    effectiveTo: "",
     revenueShare: 70,
-    documentUrl: "https://moodify.vn/contracts/sample.pdf",
+    documentUrl: "",
     status: "ACTIVE" as "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT",
   });
 
@@ -95,14 +95,14 @@ export function LicensingTab({
     }
     setIsContractModalOpen(false);
     setContractForm({
-      distributorId: distributors.length > 0 ? distributors[0].id : 1,
+      distributorId: distributors.length > 0 ? distributors[0].id : 0,
       title: "",
-      contractCode: `CTR-VN-${Math.floor(1000 + Math.random() * 9000)}`,
+      contractCode: "",
       signedDate: new Date().toISOString().split("T")[0],
       effectiveFrom: new Date().toISOString().split("T")[0],
-      effectiveTo: "2028-12-31",
+      effectiveTo: "",
       revenueShare: 70,
-      documentUrl: "https://moodify.vn/contracts/sample.pdf",
+      documentUrl: "",
       status: "ACTIVE",
     });
   };
@@ -116,7 +116,7 @@ export function LicensingTab({
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
               Bản Quyền &amp; Hợp Đồng Phân Phối
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-[11px] font-mono text-blue-300">
+            <span className="text-xs text-zinc-500">
               <Eye className="h-3 w-3" /> Chế độ xem hợp đồng (Chỉ xem)
             </span>
           </div>
@@ -250,21 +250,21 @@ export function LicensingTab({
                       </div>
                       <div className="flex items-center justify-between text-zinc-400">
                         <span>Hết hạn</span>
-                        <span className="text-zinc-200">{ct.effectiveTo || "Vô thời hạn"}</span>
+                        <span className="text-zinc-200">{ct.effectiveTo || "Chưa có thông tin"}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-5 flex items-center justify-between border-t border-[#222432] pt-3 text-[12px]">
                     <span className="text-zinc-500">Ký ngày: {ct.signedDate}</span>
-                    <a
+                    {ct.documentUrl ? <a
                       href={ct.documentUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-[#ff5500] hover:underline font-medium"
                     >
                       Văn bản PDF <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </a> : <span className="text-zinc-500">Chưa có văn bản</span>}
                   </div>
                 </div>
               );
@@ -467,7 +467,7 @@ export function LicensingTab({
                     type="text"
                     value={distributorForm.contactName}
                     onChange={(e) => setDistributorForm({ ...distributorForm, contactName: e.target.value })}
-                    placeholder="Ví dụ: Nguyễn Văn A"
+                    placeholder="Ví dụ: Nguyễn Khánh Duy"
                     className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>

@@ -11,7 +11,7 @@ import {
   type AlbumDetail,
   type Track,
 } from "@/lib/api-client";
-import { usePlayer } from "./player-context";
+import { usePlayerState } from "./player-context";
 
 interface AlbumDetailModalProps {
   albumId: number | string | null;
@@ -28,7 +28,7 @@ export default function AlbumDetailModal({
   onAlbumUpdated,
   currentUsername,
 }: AlbumDetailModalProps) {
-  const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
+  const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayerState();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +203,7 @@ export default function AlbumDetailModal({
             {/* Header with Cover & Controls */}
             <div className="p-6 bg-gradient-to-b from-cyan-950/40 via-slate-900/40 to-slate-900 border-b border-white/5 flex flex-col md:flex-row gap-5 items-start md:items-center">
               <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-xl overflow-hidden shadow-2xl shrink-0 bg-slate-800">
-                <img
+                <img loading="lazy" decoding="async"
                   src={album.coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300"}
                   alt={album.title}
                   className="w-full h-full object-cover"
@@ -302,7 +302,7 @@ export default function AlbumDetailModal({
                           className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 hover:bg-slate-900 border border-white/5 text-xs"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <img
+                            <img loading="lazy" decoding="async"
                               src={t.imageUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240"}
                               className="w-7 h-7 rounded object-cover"
                               alt=""
@@ -365,7 +365,7 @@ export default function AlbumDetailModal({
                           <Play className="w-3.5 h-3.5 fill-current" />
                         </button>
 
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={t.imageUrl || album.coverUrl}
                           alt=""
                           className="w-10 h-10 rounded-lg object-cover shrink-0"

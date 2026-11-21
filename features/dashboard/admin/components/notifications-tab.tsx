@@ -38,6 +38,7 @@ type ToastFn = (message: string, type?: "success" | "error" | "info" | "warning"
 
 export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
   const [history, setHistory] = useState<NotificationBroadcast[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -50,11 +51,17 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
 
   const loadHistory = useCallback(async () => {
     setIsLoading(true);
+    setHistoryError(null);
     try {
       const data = await fetchAdminNotificationHistory();
       setHistory(Array.isArray(data) ? data : []);
     } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Không thể tải lịch sử thông báo từ máy chủ.";
       console.warn("Failed to load notification history:", err);
+      setHistoryError(msg);
       setHistory([]);
     } finally {
       setIsLoading(false);
@@ -70,6 +77,18 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
       setSendResult({ ok: false, text: "Vui lòng nhập tiêu đề và nội dung thông báo." });
       return;
     }
+    const trimmedLink = linkUrl.trim();
+    if (
+      trimmedLink &&
+      !trimmedLink.startsWith("/") &&
+      !/^https?:\/\//i.test(trimmedLink)
+    ) {
+      setSendResult({
+        ok: false,
+        text: "Đường dẫn liên kết phải bắt đầu bằng '/', 'http://' hoặc 'https://'.",
+      });
+      return;
+    }
     setIsSending(true);
     setSendResult(null);
     try {
@@ -78,7 +97,7 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
         message: message.trim(),
         type,
         targetRole,
-        linkUrl: linkUrl.trim() || undefined,
+        linkUrl: trimmedLink || undefined,
       });
       setSendResult({ ok: true, text: res.message });
       onToast(res.message, "success");
@@ -132,6 +151,18 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
             <div className="flex items-center justify-center py-14 text-zinc-500">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
               <span className="text-[13px]">Đang tải lịch sử từ máy chủ...</span>
+            </div>
+          ) : historyError ? (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-5 text-center">
+              <XCircle className="h-7 w-7 mx-auto mb-2 text-rose-400" />
+              <p className="text-[13px] font-medium text-rose-200">{historyError}</p>
+              <button
+                type="button"
+                onClick={() => void loadHistory()}
+                className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/25 transition cursor-pointer"
+              >
+                Thử lại
+              </button>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-14 text-zinc-500">

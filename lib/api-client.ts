@@ -12,6 +12,7 @@ function safeEncodeParam(id: string): string {
 }
 
 import { getValidAccessToken } from './auth-client';
+import { readSessionCached, invalidateSessionReads } from './session-read-cache';
 import { getCurrentDeviceUuid } from './auth/device-helper';
 
 // ============================================================================
@@ -837,24 +838,17 @@ export function resolveTrackAudioUrl(track: {
   spotifyId?: string;
   id?: string;
 }): string {
-  if (track.audioUrl && (track.audioUrl.startsWith("http://") || track.audioUrl.startsWith("https://"))) {
-    return track.audioUrl;
-  }
-  if (track.localPath && !track.localPath.startsWith("http")) {
-    const clean = track.localPath.replace(/^\/+/, "");
-    return `${ONLINE_AUDIO_SERVER_URL}/${clean}`;
-  }
-  if (track.localPath && (track.localPath.startsWith("http://") || track.localPath.startsWith("https://"))) {
-    return track.localPath;
-  }
-  return getTrackStreamUrl(track.spotifyId || track.id || "");
+  // Canonical playback goes through the server's current publication/license checks.
+  const id = track.id || track.spotifyId;
+  if (id) return getTrackStreamUrl(id);
+  return "";
 }
 
 /**
  * Get streaming audio URL for a track
  */
 export function getTrackStreamUrl(trackIdOrSpotifyId: string): string {
-  return `${API_BASE}/tracks/${trackIdOrSpotifyId}/stream`;
+  return `${API_BASE}/tracks/${safeEncodeParam(trackIdOrSpotifyId)}/stream`;
 }
 
 /**
@@ -1062,6 +1056,7 @@ export async function fetchArtists(query?: string, signal?: AbortSignal): Promis
 export async function fetchUserPlaylists(): Promise<Playlist[]> {
   const token = await getValidAccessToken();
 
+  return readSessionCached("playlists", token ?? "guest", async () => {
   const response = await fetch(`${API_BASE}/playlists/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1076,12 +1071,13 @@ export async function fetchUserPlaylists(): Promise<Playlist[]> {
   }
 
   return response.json();
+  });
 }
 
 /**
  * Search public playlists
  */
-export async function fetchPublicPlaylists(query?: string): Promise<Playlist[]> {
+export async function fetchPublicPlaylists(query?: string, signal?: AbortSignal): Promise<Playlist[]> {
   const token = await getValidAccessToken().catch(() => null);
   const params = new URLSearchParams();
   if (query && query.trim()) params.set('q', query.trim());
@@ -1089,7 +1085,7 @@ export async function fetchPublicPlaylists(query?: string): Promise<Playlist[]> 
   const headers: HeadersInit = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE}/playlists?${params.toString()}`, { headers });
+  const response = await fetch(`${API_BASE}/playlists?${params.toString()}`, { headers, signal });
   if (!response.ok) {
     throw new Error(`Failed to fetch public playlists: ${response.status}`);
   }
@@ -1114,20 +1110,21 @@ export async function updatePlaylistVisibility(
   if (!response.ok) {
     throw new Error(`Failed to update playlist visibility: ${response.status}`);
   }
+  invalidateSessionReads();
   return response.json();
 }
 
 /**
  * Fetch a playlist by ID (with its tracks)
  */
-export async function fetchPlaylistById(id: string): Promise<Playlist> {
+export async function fetchPlaylistById(id: string, signal?: AbortSignal): Promise<Playlist> {
   const token = await getValidAccessToken().catch(() => null);
   const headers: HeadersInit = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}/playlists/${id}`, { headers });
+  const response = await fetch(`${API_BASE}/playlists/${id}`, { headers, signal });
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -1163,6 +1160,7 @@ export async function createPlaylist(
     throw new Error('Failed to create playlist');
   }
 
+  invalidateSessionReads();
   return response.json();
 }
 
@@ -1191,6 +1189,7 @@ export async function addTrackToPlaylist(
     throw new Error('Failed to add track to playlist');
   }
 
+  invalidateSessionReads();
   return response.json();
 }
 
@@ -1220,6 +1219,7 @@ export async function removeTrackFromPlaylist(
     throw new Error('Failed to remove track from playlist');
   }
 
+  invalidateSessionReads();
   return response.json();
 }
 
@@ -1242,6 +1242,7 @@ export async function deletePlaylist(playlistId: string): Promise<void> {
     }
     throw new Error('Failed to delete playlist');
   }
+  invalidateSessionReads();
 }
 
 // ============================================================================
@@ -1457,22 +1458,15 @@ export async function fetchPackageQuotes(): Promise<PackageQuote[]> {
 
 export async function fetchMySubscription(): Promise<SubscriptionInfo> {
   const token = await getValidAccessToken();
-  const res = await fetch(`${API_BASE}/subscriptions/me`, {
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!res.ok) {
-    return {
-      isPremium: false,
-      tier: "FREE",
-      packageName: "Tài khoản Miễn phí",
-      daysRemaining: 0,
-      benefits: [],
-    };
-  }
-  return res.json();
+  const fallback: SubscriptionInfo = {
+    isPremium: false, tier: "FREE", packageName: "Tài khoản Miễn phí", daysRemaining: 0, benefits: [],
+  };
+  if (!token) return fallback;
+  return readSessionCached<SubscriptionInfo>("subscription", token, async () => {
+    const res = await fetch(`${API_BASE}/subscriptions/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error("Failed to fetch subscription");
+    return res.json();
+  }).catch(() => fallback);
 }
 
 export async function fetchMySubscriptionManagement(): Promise<ManagedSubscription[]> {
@@ -1497,23 +1491,7 @@ export async function cancelMyManagedSubscription(
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.message || "Không thể hủy gói dịch vụ này");
   }
-  return res.json();
-}
-
-export async function subscribePackage(
-  packageId: number,
-  paymentMethod: string = "QR_TRANSFER"
-): Promise<{ success: boolean; message: string; isPremium: boolean }> {
-  const token = await getValidAccessToken();
-  const res = await fetch(`${API_BASE}/subscriptions/subscribe`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ packageId, paymentMethod }),
-  });
-  if (!res.ok) throw new Error("Đăng ký gói không thành công");
+  invalidateSessionReads();
   return res.json();
 }
 
@@ -1589,24 +1567,6 @@ export async function getPaymentStatus(
   if (!res.ok) {
     throw new Error('Không thể kiểm tra trạng thái thanh toán');
   }
-  return res.json();
-}
-
-export async function devTogglePremium(
-  enable: boolean,
-  days: number = 30,
-  packageId?: number
-): Promise<{ success: boolean; message: string; isPremium: boolean; tier?: string }> {
-  const token = await getValidAccessToken();
-  const res = await fetch(`${API_BASE}/subscriptions/dev-toggle`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ enable, days, packageId }),
-  });
-  if (!res.ok) throw new Error("Chuyển trạng thái thất bại");
   return res.json();
 }
 
@@ -1718,6 +1678,7 @@ export async function fetchMyListeningHistory(params: {
   page?: number;
   size?: number;
   search?: string;
+  signal?: AbortSignal;
 } = {}): Promise<UserListeningHistoryResponse> {
   const token = await getValidAccessToken();
   if (!token) throw new Error("Chưa đăng nhập");
@@ -1727,6 +1688,7 @@ export async function fetchMyListeningHistory(params: {
   if (params.search) query.set("search", params.search);
 
   const res = await fetch(`${API_BASE}/analytics/my-history?${query.toString()}`, {
+    signal: params.signal,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -1785,7 +1747,7 @@ export async function clearMyListeningHistory(): Promise<{ success: boolean; del
 // ============================================================================
 
 export type Album = {
-  id: number;
+  id: number | string;
   title: string;
   description: string | null;
   coverUrl: string;
@@ -1816,7 +1778,8 @@ export type AlbumPageResponse = {
 export async function fetchPublicAlbums(
   q?: string,
   page: number = 0,
-  size: number = 20
+  size: number = 20,
+  signal?: AbortSignal
 ): Promise<AlbumPageResponse> {
   const token = await getValidAccessToken().catch(() => null);
   const params = new URLSearchParams();
@@ -1827,7 +1790,7 @@ export async function fetchPublicAlbums(
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}/albums?${params.toString()}`, { headers });
+  const res = await fetch(`${API_BASE}/albums?${params.toString()}`, { headers, signal });
   if (!res.ok) throw new Error(`Failed to fetch albums: ${res.status}`);
   return res.json();
 }

@@ -1,14 +1,10 @@
 export type AdminTab =
   | "overview"
-  | "analytics"
-  | "catalog"
+  | "users"
+  | "monetization"
+  | "recommendations"
   | "karaoke-resources"
   | "favorites"
-  | "history"
-  | "users"
-  | "moderation"
-  | "monetization"
-  | "licensing"
   | "notifications";
 
 export type AdminUserRole = "USER" | "CONTENT_LEAD" | "MODERATOR" | "ADMIN" | "ARTIST";
@@ -84,20 +80,20 @@ export type CatalogTrack = {
   artist: string;
   album: string;
   genre: string;
-  vibeCategory: "Energetic" | "Chill" | "Sadness" | "Focus" | "Romance";
+  vibeCategory: "Energetic" | "Chill" | "Sadness" | "Focus" | "Romance" | null;
   duration: string;
   coverUrl: string;
   audioUrl?: string;
   plays: number;
   likes: number;
   status: "published" | "draft" | "flagged" | "taken_down";
-  moderationScore: number;
-  bpm: number;
-  energy: number;
-  danceability: number;
-  valence: number;
-  acousticness: number;
-  keySignature: string;
+  moderationScore: number | null;
+  bpm: number | null;
+  energy: number | null;
+  danceability: number | null;
+  valence: number | null;
+  acousticness: number | null;
+  keySignature: string | null;
   createdAt: string;
 };
 
@@ -165,6 +161,7 @@ export type PaymentTransaction = {
   providerTransactionId: string;
   status: "SUCCESS" | "PENDING" | "FAILED" | "CANCELLED" | "REFUNDED";
   paidAt: string;
+  createdAt?: string;
 };
 
 export type AdminUserSubscription = {
@@ -302,6 +299,7 @@ export type FavoriteRecord = {
   userEmail: string;
   userAvatar: string | null;
   type: "SONG" | "ARTIST" | "ALBUM";
+  source?: "LIBRARY" | "LEGACY_SONG" | "FAVORITE_ARTISTS" | "FAVORITE_ALBUMS" | string;
   targetId: string;
   targetTitle: string;
   targetSubtitle?: string;
@@ -435,7 +433,7 @@ export type TrackRetentionMetric = {
   uniqueListeners: number;
   avgDurationMs: number;
   avgDurationFormatted: string;
-  completionRatePercent: number;
+  completionRatePercent: number | null;
   skipRatePercent: number;
   favoriteCount: number;
   genre: string;
@@ -449,7 +447,61 @@ export type ListeningSummaryMetrics = {
   totalDurationFormatted?: string;
   sessionsLast24h: number;
   completeEvents: number;
-  completionRatePercent: number;
+  completionRatePercent: number | null;
 };
 
 
+
+export type RevenueDailyPoint = {
+  isoDate: string;
+  date: string;
+  revenue: number;
+  successCount: number;
+  pendingCount: number;
+  failedCount: number;
+  refundedCount: number;
+};
+
+export type PackageRevenueBreakdown = {
+  packageId: number;
+  packageName: string;
+  tierId: string;
+  packagePrice: number;
+  packageStatus: "ACTIVE" | "INACTIVE" | string;
+  successCount: number;
+  totalCount: number;
+  revenue: number;
+  activeSubscriptions: number;
+  sharePercent: number;
+};
+
+export type ProviderRevenueBreakdown = {
+  provider: string;
+  paymentMethod: string;
+  successCount: number;
+  totalCount: number;
+  revenue: number;
+  sharePercent: number;
+};
+
+export type AdminRevenueStats = {
+  periodDays: number;
+  totalRevenue: number;
+  periodRevenue: number;
+  previousPeriodRevenue: number;
+  growthPercent: number;
+  avgOrderValue: number;
+  totalTransactions: number;
+  successCount: number;
+  periodSuccessCount: number;
+  pendingCount: number;
+  failedCount: number;
+  refundedCount: number;
+  activeSubscriptionsCount: number;
+  paidUsersCount: number;
+  dailySeries: RevenueDailyPoint[];
+  byPackage: PackageRevenueBreakdown[];
+  byProvider: ProviderRevenueBreakdown[];
+};
+
+export type AdminPreviewTrack = Pick<CatalogTrack, "id" | "title" | "artist" | "coverUrl" | "audioUrl">;

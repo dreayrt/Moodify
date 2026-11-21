@@ -18,6 +18,8 @@ interface InteractiveDonutChartProps {
   centerLabel?: string;
   size?: number;
   strokeWidth?: number;
+  formatValue?: (val: number) => string;
+  formatCenterValue?: (val: number) => string;
   className?: string;
 }
 
@@ -28,13 +30,21 @@ export function InteractiveDonutChart({
   centerLabel = "Tổng cộng",
   size = 190,
   strokeWidth = 26,
+  formatValue,
+  formatCenterValue,
   className = "",
 }: InteractiveDonutChartProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const total = useMemo(() => {
-    return data.reduce((sum, item) => sum + (item.value || 0), 0) || 1;
+  const rawTotal = useMemo(() => {
+    return data.reduce((sum, item) => sum + (item.value || 0), 0);
   }, [data]);
+  const safeDivisor = rawTotal > 0 ? rawTotal : 1;
+
+  const formatDisplay = (val: number) =>
+    formatValue ? formatValue(val) : val.toLocaleString("vi-VN");
+  const formatCenterDisplay = (val: number) =>
+    formatCenterValue ? formatCenterValue(val) : formatDisplay(val);
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -42,14 +52,14 @@ export function InteractiveDonutChart({
   // Compute stroke offsets
   let accumulatedAngle = 0;
   const slices = data.map((item) => {
-    const percentage = item.value / total;
-    const strokeDasharray = `${percentage * circumference} ${circumference}`;
+    const ratio = rawTotal > 0 ? (item.value || 0) / safeDivisor : 0;
+    const strokeDasharray = `${ratio * circumference} ${circumference}`;
     const strokeDashoffset = -accumulatedAngle * circumference;
-    accumulatedAngle += percentage;
+    accumulatedAngle += ratio;
 
     return {
       ...item,
-      percentage: Math.round(percentage * 1000) / 10,
+      percentage: rawTotal > 0 ? Math.round(ratio * 1000) / 10 : 0,
       strokeDasharray,
       strokeDashoffset,
     };
@@ -119,30 +129,44 @@ export function InteractiveDonutChart({
           </svg>
 
           {/* Donut Center Display */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3 pointer-events-none">
-            {activeSlice ? (
-              <>
-                <span className="font-mono text-xl font-bold text-white tracking-tight">
-                  {activeSlice.percentage}%
-                </span>
-                <span className="text-[10px] font-mono text-zinc-400 truncate max-w-[85px]">
-                  {activeSlice.label}
-                </span>
-                <span className="text-[10px] font-mono text-zinc-500">
-                  {activeSlice.value.toLocaleString()}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="font-mono text-xl font-bold text-white tracking-tight">
-                  {total.toLocaleString()}
-                </span>
-                <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-                  {centerLabel}
-                </span>
-              </>
-            )}
-          </div>
+          {(() => {
+            const centerText = formatCenterDisplay(rawTotal);
+            const activeText = activeSlice ? formatCenterDisplay(activeSlice.value) : "";
+            const totalSizeClass =
+              centerText.length > 9
+                ? "text-sm"
+                : centerText.length > 6
+                ? "text-base"
+                : "text-xl";
+            return (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-3 pointer-events-none">
+                {activeSlice ? (
+                  <>
+                    <span className="font-mono text-xl font-bold text-white tracking-tight">
+                      {activeSlice.percentage}%
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400 truncate max-w-[100px]">
+                      {activeSlice.label}
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400 truncate max-w-[108px] leading-tight">
+                      {activeText}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`font-mono ${totalSizeClass} font-bold text-white tracking-tight truncate max-w-[108px] leading-tight`}
+                    >
+                      {centerText}
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider mt-0.5">
+                      {centerLabel}
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Interactive Legend */}
@@ -162,7 +186,7 @@ export function InteractiveDonutChart({
                     : "bg-[#171822]/60 border-white/5 hover:bg-white/[0.04]"
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -174,7 +198,7 @@ export function InteractiveDonutChart({
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 font-bold">
-                    <span className="text-white">{slice.value.toLocaleString()}</span>
+                    <span className="text-white">{formatDisplay(slice.value)}</span>
                     <span className="text-[11px] text-zinc-400">({slice.percentage}%)</span>
                   </div>
                 </div>

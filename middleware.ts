@@ -64,8 +64,15 @@ const ROLE_DASHBOARD_ROUTES: Record<string, string> = {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isRootPage = pathname === "/";
+  const isDashboardPage = pathname.startsWith("/dashboard");
+  const isAdminConfinedPublicPage =
+    pathname.startsWith("/track") ||
+    pathname === "/download" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname === "/data-deletion";
 
-  if (!isRootPage && !pathname.startsWith("/dashboard")) {
+  if (!isRootPage && !isDashboardPage && !isAdminConfinedPublicPage) {
     return NextResponse.next();
   }
 
@@ -81,6 +88,10 @@ export function middleware(request: NextRequest) {
   const sessionPayload = accessPayload ?? refreshPayload;
 
   if (!sessionPayload) {
+    if (isAdminConfinedPublicPage) {
+      return NextResponse.next();
+    }
+
     if (isRootPage) {
       const dashboardUrl = new URL("/dashboard/user", request.url);
       dashboardUrl.search = request.nextUrl.search;
@@ -115,6 +126,11 @@ export function middleware(request: NextRequest) {
   // role cookie so a stale or edited cookie cannot choose the dashboard role.
   const role = sessionPayload.role?.toUpperCase();
   if (!role || !ROLE_DASHBOARD_ROUTES[role]) {
+    if (isAdminConfinedPublicPage) {
+      const response = NextResponse.next();
+      clearAuthCookies(response);
+      return response;
+    }
     // An invalid session at / must leave the root instead of redirecting to itself.
     const homeUrl = new URL(isRootPage ? "/dashboard/user" : "/", request.url);
     homeUrl.search = request.nextUrl.search;
@@ -124,6 +140,25 @@ export function middleware(request: NextRequest) {
   }
 
   const correctDashboard = ROLE_DASHBOARD_ROUTES[role];
+
+  // Strict ADMIN confinement: ADMIN can ONLY access /dashboard/admin/** routes.
+  if (role === "ADMIN") {
+    const isAllowedAdminPath =
+      pathname === "/dashboard/admin" ||
+      pathname.startsWith("/dashboard/admin/");
+    if (!isAllowedAdminPath) {
+      const redirectUrl = new URL("/dashboard/admin", request.url);
+      if (isRootPage || pathname === "/dashboard" || pathname === "/dashboard/") {
+        redirectUrl.search = request.nextUrl.search;
+      }
+      return NextResponse.redirect(redirectUrl);
+    }
+    return NextResponse.next();
+  }
+
+  if (isAdminConfinedPublicPage) {
+    return NextResponse.next();
+  }
 
   if (isRootPage || pathname === "/dashboard" || pathname === "/dashboard/") {
     const redirectUrl = new URL(correctDashboard, request.url);
@@ -138,23 +173,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard/search?type=ARTIST", request.url));
   }
 
-  // /dashboard/user is intentionally NOT role-bounced. It is the public guest
-  // dashboard and the post-logout landing zone; redirecting other roles from
-  // here based on the cookie hint raced the client guards and produced the
-  // logout flicker loop (cookie bounces to the role studio, guard without a
-  // session bounces back here, forever). Post-login role routing happens
-  // client-side after the profile is known.
+  // /dashboard/user is intentionally NOT role-bounced for non-ADMIN roles. It is
+  // the public guest dashboard and post-logout landing zone; redirecting them
+  // based on cookie hint raced client guards on logout.
 
   if (
     pathname.startsWith("/dashboard/content-lead") &&
     role !== "CONTENT_LEAD" &&
-    role !== "ARTIST" &&
-    role !== "ADMIN"
+    role !== "ARTIST"
   ) {
     return NextResponse.redirect(new URL(correctDashboard, request.url));
   }
 
-  if (pathname.startsWith("/dashboard/moderator") && role !== "MODERATOR" && role !== "ADMIN") {
+  if (pathname.startsWith("/dashboard/moderator") && role !== "MODERATOR") {
     return NextResponse.redirect(new URL(correctDashboard, request.url));
   }
 
@@ -166,5 +197,13 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*"],
+  matcher: [
+    "/",
+    "/dashboard/:path*",
+    "/track/:path*",
+    "/download",
+    "/privacy",
+    "/terms",
+    "/data-deletion",
+  ],
 };

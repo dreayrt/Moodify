@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   fetchUserLibrary,
@@ -23,7 +23,7 @@ import {
   type Album,
   type FollowedArtist,
 } from "@/lib/api-client";
-import { usePlayer } from "@/components/dashboard/player-context";
+import { usePlayerState } from "@/components/dashboard/player-context";
 import { useAuth } from "@/hooks/use-auth";
 import TrackCard from "@/components/dashboard/track-card";
 import CreatePlaylistModal from "@/components/dashboard/create-playlist-modal";
@@ -57,7 +57,7 @@ function LibraryContent() {
   const searchParams = useSearchParams();
   const playlistIdFromUrl = searchParams.get("playlistId");
 
-  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayerState();
   const { user } = useAuth();
   const canCreateAlbum = user?.role === "CONTENT_LEAD" || user?.role === "ARTIST" || user?.role === "ADMIN";
 
@@ -75,7 +75,7 @@ function LibraryContent() {
   const [likedAlbums, setLikedAlbums] = useState<Album[]>([]);
   const [loadingAlbums, setLoadingAlbums] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
-  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | null>(null);
+  const [selectedAlbumIdForModal, setSelectedAlbumIdForModal] = useState<number | string | null>(null);
 
   // Followed artists state
   const [followedArtists, setFollowedArtists] = useState<FollowedArtist[]>([]);
@@ -103,7 +103,10 @@ function LibraryContent() {
     loadFollowedArtists();
   }, []);
 
+  const previousTabRef = useRef(activeTab);
   useEffect(() => {
+    if (previousTabRef.current === activeTab) return;
+    previousTabRef.current = activeTab;
     if (activeTab === "albums") {
       loadAlbums();
     } else if (activeTab === "artists") {
@@ -372,7 +375,7 @@ function LibraryContent() {
     }
   };
 
-  const handleDeleteAlbum = async (albumId: number) => {
+  const handleDeleteAlbum = async (albumId: number | string) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa album này không?")) return;
     try {
       await deleteAlbum(albumId);
@@ -537,7 +540,7 @@ function LibraryContent() {
                   {/* Playlist Cover Art */}
                   <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden bg-slate-800 shrink-0 shadow-2xl border border-white/15 relative group flex items-center justify-center">
                     {selectedPlaylist.coverUrl ? (
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={selectedPlaylist.coverUrl}
                         alt={selectedPlaylist.name}
                         className="w-full h-full object-cover"
@@ -685,7 +688,7 @@ function LibraryContent() {
                               {/* Thumbnail */}
                               <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-800 shrink-0 border border-white/10">
                                 {track.imageUrl ? (
-                                  <img
+                                  <img loading="lazy" decoding="async"
                                     src={track.imageUrl}
                                     alt={track.name}
                                     className="w-full h-full object-cover"
@@ -813,7 +816,7 @@ function LibraryContent() {
                     {/* Cover art */}
                     <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-800 mb-3 border border-white/5">
                       {playlist.coverUrl ? (
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={playlist.coverUrl}
                           alt={playlist.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -865,7 +868,7 @@ function LibraryContent() {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "liked" ? (
           /* VIEW 3: LIKED SONGS TAB */
           <div className="space-y-6 animate-in fade-in duration-200">
             {/* Liked Songs Hero Banner */}
@@ -963,7 +966,7 @@ function LibraryContent() {
               </>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* VIEW 3: ALBUMS TAB VIEW */}
         {!selectedPlaylist && activeTab === "albums" && (
@@ -1183,7 +1186,7 @@ function LibraryContent() {
                     {/* Avatar with circle styling */}
                     <div className="relative aspect-square rounded-full overflow-hidden bg-slate-800 mb-4 mx-auto w-3/4 ring-2 ring-white/10 group-hover:ring-cyan-400/60 transition-all duration-500">
                       {artist.imageUrl ? (
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={artist.imageUrl}
                           alt={artist.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

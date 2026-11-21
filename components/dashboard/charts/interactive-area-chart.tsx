@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from "react";
-import { TrendingUp, Sparkles, Filter, Calendar } from "lucide-react";
+import React, { useId, useState, useRef, useMemo } from "react";
+import { TrendingUp } from "lucide-react";
 
 export interface AreaChartDataPoint {
   label: string;
@@ -22,6 +22,11 @@ interface InteractiveAreaChartProps {
   height?: number;
   activeRange?: "7D" | "30D" | "90D";
   onRangeChange?: (range: "7D" | "30D" | "90D") => void;
+  valueUnit?: string;
+  formatValue?: (val: number) => string;
+  formatAxisValue?: (val: number) => string;
+  showSecondaryRatio?: boolean;
+  hideRangeSelector?: boolean;
   className?: string;
 }
 
@@ -36,27 +41,38 @@ export function InteractiveAreaChart({
   height = 240,
   activeRange = "7D",
   onRangeChange,
+  valueUnit = "lượt",
+  formatValue,
+  formatAxisValue,
+  showSecondaryRatio = true,
+  hideRangeSelector = false,
   className = "",
 }: InteractiveAreaChartProps) {
+  const uid = useId().replace(/:/g, "");
+  const areaGradId = `area-glow-${uid}`;
+  const lineGradId = `line-glow-${uid}`;
+  const pointGlowId = `point-glow-${uid}`;
+
   const [internalRange, setInternalRange] = useState<"7D" | "30D" | "90D">(activeRange);
   const currentRange = onRangeChange ? activeRange : internalRange;
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Filter or sample data based on selected range if dynamic data has multiple lengths
   const displayData = useMemo(() => {
     if (!data || data.length === 0) return [];
+    const maxLen = currentRange === "7D" ? 7 : currentRange === "30D" ? 30 : 90;
+    if (onRangeChange) {
+      return data.length > maxLen ? data.slice(-maxLen) : data;
+    }
     if (currentRange === "7D") {
       return data.slice(-7);
     }
     if (currentRange === "30D") {
-      // If 30D data exists, use slice(-30), else generate smooth 30-day view
-      if (data.length >= 30) return data.slice(-30);
-      return data;
+      return data.length >= 30 ? data.slice(-30) : data;
     }
     return data;
-  }, [data, currentRange]);
+  }, [data, currentRange, onRangeChange]);
 
   const maxVal = useMemo(() => {
     if (!displayData.length) return 100;
@@ -64,8 +80,13 @@ export function InteractiveAreaChart({
     return Math.ceil(peak * 1.15) || 10;
   }, [displayData]);
 
+  const formatMetric = (val: number) =>
+    formatValue ? formatValue(val) : `${val.toLocaleString("vi-VN")} ${valueUnit}`;
+  const formatAxis = (val: number) =>
+    formatAxisValue ? formatAxisValue(val) : val.toLocaleString("vi-VN");
+
   const minVal = 0;
-  const paddingLeft = 45;
+  const paddingLeft = formatAxisValue ? 56 : 48;
   const paddingRight = 20;
   const paddingTop = 25;
   const paddingBottom = 35;
@@ -121,8 +142,9 @@ export function InteractiveAreaChart({
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!containerRef.current || points.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, mouseX / rect.width));
+    if (rect.width <= 0) return;
+    const svgX = ((e.clientX - rect.left) / rect.width) * chartWidth;
+    const ratio = Math.max(0, Math.min(1, (svgX - paddingLeft) / plotWidth));
     const targetIdx = Math.round(ratio * (points.length - 1));
     setHoverIndex(targetIdx);
   };
@@ -135,10 +157,10 @@ export function InteractiveAreaChart({
 
   // Y-axis tick marks
   const yTicks = [
-    { label: maxVal.toLocaleString(), y: paddingTop },
-    { label: Math.round(maxVal * 0.66).toLocaleString(), y: paddingTop + plotHeight * 0.33 },
-    { label: Math.round(maxVal * 0.33).toLocaleString(), y: paddingTop + plotHeight * 0.66 },
-    { label: "0", y: paddingTop + plotHeight },
+    { label: formatAxis(maxVal), y: paddingTop },
+    { label: formatAxis(Math.round(maxVal * 0.66)), y: paddingTop + plotHeight * 0.33 },
+    { label: formatAxis(Math.round(maxVal * 0.33)), y: paddingTop + plotHeight * 0.66 },
+    { label: formatAxis(0), y: paddingTop + plotHeight },
   ];
 
   return (
@@ -172,30 +194,32 @@ export function InteractiveAreaChart({
           </div>
 
           {/* Timeframe Toggle Buttons */}
-          <div className="flex items-center bg-[#171822] p-1 rounded-xl border border-white/5 text-[11px] font-mono">
-            {(["7D", "30D", "90D"] as const).map((rng) => (
-              <button
-                key={rng}
-                type="button"
-                onClick={() => {
-                  setInternalRange(rng);
-                  if (onRangeChange) onRangeChange(rng);
-                }}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold ${
-                  currentRange === rng
-                    ? "bg-[#ff5500] text-white shadow-sm"
-                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                {rng === "7D" ? "7 Ngày" : rng === "30D" ? "30 Ngày" : "90 Ngày"}
-              </button>
-            ))}
-          </div>
+          {!hideRangeSelector && (
+            <div className="flex items-center bg-[#171822] p-1 rounded-xl border border-white/5 text-[11px] font-mono">
+              {(["7D", "30D", "90D"] as const).map((rng) => (
+                <button
+                  key={rng}
+                  type="button"
+                  onClick={() => {
+                    setInternalRange(rng);
+                    if (onRangeChange) onRangeChange(rng);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold ${
+                    currentRange === rng
+                      ? "bg-[#ff5500] text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                  }`}
+                >
+                  {rng === "7D" ? "7 Ngày" : rng === "30D" ? "30 Ngày" : "90 Ngày"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── SVG Chart Viewport ────────────────────────────────── */}
-      <div className="relative w-full overflow-hidden select-none">
+      <div className="relative w-full overflow-visible select-none">
         {points.length < 2 ? (
           <div className="h-48 grid place-items-center text-xs text-zinc-500 font-mono italic">
             Chưa có đủ điểm dữ liệu để biểu diễn đồ thị
@@ -211,18 +235,18 @@ export function InteractiveAreaChart({
             >
               <defs>
                 {/* Glow & Area Linear Gradients */}
-                <linearGradient id="area-glow-grad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={accentColor} stopOpacity="0.32" />
                   <stop offset="50%" stopColor={accentColor} stopOpacity="0.08" />
                   <stop offset="100%" stopColor={accentColor} stopOpacity="0.00" />
                 </linearGradient>
 
-                <linearGradient id="line-glow-grad" x1="0" y1="0" x2="1" y2="0">
+                <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor={accentColor} />
                   <stop offset="100%" stopColor="#ff7a29" />
                 </linearGradient>
 
-                <filter id="point-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <filter id={pointGlowId} x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="3" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
@@ -256,7 +280,7 @@ export function InteractiveAreaChart({
               ))}
 
               {/* Filled Area */}
-              <path d={areaPath} fill="url(#area-glow-grad)" />
+              <path d={areaPath} fill={`url(#${areaGradId})`} />
 
               {/* Secondary Line (Completed streams) if available */}
               {completedLinePath && (
@@ -274,7 +298,7 @@ export function InteractiveAreaChart({
               <path
                 d={linePath}
                 fill="none"
-                stroke="url(#line-glow-grad)"
+                stroke={`url(#${lineGradId})`}
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -343,7 +367,7 @@ export function InteractiveAreaChart({
                     fill="rgba(255, 85, 0, 0.2)"
                     stroke={accentColor}
                     strokeWidth="1"
-                    filter="url(#point-glow)"
+                    filter={`url(#${pointGlowId})`}
                   />
 
                   {/* Inner Solid Dot */}
@@ -372,46 +396,55 @@ export function InteractiveAreaChart({
             </svg>
 
             {/* Floating Glass Tooltip Card */}
-            {activePoint && (
-              <div
-                className="absolute z-30 pointer-events-none rounded-xl border border-white/10 bg-[#171822]/95 backdrop-blur-md p-3 shadow-2xl text-xs font-mono transition-all transform -translate-x-1/2 -translate-y-full"
-                style={{
-                  left: `${(activePoint.x / chartWidth) * 100}%`,
-                  top: `${Math.max(20, (activePoint.y / chartHeight) * 100 - 10)}%`,
-                }}
-              >
-                <div className="font-bold text-white mb-1.5 pb-1 border-b border-white/10 flex items-center justify-between gap-3">
-                  <span>{activePoint.data.date || activePoint.data.label}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-zinc-300">
-                    {currentRange}
-                  </span>
-                </div>
-                <div className="space-y-1 text-[11px]">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-zinc-400 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                      {metricLabel}:
+            {activePoint && (() => {
+              const xPct = (activePoint.x / chartWidth) * 100;
+              const yPct = (activePoint.y / chartHeight) * 100;
+              const tx = xPct < 28 ? "12px" : xPct > 72 ? "calc(-100% - 12px)" : "-50%";
+              const ty = yPct < 46 ? "14px" : "calc(-100% - 14px)";
+              return (
+                <div
+                  className="absolute z-40 pointer-events-none w-max max-w-[260px] rounded-xl border border-white/15 bg-[#171822]/95 backdrop-blur-md p-3 shadow-2xl text-xs font-mono transition-[left,top,transform] duration-75"
+                  style={{
+                    left: `${xPct}%`,
+                    top: `${yPct}%`,
+                    transform: `translate(${tx}, ${ty})`,
+                  }}
+                >
+                  <div className="font-bold text-white mb-1.5 pb-1 border-b border-white/10 flex items-center justify-between gap-3">
+                    <span className="whitespace-nowrap">{activePoint.data.date || activePoint.data.label}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-zinc-300 whitespace-nowrap">
+                      {currentRange}
                     </span>
-                    <strong className="text-white font-bold">
-                      {activePoint.data.streams.toLocaleString()} lượt
-                    </strong>
                   </div>
-
-                  {activePoint.data.completed !== undefined && (
+                  <div className="space-y-1 text-[11px]">
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-zinc-400 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: secondaryColor }} />
-                        {secondaryLabel}:
+                      <span className="text-zinc-400 flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
+                        {metricLabel}:
                       </span>
-                      <strong className="text-emerald-400 font-bold">
-                        {activePoint.data.completed.toLocaleString()} lượt (
-                        {Math.round((activePoint.data.completed / (activePoint.data.streams || 1)) * 100)}%)
+                      <strong className="text-white font-bold whitespace-nowrap">
+                        {formatMetric(activePoint.data.streams)}
                       </strong>
                     </div>
-                  )}
+
+                    {activePoint.data.completed !== undefined && (
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-zinc-400 flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: secondaryColor }} />
+                          {secondaryLabel}:
+                        </span>
+                        <strong className="text-emerald-400 font-bold whitespace-nowrap">
+                          {formatMetric(activePoint.data.completed)}
+                          {showSecondaryRatio
+                            ? ` (${activePoint.data.streams > 0 ? Math.round((activePoint.data.completed / activePoint.data.streams) * 100) : 0}%)`
+                            : ""}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </div>

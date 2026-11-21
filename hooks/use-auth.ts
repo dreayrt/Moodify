@@ -14,24 +14,40 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let generation = 0;
+    let mounted = true;
     async function checkAuth() {
+      const request = ++generation;
+      const current = () => mounted && request === generation;
+      try {
       const accessToken = await getValidAccessToken();
+      if (!current()) return;
       if (!accessToken) {
+        setUser(null);
         setLoading(false);
         return;
       }
 
-      try {
         const userData = await getCurrentUser(accessToken);
-        setUser(userData);
+        if (current()) setUser(userData);
       } catch (error) {
-        console.error("Auth check failed:", error);
+        if (current()) console.error("Auth check failed:", error);
       } finally {
-        setLoading(false);
+        if (current()) setLoading(false);
       }
     }
 
-    checkAuth();
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === "moodify.auth.session") void checkAuth();
+    };
+    void checkAuth();
+    window.addEventListener("moodify-auth-changed", checkAuth);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      mounted = false;
+      window.removeEventListener("moodify-auth-changed", checkAuth);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   return { user, loading, router };

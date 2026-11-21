@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, Suspense } from "react";
+import CoverImage from "./cover-image";
+
+import { useEffect, useMemo, useState, useRef, Suspense, useCallback, memo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { AppDownloadFooter } from "@/components/shared/app-download-footer";
 import {
@@ -41,12 +43,15 @@ import {
   type FollowedArtist,
   type Album,
 } from "@/lib/api-client";
-import { usePlayer } from "@/components/dashboard/player-context";
+import { usePlayer, usePlayerState } from "@/components/dashboard/player-context";
 import { useVipTheme, type ThemeOption } from "@/lib/theme";
 import RealtimeLyrics from "./realtime-lyrics";
 import RecommendationSections from "./recommendation-sections";
 import TrackActionMenu, { TrackInlineActions } from "./track-action-menu";
-import AlbumDetailModal from "./album-detail-modal";
+import dynamic from "next/dynamic";
+import { useCatalog } from "@/hooks/use-catalog";
+const AlbumDetailModal = dynamic(() => import("./album-detail-modal"));
+import { useVisibleAnimation } from "@/hooks/use-visible-animation";
 
 // Map UI vibe ids → real genre strings stored in MongoDB
 // 147 Vietnamese tracks catalog
@@ -130,12 +135,13 @@ function NavTab({ icon, label, active = false }: { icon: React.ReactNode; label:
 }
 
 function WaveformPreview({ active }: { active: boolean }) {
+  const { ref, running } = useVisibleAnimation<HTMLDivElement>();
   const bars = useMemo(
     () => Array.from({ length: 32 }, (_, i) => 0.3 + ((Math.sin(i * 127.1) * 43758.5453) % 1 + 1) % 1 * 0.7),
     []
   );
   return (
-    <div className="flex items-center gap-[2px] h-[24px] w-full">
+    <div ref={ref} className="flex items-center gap-[2px] h-[24px] w-full">
       {bars.map((h, i) => (
         <span
           key={i}
@@ -145,6 +151,7 @@ function WaveformPreview({ active }: { active: boolean }) {
             background: active ? "linear-gradient(to top, #818cf8, #f43f5e)" : "rgba(255,255,255,0.35)",
             transformOrigin: "bottom",
             animation: active ? `waveBar ${600 + i * 30}ms ease-in-out ${i * 40}ms infinite` : "none",
+            animationPlayState: running ? "running" : "paused",
           }}
         />
       ))}
@@ -231,7 +238,7 @@ function SquareMusicCard({
       }`}
     >
       <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-900 shadow-md mb-3">
-        <img
+        <CoverImage sizes="(max-width: 640px) 40vw, 200px"
           src={coverUrl}
           alt={track.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
@@ -314,8 +321,8 @@ function RankedTrackItem({
 
         {/* Cover */}
         <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-slate-800 relative group/cover">
-          <img
-            src={track.raw?.imageUrl || "/covers/focus-flow.jpg"}
+          <CoverImage sizes="(max-width: 640px) 40vw, 200px"
+            src={track.raw?.imageUrl || "/covers/focus-flow-thumb.webp"}
             alt={track.title}
             className="w-full h-full object-cover"
           />
@@ -368,30 +375,28 @@ function RankedTrackItem({
 
 /* ── Track row ───────────────────────────────────────────────── */
 
-function TrackRow({
+const TrackRow = memo(function TrackRow({
   track,
   index,
   active,
   playing,
-  onClick,
-  onMouseEnter,
-  onMouseLeave,
+  onPlay,
+  onHover,
   vipTheme,
 }: {
   track: Track;
   index: number;
   active: boolean;
   playing: boolean;
-  onClick: () => void;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
+  onPlay: (track: Track, index?: number) => void;
+  onHover?: (track: Track | null) => void;
   vipTheme?: ThemeOption | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <div
-      className={`w-full flex flex-col rounded-2xl transition-all duration-300 ${
+      className={`${isExpanded ? "" : "catalog-row-deferred"} w-full flex flex-col rounded-2xl transition-all duration-300 ${
         isExpanded
           ? vipTheme
             ? "bg-slate-950/85 border border-[#dfba63]/50 shadow-[0_12px_36px_rgba(0,0,0,0.8)] my-1.5 backdrop-blur-xl"
@@ -405,13 +410,13 @@ function TrackRow({
     >
       {/* Top Track Row */}
       <div
-        onClick={onClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
+        onClick={() => onPlay(track, index)}
+        onMouseEnter={() => onHover?.(track)}
+        onMouseLeave={() => onHover?.(null)}
         className="group w-full grid grid-cols-[28px_46px_1fr_auto_32px] items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-left cursor-pointer transition-all"
         style={{
           animation: `lumenFadeIn 500ms cubic-bezier(0.16,1,0.3,1) both`,
-          animationDelay: `${900 + index * 50}ms`,
+          animationDelay: `${900 + Math.min(index, 9) * 50}ms`,
         }}
       >
         {/* Index / equalizer / play on hover */}
@@ -463,8 +468,9 @@ function TrackRow({
         {/* Cover with vinyl groove overlay */}
         <div
           className="w-[46px] h-[46px] rounded-xl shrink-0 shadow-[0_4px_16px_rgba(0,0,0,0.6)] border border-white/10 overflow-hidden relative"
-          style={{ background: track.cover }}
+          style={{ background: track.raw?.imageUrl ? undefined : track.cover }}
         >
+          {track.raw?.imageUrl && <CoverImage src={track.raw.imageUrl} alt="" sizes="46px" className="h-full w-full object-cover" />}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
         </div>
 
@@ -548,7 +554,7 @@ function TrackRow({
       )}
     </div>
   );
-}
+});
 
 /* ── Editor pick card ────────────────────────────────────────── */
 
@@ -650,28 +656,71 @@ function MoodChip({
 
 /* ── Main component ───────────────────────────────────────────── */
 
+function CurrentTrackLyrics() {
+  const { currentTrack, currentTime, duration, isPlaying, seek, togglePlay } = usePlayer();
+  return <RealtimeLyrics track={currentTrack} currentTime={currentTime} duration={duration}
+    isPlaying={isPlaying} onSeek={seek} onTogglePlay={togglePlay} />;
+}
+
+  // Helper function to format duration
+const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  // Map API track → UI Track; sorts playable tracks with audio first
+  const mapApiTracks = (items: ApiTrack[]): Track[] => {
+    const sorted = [...items].sort((a, b) => {
+      const aHas = Boolean(a.audioUrl || a.localPath);
+      const bHas = Boolean(b.audioUrl || b.localPath);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return 0;
+    });
+
+    return sorted.map((t) => ({
+      title: t.name,
+      artist: t.artistName,
+      duration: formatDuration(t.durationMs),
+      spotifyId: t.spotifyId,
+      audioUrl: t.audioUrl,
+      localPath: t.localPath,
+      raw: t,
+      cover: t.imageUrl
+        ? `url(${t.imageUrl}) center/cover no-repeat`
+        : "linear-gradient(135deg,#7a5cff,#1a1430)",
+    }));
+  };
+
+
 function LumenHeroContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const vibeFromUrl = searchParams.get("vibe") || "all";
 
-  const { playTrack, currentTrack, isPlaying, currentTime, duration, seek, togglePlay, isPremiumUser } = usePlayer();
+  const { playTrack, togglePlay, currentTrack, isPlaying, isPremiumUser } = usePlayerState();
   const { vipButtonsEnabled, currentVipTheme } = useVipTheme();
   const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
   const activeVipTheme = isVipButtonsActive ? currentVipTheme : null;
   const [activeVibe, setActiveVibe] = useState<string>(vibeFromUrl);
   const [viewMode, setViewMode] = useState<"lyrics" | "hero">("hero");
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
-  const [hoveredTrackIdx, setHoveredTrackIdx] = useState<number | null>(null);
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [tracksLoading, setTracksLoading] = useState(false);
-  const [tracksLoadError, setTracksLoadError] = useState<string | null>(null);
-  const [tracksRetryKey, setTracksRetryKey] = useState(0);
+  const [hoveredTrack, setHoveredTrack] = useState<Track | null>(null);
+  const catalogGenre = activeVibe === "all" ? undefined : (VIBE_TO_GENRES[activeVibe] ?? [activeVibe]).join(",");
+  const catalog = useCatalog(catalogGenre);
+  const ensureCatalogComplete = catalog.ensureComplete;
+  const tracks = useMemo(() => mapApiTracks(catalog.tracks), [catalog.tracks]);
+  const tracksLoading = catalog.loading;
+  const tracksLoadError = catalog.error;
+  const playRequestRef = useRef(0);
+  useEffect(() => () => { playRequestRef.current += 1; }, [activeVibe]);
 
   // Determine the track currently in spotlight (hovered > playing > selected by index > first track)
   const activeSelectedTrack =
-    (hoveredTrackIdx !== null ? tracks[hoveredTrackIdx] : null) ||
+    (hoveredTrack && tracks.includes(hoveredTrack) ? hoveredTrack : null) ||
     tracks.find(
       (t) =>
         t.spotifyId &&
@@ -729,6 +778,8 @@ function LumenHeroContent() {
   useEffect(() => {
     if (vibeFromUrl) {
       setActiveVibe(vibeFromUrl);
+      setActiveTrackIdx(0);
+      setHoveredTrack(null);
     }
   }, [vibeFromUrl]);
 
@@ -749,86 +800,6 @@ function LumenHeroContent() {
     router.push(`${targetBase}?vibe=${id}`);
     window.dispatchEvent(new CustomEvent("moodify-vibe-changed", { detail: { vibeId: id } }));
   };
-
-  // Helper function to format duration
-  const formatDuration = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
-
-  // Map API track → UI Track; sorts playable tracks with audio first
-  const mapApiTracks = (items: ApiTrack[]): Track[] => {
-    const sorted = [...items].sort((a, b) => {
-      const aHas = Boolean(a.audioUrl || a.localPath);
-      const bHas = Boolean(b.audioUrl || b.localPath);
-      if (aHas && !bHas) return -1;
-      if (!aHas && bHas) return 1;
-      return 0;
-    });
-
-    return sorted.map((t) => ({
-      title: t.name,
-      artist: t.artistName,
-      duration: formatDuration(t.durationMs),
-      spotifyId: t.spotifyId,
-      audioUrl: t.audioUrl,
-      localPath: t.localPath,
-      raw: t,
-      cover: t.imageUrl
-        ? `url(${t.imageUrl}) center/cover no-repeat`
-        : "linear-gradient(135deg,#7a5cff,#1a1430)",
-    }));
-  };
-
-  // Fetch tracks whose MongoDB `genres` array contains any of the target genres in a single unified request.
-  const fetchByGenres = async (genres: string[], size: number = 50): Promise<ApiTrack[]> => {
-    if (activeVibe === "all") {
-      const resp = await fetchTracks({ size });
-      return resp.content;
-    }
-
-    const resp = await fetchTracks({ genre: genres.join(","), size });
-    if (resp.content && resp.content.length > 0) {
-      return resp.content;
-    }
-
-    // If specific genre returned 0 tracks, fallback to general tracks from catalog
-    const fallback = await fetchTracks({ size });
-    return fallback.content;
-  };
-
-  // Fetch tracks when vibe changes
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setTracksLoading(true);
-      setTracksLoadError(null);
-      try {
-        const genres = VIBE_TO_GENRES[activeVibe] ?? [activeVibe];
-        const items = await fetchByGenres(genres, 50);
-        if (!cancelled) {
-          setTracks(mapApiTracks(items));
-          setActiveTrackIdx(0);
-        }
-      } catch (error) {
-        console.error("Failed to fetch tracks:", error);
-        if (!cancelled) {
-          setTracks([]);
-          setTracksLoadError(error instanceof Error ? error.message : "Unknown track loading error");
-          setActiveTrackIdx(0);
-        }
-      } finally {
-        if (!cancelled) {
-          setTracksLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeVibe, tracksRetryKey]);
 
   // Public Albums State
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -908,7 +879,21 @@ function LumenHeroContent() {
     };
   }, []);
 
-  const handlePlayTrack = (t: Track, index?: number) => {
+  const handlePlayTrack = useCallback(async (t: Track, index?: number, random = false) => {
+    const request = ++playRequestRef.current;
+    let queue: Track[];
+    try {
+      queue = mapApiTracks(await ensureCatalogComplete());
+      if (request !== playRequestRef.current) return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setSharedToast("Chưa tải đủ danh sách. Hãy thử tải lại danh mục rồi phát nhạc.");
+      return;
+    }
+    if (random) {
+      const playable = queue.filter((track) => track.raw?.audioUrl || track.raw?.localPath);
+      if (playable.length) t = playable[Math.floor(Math.random() * playable.length)];
+    }
     if (!t.raw?.audioUrl && !t.raw?.localPath) {
       alert(`Bài hát "${t.title}" hiện chưa có bản thu âm sẵn trên hệ thống. Vui lòng chọn bài hát có sẵn audio.`);
       return;
@@ -932,7 +917,7 @@ function LumenHeroContent() {
           audioUrl: t.raw.audioUrl || (t.raw.localPath ? `https://moodify.click/${t.raw.localPath.replace(/^\/+/, "")}` : undefined),
           localPath: t.raw.localPath,
         },
-        tracks
+        queue
           .filter((x) => x.raw && (x.raw.audioUrl || x.raw.localPath))
           .map((x) => ({
             id: x.raw!.id,
@@ -949,7 +934,23 @@ function LumenHeroContent() {
           }))
       );
     }
-  };
+  }, [ensureCatalogComplete, playTrack]);
+
+  const playableTracks = useMemo(() => tracks.filter((track) => track.raw?.audioUrl || track.raw?.localPath), [tracks]);
+  const featuredArtists = useMemo(() => {
+    const artists = new Map<string, { name: string; image?: string; id?: string }>();
+    for (const track of tracks) {
+      if (track.artist && track.raw?.imageUrl && !artists.has(track.artist)) {
+        artists.set(track.artist, { name: track.artist, image: track.raw.imageUrl,
+          id: track.raw.artistSpotifyId || track.raw.artistName });
+      }
+    }
+    return Array.from(artists.values()).slice(0, 6);
+  }, [tracks]);
+  const filteredCatalog = useMemo(() => {
+    const query = catalogSearch.trim().toLowerCase();
+    return query ? tracks.filter((track) => track.title.toLowerCase().includes(query) || track.artist.toLowerCase().includes(query)) : tracks;
+  }, [tracks, catalogSearch]);
 
   const active = VIBES.find((v) => v.id === activeVibe) ?? VIBES[0];
 
@@ -972,7 +973,7 @@ function LumenHeroContent() {
           <div className="text-white/30 text-xs mb-5">{tracksLoadError}</div>
           <button
             type="button"
-            onClick={() => setTracksRetryKey((key) => key + 1)}
+            onClick={() => catalog.retry()}
             className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
           >
             Thử tải lại
@@ -983,8 +984,9 @@ function LumenHeroContent() {
 
     return (
       <div className="text-center py-24">
-        <div className="text-white/80 text-xl mb-2">Chưa có bài hát nào</div>
-        <div className="text-white/40 text-sm">Vui lòng chọn thể loại khác</div>
+        <div className="text-white/80 text-xl mb-2">{catalog.error ? "Chưa thể tải danh mục" : "Chưa có bài hát nào"}</div>
+        {catalog.error ? <button type="button" onClick={catalog.retry} className="text-white/60 text-sm underline">Thử lại</button>
+          : <div className="text-white/40 text-sm">Vui lòng chọn thể loại khác</div>}
       </div>
     );
   }
@@ -1040,14 +1042,7 @@ function LumenHeroContent() {
 
         {viewMode === "lyrics" && currentTrack ? (
           <div className="anim-fade-up">
-            <RealtimeLyrics
-              track={currentTrack}
-              currentTime={currentTime}
-              duration={duration}
-              isPlaying={isPlaying}
-              onSeek={seek}
-              onTogglePlay={togglePlay}
-            />
+            <CurrentTrackLyrics />
             {/* Genre chips underneath lyrics */}
             <div className="flex flex-wrap items-center gap-2 mt-4">
               {VIBES.map((v) => (
@@ -1151,15 +1146,7 @@ function LumenHeroContent() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      const playableTracks = tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath);
-                      if (playableTracks.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * playableTracks.length);
-                        handlePlayTrack(playableTracks[randomIndex]);
-                      } else if (tracks.length > 0) {
-                        handlePlayTrack(tracks[0]);
-                      }
-                    }}
+                    onClick={() => { if (tracks[0]) void handlePlayTrack(tracks[0], undefined, true); }}
                     className={`flex items-center gap-2 px-5 py-3 rounded-full text-[13px] font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                       isVipButtonsActive
                         ? currentVipTheme.secondaryBtnClass
@@ -1254,8 +1241,8 @@ function LumenHeroContent() {
           </Link>
 
           {/* 2-6: Popular Playable Tracks */}
-          {(tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath).length >= 5
-            ? tracks.filter((t) => t.raw?.audioUrl || t.raw?.localPath)
+          {(playableTracks.length >= 5
+            ? playableTracks
             : tracks
           )
             .slice(0, 5)
@@ -1288,7 +1275,7 @@ function LumenHeroContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* BOX 1: DÀNH RIÊNG CHO BẠN (Made For You / Based on your listening)        */}
+      {/* Personalized listening stays in Home, after the hero and quick access. */}
       {/* ========================================================================= */}
       <div id="for-you" className="anim-fade-up scroll-mt-24"><RecommendationSections /></div>
 
@@ -1340,7 +1327,7 @@ function LumenHeroContent() {
                 className="group/album relative flex flex-col p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] hover:border-cyan-500/40 transition-all duration-300 cursor-pointer shadow-md hover:shadow-2xl hover:shadow-cyan-950/20 hover:-translate-y-1.5"
               >
                 <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-800 shadow-md mb-3">
-                  <img
+                  <CoverImage sizes="(max-width: 640px) 40vw, 200px"
                     src={alb.coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300"}
                     alt={alb.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover/album:scale-105"
@@ -1414,7 +1401,7 @@ function LumenHeroContent() {
                   index={originalIndex}
                   active={currentTrack?.spotifyId === track.spotifyId}
                   playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(track)}
+                  onPlay={handlePlayTrack}
                 />
               ))}
           </div>
@@ -1430,7 +1417,7 @@ function LumenHeroContent() {
                   index={originalIndex}
                   active={currentTrack?.spotifyId === track.spotifyId}
                   playing={currentTrack?.spotifyId === track.spotifyId && isPlaying}
-                  onClick={() => handlePlayTrack(track)}
+                  onPlay={handlePlayTrack}
                 />
               ))}
           </div>
@@ -1443,7 +1430,7 @@ function LumenHeroContent() {
               index={i}
               active={currentTrack?.spotifyId === t.spotifyId}
               playing={currentTrack?.spotifyId === t.spotifyId && isPlaying}
-              onClick={() => handlePlayTrack(t)}
+              onPlay={handlePlayTrack}
             />
           ))}
         </div>
@@ -1463,18 +1450,7 @@ function LumenHeroContent() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {(() => {
-            const artistMap = new Map<string, { name: string; image?: string; id?: string }>();
-            tracks.forEach((t) => {
-              if (t.artist && !artistMap.has(t.artist) && t.raw?.imageUrl) {
-                artistMap.set(t.artist, {
-                  name: t.artist,
-                  image: t.raw.imageUrl,
-                  id: t.raw.artistSpotifyId || t.raw.artistName,
-                });
-              }
-            });
-            const list = Array.from(artistMap.values()).slice(0, 6);
-            return list.map((art) => (
+            return featuredArtists.map((art) => (
               <div
                 key={art.name}
                 onClick={() => router.push(`/dashboard/artist/${encodeURIComponent(art.id || art.name)}`)}
@@ -1482,7 +1458,7 @@ function LumenHeroContent() {
               >
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden mb-3 bg-slate-800 ring-2 ring-white/10 group-hover:ring-purple-400/80 transition-all shadow-xl relative group/avatar">
                   {art.image ? (
-                    <img
+                    <CoverImage sizes="(max-width: 640px) 40vw, 200px"
                       src={art.image}
                       alt={art.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -1528,7 +1504,7 @@ function LumenHeroContent() {
               DANH MỤC CA KHÚC
             </p>
             <h3 className="font-display font-bold text-white text-lg sm:text-xl">
-              {active.label === "TẤT CẢ" ? "Tất cả bài hát" : `Giai điệu: ${active.label}`} ({tracks.length} ca khúc)
+              {active.label === "TẤT CẢ" ? "Tất cả bài hát" : `Giai điệu: ${active.label}`} ({catalog.total} ca khúc)
             </h3>
           </div>
 
@@ -1548,13 +1524,7 @@ function LumenHeroContent() {
         {/* Clean track table */}
         <div className="flex flex-col gap-1.5">
           {(() => {
-            const filtered = catalogSearch.trim()
-              ? tracks.filter(
-                  (t) =>
-                    t.title.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-                    t.artist.toLowerCase().includes(catalogSearch.toLowerCase())
-                )
-              : tracks;
+            const filtered = filteredCatalog;
 
             const displayList = isCatalogExpanded || catalogSearch.trim() ? filtered : filtered.slice(0, 10);
 
@@ -1580,9 +1550,8 @@ function LumenHeroContent() {
                         : idx === activeTrackIdx
                     }
                     playing={Boolean(currentTrack?.spotifyId === track.spotifyId && isPlaying)}
-                    onClick={() => handlePlayTrack(track, idx)}
-                    onMouseEnter={() => setHoveredTrackIdx(idx)}
-                    onMouseLeave={() => setHoveredTrackIdx(null)}
+                    onPlay={handlePlayTrack}
+                    onHover={setHoveredTrack}
                   />
                 ))}
 
@@ -1613,15 +1582,18 @@ function LumenHeroContent() {
         </div>
       </div>
 
+      {catalog.error && <div role="status" className="text-center text-sm text-white/60">
+        Chưa tải đủ danh mục. <button type="button" onClick={catalog.retry} className="underline">Thử lại</button>
+      </div>}
       {/* Album Detail Modal */}
-      <AlbumDetailModal
+      {isAlbumModalOpen && <AlbumDetailModal
         albumId={selectedAlbumId}
         isOpen={isAlbumModalOpen}
         onClose={() => {
           setIsAlbumModalOpen(false);
           setSelectedAlbumId(null);
         }}
-      />
+      />}
     </div>
   );
 }

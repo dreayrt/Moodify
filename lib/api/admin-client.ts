@@ -1,5 +1,7 @@
 import { getValidAccessToken } from "../auth/auth-client";
+import { getCurrentDeviceUuid } from "../auth/device-helper";
 import {
+  AdminRevenueStats,
   AdminUser,
   AdminUserSubscription,
   AdCampaign,
@@ -28,6 +30,18 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:8088";
 
+function emitAdminSessionInvalidated(
+  reason: "UNAUTHORIZED" | "DEVICE_REVOKED",
+  message: string
+) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("moodify:admin-session-invalidated", {
+      detail: { reason, message },
+    })
+  );
+}
+
 async function adminRequest<T>(
   path: string,
   options: {
@@ -37,26 +51,36 @@ async function adminRequest<T>(
 ): Promise<T> {
   const token = await getValidAccessToken();
   if (!token) {
+    emitAdminSessionInvalidated("UNAUTHORIZED", "Phiên đăng nhập quản trị viên đã hết hạn.");
     throw new Error("Phiên đăng nhập quản trị viên đã hết hạn.");
   }
 
+  const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : "";
   const method = options.method ?? (options.body ? "POST" : "GET");
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      ...(deviceUuid ? { "X-Device-Uuid": deviceUuid } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
   if (!response.ok) {
     let errorMsg = `Yêu cầu thất bại với mã ${response.status}`;
+    let errorCode = "";
     try {
       const errPayload = await response.json();
       errorMsg = errPayload.message || errPayload.error || errorMsg;
+      errorCode = typeof errPayload.error === "string" ? errPayload.error : "";
     } catch {
       // fallback
+    }
+    if (response.status === 401) {
+      emitAdminSessionInvalidated("UNAUTHORIZED", errorMsg);
+    } else if (response.status === 403 && errorCode === "DEVICE_REVOKED") {
+      emitAdminSessionInvalidated("DEVICE_REVOKED", errorMsg);
     }
     throw new Error(errorMsg);
   }
@@ -179,8 +203,8 @@ export async function updateAdminUserRole(
 
 export async function resetAdminUserPassword(
   userId: number
-): Promise<{ success: boolean; message: string }> {
-  return adminRequest<{ success: boolean; message: string }>(
+): Promise<{ success: boolean; message: string; tempPassword?: string }> {
+  return adminRequest<{ success: boolean; message: string; tempPassword?: string }>(
     `/api/admin/users/${userId}/reset-password`,
     { method: "POST" }
   );
@@ -244,6 +268,15 @@ export async function revokeAdminDevice(
   return adminRequest<{ success: boolean; message: string }>(
     `/api/admin/devices/${deviceId}/revoke`,
     { method: "PATCH" }
+  );
+}
+
+export async function revokeAllAdminUserDevices(
+  userId: number
+): Promise<{ success: boolean; revokedCount: number; message: string }> {
+  return adminRequest<{ success: boolean; revokedCount: number; message: string }>(
+    `/api/admin/users/${userId}/devices/revoke-all`,
+    { method: "POST" }
   );
 }
 
@@ -405,6 +438,12 @@ export async function fetchAdminTransactions(): Promise<PaymentTransaction[]> {
   return adminRequest<PaymentTransaction[]>("/api/admin/transactions");
 }
 
+export async function fetchAdminRevenueStats(
+  days: 7 | 30 | 90 = 30
+): Promise<AdminRevenueStats> {
+  return adminRequest<AdminRevenueStats>(`/api/admin/monetization/revenue-stats?days=${days}`);
+}
+
 export async function fetchAdminSubscriptions(): Promise<AdminUserSubscription[]> {
   return adminRequest<AdminUserSubscription[]>("/api/admin/subscriptions");
 }
@@ -518,10 +557,16 @@ export async function fetchAdminFavoritesLeaderboard(
 }
 
 export async function deleteAdminFavorite(
-  id: number
+  id: number,
+  type?: "SONG" | "ARTIST" | "ALBUM",
+  source?: string
 ): Promise<{ success: boolean; message: string }> {
+  const q = new URLSearchParams();
+  if (type) q.set("type", type);
+  if (source) q.set("source", source);
+  const qs = q.toString();
   return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/favorites/${id}`,
+    `/api/admin/favorites/${id}${qs ? `?${qs}` : ""}`,
     {
       method: "DELETE",
     }
@@ -615,22 +660,34 @@ export async function uploadAdminAdAudio(
 ): Promise<{ success: boolean; url: string }> {
   const token = await getValidAccessToken();
   if (!token) {
+    emitAdminSessionInvalidated("UNAUTHORIZED", "Phiên đăng nhập quản trị viên đã hết hạn.");
     throw new Error("Phiên đăng nhập quản trị viên đã hết hạn.");
   }
+  const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : "";
   const formData = new FormData();
   formData.append("file", file);
   const response = await fetch(`${API_BASE_URL}/api/admin/ads/upload`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(deviceUuid ? { "X-Device-Uuid": deviceUuid } : {}),
+    },
     body: formData,
   });
   if (!response.ok) {
     let errorMsg = `Tải tệp thất bại với mã ${response.status}`;
+    let errorCode = "";
     try {
       const errPayload = await response.json();
       errorMsg = errPayload.message || errPayload.error || errorMsg;
+      errorCode = typeof errPayload.error === "string" ? errPayload.error : "";
     } catch {
       // fallback
+    }
+    if (response.status === 401) {
+      emitAdminSessionInvalidated("UNAUTHORIZED", errorMsg);
+    } else if (response.status === 403 && errorCode === "DEVICE_REVOKED") {
+      emitAdminSessionInvalidated("DEVICE_REVOKED", errorMsg);
     }
     throw new Error(errorMsg);
   }
@@ -667,23 +724,6 @@ export async function deleteAdminAdCategory(
   return adminRequest<{ success: boolean; message: string }>(
     `/api/admin/ads/categories/${id}`,
     { method: "DELETE" }
-  );
-}
-
-// 10. System Settings & Global Config
-export async function fetchAdminSystemConfig<T = Record<string, unknown>>(): Promise<T> {
-  return adminRequest<T>("/api/admin/system/config");
-}
-
-export async function saveAdminSystemConfig(
-  config: Record<string, unknown>
-): Promise<{ success: boolean; message: string }> {
-  return adminRequest<{ success: boolean; message: string }>(
-    "/api/admin/system/config",
-    {
-      method: "PUT",
-      body: config,
-    }
   );
 }
 
