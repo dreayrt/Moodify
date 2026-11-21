@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useId,
@@ -197,15 +198,22 @@ function getDashboardPathForRole(role: string) {
 type HeroCarouselProps = {
   /** Render only the existing authentication dialogs for dashboard guests. */
   authOnly?: boolean;
+  authRequest?: { mode: "login" | "register"; sequence: number };
   onAuthenticated?: (user: UserProfileResponse) => void;
 };
 
-export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarouselProps) {
+export function HeroCarousel({ authOnly = false, authRequest, onAuthenticated }: HeroCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [authUser, setAuthUser] = useState<UserProfileResponse | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
-  const [isSignInOpen, setIsSignInOpen] = useState(false);
-  const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false);
+  const [isSignInOpen, setIsSignInOpen] = useState(authRequest?.mode === "login");
+  const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(authRequest?.mode === "register");
+  const [previousAuthRequest, setPreviousAuthRequest] = useState(authRequest);
+  if (authRequest && previousAuthRequest !== authRequest) {
+    setPreviousAuthRequest(authRequest);
+    setIsSignInOpen(authRequest.mode === "login");
+    setIsCreateAccountOpen(authRequest.mode === "register");
+  }
   const [showCreateFields, setShowCreateFields] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [createAccountError, setCreateAccountError] = useState<string | null>(
@@ -589,20 +597,20 @@ export function HeroCarousel({ authOnly = false, onAuthenticated }: HeroCarousel
     }
   };
 
-  const openSignIn = () => {
+  const openSignIn = useCallback(() => {
     setIsCreateAccountOpen(false);
     setShowCreateFields(false);
     setCreateAccountError(null);
     setSignInError(null);
     setIsSignInOpen(true);
-  };
+  }, []);
 
-  const openCreateAccount = () => {
+  const openCreateAccount = useCallback(() => {
     setIsSignInOpen(false);
     setSignInError(null);
     setCreateAccountError(null);
     setIsCreateAccountOpen(true);
-  };
+  }, []);
 
   useEffect(() => {
     if (!authOnly) return;
@@ -1265,7 +1273,7 @@ function CreateAccountModal({
                       id={fullNameId}
                       name="fullName"
                       onChange={onChange}
-                      placeholder="Nguyễn Văn A"
+                      placeholder="Lê Vũ Hải"
                       type="text"
                       value={form.fullName}
                       required

@@ -1,5 +1,9 @@
 "use client";
 
+import { AdminCoverImage } from "./shared/admin-cover-image";
+
+import type { AdminPreviewTrack } from "../types";
+
 import React, { useState } from "react";
 import {
   ArrowUpRight,
@@ -7,20 +11,14 @@ import {
   Heart,
   Play,
   Pause,
-  Clock,
   Compass,
+  Flame,
   Music2,
   Users,
-  Flame,
   CreditCard,
-  Radio,
-  Sparkles,
-  Zap,
   Smartphone,
   Laptop,
   CheckCircle2,
-  AlertTriangle,
-  TrendingUp,
 } from "lucide-react";
 import {
   AdminTab,
@@ -31,25 +29,24 @@ import {
   TrackRetentionMetric,
 } from "../types";
 import { AdminOverviewResponse } from "@/lib/api/admin-client";
-import { MiniSparkline } from "@/components/dashboard/charts/mini-sparkline";
 import { InteractiveAreaChart } from "@/components/dashboard/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
 type OverviewTabProps = {
   users: AdminUser[];
-  tracks: CatalogTrack[];
+  tracks?: CatalogTrack[];
   transactions: PaymentTransaction[];
   auditLogs: SystemAuditLog[];
   overviewData?: AdminOverviewResponse | null;
-  previewTrack?: CatalogTrack | null;
+  previewTrack?: AdminPreviewTrack | null;
   isPlayingPreview?: boolean;
-  onTogglePreview?: (track: CatalogTrack) => void;
+  onTogglePreview?: (track: AdminPreviewTrack) => void;
   onNavigateTab: (tab: AdminTab) => void;
 };
 
 export function OverviewTab({
   users,
-  tracks,
+  tracks = [],
   transactions,
   overviewData,
   previewTrack,
@@ -83,40 +80,29 @@ export function OverviewTab({
     if (overviewData?.trackPerformanceMetrics && overviewData.trackPerformanceMetrics.length > 0) {
       return overviewData.trackPerformanceMetrics;
     }
-    return (overviewData?.topListenedTracks || []).map((t) => ({
-      trackId: t.trackId,
-      title: t.title,
-      artist: t.artist,
-      coverUrl: t.coverUrl,
-      duration: t.duration,
-      trackDurationMs: 0,
-      streamCount: t.streamCount,
-      uniqueListeners: 0,
-      avgDurationMs: 0,
-      avgDurationFormatted: "0:00",
-      completionRatePercent: 0,
-      skipRatePercent: 0,
-      favoriteCount: 0,
-      genre: t.genre,
-      audioUrl: t.audioUrl,
-    }));
+    return [];
   }, [overviewData?.trackPerformanceMetrics, overviewData?.topListenedTracks]);
 
   // Real Platform and Source distributions from DB
   const realPlatformCounts = React.useMemo(() => {
     const raw = overviewData?.streamsByPlatform;
-    const counts: Record<string, number> = { WEB: 0, ANDROID: 0, IOS: 0 };
+    const counts: Record<string, number> = { WEB: 0, ANDROID: 0, IOS: 0, OTHER: 0 };
     if (Array.isArray(raw)) {
-      raw.forEach((item: any) => {
+      raw.forEach((item: { platform?: string; device?: string; source?: string; count?: number; value?: number }) => {
         const p = (item.platform || item.device || "").toString().toUpperCase();
+        const val = Number(item.count || item.value || 0);
         if (p && counts[p] !== undefined) {
-          counts[p] += Number(item.count || item.value || 0);
+          counts[p] += val;
+        } else if (val > 0) {
+          counts.OTHER += val;
         }
       });
     } else if (raw && typeof raw === "object") {
       Object.entries(raw).forEach(([k, v]) => {
         const p = k.toUpperCase();
-        if (counts[p] !== undefined) counts[p] = Number(v || 0);
+        const val = Number(v || 0);
+        if (counts[p] !== undefined) counts[p] += val;
+        else if (val > 0) counts.OTHER += val;
       });
     }
     return counts;
@@ -124,18 +110,23 @@ export function OverviewTab({
 
   const realSourceCounts = React.useMemo(() => {
     const raw = overviewData?.streamsBySource;
-    const counts: Record<string, number> = { EMOTION: 0, HOME: 0, SEARCH: 0, PLAYLIST: 0 };
+    const counts: Record<string, number> = { EMOTION: 0, HOME: 0, SEARCH: 0, PLAYLIST: 0, OTHER: 0 };
     if (Array.isArray(raw)) {
-      raw.forEach((item: any) => {
+      raw.forEach((item: { platform?: string; device?: string; source?: string; count?: number; value?: number }) => {
         const s = (item.source || "").toString().toUpperCase();
+        const val = Number(item.count || item.value || 0);
         if (s && counts[s] !== undefined) {
-          counts[s] += Number(item.count || item.value || 0);
+          counts[s] += val;
+        } else if (val > 0) {
+          counts.OTHER += val;
         }
       });
     } else if (raw && typeof raw === "object") {
       Object.entries(raw).forEach(([k, v]) => {
         const s = k.toUpperCase();
-        if (counts[s] !== undefined) counts[s] = Number(v || 0);
+        const val = Number(v || 0);
+        if (counts[s] !== undefined) counts[s] += val;
+        else if (val > 0) counts.OTHER += val;
       });
     }
     return counts;
@@ -149,27 +140,48 @@ export function OverviewTab({
       ? Number(overviewData.avgCompletionRate)
       : trackMetrics.length > 0
       ? Math.round(
-          trackMetrics.reduce((sum, item) => sum + item.completionRatePercent, 0) /
+          trackMetrics.reduce((sum, item) => sum + (item.completionRatePercent ?? 0), 0) /
             trackMetrics.length
         )
       : 0;
 
-  // Area Chart Data with 7D / 30D / 90D support (100% from real listeningTrend)
+  // Area Chart Data: continuous 90-calendar-day series so 7D / 30D / 90D always render smoothly
   const chartData = React.useMemo(() => {
-    if (listeningTrend && listeningTrend.length > 0) {
-      return listeningTrend.map((t) => ({
-        label: t.label || t.date,
-        date: t.date || t.label,
+    const byDate = new Map<string, { streams: number; completed?: number }>();
+    const byLabel = new Map<string, { streams: number; completed?: number }>();
+    (listeningTrend || []).forEach((t) => {
+      const entry = {
         streams: Number(t.streams) || 0,
-        completed: t.completed !== undefined ? Number(t.completed) : Math.round((Number(t.streams) || 0) * (avgCompletionRate / 100)),
-      }));
+        completed: t.completed !== undefined ? Number(t.completed) : 0,
+      };
+      if (t.date) byDate.set(t.date.slice(0, 10), entry);
+      if (t.label) byLabel.set(t.label, entry);
+    });
+
+    const today = new Date();
+    const continuous: { label: string; date: string; streams: number; completed: number }[] = [];
+    for (let i = 89; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const isoDate = `${yyyy}-${mm}-${dd}`;
+      const label = `${dd}/${mm}`;
+      const matched = byDate.get(isoDate) ?? byLabel.get(label);
+      continuous.push({
+        label,
+        date: isoDate,
+        streams: matched?.streams ?? 0,
+        completed: matched?.completed ?? 0,
+      });
     }
-    return [];
-  }, [listeningTrend, avgCompletionRate]);
+    return continuous;
+  }, [listeningTrend]);
 
   // Donut 1: Channels & Sources (100% Real DB)
   const sourceDonutData = React.useMemo(() => {
-    return [
+    const base = [
       {
         id: "EMOTION",
         label: "Cảm Xúc",
@@ -199,11 +211,21 @@ export function OverviewTab({
         icon: Music2,
       },
     ];
+    if (realSourceCounts.OTHER > 0) {
+      base.push({
+        id: "OTHER",
+        label: "Nguồn Khác",
+        value: realSourceCounts.OTHER,
+        color: "#64748b",
+        icon: Compass,
+      });
+    }
+    return base;
   }, [realSourceCounts]);
 
   // Donut 2: Platform Devices (100% Real DB)
   const platformDonutData = React.useMemo(() => {
-    return [
+    const base = [
       {
         id: "WEB",
         label: "Web Browser",
@@ -226,6 +248,16 @@ export function OverviewTab({
         icon: Smartphone,
       },
     ];
+    if (realPlatformCounts.OTHER > 0) {
+      base.push({
+        id: "OTHER",
+        label: "Nền Tảng Khác",
+        value: realPlatformCounts.OTHER,
+        color: "#64748b",
+        icon: Smartphone,
+      });
+    }
+    return base;
   }, [realPlatformCounts]);
 
   return (
@@ -289,16 +321,6 @@ export function OverviewTab({
               <span className="text-[11px] text-zinc-400 font-mono" title={`Tổng thời lượng tích lũy: ${overviewData?.totalListenedHours || 0} giờ`}>
                 {overviewData?.totalListenedFormatted || `${overviewData?.totalListenedHours || 0} giờ`}
               </span>
-              <MiniSparkline
-                data={
-                  listeningTrend.length >= 2
-                    ? listeningTrend.map((t) => Number(t.streams) || 0)
-                    : [0, totalStreamsCount]
-                }
-                color="#38bdf8"
-                width={75}
-                height={24}
-              />
             </div>
           </div>
 
@@ -319,16 +341,6 @@ export function OverviewTab({
             </div>
             <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
               <span className="text-[11px] text-zinc-400 font-mono">Trung bình</span>
-              <MiniSparkline
-                data={
-                  trackMetrics.length >= 2
-                    ? trackMetrics.slice(0, 7).map((m) => Math.round(m.completionRatePercent))
-                    : [avgCompletionRate, avgCompletionRate]
-                }
-                color="#10b981"
-                width={75}
-                height={24}
-              />
             </div>
           </div>
 
@@ -352,14 +364,7 @@ export function OverviewTab({
               <span className="text-[11px] text-zinc-400 font-mono">
                 Nghệ sĩ: <strong className="text-amber-300">{contentLeadsCount}</strong>
               </span>
-              {overviewData?.userTrend && overviewData.userTrend.length >= 2 ? (
-                <MiniSparkline
-                  data={overviewData.userTrend.map((u) => u.count)}
-                  color="#f59e0b"
-                  width={75}
-                  height={24}
-                />
-              ) : (
+              {(
                 <div className="flex items-center gap-1.5" title={`${contentLeadsCount}/${totalUsersCount} nghệ sĩ/nhà sáng tạo`}>
                   <div className="w-[54px] h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <div
@@ -396,19 +401,6 @@ export function OverviewTab({
               <span className="text-[11px] text-zinc-400 font-mono">
                 Thuê bao: <strong className="text-purple-300">{overviewData?.activeSubscriptions ?? 0}</strong>
               </span>
-              <MiniSparkline
-                data={
-                  transactions.filter((t) => t.status === "SUCCESS").length >= 2
-                    ? transactions
-                        .filter((t) => t.status === "SUCCESS")
-                        .slice(-7)
-                        .map((t) => Math.round(t.amount / 1000))
-                    : [0, Math.round(totalRevenue / 1000)]
-                }
-                color="#a855f7"
-                width={75}
-                height={24}
-              />
             </div>
           </div>
         </div>
@@ -432,10 +424,10 @@ export function OverviewTab({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => onNavigateTab("catalog")}
+              onClick={() => onNavigateTab("recommendations")}
               className="text-xs font-semibold text-[#ff5500] hover:underline flex items-center gap-1 cursor-pointer"
             >
-              Quản lý bài hát <ArrowUpRight className="h-3.5 w-3.5" />
+              Tuyển chọn âm nhạc <ArrowUpRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -463,8 +455,8 @@ export function OverviewTab({
               <tbody className="divide-y divide-[#222432]">
                 {trackMetrics.map((track, idx) => {
                   const isPlayingThis = isPlayingPreview && previewTrack?.id === track.trackId;
-                  const isHighCompletion = track.completionRatePercent >= 75;
-                  const isLowCompletion = track.completionRatePercent < 45;
+                  const isHighCompletion = track.completionRatePercent != null && track.completionRatePercent >= 75;
+                  const isLowCompletion = track.completionRatePercent != null && track.completionRatePercent < 45;
 
                   return (
                     <tr
@@ -482,7 +474,7 @@ export function OverviewTab({
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="relative h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-black/40 border border-white/10 group">
-                            <img
+                            <AdminCoverImage
                               src={track.coverUrl}
                               alt={track.title}
                               className="h-full w-full object-cover"
@@ -500,24 +492,10 @@ export function OverviewTab({
                                       id: track.trackId,
                                       title: track.title,
                                       artist: track.artist,
-                                      album: "Single",
+
                                       coverUrl: track.coverUrl,
                                       audioUrl: track.audioUrl,
-                                      duration: track.duration,
-                                      genre: track.genre,
-                                      status: "published",
-                                      plays: track.streamCount,
-                                      likes: track.favoriteCount,
-                                      bpm: 0,
-                                      keySignature: "",
-                                      energy: 0,
-                                      valence: 0,
-                                      danceability: 0,
-                                      acousticness: 0,
-                                      vibeCategory: "Chill",
-                                      moderationScore: 100,
-                                      createdAt: "",
-                                      spotifyId: track.trackId,
+
                                     });
                                   }
                                 }
@@ -582,7 +560,7 @@ export function OverviewTab({
                                   : "text-amber-400"
                               }`}
                             >
-                              {track.completionRatePercent}%
+                              {track.completionRatePercent == null ? "Chưa có thời lượng" : `${track.completionRatePercent ?? 0}%`}
                             </span>
                           </div>
                           <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
@@ -594,7 +572,7 @@ export function OverviewTab({
                                   ? "bg-rose-400"
                                   : "bg-amber-400"
                               }`}
-                              style={{ width: `${track.completionRatePercent}%` }}
+                              style={{ width: `${track.completionRatePercent ?? 0}%` }}
                             />
                           </div>
                         </div>

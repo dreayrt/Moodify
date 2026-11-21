@@ -19,8 +19,10 @@ import {
   isTrackInLibrary,
   type Track,
 } from "@/lib/api-client";
-import AddToPlaylistModal from "./add-to-playlist-modal";
-import ShareSongCardModal from "./share-song-card-modal";
+import { usePlayerState } from "./player-context";
+import dynamic from "next/dynamic";
+const AddToPlaylistModal = dynamic(() => import("./add-to-playlist-modal"));
+const ShareSongCardModal = dynamic(() => import("./share-song-card-modal"));
 
 export interface TrackActionMenuProps {
   track: {
@@ -45,12 +47,7 @@ export interface TrackActionMenuProps {
   iconClassName?: string;
 }
 
-const MODULAR_KEYFRAMES = `
-@keyframes modularEntrance {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-`;
+
 
 /** Shared song actions for floating menus and inline track drawers. */
 export function TrackInlineActions({
@@ -80,6 +77,7 @@ export function TrackInlineActions({
   useEffect(() => {
     onModalOpenChange?.(isModalOpen);
   }, [isModalOpen, onModalOpenChange]);
+  const { playTrack, addToQueue } = usePlayerState();
 
   const trackSpotifyId = track.spotifyId || track.id || "";
   const trackTitle = track.title || track.name || "Bài hát";
@@ -202,7 +200,6 @@ export function TrackInlineActions({
       className={`w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 text-white shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop-blur-2xl ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
-      <style dangerouslySetInnerHTML={{ __html: MODULAR_KEYFRAMES }} />
 
       <div className="flex items-center gap-3 border-b border-white/[0.08] bg-white/[0.03] p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -298,7 +295,7 @@ export function TrackInlineActions({
       </div>
 
       {/* Add To Playlist Modal */}
-      <AddToPlaylistModal
+      {isPlaylistModalOpen && <AddToPlaylistModal
         track={normalizedForPlaylist}
         isOpen={isPlaylistModalOpen}
         onClose={() => setIsPlaylistModalOpen(false)}
@@ -310,10 +307,10 @@ export function TrackInlineActions({
             })
           );
         }}
-      />
+      />}
 
       {/* Share Song Card / Story Modal */}
-      <ShareSongCardModal
+      {isShareModalOpen && <ShareSongCardModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         track={{
@@ -326,7 +323,7 @@ export function TrackInlineActions({
           lyricsPlain: track.lyricsPlain,
           lyricsSynced: track.lyricsSynced,
         }}
-      />
+      />}
 
       {/* Floating Toast Notification */}
       {toastMessage &&
@@ -421,7 +418,6 @@ export default function TrackActionMenu({
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: MODULAR_KEYFRAMES }} />
 
       {/* Dropdown Chevron Button (replacing 3-dots) */}
       <button

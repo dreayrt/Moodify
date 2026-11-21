@@ -1,4 +1,5 @@
 import { getValidAccessToken } from "../auth/auth-client";
+import { getCurrentDeviceUuid } from "../auth/device-helper";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8088";
 const ROOT = "/api/admin/karaoke";
@@ -26,13 +27,36 @@ export type ResourceList = {
 };
 export type ResourceDetail = { songId: string; title: string; artist: string; sourceAvailable: boolean; versions: KaraokeVersion[]; publishedVersion: string; jobs?: ProcessingJob[] };
 
+function emitKaraokeSessionInvalidated(reason: "UNAUTHORIZED" | "DEVICE_REVOKED", message: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("moodify:admin-session-invalidated", { detail: { reason, message } }));
+}
+
 async function request(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await getValidAccessToken();
-  if (!token) throw new Error("Phiên đăng nhập đã hết hạn.");
-  const response = await fetch(`${BASE}${ROOT}${path}`, { ...options, cache: "no-store", headers: { ...options.headers, Authorization: `Bearer ${token}` } });
+  if (!token) {
+    emitKaraokeSessionInvalidated("UNAUTHORIZED", "Phiên đăng nhập đã hết hạn.");
+    throw new Error("Phiên đăng nhập đã hết hạn.");
+  }
+  const deviceUuid = typeof window !== "undefined" ? getCurrentDeviceUuid() : "";
+  const response = await fetch(`${BASE}${ROOT}${path}`, {
+    ...options,
+    cache: "no-store",
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+      ...(deviceUuid ? { "X-Device-Uuid": deviceUuid } : {}),
+    },
+  });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.message || payload.detail || `Yêu cầu thất bại (${response.status}).`);
+    const errMsg = payload.message || payload.detail || payload.error || `Yêu cầu thất bại (${response.status}).`;
+    if (response.status === 401) {
+      emitKaraokeSessionInvalidated("UNAUTHORIZED", errMsg);
+    } else if (response.status === 403 && payload?.error === "DEVICE_REVOKED") {
+      emitKaraokeSessionInvalidated("DEVICE_REVOKED", errMsg);
+    }
+    throw new Error(errMsg);
   }
   return response;
 }

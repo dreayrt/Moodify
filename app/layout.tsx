@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 
 import { I18nProvider } from "@/components/i18n/i18n-provider";
+import { AdminRouteGuard } from "@/components/shared/admin-route-guard";
 
 import "./globals.css";
 
@@ -67,7 +68,10 @@ export default function RootLayout({
     >
       <head />
       <body className="font-sans" suppressHydrationWarning>
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider>
+          <AdminRouteGuard />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

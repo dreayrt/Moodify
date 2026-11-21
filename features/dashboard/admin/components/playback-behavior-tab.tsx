@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminCoverImage } from "./shared/admin-cover-image";
+
 import React, { useEffect, useState } from "react";
 import {
   Activity,
@@ -302,11 +304,10 @@ export function PlaybackBehaviorTab({
                 key={f.key}
                 type="button"
                 onClick={() => setEventTypeFilter(f.key)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                  eventTypeFilter === f.key
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${eventTypeFilter === f.key
                     ? "bg-purple-600 text-white shadow-sm"
                     : "text-zinc-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {f.label}
               </button>
@@ -379,7 +380,7 @@ export function PlaybackBehaviorTab({
                       <div className="flex items-center gap-2.5">
                         <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-zinc-900">
                           {evt.coverUrl ? (
-                            <img
+                            <AdminCoverImage
                               src={evt.coverUrl}
                               alt={evt.trackTitle || "Track"}
                               className="h-full w-full object-cover"

@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminCoverImage } from "./shared/admin-cover-image";
+
 import { useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -124,7 +126,7 @@ export function ModerationTab({
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
               Kiểm Duyệt Bài Hát &amp; Nội Dung
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-[11px] font-mono text-blue-300">
+            <span className="text-xs text-zinc-500">
               <Eye className="h-3 w-3" /> Chế độ xem kiểm toán (Chỉ xem)
             </span>
           </div>
@@ -170,7 +172,7 @@ export function ModerationTab({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3.5">
                     <div className="relative group">
-                      <img
+                      <AdminCoverImage
                         src={item.coverUrl}
                         alt={item.title}
                         className="h-16 w-16 rounded-xl object-cover border border-[#222432] shadow-md"

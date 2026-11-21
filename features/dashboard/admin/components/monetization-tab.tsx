@@ -2,38 +2,33 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  ArrowDownLeft,
   Check,
   CheckCircle2,
   Clock,
   CreditCard,
   DollarSign,
   Edit2,
-  Filter,
+  Layers,
   Plus,
   Receipt,
   RefreshCcw,
   Search,
   Settings2,
-  Sparkles,
-  ToggleLeft,
-  ToggleRight,
+  Sliders,
   Trash2,
-  TrendingUp,
   Users,
   X,
   XCircle,
   Crown,
-  Download,
-  Headphones,
-  Radio,
-  ShieldCheck,
-  SkipForward,
-  Sliders,
-  Smartphone,
-  Layers,
 } from "lucide-react";
-import { PaymentTransaction, ServicePackage, PackageEntitlements, SubscriptionTier, AdminUserSubscription } from "../types";
+import {
+  PaymentTransaction,
+  ServicePackage,
+  PackageEntitlements,
+  SubscriptionTier,
+  AdminUserSubscription,
+  AdminRevenueStats,
+} from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
 import { fetchAdminSubscriptionTiers, updateAdminSubscriptionTier } from "@/lib/api/admin-client";
@@ -51,12 +46,17 @@ type MonetizationTabProps = {
   onRefundTransaction?: (transactionId: number) => void;
   subscriptions?: AdminUserSubscription[];
   onCancelSubscription?: (subscriptionId: number) => void;
+  revenueStats?: AdminRevenueStats | null;
+  revenueDays?: 7 | 30 | 90;
+  onRevenueDaysChange?: (days: 7 | 30 | 90) => void;
+  loadingRevenueStats?: boolean;
+  onToast?: (message: string, type?: "success" | "error" | "info" | "warning") => void;
 };
 
 export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlements {
   if (pkg.entitlements && pkg.entitlements.adPolicy) {
     return {
-      tier: (pkg.tierId as any) || pkg.entitlements.tier,
+      tier: (pkg.tierId as PackageEntitlements["tier"]) || pkg.entitlements.tier,
       ...pkg.entitlements,
     };
   }
@@ -64,19 +64,19 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
   if (pkg.featuresJson) {
     try {
       const parsed = JSON.parse(pkg.featuresJson);
-      if (parsed && typeof parsed === "object") {
+      if (parsed && typeof parsed === "object" && parsed.adPolicy && parsed.skipPolicy) {
         return {
-          tier: (pkg.tierId as any) || parsed.tier,
-          adPolicy: parsed.adPolicy || "DAILY_QUOTA",
-          adFreeDailyLimit: parsed.adFreeDailyLimit ?? 15,
-          adIntervalAfterLimit: parsed.adIntervalAfterLimit ?? 7,
+          tier: (pkg.tierId as PackageEntitlements["tier"]) || parsed.tier,
+          adPolicy: parsed.adPolicy || "FULL_ADS",
+          adFreeDailyLimit: parsed.adFreeDailyLimit ?? 0,
+          adIntervalAfterLimit: parsed.adIntervalAfterLimit ?? 0,
           skipPolicy: parsed.skipPolicy || "LIMITED",
-          skipDailyLimit: parsed.skipDailyLimit ?? 30,
-          offlineAllowed: parsed.offlineAllowed ?? true,
-          offlineMaxTracks: parsed.offlineMaxTracks ?? 50,
+          skipDailyLimit: parsed.skipDailyLimit ?? 0,
+          offlineAllowed: parsed.offlineAllowed ?? false,
+          offlineMaxTracks: parsed.offlineMaxTracks ?? 0,
           maxDevices: parsed.maxDevices ?? 1,
-          syncedLyrics: parsed.syncedLyrics ?? true,
-          vipBadge: parsed.vipBadge ?? true,
+          syncedLyrics: parsed.syncedLyrics ?? false,
+          vipBadge: parsed.vipBadge ?? false,
           familySharing: parsed.familySharing ?? false,
           familyMembers: parsed.familyMembers ?? 1,
         };
@@ -84,56 +84,7 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
     } catch (_) {}
   }
 
-  const name = pkg.name.toLowerCase();
-  if (name.includes("gia đình") || name.includes("family")) {
-    return {
-      tier: "FAMILY",
-      adPolicy: "NO_ADS",
-      adFreeDailyLimit: 9999,
-      adIntervalAfterLimit: 0,
-      skipPolicy: "UNLIMITED",
-      skipDailyLimit: 9999,
-      offlineAllowed: true,
-      offlineMaxTracks: 9999,
-      maxDevices: 6,
-      syncedLyrics: true,
-      vipBadge: true,
-      familySharing: true,
-      familyMembers: 6,
-    };
-  }
-  if (name.includes("full") || name.includes("không giới hạn")) {
-    return {
-      tier: "INDIVIDUAL_FULL",
-      adPolicy: "NO_ADS",
-      adFreeDailyLimit: 9999,
-      adIntervalAfterLimit: 0,
-      skipPolicy: "UNLIMITED",
-      skipDailyLimit: 9999,
-      offlineAllowed: true,
-      offlineMaxTracks: 9999,
-      maxDevices: 1,
-      syncedLyrics: true,
-      vipBadge: true,
-      familySharing: false,
-      familyMembers: 1,
-    };
-  }
-  return {
-    tier: "INDIVIDUAL_BASIC",
-    adPolicy: "DAILY_QUOTA",
-    adFreeDailyLimit: 15,
-    adIntervalAfterLimit: 7,
-    skipPolicy: "LIMITED",
-    skipDailyLimit: 30,
-    offlineAllowed: true,
-    offlineMaxTracks: 50,
-    maxDevices: 1,
-    syncedLyrics: true,
-    vipBadge: true,
-    familySharing: false,
-    familyMembers: 1,
-  };
+  throw new Error("Gói dịch vụ chưa có cấu hình quyền lợi từ máy chủ.");
 }
 
 export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): string[] {
@@ -182,25 +133,111 @@ const POPULAR_BENEFITS = [
   "Chia sẻ nhiều thiết bị đồng thời",
 ];
 
-function EntitlementsEditor({
+function buildEntitlementsFromTier(
+  tierId: string,
+  tiers: SubscriptionTier[],
+  fallback?: PackageEntitlements
+): PackageEntitlements {
+  const matched = tiers.find((t) => t.id === tierId);
+  if (matched) {
+    return {
+      tier: matched.id as PackageEntitlements["tier"],
+      adPolicy: matched.adPolicy,
+      adFreeDailyLimit: matched.adFreeDailyLimit ?? 0,
+      adIntervalAfterLimit: 7,
+      skipPolicy: matched.skipPolicy,
+      skipDailyLimit: matched.skipDailyLimit ?? 0,
+      offlineAllowed: Boolean(matched.offlineAllowed),
+      offlineMaxTracks: matched.offlineMaxTracks ?? 0,
+      maxDevices: matched.maxDevices ?? 1,
+      syncedLyrics: Boolean(matched.syncedLyrics),
+      vipBadge: Boolean(matched.vipBadge),
+      familySharing: Boolean(matched.familySharing),
+      familyMembers: matched.familyMembers ?? 1,
+    };
+  }
+  if (tierId === "INDIVIDUAL_FULL") {
+    return {
+      tier: "INDIVIDUAL_FULL",
+      adPolicy: "NO_ADS",
+      adFreeDailyLimit: 0,
+      adIntervalAfterLimit: 0,
+      skipPolicy: "UNLIMITED",
+      skipDailyLimit: 0,
+      offlineAllowed: true,
+      offlineMaxTracks: 9999,
+      maxDevices: 2,
+      syncedLyrics: true,
+      vipBadge: true,
+      familySharing: false,
+      familyMembers: 1,
+    };
+  }
+  if (tierId === "FAMILY") {
+    return {
+      tier: "FAMILY",
+      adPolicy: "NO_ADS",
+      adFreeDailyLimit: 0,
+      adIntervalAfterLimit: 0,
+      skipPolicy: "UNLIMITED",
+      skipDailyLimit: 0,
+      offlineAllowed: true,
+      offlineMaxTracks: 9999,
+      maxDevices: 6,
+      syncedLyrics: true,
+      vipBadge: true,
+      familySharing: true,
+      familyMembers: 6,
+    };
+  }
+  return (
+    fallback ?? {
+      tier: (tierId || "INDIVIDUAL_BASIC") as PackageEntitlements["tier"],
+      adPolicy: "DAILY_QUOTA",
+      adFreeDailyLimit: 15,
+      adIntervalAfterLimit: 7,
+      skipPolicy: "LIMITED",
+      skipDailyLimit: 30,
+      offlineAllowed: true,
+      offlineMaxTracks: 50,
+      maxDevices: 1,
+      syncedLyrics: true,
+      vipBadge: true,
+      familySharing: false,
+      familyMembers: 1,
+    }
+  );
+}
+
+function TierInheritedPreview({
+  tierId,
   entitlements,
-  onChange,
   onSyncToBullets,
+  onNavigateToTiers,
 }: {
+  tierId: string;
   entitlements: PackageEntitlements;
-  onChange: (updated: PackageEntitlements) => void;
   onSyncToBullets: () => void;
+  onNavigateToTiers: () => void;
 }) {
   return (
-    <div className="border-t border-white/10 pt-4 space-y-3.5">
-      <div className="flex items-center justify-between">
+    <div className="border-t border-white/10 pt-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h4 className="text-xs font-mono uppercase tracking-wider font-semibold text-white flex items-center gap-2">
             <Sliders className="w-3.5 h-3.5 text-[#ff5500]" />
-            Cấu Hình Chi Tiết Quyền Lợi &amp; Giới Hạn Gói Cước
+            Quyền Lợi Kế Thừa Từ Tầng ({tierId})
           </h4>
           <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
-            Cấu hình trực tiếp logic quảng cáo, hạn mức skip và chất lượng nhạc
+            Quyền hạn thực thi do tầng dịch vụ quyết định. Sửa tại{" "}
+            <button
+              type="button"
+              onClick={onNavigateToTiers}
+              className="text-[#ff5500] underline hover:brightness-110 cursor-pointer"
+            >
+              Tầng Quyền Lợi
+            </button>
+            .
           </p>
         </div>
         <button
@@ -209,218 +246,54 @@ function EntitlementsEditor({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#ff5500]/40 bg-[#ff5500]/10 text-[#ff5500] hover:bg-[#ff5500]/20 text-xs font-mono font-semibold transition active:scale-[0.98] cursor-pointer"
           title="Tự động đồng bộ các quyền này thành danh sách gạch đầu dòng giới thiệu cho người dùng"
         >
-          <RefreshCcw className="w-3 h-3" /> Tự động tạo gạch đầu dòng
+          <RefreshCcw className="w-3 h-3" /> Đồng bộ gạch đầu dòng
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* 1. Ad Policy */}
-        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
-          <label className="text-[11px] font-mono font-semibold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Radio className="w-3 h-3" /> Quảng Cáo (Ad Engine)
-          </label>
-          <select
-            value={entitlements.adPolicy}
-            onChange={(e) =>
-              onChange({
-                ...entitlements,
-                adPolicy: e.target.value as "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS",
-              })
-            }
-            className="w-full rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500]"
-          >
-            <option value="NO_ADS">100% Không quảng cáo (FULL / Gia Đình)</option>
-            <option value="DAILY_QUOTA">Hạn ngạch ngày (Gói Tiết Kiệm - 15 bài đầu)</option>
-            <option value="FULL_ADS">Quảng cáo tiêu chuẩn (1-3 bài/QC)</option>
-          </select>
-
-          {entitlements.adPolicy === "DAILY_QUOTA" && (
-            <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
-              <div>
-                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Bài/ngày ko QC</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={entitlements.adFreeDailyLimit}
-                  onChange={(e) =>
-                    onChange({
-                      ...entitlements,
-                      adFreeDailyLimit: Math.max(1, Number(e.target.value)),
-                    })
-                  }
-                  className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-amber-300 font-bold focus:border-[#ff5500] outline-none"
-                />
-              </div>
-              <div>
-                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Sau đó 1 QC /</span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={1}
-                    value={entitlements.adIntervalAfterLimit}
-                    onChange={(e) =>
-                      onChange({
-                        ...entitlements,
-                        adIntervalAfterLimit: Math.max(1, Number(e.target.value)),
-                      })
-                    }
-                    className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-white focus:border-[#ff5500] outline-none"
-                  />
-                  <span className="text-[10px] text-zinc-400 font-mono">bài</span>
-                </div>
-              </div>
-            </div>
-          )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 rounded-xl border border-[#222432] bg-[#12131a] p-3 text-[11px] font-mono">
+        <div>
+          <span className="text-zinc-500 block">Quảng cáo</span>
+          <strong className="text-amber-300">
+            {entitlements.adPolicy === "NO_ADS"
+              ? "Không quảng cáo"
+              : entitlements.adPolicy === "DAILY_QUOTA"
+              ? `${entitlements.adFreeDailyLimit} bài/ngày ko QC`
+              : "Quảng cáo tiêu chuẩn"}
+          </strong>
         </div>
-
-        {/* 2. Skip Policy */}
-        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
-          <label className="text-[11px] font-mono font-semibold text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
-            <SkipForward className="w-3 h-3" /> Lượt Chuyển Bài (Skip)
-          </label>
-          <select
-            value={entitlements.skipPolicy}
-            onChange={(e) =>
-              onChange({
-                ...entitlements,
-                skipPolicy: e.target.value as "UNLIMITED" | "LIMITED",
-              })
-            }
-            className="w-full rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-[#ff5500]"
-          >
-            <option value="UNLIMITED">Chuyển bài vô hạn (Unlimited Skips)</option>
-            <option value="LIMITED">Giới hạn lượt/ngày (Gói Tiết Kiệm: 30 lượt)</option>
-          </select>
-
-          {entitlements.skipPolicy === "LIMITED" && (
-            <div className="pt-1.5 border-t border-white/5">
-              <span className="block text-[10px] font-mono text-zinc-400 mb-1">Số lượt chuyển bài thủ công/ngày</span>
-              <input
-                type="number"
-                min={1}
-                value={entitlements.skipDailyLimit}
-                onChange={(e) =>
-                  onChange({
-                    ...entitlements,
-                    skipDailyLimit: Math.max(1, Number(e.target.value)),
-                  })
-                }
-                className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-sky-300 font-bold focus:border-[#ff5500] outline-none"
-              />
-            </div>
-          )}
+        <div>
+          <span className="text-zinc-500 block">Chuyển bài</span>
+          <strong className="text-sky-300">
+            {entitlements.skipPolicy === "UNLIMITED"
+              ? "Không giới hạn"
+              : `${entitlements.skipDailyLimit} lượt/ngày`}
+          </strong>
         </div>
-
-
-        {/* 4. Offline Downloads */}
-        <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432] space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[11px] font-mono font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Download className="w-3 h-3" /> Tải Nhạc Offline
-            </label>
-            <input
-              type="checkbox"
-              checked={entitlements.offlineAllowed}
-              onChange={(e) =>
-                onChange({
-                  ...entitlements,
-                  offlineAllowed: e.target.checked,
-                })
-              }
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-[#ff5500] cursor-pointer"
-            />
-          </div>
-
-          {entitlements.offlineAllowed ? (
-            <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
-              <div>
-                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Số bài tối đa</span>
-                <select
-                  value={entitlements.offlineMaxTracks}
-                  onChange={(e) =>
-                    onChange({
-                      ...entitlements,
-                      offlineMaxTracks: Number(e.target.value),
-                    })
-                  }
-                  className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-white outline-none"
-                >
-                  <option value={50}>50 bài (Tiết Kiệm)</option>
-                  <option value={100}>100 bài</option>
-                  <option value={500}>500 bài</option>
-                  <option value={9999}>Không giới hạn (FULL)</option>
-                </select>
-              </div>
-              <div>
-                <span className="block text-[10px] font-mono text-zinc-400 mb-1">Số thiết bị</span>
-                <select
-                  value={entitlements.maxDevices}
-                  onChange={(e) =>
-                    onChange({
-                      ...entitlements,
-                      maxDevices: Number(e.target.value),
-                    })
-                  }
-                  className="w-full rounded-md border border-[#222432] bg-[#171822] px-2 py-1 text-xs font-mono text-white outline-none"
-                >
-                  <option value={1}>1 máy (Cá nhân)</option>
-                  <option value={3}>3 máy</option>
-                  <option value={6}>6 máy (Gia đình)</option>
-                </select>
-              </div>
-            </div>
-          ) : (
-            <p className="text-[10px] text-zinc-500 font-mono italic">
-              Không cho phép tải nhạc ngoại tuyến.
-            </p>
-          )}
+        <div>
+          <span className="text-zinc-500 block">Offline &amp; Thiết bị</span>
+          <strong className="text-emerald-300">
+            {entitlements.offlineAllowed
+              ? `${entitlements.offlineMaxTracks >= 9999 ? "Vô hạn" : entitlements.offlineMaxTracks + " bài"} · ${entitlements.maxDevices} máy`
+              : `Không offline · ${entitlements.maxDevices} máy`}
+          </strong>
         </div>
-      </div>
-
-      {/* 5. Special Perks */}
-      <div className="p-3 rounded-xl bg-[#12131a] border border-[#222432]">
-        <span className="block text-[11px] font-mono font-semibold text-purple-300 uppercase tracking-wider mb-2">
-          Đặc Quyền Bổ Sung &amp; Nhận Diện
-        </span>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-white/90">
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={entitlements.syncedLyrics}
-              onChange={(e) =>
-                onChange({ ...entitlements, syncedLyrics: e.target.checked })
-              }
-              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
-            />
-            <span>Karaoke Lyrics</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={entitlements.vipBadge}
-              onChange={(e) =>
-                onChange({ ...entitlements, vipBadge: e.target.checked })
-              }
-              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
-            />
-            <span>Huy Hiệu VIP</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={entitlements.familySharing}
-              onChange={(e) =>
-                onChange({
-                  ...entitlements,
-                  familySharing: e.target.checked,
-                  maxDevices: e.target.checked ? 6 : entitlements.maxDevices,
-                  familyMembers: e.target.checked ? 6 : 1,
-                })
-              }
-              className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
-            />
-            <span>Gia Đình (6 tài khoản)</span>
-          </label>
+        <div>
+          <span className="text-zinc-500 block">Lyrics đồng bộ</span>
+          <strong className={entitlements.syncedLyrics ? "text-white" : "text-zinc-500"}>
+            {entitlements.syncedLyrics ? "Có hỗ trợ" : "Không"}
+          </strong>
+        </div>
+        <div>
+          <span className="text-zinc-500 block">Huy hiệu VIP</span>
+          <strong className={entitlements.vipBadge ? "text-yellow-300" : "text-zinc-500"}>
+            {entitlements.vipBadge ? "Bật" : "Tắt"}
+          </strong>
+        </div>
+        <div>
+          <span className="text-zinc-500 block">Chia sẻ gia đình</span>
+          <strong className={entitlements.familySharing ? "text-amber-300" : "text-zinc-400"}>
+            {entitlements.familySharing ? `${entitlements.familyMembers || 6} thành viên` : "Cá nhân"}
+          </strong>
         </div>
       </div>
     </div>
@@ -437,25 +310,38 @@ export function MonetizationTab({
   onDeletePackage,
   subscriptions = [],
   onCancelSubscription,
+  revenueStats,
+  revenueDays = 30,
+  onRevenueDaysChange,
+  loadingRevenueStats = false,
+  onToast,
 }: MonetizationTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<"packages" | "transactions" | "tiers" | "subscriptions">("packages");
+  const [revenueBreakdownMode, setRevenueBreakdownMode] = useState<"package" | "daily" | "provider">("package");
+  const [onlyNonZeroDaily, setOnlyNonZeroDaily] = useState(false);
   const [transactionSearch, setTransactionSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [subSearch, setSubSearch] = useState("");
   const [subStatusFilter, setSubStatusFilter] = useState("ALL");
+  const [subPage, setSubPage] = useState(1);
+  const [subPageSize, setSubPageSize] = useState(10);
   const [selectedSubForCancel, setSelectedSubForCancel] = useState<AdminUserSubscription | null>(null);
 
   // Normalized Subscription Tiers
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [editingTier, setEditingTier] = useState<SubscriptionTier | null>(null);
   const [tierSaving, setTierSaving] = useState(false);
+  const [tierError, setTierError] = useState("");
+  const [packageError, setPackageError] = useState("");
+  const [tiersLoading, setTiersLoading] = useState(true);
 
   useEffect(() => {
     fetchAdminSubscriptionTiers()
       .then((data) => {
         if (Array.isArray(data)) setTiers(data);
       })
-      .catch((err) => console.error("Failed to fetch subscription tiers:", err));
+      .catch((err) => setTierError(err instanceof Error ? err.message : "Không tải được tầng quyền lợi"))
+      .finally(() => setTiersLoading(false));
   }, []);
 
   // Modals state
@@ -493,86 +379,101 @@ export function MonetizationTab({
   const [packageToDelete, setPackageToDelete] = useState<ServicePackage | null>(null);
 
   const formatVND = (val: number) => {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
   };
 
-  const totalRevenue = transactions
+  const formatCompactVND = (val: number) => {
+    if (!val) return "0";
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)}M`;
+    if (val >= 1_000) return `${Math.round(val / 1_000)}K`;
+    return val.toLocaleString("vi-VN");
+  };
+
+  const clientTotalRevenue = transactions
     .filter((t) => t.status === "SUCCESS")
     .reduce((sum, t) => sum + t.amount, 0);
+  const clientSuccessCount = transactions.filter((t) => t.status === "SUCCESS").length;
+  const clientPendingCount = transactions.filter((t) => t.status === "PENDING").length;
+  const clientFailedCount = transactions.filter((t) => t.status === "FAILED" || t.status === "CANCELLED").length;
 
-  const successCount = transactions.filter((t) => t.status === "SUCCESS").length;
-  const successRate = transactions.length > 0 ? Math.round((successCount / transactions.length) * 100) : 100;
-  const activeSubsCount = subscriptions.filter((s) => s.status === "ACTIVE").length || subscriptions.length;
+  const totalRevenue = revenueStats ? revenueStats.totalRevenue : clientTotalRevenue;
+  const periodRevenue = revenueStats ? revenueStats.periodRevenue : clientTotalRevenue;
+  const growthPercent = revenueStats ? revenueStats.growthPercent : 0;
+  const totalTxCount = revenueStats ? revenueStats.totalTransactions : transactions.length;
+  const successCount = revenueStats ? revenueStats.successCount : clientSuccessCount;
+  const pendingCount = revenueStats ? revenueStats.pendingCount : clientPendingCount;
+  const failedCount = revenueStats ? revenueStats.failedCount : clientFailedCount;
+  const successRate = totalTxCount > 0 ? Math.round((successCount / totalTxCount) * 100) : 0;
+  const avgOrderValue = revenueStats
+    ? revenueStats.avgOrderValue
+    : clientSuccessCount > 0
+    ? Math.round(clientTotalRevenue / clientSuccessCount)
+    : 0;
+  const activeSubsCount = revenueStats
+    ? revenueStats.activeSubscriptionsCount
+    : subscriptions.filter((s) => s.status === "ACTIVE").length;
+  const paidUsersCount = revenueStats ? revenueStats.paidUsersCount : 0;
   const activePackagesCount = packages.filter((p) => p.status === "ACTIVE").length;
 
-  // Revenue Trend Chart Data (VND in Thousands) - Accurate timeline
   const revenueChartData = React.useMemo(() => {
-    const dateMap = new Map<string, { streams: number; completed: number }>();
-
-    // Sort transactions by id/order
-    const sortedTx = [...transactions].sort((a, b) => (a.id || 0) - (b.id || 0));
-
-    sortedTx.forEach((tx) => {
-      if (!tx.paidAt) return;
-      const datePart = tx.paidAt.split(" ")[0]; // "dd/MM/yyyy" or "yyyy-MM-dd"
-      let dayKey = "";
-      if (datePart.includes("/")) {
-        const parts = datePart.split("/");
-        dayKey = `${parts[0]}/${parts[1]}`;
-      } else if (datePart.includes("-")) {
-        const parts = datePart.split("-");
-        dayKey = `${parts[2]}/${parts[1]}`;
-      }
-      if (!dayKey) return;
-
-      const current = dateMap.get(dayKey) || { streams: 0, completed: 0 };
-      const valK = Math.round((tx.amount || 0) / 1000);
-      current.streams += valK;
-      if (tx.status === "SUCCESS") {
-        current.completed += valK;
-      }
-      dateMap.set(dayKey, current);
-    });
-
-    const result: { label: string; date: string; streams: number; completed: number }[] = [];
-    dateMap.forEach((val, label) => {
-      result.push({
-        label,
-        date: label,
-        streams: val.streams,
-        completed: val.completed,
-      });
-    });
-
-    // Ensure at least 7 continuous data points so InteractiveAreaChart renders smoothly without "Chưa có đủ điểm dữ liệu"
-    if (result.length > 0 && result.length < 7) {
-      const paddingNeeded = 7 - result.length;
-      const padded: typeof result = [];
-      for (let i = paddingNeeded; i >= 1; i--) {
-        padded.push({
-          label: `T-${i}`,
-          date: `T-${i}`,
-          streams: 0,
-          completed: 0,
-        });
-      }
-      return [...padded, ...result];
-    }
-
-    if (result.length === 0) {
-      return ["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => ({
-        label: day,
-        date: day,
-        streams: 0,
-        completed: 0,
+    if (revenueStats?.dailySeries && revenueStats.dailySeries.length > 0) {
+      return revenueStats.dailySeries.map((pt) => ({
+        label: pt.date,
+        date: pt.isoDate,
+        streams: Number(pt.revenue) || 0,
       }));
     }
 
-    return result;
-  }, [transactions]);
+    const today = new Date();
+    const fallbackPoints: { label: string; date: string; streams: number }[] = [];
+    const byDate = new Map<string, number>();
+    transactions
+      .filter((t) => t.status === "SUCCESS")
+      .forEach((tx) => {
+        const raw = tx.paidAt || tx.createdAt;
+        if (!raw) return;
+        const datePart = raw.split(" ")[0];
+        let dayKey = "";
+        if (datePart.includes("/")) {
+          const p = datePart.split("/");
+          dayKey = `${p[0]}/${p[1]}`;
+        } else if (datePart.includes("-")) {
+          const p = datePart.split("-");
+          dayKey = `${p[2]}/${p[1]}`;
+        }
+        if (dayKey) {
+          byDate.set(dayKey, (byDate.get(dayKey) || 0) + (tx.amount || 0));
+        }
+      });
 
-  // Package Revenue Distribution Donut (100% Real from Payment Transactions)
+    for (let i = revenueDays - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const label = `${dd}/${mm}`;
+      fallbackPoints.push({
+        label,
+        date: d.toISOString().slice(0, 10),
+        streams: byDate.get(label) || 0,
+      });
+    }
+    return fallbackPoints;
+  }, [revenueStats?.dailySeries, transactions, revenueDays]);
+
   const packageRevenueDonutData = React.useMemo(() => {
+    const colors = ["#ff5500", "#10b981", "#38bdf8", "#a855f7", "#f59e0b", "#f43f5e"];
+    if (revenueStats?.byPackage && revenueStats.byPackage.length > 0) {
+      const withRevenue = revenueStats.byPackage.filter((p) => p.revenue > 0);
+      const source = withRevenue.length > 0 ? withRevenue : revenueStats.byPackage;
+      return source.map((item, idx) => ({
+        id: `pkg-${item.packageId}`,
+        label: item.packageName,
+        value: item.revenue,
+        color: colors[idx % colors.length],
+      }));
+    }
+
     const pkgRevenue: Record<string, number> = {};
     transactions
       .filter((t) => t.status === "SUCCESS")
@@ -581,7 +482,6 @@ export function MonetizationTab({
         pkgRevenue[name] = (pkgRevenue[name] || 0) + t.amount;
       });
 
-    const colors = ["#ff5500", "#10b981", "#38bdf8", "#a855f7", "#f59e0b"];
     const entries = Object.entries(pkgRevenue);
     if (entries.length > 0) {
       return entries.map(([name, amount], idx) => ({
@@ -598,7 +498,20 @@ export function MonetizationTab({
       value: 0,
       color: colors[idx % colors.length],
     }));
-  }, [transactions, packages]);
+  }, [revenueStats?.byPackage, transactions, packages]);
+
+  const dailyRows = React.useMemo(() => {
+    const base = revenueStats?.dailySeries ? [...revenueStats.dailySeries].reverse() : [];
+    if (!onlyNonZeroDaily) return base;
+    return base.filter(
+      (d) =>
+        d.revenue > 0 ||
+        d.successCount > 0 ||
+        d.pendingCount > 0 ||
+        d.failedCount > 0 ||
+        d.refundedCount > 0
+    );
+  }, [revenueStats?.dailySeries, onlyNonZeroDaily]);
 
   const filteredTransactions = transactions.filter((tx) => {
     const matchesSearch =
@@ -635,6 +548,15 @@ export function MonetizationTab({
     return matchesSearch && matchesStatus;
   });
 
+  useEffect(() => {
+    setSubPage(1);
+  }, [subSearch, subStatusFilter]);
+
+  const paginatedSubscriptions = filteredSubscriptions.slice(
+    (subPage - 1) * subPageSize,
+    subPage * subPageSize
+  );
+
   const parseDescriptionToFeatures = (desc: string): string[] => {
     if (!desc) return [];
     // Split by newlines or semicolons or bullet points
@@ -646,7 +568,9 @@ export function MonetizationTab({
 
   const handleOpenEdit = (pkg: ServicePackage) => {
     const features = parseDescriptionToFeatures(pkg.description);
-    const ents = getEffectiveEntitlements(pkg);
+    let ents: PackageEntitlements;
+    try { ents = getEffectiveEntitlements(pkg); setPackageError(""); }
+    catch (error) { setPackageError(error instanceof Error ? error.message : "Không đọc được cấu hình quyền lợi"); return; }
     const tierId = pkg.tierId || ents.tier || "INDIVIDUAL_BASIC";
     setEditingPackage(pkg);
     setFormData({
@@ -657,8 +581,8 @@ export function MonetizationTab({
       status: pkg.status,
       tierId: tierId,
       description: pkg.description,
-      featureItems: features.length > 0 ? features : generateBulletPointsFromEntitlements(ents),
-      entitlements: { ...ents, tier: tierId as any },
+      featureItems: features,
+      entitlements: { ...ents, tier: tierId as PackageEntitlements["tier"] },
     });
     setNewFeatureInput("");
   };
@@ -713,15 +637,31 @@ export function MonetizationTab({
     }));
   };
 
+  const serializeFeatureItems = (items: string[]) =>
+    items.length > 0 ? items.map((item) => `• ${item}`).join("\n") : "";
+
   const handleSaveEditPackage = () => {
     if (!editingPackage) return;
-    const serializedDesc = formData.featureItems.join("\n• ");
-    const finalDesc = serializedDesc.startsWith("• ") ? serializedDesc : `• ${serializedDesc}`;
+    const cleanName = formData.name.trim();
+    if (!cleanName) {
+      onToast?.("Vui lòng nhập tên gói cước.", "warning");
+      return;
+    }
+    if (!Number.isFinite(formData.price) || formData.price < 0) {
+      onToast?.("Đơn giá gói cước không hợp lệ.", "warning");
+      return;
+    }
+    if (!Number.isFinite(formData.durationDays) || formData.durationDays < 1) {
+      onToast?.("Chu kỳ gói cước phải tối thiểu 1 ngày.", "warning");
+      return;
+    }
+
+    const finalDesc = serializeFeatureItems(formData.featureItems);
     const featuresJsonStr = JSON.stringify(formData.entitlements);
 
     if (onUpdatePackageDetails) {
       onUpdatePackageDetails(editingPackage.id, {
-        name: formData.name,
+        name: cleanName,
         price: formData.price,
         durationDays: formData.durationDays,
         displayOrder: formData.displayOrder,
@@ -737,13 +677,26 @@ export function MonetizationTab({
   };
 
   const handleSaveCreatePackage = () => {
-    const serializedDesc = formData.featureItems.join("\n• ");
-    const finalDesc = serializedDesc.startsWith("• ") ? serializedDesc : `• ${serializedDesc}`;
+    const cleanName = formData.name.trim();
+    if (!cleanName) {
+      onToast?.("Vui lòng nhập tên gói cước mới.", "warning");
+      return;
+    }
+    if (!Number.isFinite(formData.price) || formData.price < 0) {
+      onToast?.("Đơn giá gói cước không hợp lệ.", "warning");
+      return;
+    }
+    if (!Number.isFinite(formData.durationDays) || formData.durationDays < 1) {
+      onToast?.("Chu kỳ gói cước phải tối thiểu 1 ngày.", "warning");
+      return;
+    }
+
+    const finalDesc = serializeFeatureItems(formData.featureItems);
     const featuresJsonStr = JSON.stringify(formData.entitlements);
 
     if (onCreatePackage) {
       onCreatePackage({
-        name: formData.name,
+        name: cleanName,
         price: formData.price,
         durationDays: formData.durationDays,
         displayOrder: formData.displayOrder,
@@ -762,6 +715,7 @@ export function MonetizationTab({
 
   return (
     <div className="space-y-6 anim-fade-in">
+      {packageError && <p role="alert" className="text-sm text-rose-300">{packageError}</p>}
       {/* Studio Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -809,7 +763,7 @@ export function MonetizationTab({
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <Layers className="h-3.5 w-3.5" /> Tầng Quyền Lợi ({tiers.length || 4})
+              <Layers className="h-3.5 w-3.5" /> Tầng Quyền Lợi ({tiers.length})
             </button>
             <button
               type="button"
@@ -843,27 +797,32 @@ export function MonetizationTab({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
             <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Doanh Thu</span>
+              <span>Tổng Doanh Thu</span>
               <DollarSign className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="font-display text-2xl font-bold text-white tracking-tight">
               {formatVND(totalRevenue)}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1 font-mono">
-              Giao dịch thành công
+            <p className="text-[11px] text-zinc-400 mt-1 font-mono flex items-center justify-between gap-2">
+              <span>Kỳ {revenueDays} ngày: {formatVND(periodRevenue)}</span>
+              {growthPercent !== 0 && (
+                <span className={growthPercent > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                  {growthPercent > 0 ? `+${growthPercent}%` : `${growthPercent}%`}
+                </span>
+              )}
             </p>
           </div>
 
           <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
             <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Số Giao Dịch</span>
+              <span>Giao Dịch Thanh Toán</span>
               <Receipt className="w-4 h-4 text-sky-400" />
             </div>
             <div className="font-display text-2xl font-bold text-white tracking-tight">
-              {transactions.length} GD
+              {totalTxCount} GD
             </div>
             <p className="text-[11px] text-sky-400 mt-1 font-mono">
-              Tỷ lệ thành công: {successRate}%
+              {successCount} thành công ({successRate}%) · {pendingCount} chờ · {failedCount} lỗi/hủy
             </p>
           </div>
 
@@ -875,8 +834,8 @@ export function MonetizationTab({
             <div className="font-display text-2xl font-bold text-white tracking-tight">
               {activeSubsCount} người
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1 font-mono">
-              Đang kích hoạt
+            <p className="text-[11px] text-zinc-400 mt-1 font-mono">
+              {paidUsersCount} khách trả phí · TB/đơn: {formatVND(avgOrderValue)}
             </p>
           </div>
 
@@ -889,7 +848,7 @@ export function MonetizationTab({
               {activePackagesCount} / {packages.length} gói
             </div>
             <p className="text-[11px] text-zinc-500 mt-1 font-mono">
-              Tổng số {packages.length} gói dịch vụ
+              {loadingRevenueStats ? "Đang cập nhật thống kê..." : `Kỳ thống kê: ${revenueDays} ngày`}
             </p>
           </div>
         </div>
@@ -898,13 +857,15 @@ export function MonetizationTab({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           <div className="lg:col-span-7">
             <InteractiveAreaChart
-              title="Doanh Thu Theo Thời Gian (Nghìn VNĐ)"
-              subtitle="Biểu đồ biến động doanh thu thanh toán qua các ngày."
+              title="Doanh Thu Theo Thời Gian"
+              subtitle={`Biểu đồ biến động doanh thu thanh toán thành công trong ${revenueDays} ngày qua.`}
               data={revenueChartData}
-              metricLabel="Doanh số (K VND)"
-              secondaryLabel="Đã thu tiền (K VND)"
+              metricLabel="Doanh thu (VND)"
               accentColor="#ff5500"
-              secondaryColor="#10b981"
+              activeRange={revenueDays === 7 ? "7D" : revenueDays === 90 ? "90D" : "30D"}
+              onRangeChange={(rng) => onRevenueDaysChange?.(rng === "7D" ? 7 : rng === "90D" ? 90 : 30)}
+              formatValue={formatVND}
+              formatAxisValue={formatCompactVND}
               height={230}
             />
           </div>
@@ -916,7 +877,215 @@ export function MonetizationTab({
               centerLabel="Doanh Thu"
               size={180}
               strokeWidth={22}
+              formatValue={formatVND}
+              formatCenterValue={(v) => (v === 0 ? "0 ₫" : formatCompactVND(v) + " ₫")}
             />
+          </div>
+        </div>
+
+        {/* Working Revenue Summary Breakdown Table */}
+        <div className="rounded-2xl border border-[#222432] bg-[#12131a] shadow-xl overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-4">
+            <div>
+              <h3 className="font-graphik text-sm font-bold text-white">
+                Bảng Thống Kê Doanh Thu Chi Tiết
+              </h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Phân tích doanh thu theo gói dịch vụ, theo từng ngày trong kỳ {revenueDays} ngày và theo cổng thanh toán.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {revenueBreakdownMode === "daily" && (
+                <label className="inline-flex items-center gap-1.5 rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-[11px] font-mono text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyNonZeroDaily}
+                    onChange={(e) => setOnlyNonZeroDaily(e.target.checked)}
+                    className="accent-[#ff5500]"
+                  />
+                  <span>Chỉ ngày có GD</span>
+                </label>
+              )}
+
+              <div className="flex items-center rounded-xl border border-[#222432] bg-[#171822] p-1 text-[11px] font-mono">
+                {(
+                  [
+                    { id: "package", label: "Theo Gói" },
+                    { id: "daily", label: "Theo Ngày" },
+                    { id: "provider", label: "Theo Cổng TT" },
+                  ] as const
+                ).map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setRevenueBreakdownMode(mode.id)}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer font-semibold ${
+                      revenueBreakdownMode === mode.id
+                        ? "bg-[#ff5500] text-white shadow-sm"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            {revenueBreakdownMode === "package" && (
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                  <tr>
+                    <th className="px-5 py-3">Gói Dịch Vụ</th>
+                    <th className="px-4 py-3">Tầng (Tier)</th>
+                    <th className="px-4 py-3">Giá Niêm Yết</th>
+                    <th className="px-4 py-3">Thuê Bao Đang Dùng</th>
+                    <th className="px-4 py-3">Đơn Thành Công / Tổng</th>
+                    <th className="px-4 py-3">Doanh Thu</th>
+                    <th className="px-5 py-3 min-w-[140px]">Tỷ Trọng (%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {(!revenueStats?.byPackage || revenueStats.byPackage.length === 0) ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center font-mono text-zinc-500">
+                        Chưa có dữ liệu doanh thu theo gói dịch vụ.
+                      </td>
+                    </tr>
+                  ) : (
+                    revenueStats.byPackage.map((row) => (
+                      <tr key={row.packageId} className="hover:bg-white/[0.02] transition">
+                        <td className="px-5 py-3 font-semibold text-white">
+                          {row.packageName}
+                          <span
+                            className={`ml-2 text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                              row.packageStatus === "ACTIVE"
+                                ? "bg-emerald-500/10 text-emerald-400"
+                                : "bg-zinc-700/40 text-zinc-400"
+                            }`}
+                          >
+                            {row.packageStatus}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-amber-300">{row.tierId}</td>
+                        <td className="px-4 py-3 font-mono text-zinc-300">{formatVND(row.packagePrice)}</td>
+                        <td className="px-4 py-3 font-mono text-sky-300 font-bold">{row.activeSubscriptions}</td>
+                        <td className="px-4 py-3 font-mono text-zinc-300">
+                          <span className="text-emerald-400 font-bold">{row.successCount}</span> / {row.totalCount}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-white">{formatVND(row.revenue)}</td>
+                        <td className="px-5 py-3 font-mono">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-[#ff5500]"
+                                style={{ width: `${Math.min(100, row.sharePercent)}%` }}
+                              />
+                            </div>
+                            <span className="w-11 text-right text-zinc-300">{row.sharePercent}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot className="border-t border-white/10 bg-[#171822]/70 font-mono text-xs">
+                  <tr>
+                    <td colSpan={3} className="px-5 py-3 font-bold text-zinc-300">TỔNG CỘNG</td>
+                    <td className="px-4 py-3 font-bold text-sky-300">{activeSubsCount}</td>
+                    <td className="px-4 py-3 font-bold text-zinc-200">{successCount} / {totalTxCount}</td>
+                    <td className="px-4 py-3 font-bold text-emerald-400">{formatVND(totalRevenue)}</td>
+                    <td className="px-5 py-3 font-bold text-zinc-300">{totalRevenue > 0 ? "100%" : "0%"}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+
+            {revenueBreakdownMode === "daily" && (
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-white/10 bg-[#171822] sticky top-0 font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                    <tr>
+                      <th className="px-5 py-3">Ngày</th>
+                      <th className="px-4 py-3">Thành Công</th>
+                      <th className="px-4 py-3">Đang Chờ</th>
+                      <th className="px-4 py-3">Thất Bại / Hủy</th>
+                      <th className="px-4 py-3">Hoàn Tiền</th>
+                      <th className="px-5 py-3 text-right">Doanh Thu Ngày</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-mono">
+                    {dailyRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-zinc-500">
+                          Không có giao dịch phát sinh trong khoảng thời gian đã chọn.
+                        </td>
+                      </tr>
+                    ) : (
+                      dailyRows.map((d) => (
+                        <tr key={d.isoDate} className="hover:bg-white/[0.02] transition">
+                          <td className="px-5 py-2.5 text-white font-semibold">
+                            {d.date} <span className="text-zinc-500 text-[10px]">({d.isoDate})</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-emerald-400 font-bold">{d.successCount}</td>
+                          <td className="px-4 py-2.5 text-amber-300">{d.pendingCount}</td>
+                          <td className="px-4 py-2.5 text-rose-400">{d.failedCount}</td>
+                          <td className="px-4 py-2.5 text-zinc-400">{d.refundedCount}</td>
+                          <td className="px-5 py-2.5 text-right font-bold text-white">{formatVND(d.revenue)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {revenueBreakdownMode === "provider" && (
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                  <tr>
+                    <th className="px-5 py-3">Cổng Thanh Toán</th>
+                    <th className="px-4 py-3">Phương Thức</th>
+                    <th className="px-4 py-3">Đơn Thành Công / Tổng</th>
+                    <th className="px-4 py-3">Doanh Thu</th>
+                    <th className="px-5 py-3 min-w-[140px]">Tỷ Trọng (%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-mono">
+                  {(!revenueStats?.byProvider || revenueStats.byProvider.length === 0) ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-zinc-500">
+                        Chưa có dữ liệu giao dịch theo cổng thanh toán.
+                      </td>
+                    </tr>
+                  ) : (
+                    revenueStats.byProvider.map((row, idx) => (
+                      <tr key={`${row.provider}-${row.paymentMethod}-${idx}`} className="hover:bg-white/[0.02] transition">
+                        <td className="px-5 py-3 text-white font-bold">{row.provider}</td>
+                        <td className="px-4 py-3 text-zinc-300">{row.paymentMethod}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-emerald-400 font-bold">{row.successCount}</span> / {row.totalCount}
+                        </td>
+                        <td className="px-4 py-3 text-white font-bold">{formatVND(row.revenue)}</td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-emerald-400"
+                                style={{ width: `${Math.min(100, row.sharePercent)}%` }}
+                              />
+                            </div>
+                            <span className="w-11 text-right text-zinc-300">{row.sharePercent}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
@@ -924,6 +1093,7 @@ export function MonetizationTab({
       {/* SUBTAB 1: PACKAGES GRID */}
       {activeSubTab === "packages" && (
         <div className="space-y-6 anim-fade-up">
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {packages.map((pkg) => {
               const isActive = pkg.status === "ACTIVE";
@@ -1052,8 +1222,10 @@ export function MonetizationTab({
               >
                 <option value="ALL">Tất cả ({transactions.length})</option>
                 <option value="SUCCESS">Thành công (SUCCESS)</option>
-                <option value="REFUNDED">Đã hoàn tiền (REFUNDED)</option>
                 <option value="PENDING">Đang chờ (PENDING)</option>
+                <option value="FAILED">Thất bại (FAILED)</option>
+                <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+                <option value="REFUNDED">Đã hoàn tiền (REFUNDED)</option>
               </select>
 
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 font-mono text-xs text-emerald-300 font-semibold">
@@ -1075,7 +1247,7 @@ export function MonetizationTab({
                     <th className="px-5 py-3.5">Cổng TT</th>
                     <th className="px-5 py-3.5">Thời Gian</th>
                     <th className="px-5 py-3.5">Trạng Thái</th>
-                    <th className="px-5 py-3.5 text-right">Thao Tác</th>
+                    <th className="px-5 py-3.5 text-right">Phương Thức</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-sans">
@@ -1089,6 +1261,7 @@ export function MonetizationTab({
                     paginatedTransactions.map((tx) => {
                       const isSuccess = tx.status === "SUCCESS";
                       const isRefunded = tx.status === "REFUNDED";
+                      const isFailedOrCancelled = tx.status === "FAILED" || tx.status === "CANCELLED";
 
                       return (
                         <tr key={tx.id} className="transition hover:bg-white/[0.02]">
@@ -1111,7 +1284,7 @@ export function MonetizationTab({
                             </span>
                           </td>
                           <td className="px-5 py-4 font-mono text-xs text-zinc-400">
-                            {tx.paidAt}
+                            {tx.paidAt || "Chưa thanh toán"}
                           </td>
                           <td className="px-5 py-4">
                             {isSuccess && (
@@ -1124,18 +1297,19 @@ export function MonetizationTab({
                                 <RefreshCcw className="h-3 w-3" /> Đã hoàn tiền
                               </span>
                             )}
-                            {!isSuccess && !isRefunded && (
+                            {isFailedOrCancelled && (
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-rose-300">
+                                <XCircle className="h-3 w-3" /> {tx.status === "FAILED" ? "Thất bại" : "Đã hủy"}
+                              </span>
+                            )}
+                            {!isSuccess && !isRefunded && !isFailedOrCancelled && (
                               <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-300">
-                                <Clock className="h-3 w-3" /> {tx.status}
+                                <Clock className="h-3 w-3" /> Đang chờ
                               </span>
                             )}
                           </td>
-                          <td className="px-5 py-4 text-right">
-                            {isSuccess && (
-                              <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-emerald-400">
-                                <CheckCircle2 className="h-3.5 w-3.5" /> Thành công
-                              </span>
-                            )}
+                          <td className="px-5 py-4 text-right font-mono text-xs text-zinc-300">
+                            {tx.paymentMethod || "—"}
                           </td>
                         </tr>
                       );
@@ -1176,12 +1350,10 @@ export function MonetizationTab({
 
             {/* Grid of Tiers */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              {(tiers.length > 0 ? tiers : [
-                { id: "FREE", name: "Tài khoản Miễn Phí", description: "Dành cho người nghe thông thường", adPolicy: "FULL_ADS" as const, adFreeDailyLimit: 0, skipPolicy: "LIMITED" as const, skipDailyLimit: 6, offlineAllowed: false, offlineMaxTracks: 0, maxDevices: 1, syncedLyrics: false, vipBadge: false, familySharing: false, familyMembers: 0 },
-                { id: "INDIVIDUAL_BASIC", name: "VIP Tiết Kiệm", description: "Hạn ngạch ngày tiết kiệm", adPolicy: "DAILY_QUOTA" as const, adFreeDailyLimit: 15, skipPolicy: "LIMITED" as const, skipDailyLimit: 30, offlineAllowed: true, offlineMaxTracks: 50, maxDevices: 1, syncedLyrics: true, vipBadge: true, familySharing: false, familyMembers: 0 },
-                { id: "INDIVIDUAL_FULL", name: "Cá Nhân VIP FULL", description: "Không giới hạn đặc quyền", adPolicy: "NO_ADS" as const, adFreeDailyLimit: 0, skipPolicy: "UNLIMITED" as const, skipDailyLimit: 0, offlineAllowed: true, offlineMaxTracks: 9999, maxDevices: 1, syncedLyrics: true, vipBadge: true, familySharing: false, familyMembers: 0 },
-                { id: "FAMILY", name: "Gói Gia Đình VIP", description: "Trọn bộ đặc quyền cho 6 người", adPolicy: "NO_ADS" as const, adFreeDailyLimit: 0, skipPolicy: "UNLIMITED" as const, skipDailyLimit: 0, offlineAllowed: true, offlineMaxTracks: 9999, maxDevices: 6, syncedLyrics: true, vipBadge: true, familySharing: true, familyMembers: 6 },
-              ]).map((tier) => (
+              {tiersLoading && <p role="status" className="text-sm text-zinc-400">Đang tải tầng quyền lợi…</p>}
+              {tierError && <p role="alert" className="text-sm text-rose-300">{tierError}</p>}
+              {!tiersLoading && !tierError && tiers.length === 0 && <p className="text-sm text-zinc-400">Chưa có tầng quyền lợi trong hệ thống.</p>}
+              {tiers.map((tier) => (
                 <div
                   key={tier.id}
                   className="flex flex-col justify-between rounded-2xl border border-[#222432] bg-[#171822] p-5 shadow-lg hover:border-[#ff5500]/40 transition"
@@ -1237,6 +1409,20 @@ export function MonetizationTab({
                         <span className="text-zinc-500">Gói gia đình:</span>
                         <span className={tier.familySharing ? "text-yellow-400 font-bold" : "text-zinc-500"}>
                           {tier.familySharing ? `${tier.familyMembers || 6} thành viên` : "Cá nhân"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Lyrics đồng bộ:</span>
+                        <span className={tier.syncedLyrics ? "text-white font-semibold" : "text-zinc-500"}>
+                          {tier.syncedLyrics ? "Có hỗ trợ" : "Không"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-500">Huy hiệu VIP:</span>
+                        <span className={tier.vipBadge ? "text-yellow-300 font-semibold" : "text-zinc-500"}>
+                          {tier.vipBadge ? "Bật" : "Tắt"}
                         </span>
                       </div>
                     </div>
@@ -1310,7 +1496,7 @@ export function MonetizationTab({
                       </td>
                     </tr>
                   ) : (
-                    filteredSubscriptions.map((sub) => {
+                    paginatedSubscriptions.map((sub) => {
                       const isActive = sub.status === "ACTIVE";
                       const isCancelled = sub.status === "CANCELLED";
                       const isExpired = sub.status === "EXPIRED";
@@ -1320,7 +1506,7 @@ export function MonetizationTab({
                           <td className="px-5 py-4 font-mono text-zinc-400">#{sub.id}</td>
                           <td className="px-5 py-4">
                             <div className="font-semibold text-white">{sub.userName || "Người dùng #" + sub.userId}</div>
-                            <div className="text-[11px] font-mono text-zinc-400">{sub.userEmail || "user@" + sub.userId}</div>
+                            <div className="text-[11px] font-mono text-zinc-400">{sub.userEmail || "Chưa có email"}</div>
                           </td>
                           <td className="px-5 py-4">
                             <span className="font-semibold text-white">{sub.packageName}</span>
@@ -1377,6 +1563,15 @@ export function MonetizationTab({
                 </tbody>
               </table>
             </div>
+
+            <AdminPagination
+              currentPage={subPage}
+              totalItems={filteredSubscriptions.length}
+              pageSize={subPageSize}
+              onPageChange={setSubPage}
+              onPageSizeChange={setSubPageSize}
+              pageSizeOptions={[10, 20, 50]}
+            />
           </div>
         </div>
       )}
@@ -1433,7 +1628,7 @@ export function MonetizationTab({
                     <label className="block text-zinc-400 mb-1">Chính Sách Quảng Cáo</label>
                     <select
                       value={editingTier.adPolicy}
-                      onChange={(e) => setEditingTier({ ...editingTier, adPolicy: e.target.value as any })}
+                      onChange={(e) => setEditingTier({ ...editingTier, adPolicy: e.target.value as SubscriptionTier["adPolicy"] })}
                       className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
                     >
                       <option value="NO_ADS">NO_ADS (100% Không QC)</option>
@@ -1459,7 +1654,7 @@ export function MonetizationTab({
                     <label className="block text-zinc-400 mb-1">Chính Sách Chuyển Bài (Skip)</label>
                     <select
                       value={editingTier.skipPolicy}
-                      onChange={(e) => setEditingTier({ ...editingTier, skipPolicy: e.target.value as any })}
+                      onChange={(e) => setEditingTier({ ...editingTier, skipPolicy: e.target.value as SubscriptionTier["skipPolicy"] })}
                       className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
                     >
                       <option value="UNLIMITED">UNLIMITED (Vô hạn skip)</option>
@@ -1536,7 +1731,35 @@ export function MonetizationTab({
                     />
                   </div>
                 </div>
+
+                {/* Synced Lyrics & VIP Badge */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <label className="flex items-center gap-2 rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
+                    <input
+                      type="checkbox"
+                      checked={editingTier.syncedLyrics}
+                      onChange={(e) => setEditingTier({ ...editingTier, syncedLyrics: e.target.checked })}
+                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                    />
+                    <span>Lyrics Karaoke đồng bộ</span>
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
+                    <input
+                      type="checkbox"
+                      checked={editingTier.vipBadge}
+                      onChange={(e) => setEditingTier({ ...editingTier, vipBadge: e.target.checked })}
+                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                    />
+                    <span>Huy hiệu VIP</span>
+                  </label>
+                </div>
               </div>
+
+              {tierError && (
+                <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                  {tierError}
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
                 <button
@@ -1551,13 +1774,17 @@ export function MonetizationTab({
                   disabled={tierSaving}
                   onClick={async () => {
                     setTierSaving(true);
+                    setTierError("");
                     try {
                       await updateAdminSubscriptionTier(editingTier.id, editingTier);
                       const res = await fetchAdminSubscriptionTiers();
                       if (Array.isArray(res)) setTiers(res);
+                      onToast?.(`Đã cập nhật tầng quyền lợi ${editingTier.id}.`, "success");
                       setEditingTier(null);
                     } catch (err) {
-                      console.error("Lỗi khi lưu tầng dịch vụ:", err);
+                      const msg = err instanceof Error ? err.message : "Lỗi khi lưu tầng dịch vụ.";
+                      setTierError(msg);
+                      onToast?.(msg, "error");
                     } finally {
                       setTierSaving(false);
                     }
@@ -1665,42 +1892,7 @@ export function MonetizationTab({
                       value={formData.tierId}
                       onChange={(e) => {
                         const selectedTier = e.target.value;
-                        let newEnts = { ...formData.entitlements, tier: selectedTier as any };
-                        if (selectedTier === "INDIVIDUAL_FULL") {
-                          newEnts = {
-                            ...newEnts,
-                            adPolicy: "NO_ADS",
-                            skipPolicy: "UNLIMITED",
-                            offlineAllowed: true,
-                            offlineMaxTracks: 9999,
-                            maxDevices: 1,
-                            familySharing: false,
-                          };
-                        } else if (selectedTier === "FAMILY") {
-                          newEnts = {
-                            ...newEnts,
-                            adPolicy: "NO_ADS",
-                            skipPolicy: "UNLIMITED",
-                            offlineAllowed: true,
-                            offlineMaxTracks: 9999,
-                            maxDevices: 6,
-                            familySharing: true,
-                            familyMembers: 6,
-                          };
-                        } else if (selectedTier === "INDIVIDUAL_BASIC") {
-                          newEnts = {
-                            ...newEnts,
-                            adPolicy: "DAILY_QUOTA",
-                            adFreeDailyLimit: 15,
-                            adIntervalAfterLimit: 7,
-                            skipPolicy: "LIMITED",
-                            skipDailyLimit: 30,
-                            offlineAllowed: true,
-                            offlineMaxTracks: 50,
-                            maxDevices: 1,
-                            familySharing: false,
-                          };
-                        }
+                        const newEnts = buildEntitlementsFromTier(selectedTier, tiers, formData.entitlements);
                         setFormData({
                           ...formData,
                           tierId: selectedTier,
@@ -1710,9 +1902,18 @@ export function MonetizationTab({
                       }}
                       className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none"
                     >
-                      <option value="INDIVIDUAL_BASIC">INDIVIDUAL_BASIC (Tiết Kiệm)</option>
-                      <option value="INDIVIDUAL_FULL">INDIVIDUAL_FULL (Cá Nhân FULL)</option>
-                      <option value="FAMILY">FAMILY (Gói Gia Đình)</option>
+                      {(tiers.length > 0
+                        ? tiers.filter((t) => t.id !== "FREE" || formData.tierId === "FREE")
+                        : [
+                            { id: "INDIVIDUAL_BASIC", name: "Tiết Kiệm" },
+                            { id: "INDIVIDUAL_FULL", name: "Cá Nhân FULL" },
+                            { id: "FAMILY", name: "Gói Gia Đình" },
+                          ]
+                      ).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.id} ({t.name})
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1745,16 +1946,22 @@ export function MonetizationTab({
               </div>
             </div>
 
-            {/* Granular Entitlements Configuration Matrix */}
-            <EntitlementsEditor
-              entitlements={formData.entitlements}
-              onChange={(ents) => setFormData((prev) => ({ ...prev, entitlements: ents }))}
+            {/* Read-only Tier Entitlements Inheritance Preview */}
+            <TierInheritedPreview
+              tierId={formData.tierId}
+              entitlements={buildEntitlementsFromTier(formData.tierId, tiers, formData.entitlements)}
               onSyncToBullets={() =>
                 setFormData((prev) => ({
                   ...prev,
-                  featureItems: generateBulletPointsFromEntitlements(prev.entitlements),
+                  featureItems: generateBulletPointsFromEntitlements(
+                    buildEntitlementsFromTier(prev.tierId, tiers, prev.entitlements)
+                  ),
                 }))
               }
+              onNavigateToTiers={() => {
+                setEditingPackage(null);
+                setActiveSubTab("tiers");
+              }}
             />
 
             {/* Feature items editor */}
@@ -1960,42 +2167,7 @@ export function MonetizationTab({
                       value={formData.tierId}
                       onChange={(e) => {
                         const selectedTier = e.target.value;
-                        let newEnts = { ...formData.entitlements, tier: selectedTier as any };
-                        if (selectedTier === "INDIVIDUAL_FULL") {
-                          newEnts = {
-                            ...newEnts,
-                            adPolicy: "NO_ADS",
-                            skipPolicy: "UNLIMITED",
-                            offlineAllowed: true,
-                            offlineMaxTracks: 9999,
-                            maxDevices: 1,
-                            familySharing: false,
-                          };
-                        } else if (selectedTier === "FAMILY") {
-                          newEnts = {
-                            ...newEnts,
-                            adPolicy: "NO_ADS",
-                            skipPolicy: "UNLIMITED",
-                            offlineAllowed: true,
-                            offlineMaxTracks: 9999,
-                            maxDevices: 6,
-                            familySharing: true,
-                            familyMembers: 6,
-                          };
-                        } else if (selectedTier === "INDIVIDUAL_BASIC") {
-                          newEnts = {
-                            ...newEnts,
-                            adPolicy: "DAILY_QUOTA",
-                            adFreeDailyLimit: 15,
-                            adIntervalAfterLimit: 7,
-                            skipPolicy: "LIMITED",
-                            skipDailyLimit: 30,
-                            offlineAllowed: true,
-                            offlineMaxTracks: 50,
-                            maxDevices: 1,
-                            familySharing: false,
-                          };
-                        }
+                        const newEnts = buildEntitlementsFromTier(selectedTier, tiers, formData.entitlements);
                         setFormData({
                           ...formData,
                           tierId: selectedTier,
@@ -2005,9 +2177,18 @@ export function MonetizationTab({
                       }}
                       className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none"
                     >
-                      <option value="INDIVIDUAL_BASIC">INDIVIDUAL_BASIC (Tiết Kiệm)</option>
-                      <option value="INDIVIDUAL_FULL">INDIVIDUAL_FULL (Cá Nhân FULL)</option>
-                      <option value="FAMILY">FAMILY (Gói Gia Đình)</option>
+                      {(tiers.length > 0
+                        ? tiers.filter((t) => t.id !== "FREE" || formData.tierId === "FREE")
+                        : [
+                            { id: "INDIVIDUAL_BASIC", name: "Tiết Kiệm" },
+                            { id: "INDIVIDUAL_FULL", name: "Cá Nhân FULL" },
+                            { id: "FAMILY", name: "Gói Gia Đình" },
+                          ]
+                      ).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.id} ({t.name})
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -2040,16 +2221,22 @@ export function MonetizationTab({
               </div>
             </div>
 
-            {/* Granular Entitlements Configuration Matrix */}
-            <EntitlementsEditor
-              entitlements={formData.entitlements}
-              onChange={(ents) => setFormData((prev) => ({ ...prev, entitlements: ents }))}
+            {/* Read-only Tier Entitlements Inheritance Preview */}
+            <TierInheritedPreview
+              tierId={formData.tierId}
+              entitlements={buildEntitlementsFromTier(formData.tierId, tiers, formData.entitlements)}
               onSyncToBullets={() =>
                 setFormData((prev) => ({
                   ...prev,
-                  featureItems: generateBulletPointsFromEntitlements(prev.entitlements),
+                  featureItems: generateBulletPointsFromEntitlements(
+                    buildEntitlementsFromTier(prev.tierId, tiers, prev.entitlements)
+                  ),
                 }))
               }
+              onNavigateToTiers={() => {
+                setIsCreateModalOpen(false);
+                setActiveSubTab("tiers");
+              }}
             />
 
             {/* Feature items */}

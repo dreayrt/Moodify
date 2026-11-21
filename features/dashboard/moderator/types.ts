@@ -1,3 +1,5 @@
+import type { AgreementDetails } from "@/lib/agreement-details";
+
 export type ModerationStatus = "pending" | "approved" | "rejected" | "needs_revision";
 
 export type ModerationPriority = "urgent" | "high" | "normal";
@@ -63,6 +65,7 @@ export type ModerationTrack = {
   expiryDate?: string;
   licenseStatus?: string;
   licenseDocumentUrl?: string;
+  agreementDetails?: AgreementDetails;
   audioFeatures?: {
     bpm?: number;
     keySignature?: string;

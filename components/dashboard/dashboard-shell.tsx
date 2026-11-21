@@ -42,17 +42,19 @@ import {
   type Playlist,
   type SubscriptionInfo,
 } from "@/lib/api-client";
-import CreatePlaylistModal from "./create-playlist-modal";
+import dynamic from "next/dynamic";
+const CreatePlaylistModal = dynamic(() => import("./create-playlist-modal"));
 import MoodifyMascot from "./moodify-mascot";
-import UserSettingsModal from "./user-settings-modal";
+const UserSettingsModal = dynamic(() => import("./user-settings-modal"));
 import { useCurrentMascot } from "@/lib/mascots";
 import { BrandLogo } from "@/components/shared/logo-mark";
 import { MOBILE_DOWNLOADS } from "@/lib/mobile-downloads";
 import { useVipTheme, NORMAL_THEME } from "@/lib/theme";
 import MoodSearchBar from "./mood-search-bar";
-import UserTourGuide, { triggerUserTour } from "./user-tour-guide";
-import { usePlayer } from "./player-context";
-import { HeroCarousel } from "@/features/home/components/hero-carousel";
+const UserTourGuide = dynamic(() => import("./user-tour-guide"));
+import { triggerUserTour } from "@/lib/user-tour-trigger";
+import { usePlayerState } from "./player-context";
+import AuthDialogLoader from "./auth-dialog-loader";
 
 export type Vibe = {
   id: string;
@@ -356,7 +358,6 @@ function AudioAuraBackdrop({ isPremium = false }: { isPremium?: boolean }) {
           background: isPremium
             ? "radial-gradient(circle, #f59e0b 0%, #d97706 45%, transparent 70%)"
             : "radial-gradient(circle, #6366f1 0%, #a855f7 45%, transparent 70%)",
-          animation: "auraGlowPulse 16s ease-in-out infinite",
         }}
       />
       <div
@@ -365,7 +366,6 @@ function AudioAuraBackdrop({ isPremium = false }: { isPremium?: boolean }) {
           background: isPremium
             ? "radial-gradient(circle, #fbbf24 0%, #b45309 50%, transparent 70%)"
             : "radial-gradient(circle, #ec4899 0%, #3b82f6 50%, transparent 70%)",
-          animation: "auraGlowPulse 20s ease-in-out 3s infinite reverse",
         }}
       />
       <div
@@ -374,7 +374,6 @@ function AudioAuraBackdrop({ isPremium = false }: { isPremium?: boolean }) {
           background: isPremium
             ? "radial-gradient(circle, #f43f5e 0%, #ea580c 50%, transparent 70%)"
             : "radial-gradient(circle, #8b5cf6 0%, #06b6d4 50%, transparent 70%)",
-          animation: "auraGlowPulse 18s ease-in-out 6s infinite",
         }}
       />
 
@@ -517,23 +516,6 @@ function MascotAccountTrigger({
             <Crown className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
             <span>{subInfo?.isPremium ? "Quản lý gói dịch vụ" : "Gói Moodify VIP"}</span>
           </Link>
-
-          {/* Admin Console Quick Link */}
-          {user?.role === "ADMIN" && (
-            <Link
-              href="/dashboard/admin"
-              onClick={() => setOpen(false)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 transition-all group"
-            >
-              <div className="flex items-center gap-2.5">
-                <Shield className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>Bảng Quản Trị Hệ Thống</span>
-              </div>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-200">
-                ADMIN
-              </span>
-            </Link>
-          )}
 
           {/* Content Lead Studio Quick Link */}
           {(user?.role === "CONTENT_LEAD" || user?.role === "ARTIST") && (
@@ -851,7 +833,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isPlayerBarHidden } = usePlayer();
+  const { isPlayerBarHidden } = usePlayerState();
 
   const currentVibe = searchParams.get("vibe") || "all";
   const activeVibeObj = VIBES.find((v) => v.id === currentVibe) ?? VIBES[0];
@@ -914,37 +896,46 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    let generation = 0;
+    let mounted = true;
+    const loadSession = async () => {
+      const request = ++generation;
+      const current = () => mounted && request === generation;
       try {
         const token = await getValidAccessToken();
-        if (token) {
-          const profile = await getCurrentUser(token);
-          if (!cancelled) {
-            setUser(profile);
-            setUserLoading(false);
-          }
-          const pl = await fetchUserPlaylists().catch(() => []);
-          if (!cancelled) {
-            setUserPlaylists(pl);
-          }
-          const sub = await fetchMySubscription().catch(() => null);
-          if (!cancelled) {
-            setSubInfo(sub);
-          }
-          // Tự động đồng bộ và liên kết thiết bị hiện tại vào hệ thống quản lý thiết bị
-          void registerCurrentDevice();
-        } else {
-          if (!cancelled) setUserLoading(false);
+        if (!current()) return;
+        if (!token) {
+          setUser(null); setUserPlaylists([]); setSubInfo(null); setUserLoading(false);
+          return;
         }
+        await Promise.all([
+          getCurrentUser(token).then((profile) => { if (current()) setUser(profile); }),
+          fetchUserPlaylists().then((list) => { if (current()) setUserPlaylists(list); }).catch(() => {}),
+          fetchMySubscription().then((sub) => { if (current()) setSubInfo(sub); }).catch(() => {}),
+        ]);
+        if (current()) void registerCurrentDevice();
       } catch {
-        if (!cancelled) setUserLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
+        // Keep the last known session during a temporary network failure.
+      } finally { if (current()) setUserLoading(false); }
     };
-  }, [pathname]);
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === "moodify.auth.session") void loadSession();
+    };
+    void loadSession();
+    window.addEventListener("moodify-auth-changed", loadSession);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      mounted = false;
+      window.removeEventListener("moodify-auth-changed", loadSession);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user?.role?.trim().toUpperCase() === "ADMIN") {
+      router.replace("/dashboard/admin");
+    }
+  }, [user, router]);
 
   // Listen for global playlist changes and subscription changes
   useEffect(() => {
@@ -1060,6 +1051,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     : isPre
     ? "text-[#edd087]"
     : "text-white/70 group-hover:text-white";
+
+  if (user?.role?.trim().toUpperCase() === "ADMIN") {
+    return null;
+  }
 
   return (
     <div className="relative w-full min-h-screen overflow-x-clip bg-black text-white">
@@ -1415,24 +1410,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Management Consoles (for ADMIN / CONTENT_LEAD / MODERATOR) */}
-            {user?.role === "ADMIN" && (
-              <div className="pt-2 border-t border-white/[0.08]">
-                <Link
-                  href="/dashboard/admin"
-                  className="w-full group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/35 transition-all shadow-sm"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Shield className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                    <span>Quản Trị Admin</span>
-                  </div>
-                  <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-200">
-                    CONSOLE
-                  </span>
-                </Link>
-              </div>
-            )}
-
+            {/* Management Consoles (for CONTENT_LEAD / MODERATOR) */}
             {(user?.role === "CONTENT_LEAD" || user?.role === "ARTIST") && (
               <div className="pt-2 border-t border-white/[0.08]">
                 <Link
@@ -1527,8 +1505,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
       {/* Global Create Playlist Modal */}
       {!userLoading && !user ? (
-        <HeroCarousel
-          authOnly
+        <AuthDialogLoader
           onAuthenticated={(authenticatedUser) => {
             setUser(authenticatedUser);
             setUserLoading(false);
@@ -1539,23 +1516,23 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         />
       ) : null}
 
-      <CreatePlaylistModal
+      {isCreateOpen && <CreatePlaylistModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreated={handlePlaylistCreated}
-      />
+      />}
 
       {/* User Settings & Mascot Switcher Modal */}
-      <UserSettingsModal
+      {isSettingsOpen && <UserSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         user={user}
         isPremium={Boolean(subInfo?.isPremium)}
         onProfileUpdated={(updated) => setUser(updated)}
-      />
+      />}
 
       {/* Onboarding Tutorial Tour for Role = USER */}
-      <UserTourGuide user={user} userLoading={userLoading} />
+      {user && !userLoading && <UserTourGuide user={user} userLoading={userLoading} />}
     </div>
   );
 }

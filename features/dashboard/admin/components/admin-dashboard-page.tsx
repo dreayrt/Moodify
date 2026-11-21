@@ -1,57 +1,45 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
-  BarChart3,
   CheckCircle2,
-  ChevronRight,
   DollarSign,
   Heart,
-  Headphones,
   HelpCircle,
-  Key,
   Layers,
   LayoutDashboard,
   LogOut,
   Megaphone,
-  Music2,
-  Radio,
-  Search,
-  Server,
-  Shield,
+  RefreshCw,
   ShieldAlert,
-  ShieldCheck,
-  Star,
+  Sparkles,
   Users,
   XCircle,
 } from "lucide-react";
 
+import "./admin-layout.css";
 import { BrandLogo } from "@/components/shared/logo-mark";
 import {
   clearAuthSession,
   getCurrentUser,
-  getStoredAuthSession,
   getValidAccessToken,
   logoutAndRedirect,
+  pingDeviceStatus,
+  registerCurrentDevice,
   type UserProfileResponse,
 } from "@/lib/auth/auth-client";
 import {
-  fetchAdminCatalog,
   fetchAdminPackages,
   fetchAdminTransactions,
+  fetchAdminRevenueStats,
   fetchAdminSubscriptions,
   cancelAdminSubscription,
   fetchAdminUsers,
   fetchAdminOverview,
   fetchAdminAuditLogs,
   type AdminOverviewResponse,
-  takedownAdminTrack,
-  restoreAdminTrack,
-  updateAdminTrackGenre,
-  deleteAdminTrack,
   updateAdminPackagePrice,
   updateAdminUserRole,
   updateAdminUserStatus,
@@ -63,86 +51,74 @@ import {
   createAdminUser,
   updateAdminUserProfile,
   revokeAdminDevice,
-  fetchAdminModerationQueue,
-  fetchAdminReviewActions,
-  submitAdminReviewDecision,
-  fetchAdminLicensing,
-  createAdminDistributor,
-  updateAdminDistributor,
-  toggleAdminDistributorStatus,
-  createAdminContract,
-  updateAdminContract,
-  updateAdminContractStatus,
+  revokeAllAdminUserDevices,
 } from "@/lib/api/admin-client";
 import {
   AdminTab,
+  AdminPreviewTrack,
+  AdminRevenueStats,
   AdminToast,
   AdminUser,
   AdminUserRole,
   AdminUserStatus,
   AdminUserSubscription,
-  CatalogTrack,
-  DistributionContract,
-  Distributor,
   PaymentTransaction,
-  ReviewAction,
-  ReviewRequest,
   ServicePackage,
-  SongLicense,
   SystemAuditLog,
   UserDevice,
 } from "../types";
 
 import { OverviewTab } from "./overview-tab";
 import { UsersManagementTab } from "./users-management-tab";
-import { CatalogManagementTab } from "./catalog-management-tab";
 import { FavoritesManagementTab } from "./favorites-management-tab";
-import { ListeningHistoryTab } from "./listening-history-tab";
-import { ModerationTab } from "./moderation-tab";
 import { MonetizationTab } from "./monetization-tab";
-import { LicensingTab } from "./licensing-tab";
 import { NotificationsTab } from "./notifications-tab";
 import { KaraokeResourcesTab } from "./karaoke-resources-tab";
+import { RecommendationsCurationTab } from "./recommendations-curation-tab";
 import { AdminAudioPlayerDock } from "./shared/admin-audio-player-dock";
 
-const HOME_ROUTE = "/dashboard";
 const USER_DASHBOARD_ROUTE = "/dashboard/user";
 const CONTENT_LEAD_DASHBOARD_ROUTE = "/dashboard/content-lead";
-const ARTIST_DASHBOARD_ROUTE = "/dashboard/content-lead";
 
-export default function AdminDashboardPage() {
+export default function AdminDashboardPage({
+  initialTab = "overview",
+}: {
+  initialTab?: AdminTab;
+}) {
   const router = useRouter();
 
   // Auth & Guard State
   const [authState, setAuthState] = useState<"checking" | "allowed" | "denied">("checking");
   const [currentAdmin, setCurrentAdmin] = useState<UserProfileResponse | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const isForcingLogoutRef = useRef(false);
 
   // Active Core Tab
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
-  // Domain States (100% Real Database, khởi tạo mảng rỗng thay vì mock data)
+  // Data loaded from the administrative API.
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [devices, setDevices] = useState<UserDevice[]>([]);
-  const [tracks, setTracks] = useState<CatalogTrack[]>([]);
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
-  const [reviews, setReviews] = useState<ReviewRequest[]>([]);
-  const [reviewActions, setReviewActions] = useState<ReviewAction[]>([]);
-  const [distributors, setDistributors] = useState<Distributor[]>([]);
-  const [contracts, setContracts] = useState<DistributionContract[]>([]);
-  const [licenses, setLicenses] = useState<SongLicense[]>([]);
   const [subscriptions, setSubscriptions] = useState<AdminUserSubscription[]>([]);
+  const [revenueDays, setRevenueDays] = useState<7 | 30 | 90>(30);
+  const [revenueStats, setRevenueStats] = useState<AdminRevenueStats | null>(null);
+  const [loadingRevenueStats, setLoadingRevenueStats] = useState(false);
+
   // Nhật ký hành chính: bản ghi thật từ backend + bản ghi của phiên làm việc hiện tại
   const [backendAuditLogs, setBackendAuditLogs] = useState<SystemAuditLog[]>([]);
   const [sessionAuditLogs, setSessionAuditLogs] = useState<SystemAuditLog[]>([]);
   const [overviewData, setOverviewData] = useState<AdminOverviewResponse | null>(null);
 
   // Global Audio Preview Player state
-  const [previewTrack, setPreviewTrack] = useState<CatalogTrack | null>(null);
+  const [previewTrack, setPreviewTrack] = useState<AdminPreviewTrack | null>(null);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
 
-  const handleTogglePreviewTrack = (track: CatalogTrack) => {
+  const handleTogglePreviewTrack = (track: AdminPreviewTrack) => {
     // Synchronously unlock Web Audio context on user gesture
     if (typeof window !== "undefined") {
       try {
@@ -165,7 +141,8 @@ export default function AdminDashboardPage() {
   };
 
   // Live Database Sync States
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [dataErrors, setDataErrors] = useState<string[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
   const [dbStatus, setDbStatus] = useState<"connected" | "connecting" | "error">("connecting");
 
@@ -228,42 +205,56 @@ export default function AdminDashboardPage() {
   };
 
   // ================= LOAD REAL DATA FROM DB =================
-  const loadRealData = async (silent = false) => {
+  const loadRealData = async (silent = false, daysParam: 7 | 30 | 90 = revenueDays) => {
     setIsLoadingData(true);
     setDbStatus("connecting");
     try {
       const [
         usersRes,
-        catalogRes,
         packagesRes,
         transactionsRes,
-        moderationRes,
-        actionsRes,
-        licensingRes,
+        revenueStatsRes,
         overviewRes,
         auditRes,
         subscriptionsRes,
       ] = await Promise.allSettled([
         fetchAdminUsers(),
-        fetchAdminCatalog(),
         fetchAdminPackages(),
         fetchAdminTransactions(),
-        fetchAdminModerationQueue(),
-        fetchAdminReviewActions(),
-        fetchAdminLicensing(),
+        fetchAdminRevenueStats(daysParam),
         fetchAdminOverview(),
         fetchAdminAuditLogs(),
         fetchAdminSubscriptions(),
       ]);
 
+      const results = [
+        usersRes,
+        packagesRes,
+        transactionsRes,
+        revenueStatsRes,
+        overviewRes,
+        auditRes,
+        subscriptionsRes,
+      ];
+      const labels = [
+        "Người dùng",
+        "Gói dịch vụ",
+        "Giao dịch",
+        "Thống kê doanh thu",
+        "Tổng quan",
+        "Nhật ký",
+        "Đăng ký gói",
+      ];
+      const failures = results.flatMap((result, index) =>
+        result.status === "rejected"
+          ? [`${labels[index]}: ${result.reason instanceof Error ? result.reason.message : "Không tải được dữ liệu"}`]
+          : []
+      );
+      setDataErrors(failures);
       let successCount = 0;
 
       if (usersRes.status === "fulfilled" && Array.isArray(usersRes.value)) {
         setUsers(usersRes.value);
-        successCount++;
-      }
-      if (catalogRes.status === "fulfilled" && Array.isArray(catalogRes.value)) {
-        setTracks(catalogRes.value);
         successCount++;
       }
       if (packagesRes.status === "fulfilled" && Array.isArray(packagesRes.value)) {
@@ -274,32 +265,16 @@ export default function AdminDashboardPage() {
         setTransactions(transactionsRes.value);
         successCount++;
       }
+      if (revenueStatsRes.status === "fulfilled" && revenueStatsRes.value) {
+        setRevenueStats(revenueStatsRes.value);
+        successCount++;
+      }
       if (subscriptionsRes.status === "fulfilled" && Array.isArray(subscriptionsRes.value)) {
         setSubscriptions(subscriptionsRes.value);
         successCount++;
       }
-      if (moderationRes.status === "fulfilled" && Array.isArray(moderationRes.value)) {
-        setReviews(moderationRes.value);
-        successCount++;
-      }
-      if (actionsRes.status === "fulfilled" && Array.isArray(actionsRes.value)) {
-        setReviewActions(actionsRes.value);
-        successCount++;
-      }
       if (overviewRes.status === "fulfilled" && overviewRes.value) {
         setOverviewData(overviewRes.value);
-        successCount++;
-      }
-      if (licensingRes.status === "fulfilled" && licensingRes.value) {
-        if (Array.isArray(licensingRes.value.distributors)) {
-          setDistributors(licensingRes.value.distributors);
-        }
-        if (Array.isArray(licensingRes.value.contracts)) {
-          setContracts(licensingRes.value.contracts);
-        }
-        if (Array.isArray(licensingRes.value.licenses)) {
-          setLicenses(licensingRes.value.licenses);
-        }
         successCount++;
       }
       if (auditRes.status === "fulfilled" && Array.isArray(auditRes.value)) {
@@ -308,7 +283,6 @@ export default function AdminDashboardPage() {
           if (action.includes("ROLE") || action.includes("BAN") || action.includes("USER") || action.includes("PASSWORD")) return "IAM";
           if (action.includes("TRACK") || action.includes("CATALOG")) return "CATALOG";
           if (action.includes("PACKAGE") || action.includes("REFUND") || action.includes("PAYMENT")) return "BILLING";
-          if (action.includes("MODERATION") || action.includes("REVIEW")) return "MODERATION";
           if (action.includes("DEVICE") || action.includes("TOKEN")) return "SECURITY";
           return "SYSTEM";
         };
@@ -333,11 +307,11 @@ export default function AdminDashboardPage() {
         second: "2-digit",
       }).format(new Date());
 
-      if (successCount > 0) {
+      if (successCount > 0 && failures.length === 0) {
         setDbStatus("connected");
         setLastSyncTime(syncStr);
         if (!silent) {
-          addToast(`Đã đồng bộ trực tiếp dữ liệu quản trị hệ thống (${users.length} người dùng, ${tracks.length} bài hát).`, "success");
+          addToast("Đã cập nhật dữ liệu quản trị từ máy chủ.", "success");
         }
       } else {
         setDbStatus("error");
@@ -389,11 +363,12 @@ export default function AdminDashboardPage() {
 
         setCurrentAdmin(profile);
         setAuthState("allowed");
+        void registerCurrentDevice();
         void loadRealData(true);
       } catch (err) {
         console.warn("Admin Guard error:", err);
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+        if (msg.includes("401") || msg.toLowerCase().includes("unauthorized") || msg.includes("DEVICE_REVOKED")) {
           clearAuthSession();
         }
         if (!cancelled) setAuthState("denied");
@@ -406,6 +381,67 @@ export default function AdminDashboardPage() {
       cancelled = true;
     };
   }, [router]);
+
+  const forceAdminSignOut = useCallback((message?: string) => {
+    if (isForcingLogoutRef.current) return;
+    isForcingLogoutRef.current = true;
+    if (message) {
+      addToast(message, "warning");
+    }
+    logoutAndRedirect();
+  }, []);
+
+  useEffect(() => {
+    if (authState !== "allowed") return;
+
+    const handleSessionInvalidated = (event: Event) => {
+      const detail = (event as CustomEvent<{ reason?: string; message?: string }>).detail;
+      forceAdminSignOut(detail?.message || "Phiên đăng nhập quản trị đã hết hạn hoặc bị thu hồi.");
+    };
+
+    const handleDeviceRevoked = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      forceAdminSignOut(detail?.message || "Phiên quản trị trên thiết bị này đã bị thu hồi.");
+    };
+
+    window.addEventListener("moodify:admin-session-invalidated", handleSessionInvalidated);
+    window.addEventListener("moodify:device-revoked", handleDeviceRevoked);
+
+    const heartbeatTimer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void pingDeviceStatus()
+        .then((res) => {
+          if (res && res.active === false) {
+            forceAdminSignOut("Phiên đăng nhập quản trị trên thiết bị này đã bị thu hồi.");
+          }
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("DEVICE_REVOKED") || msg.includes("401")) {
+            forceAdminSignOut(msg);
+          }
+        });
+    }, 30_000);
+
+    return () => {
+      window.removeEventListener("moodify:admin-session-invalidated", handleSessionInvalidated);
+      window.removeEventListener("moodify:device-revoked", handleDeviceRevoked);
+      clearInterval(heartbeatTimer);
+    };
+  }, [authState, forceAdminSignOut]);
+
+  const handleRevenueDaysChange = async (days: 7 | 30 | 90) => {
+    setRevenueDays(days);
+    setLoadingRevenueStats(true);
+    try {
+      const stats = await fetchAdminRevenueStats(days);
+      setRevenueStats(stats);
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : "Không tải được thống kê doanh thu.", "error");
+    } finally {
+      setLoadingRevenueStats(false);
+    }
+  };
 
   // Logout Handler
   const handleLogout = () => {
@@ -424,12 +460,12 @@ export default function AdminDashboardPage() {
       setUsers((prev) =>
         prev.map((u) =>
           u.id === userId
-            ? { ...u, status: "BANNED", banReason: reason, bannedUntil: duration }
+            ? { ...u, status: "BANNED", banReason: reason, bannedUntil: duration, devicesCount: 0 }
             : u
         )
       );
-      recordAudit("BAN_USER", `@${target?.username}`, `Khóa tài khoản: ${reason} (Thời hạn: ${duration})`, "IAM", "critical");
-      addToast(`Đã khóa tài khoản "${target?.username}" thành công.`, "warning");
+      recordAudit("BAN_USER", `@${target?.username}`, `Khóa tài khoản: ${reason}`, "IAM", "critical");
+      addToast(`Đã khóa tài khoản "${target?.username}" và thu hồi toàn bộ phiên đăng nhập.`, "warning");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi khóa tài khoản: ${msg}`, "error");
@@ -463,20 +499,25 @@ export default function AdminDashboardPage() {
     const target = users.find((u) => u.id === userId);
     try {
       await updateAdminUserRole(userId, newRole, extra);
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId
-            ? {
-                ...u,
-                role: newRole,
-                staffCode: extra?.staffCode || u.staffCode,
-                artistSpotifyId: extra?.artistSpotifyId || u.artistSpotifyId,
-              }
-            : u
-        )
-      );
+      const freshUsers = await fetchAdminUsers().catch(() => null);
+      if (Array.isArray(freshUsers)) {
+        setUsers(freshUsers);
+      } else {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === userId
+              ? {
+                  ...u,
+                  role: newRole,
+                  artistSpotifyId: extra?.artistSpotifyId || u.artistSpotifyId,
+                  devicesCount: 0,
+                }
+              : u
+          )
+        );
+      }
       recordAudit("CHANGE_ROLE", `@${target?.username}`, `Chuyển vai trò từ ${target?.role} sang ${newRole}`, "IAM", "info");
-      addToast(`Đã cập nhật vai trò của "${target?.username}" thành ${newRole} thành công.`, "success");
+      addToast(`Đã cập nhật vai trò của "${target?.username}" thành ${newRole} và làm mới phiên đăng nhập.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi đổi vai trò: ${msg}`, "error");
@@ -489,72 +530,31 @@ export default function AdminDashboardPage() {
       setDevices((prev) =>
         prev.map((d) => (d.id === deviceId ? { ...d, status: "REVOKED" } : d))
       );
-      recordAudit("REVOKE_DEVICE", `DEV-ID-${deviceId}`, "Thu hồi quyền nghe offline của thiết bị", "SECURITY", "warning");
-      addToast("Đã thu hồi quyền thiết bị offline thành công.", "info");
+      const freshUsers = await fetchAdminUsers().catch(() => null);
+      if (Array.isArray(freshUsers)) setUsers(freshUsers);
+      recordAudit("REVOKE_DEVICE", `DEV-ID-${deviceId}`, "Thu hồi quyền truy cập của thiết bị", "SECURITY", "warning");
+      addToast("Đã thu hồi phiên thiết bị thành công.", "info");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi thu hồi thiết bị: ${msg}`, "error");
     }
   };
 
-  // 2. Catalog Actions
-  const handleTakedownTrack = async (trackId: string, reason: string) => {
-    const target = tracks.find((t) => t.id === trackId);
+  const handleRevokeAllUserDevices = async (userId: number) => {
     try {
-      await takedownAdminTrack(trackId);
-      setTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, status: "taken_down" } : t))
-      );
-      recordAudit("TAKEDOWN_TRACK", target?.title || trackId, `Cưỡng chế gỡ bỏ khỏi sàn: ${reason}`, "CATALOG", "critical");
-      addToast(`Đã cưỡng chế gỡ bài hát "${target?.title}" khỏi kho nhạc hệ thống.`, "error");
+      const res = await revokeAllAdminUserDevices(userId);
+      const freshUsers = await fetchAdminUsers().catch(() => null);
+      if (Array.isArray(freshUsers)) setUsers(freshUsers);
+      setDevices((prev) => prev.map((d) => (d.userId === userId ? { ...d, status: "REVOKED" } : d)));
+      recordAudit("REVOKE_ALL_DEVICES", `User #${userId}`, res.message || "Thu hồi tất cả phiên đăng nhập", "SECURITY", "warning");
+      addToast(res.message || "Đã thu hồi toàn bộ phiên đăng nhập đang hoạt động.", "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi gỡ bài hát: ${msg}`, "error");
+      addToast(`Lỗi khi thu hồi phiên đăng nhập: ${msg}`, "error");
     }
   };
 
-  const handleRestoreTrack = async (trackId: string) => {
-    const target = tracks.find((t) => t.id === trackId);
-    try {
-      await restoreAdminTrack(trackId);
-      setTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, status: "published" } : t))
-      );
-      recordAudit("RESTORE_TRACK", target?.title || trackId, "Khôi phục phát sóng / Public lại bài hát lên toàn sàn", "CATALOG", "info");
-      addToast(`Đã khôi phục phát sóng bài hát "${target?.title || trackId}" thành công.`, "success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi khôi phục bài hát: ${msg}`, "error");
-    }
-  };
-
-  const handleDeleteTrack = async (trackId: string) => {
-    const target = tracks.find((t) => t.id === trackId);
-    try {
-      await deleteAdminTrack(trackId);
-      setTracks((prev) => prev.filter((t) => t.id !== trackId));
-      recordAudit("DELETE_TRACK", target?.title || trackId, "Xóa vĩnh viễn bài hát khỏi danh mục hệ thống và MongoDB", "CATALOG", "critical");
-      addToast(`Đã xóa vĩnh viễn bài hát "${target?.title || trackId}" khỏi hệ thống thành công.`, "warning");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi xóa bài hát";
-      addToast(msg, "error");
-    }
-  };
-
-  const handleChangeTrackGenre = async (trackId: string, newGenre: string) => {
-    const target = tracks.find((t) => t.id === trackId);
-    try {
-      await updateAdminTrackGenre(trackId, newGenre);
-      setTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, genre: newGenre } : t))
-      );
-      recordAudit("UPDATE_TRACK_GENRE", target?.title || trackId, `Cập nhật thể loại bài hát thành ${newGenre} trong MongoDB`, "CATALOG", "info");
-      addToast(`Đã cập nhật thể loại bài hát "${target?.title || trackId}" thành "${newGenre}".`, "success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi đổi thể loại";
-      addToast(msg, "error");
-    }
-  };
+  // 2. Monetization Actions
 
   const handleTogglePackageStatus = async (packageId: number) => {
     try {
@@ -573,6 +573,7 @@ export default function AdminDashboardPage() {
       }
       recordAudit("TOGGLE_PACKAGE", `PKG-00${packageId}`, "Bật/Tắt trạng thái hoạt động của gói cước", "BILLING", "info");
       addToast("Đã thay đổi trạng thái kích hoạt gói dịch vụ thành công.", "success");
+      void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi đổi trạng thái gói cước: ${msg}`, "error");
@@ -603,6 +604,7 @@ export default function AdminDashboardPage() {
       );
       recordAudit("CANCEL_SUBSCRIPTION", `SUB-00${subscriptionId}`, "Hủy gói thuê bao người dùng", "BILLING", "warning");
       addToast(`Đã hủy gói thuê bao #${subscriptionId} thành công.`, "success");
+      void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi hủy gói: ${msg}`, "error");
@@ -618,6 +620,7 @@ export default function AdminDashboardPage() {
       }
       recordAudit("CREATE_PACKAGE", data.name || "Gói Cước Mới", `Tạo gói cước mới với giá ${Number(data.price || 0).toLocaleString()} đ`, "BILLING", "info");
       addToast(`Đã tạo gói cước "${data.name || "mới"}" thành công vào cơ sở dữ liệu.`, "success");
+      void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi tạo gói cước: ${msg}`, "error");
@@ -633,6 +636,7 @@ export default function AdminDashboardPage() {
       }
       recordAudit("UPDATE_PACKAGE", `PKG-00${packageId}`, `Cập nhật toàn diện thông tin và quyền lợi gói cước`, "BILLING", "info");
       addToast("Đã cập nhật chi tiết gói cước thành công vào cơ sở dữ liệu.", "success");
+      void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi cập nhật gói cước: ${msg}`, "error");
@@ -651,6 +655,7 @@ export default function AdminDashboardPage() {
       }
       recordAudit("DELETE_PACKAGE", target?.name || `PKG-00${packageId}`, "Xóa / vô hiệu hóa gói cước khỏi hệ thống", "BILLING", "warning");
       addToast(`Đã xóa gói cước "${target?.name || packageId}" thành công khỏi cơ sở dữ liệu.`, "info");
+      void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi xóa gói cước: ${msg}`, "error");
@@ -665,7 +670,7 @@ export default function AdminDashboardPage() {
     role: AdminUserRole;
     status: AdminUserStatus;
     password?: string;
-  }) => {
+  }): Promise<{ ok: boolean; error?: string }> => {
     try {
       await createAdminUser(data);
       const realUsers = await fetchAdminUsers();
@@ -674,16 +679,18 @@ export default function AdminDashboardPage() {
       }
       recordAudit("CREATE_USER", `@${data.username}`, `Tạo người dùng mới với vai trò ${data.role}`, "IAM", "info");
       addToast(`Đã tạo người dùng "${data.fullName}" thành công vào cơ sở dữ liệu.`, "success");
+      return { ok: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi tạo người dùng: ${msg}`, "error");
+      return { ok: false, error: msg };
     }
   };
 
   const handleUpdateUserProfile = async (
     userId: number,
     data: { fullName?: string; email?: string; phone?: string }
-  ) => {
+  ): Promise<{ ok: boolean; error?: string }> => {
     try {
       await updateAdminUserProfile(userId, data);
       const realUsers = await fetchAdminUsers();
@@ -696,18 +703,22 @@ export default function AdminDashboardPage() {
       }
       recordAudit("UPDATE_USER_PROFILE", `User #${userId}`, "Cập nhật thông tin hồ sơ người dùng", "IAM", "info");
       addToast("Đã cập nhật thông tin người dùng thành công vào cơ sở dữ liệu.", "success");
+      return { ok: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi cập nhật thông tin người dùng: ${msg}`, "error");
+      return { ok: false, error: msg };
     }
   };
 
-  const handleResetUserPassword = async (userId: number) => {
+  const handleResetUserPassword = async (userId: number): Promise<string | null> => {
     const target = users.find((u) => u.id === userId);
     try {
       const res = await resetAdminUserPassword(userId);
       const tempPassword =
         "tempPassword" in res && typeof res.tempPassword === "string" ? res.tempPassword : "";
+      const freshUsers = await fetchAdminUsers().catch(() => null);
+      if (Array.isArray(freshUsers)) setUsers(freshUsers);
       recordAudit(
         "RESET_PASSWORD",
         target?.fullName || `User #${userId}`,
@@ -717,120 +728,15 @@ export default function AdminDashboardPage() {
       );
       addToast(
         tempPassword
-          ? `Đã đặt lại mật khẩu cho "${target?.fullName}". Mật khẩu tạm: ${tempPassword} (vui lòng ghi lại và chia sẻ cho người dùng).`
+          ? `Đã đặt lại mật khẩu tạm cho "${target?.fullName}" và thu hồi các phiên cũ.`
           : `Đã đặt lại mật khẩu cho "${target?.fullName}" thành công.`,
         "success"
       );
+      return tempPassword || null;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi đặt lại mật khẩu: ${msg}`, "error");
-    }
-  };
-
-  // 4. Licensing Real Actions
-
-  const handleCreateDistributor = async (data: Partial<Distributor>) => {
-    try {
-      await createAdminDistributor(data);
-      const licRes = await fetchAdminLicensing();
-      if (licRes?.distributors) setDistributors(licRes.distributors);
-      addToast("Đã thêm nhà phân phối đối tác mới thành công.", "success");
-      recordAudit("CREATE_DISTRIBUTOR", data.companyName || "Đối tác", "Tạo đối tác phân phối mới", "SYSTEM", "info");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi thêm nhà phân phối";
-      addToast(msg, "error");
-    }
-  };
-
-  const handleToggleDistributorStatus = async (distributorId: number) => {
-    try {
-      await toggleAdminDistributorStatus(distributorId);
-      const licRes = await fetchAdminLicensing();
-      if (licRes?.distributors) setDistributors(licRes.distributors);
-      addToast("Đã cập nhật trạng thái nhà phân phối thành công.", "success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi cập nhật trạng thái";
-      addToast(msg, "error");
-    }
-  };
-
-  const handleCreateContract = async (data: Partial<DistributionContract>) => {
-    try {
-      await createAdminContract(data);
-      const licRes = await fetchAdminLicensing();
-      if (licRes?.contracts) setContracts(licRes.contracts);
-      addToast("Đã ký hợp đồng phân phối mới thành công.", "success");
-      recordAudit("CREATE_CONTRACT", data.contractCode || "Hợp đồng", "Lập hợp đồng phân phối mới", "SYSTEM", "info");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi tạo hợp đồng";
-      addToast(msg, "error");
-    }
-  };
-
-  const handleToggleContractStatus = async (contractId: number, status: string) => {
-    try {
-      await updateAdminContractStatus(contractId, status);
-      const licRes = await fetchAdminLicensing();
-      if (licRes?.contracts) setContracts(licRes.contracts);
-      addToast("Đã cập nhật trạng thái hợp đồng thành công.", "success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi cập nhật hợp đồng";
-      addToast(msg, "error");
-    }
-  };
-
-  // 5. Moderation Actions
-  const handleApproveReview = async (requestId: number) => {
-    try {
-      await submitAdminReviewDecision(requestId, "APPROVE");
-      setReviews((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status: "APPROVED" } : r))
-      );
-      try {
-        const freshActions = await fetchAdminReviewActions();
-        if (Array.isArray(freshActions)) setReviewActions(freshActions);
-      } catch {}
-      recordAudit("APPROVE_TRACK", `Yêu cầu #${requestId}`, "Phê duyệt phát hành bài hát/album mới", "MODERATION", "info");
-      addToast("Đã phê duyệt xuất bản tác phẩm thành công.", "success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi phê duyệt: ${msg}`, "error");
-    }
-  };
-
-  const handleRejectReview = async (requestId: number, reason: string) => {
-    try {
-      await submitAdminReviewDecision(requestId, "REJECT", reason);
-      setReviews((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status: "REJECTED" } : r))
-      );
-      try {
-        const freshActions = await fetchAdminReviewActions();
-        if (Array.isArray(freshActions)) setReviewActions(freshActions);
-      } catch {}
-      recordAudit("REJECT_TRACK", `Yêu cầu #${requestId}`, `Từ chối phát hành: ${reason}`, "MODERATION", "warning");
-      addToast("Đã từ chối tác phẩm.", "warning");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi từ chối: ${msg}`, "error");
-    }
-  };
-
-  const handleReturnReview = async (requestId: number, reason: string) => {
-    try {
-      await submitAdminReviewDecision(requestId, "RETURN_FOR_EDIT", reason);
-      setReviews((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status: "IN_REVIEW" } : r))
-      );
-      try {
-        const freshActions = await fetchAdminReviewActions();
-        if (Array.isArray(freshActions)) setReviewActions(freshActions);
-      } catch {}
-      recordAudit("RETURN_TRACK", `Yêu cầu #${requestId}`, `Yêu cầu chỉnh sửa: ${reason}`, "MODERATION", "info");
-      addToast("Đã gửi yêu cầu chỉnh sửa cho nghệ sĩ.", "info");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi gửi yêu cầu sửa: ${msg}`, "error");
+      return null;
     }
   };
 
@@ -863,42 +769,36 @@ export default function AdminDashboardPage() {
           >
             Về Trang Nghe Nhạc
           </Link>
-          <Link
-            href={HOME_ROUTE}
-            className="rounded-xl bg-[#ff5500] px-5 py-2.5 text-[13px] font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:brightness-110 transition active:scale-[0.98]"
-          >
-            Về Trang Chủ
-          </Link>
         </div>
       </div>
     );
   }
 
-  // ================= 8 CORE ADMIN TABS =================
-  const pendingModerationCount = reviews.filter((r) => r.status === "PENDING" || r.status === "IN_REVIEW").length;
-
+  // ================= 7 CORE ADMIN TABS =================
   const CORE_ADMIN_TABS: { key: AdminTab; label: string; count?: number; icon: React.ComponentType<{ className?: string }> }[] = [
     { key: "overview", label: "Tổng Quan", icon: LayoutDashboard },
     { key: "users", label: "Người Dùng", count: users.length, icon: Users },
     { key: "monetization", label: "Gói Dịch Vụ", count: packages.length, icon: DollarSign },
-    { key: "catalog", label: "Bài Hát", count: tracks.length, icon: Music2 },
+    { key: "recommendations", label: "Tuyển Chọn Âm Nhạc", icon: Sparkles },
     { key: "karaoke-resources", label: "Tài Nguyên Karaoke", icon: Layers },
     { key: "favorites", label: "Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
-    { key: "history", label: "Lịch Sử Nghe", icon: Headphones },
-    { key: "moderation", label: "Kiểm Duyệt", count: pendingModerationCount, icon: ShieldCheck },
-    { key: "licensing", label: "Bản Quyền", count: contracts.length, icon: Key },
     { key: "notifications", label: "Thông Báo", icon: Megaphone },
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#0e0f14] text-white font-sans flex antialiased">
+    <div className="admin-workspace min-h-screen w-full bg-[#0e0f14] text-white font-sans flex flex-col md:flex-row antialiased">
       {/* ================= LEFT SIDEBAR NAVIGATION ================= */}
-      <aside className="w-64 shrink-0 border-r border-[#222432] bg-[#12131a] flex flex-col justify-between sticky top-0 h-screen z-30 select-none">
-        {/* Top: Brand Logo & Station Badge */}
+      <aside className="admin-sidebar w-full md:w-56 xl:w-64 shrink-0 border-r border-[#222432] bg-[#12131a] flex flex-col justify-between md:sticky top-0 md:h-screen z-30 select-none">
+        {/* Top: Brand Logo (confined inside Admin Console) */}
         <div className="p-5 border-b border-[#222432]">
-          <Link href={HOME_ROUTE} className="flex items-center gap-2 group">
+          <button
+            type="button"
+            onClick={() => setActiveTab("overview")}
+            className="flex items-center gap-2 group cursor-pointer"
+            title="Về Tổng quan quản trị"
+          >
             <BrandLogo variant="horizontal-dark" className="h-7 w-auto transition-transform group-hover:scale-[1.02]" />
-          </Link>
+          </button>
         </div>
 
         {/* Middle: Navigation Tabs List */}
@@ -973,7 +873,7 @@ export default function AdminDashboardPage() {
       {/* ================= RIGHT MAIN WORKSPACE ================= */}
       <div className="flex-1 min-w-0 min-h-screen flex flex-col z-10 bg-[#0e0f14]">
         {/* Top Navbar */}
-        <header className="h-14 px-6 border-b border-[#222432] bg-[#12131a]/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
+        <header className="min-h-14 gap-3 flex-wrap py-3 px-4 sm:px-6 border-b border-[#222432] bg-[#12131a]/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 font-mono text-xs">
               <span className="text-zinc-500">Moodify Operations</span>
@@ -985,23 +885,63 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/user"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#222432] bg-[#171822] text-xs font-semibold text-zinc-300 hover:text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"
-              title="Mở giao diện nghe nhạc dành cho người dùng"
+            <span
+              className={`hidden sm:inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-mono ${
+                dbStatus === "connected"
+                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                  : dbStatus === "connecting"
+                  ? "border-amber-500/25 bg-amber-500/10 text-amber-300"
+                  : "border-rose-500/25 bg-rose-500/10 text-rose-300"
+              }`}
             >
-              <Radio className="h-3.5 w-3.5 text-[#ff5500]" />
-              <span>Giao Diện Nghe Nhạc</span>
-            </Link>
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  dbStatus === "connected"
+                    ? "bg-emerald-400"
+                    : dbStatus === "connecting"
+                    ? "bg-amber-400 animate-pulse"
+                    : "bg-rose-400"
+                }`}
+              />
+              {dbStatus === "connected" ? "Đã đồng bộ" : dbStatus === "connecting" ? "Đang đồng bộ..." : "Mất đồng bộ"}
+            </span>
+
+            <button
+              type="button"
+              disabled={isLoadingData}
+              onClick={() => void loadRealData(false)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#222432] bg-[#171822] text-xs font-semibold text-zinc-300 hover:text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              title="Đồng bộ lại dữ liệu quản trị"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-[#ff5500] ${isLoadingData ? "animate-spin" : ""}`} />
+              <span>Làm Mới</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={loggingOut}
+              onClick={handleLogout}
+              className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer disabled:opacity-50"
+              title="Đăng xuất"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Đăng xuất</span>
+            </button>
           </div>
         </header>
 
         {/* Dynamic Tab Views Content */}
-        <main className="p-6 lg:p-8 pb-28 flex-1 max-w-[1600px] w-full">
+        <main className="min-w-0 p-4 sm:p-6 lg:p-8 pb-40 flex-1 max-w-[1600px] w-full mx-auto">
+          {isLoadingData && <p role="status" className="mb-5 text-sm text-zinc-400">Đang cập nhật dữ liệu quản trị…</p>}
+          {dataErrors.length > 0 && <div role="alert" className="mb-6 rounded-lg border border-rose-500/30 bg-rose-500/5 p-4 text-sm text-rose-200">
+            <p className="font-semibold">Một số dữ liệu chưa tải được. Dữ liệu đã tải trước đó có thể chưa được cập nhật.</p>
+            <ul className="mt-2 list-inside list-disc space-y-1">{dataErrors.map((message) => <li key={message}>{message}</li>)}</ul>
+            <button type="button" disabled={isLoadingData} onClick={() => void loadRealData()} className="mt-3 rounded-md border border-rose-300/30 px-3 py-2 disabled:opacity-50">Tải lại dữ liệu</button>
+          </div>}
+          {!isLoadingData && dataErrors.length === 0 && lastSyncTime && <p className="mb-5 text-xs text-zinc-500">Cập nhật lúc {lastSyncTime}</p>}
           {activeTab === "overview" && (
             <OverviewTab
               users={users}
-              tracks={tracks}
               transactions={transactions}
               auditLogs={auditLogs}
               overviewData={overviewData}
@@ -1016,26 +956,16 @@ export default function AdminDashboardPage() {
             <UsersManagementTab
               users={users}
               devices={devices}
+              currentAdminId={currentAdmin?.id}
+              currentAdminUsername={currentAdmin?.username}
               onBanUser={handleBanUser}
               onUnbanUser={handleUnbanUser}
               onChangeUserRole={handleChangeUserRole}
               onRevokeDevice={handleRevokeDevice}
+              onRevokeAllUserDevices={handleRevokeAllUserDevices}
               onResetPassword={handleResetUserPassword}
               onCreateUser={handleCreateUser}
               onUpdateProfile={handleUpdateUserProfile}
-            />
-          )}
-
-          {activeTab === "catalog" && (
-            <CatalogManagementTab
-              tracks={tracks}
-              onTakedownTrack={handleTakedownTrack}
-              onRestoreTrack={handleRestoreTrack}
-              onChangeTrackGenre={handleChangeTrackGenre}
-              onDeleteTrack={handleDeleteTrack}
-              onPreviewTrack={handleTogglePreviewTrack}
-              playingTrackId={previewTrack?.id || null}
-              isPlayingPreview={isPlayingPreview}
             />
           )}
 
@@ -1048,23 +978,16 @@ export default function AdminDashboardPage() {
             />
           )}
 
-          {activeTab === "history" && (
-            <ListeningHistoryTab onToast={addToast} />
-          )}
-
-          {activeTab === "moderation" && (
-            <ModerationTab
-              reviews={reviews}
-              reviewActions={reviewActions}
-              isReadOnly={true}
-            />
-          )}
-
           {activeTab === "monetization" && (
             <MonetizationTab
               packages={packages}
               transactions={transactions}
               subscriptions={subscriptions}
+              revenueStats={revenueStats}
+              revenueDays={revenueDays}
+              onRevenueDaysChange={handleRevenueDaysChange}
+              loadingRevenueStats={loadingRevenueStats}
+              onToast={addToast}
               onTogglePackageStatus={handleTogglePackageStatus}
               onUpdatePackagePrice={handleUpdatePackagePrice}
               onCreatePackage={handleCreatePackage}
@@ -1074,15 +997,7 @@ export default function AdminDashboardPage() {
             />
           )}
 
-          {activeTab === "licensing" && (
-            <LicensingTab
-              distributors={distributors}
-              contracts={contracts}
-              licenses={licenses}
-              isReadOnly={true}
-            />
-          )}
-
+          {activeTab === "recommendations" && <RecommendationsCurationTab onToast={addToast} />}
           {activeTab === "notifications" && <NotificationsTab onToast={addToast} />}
           {activeTab === "karaoke-resources" && <KaraokeResourcesTab onToast={addToast} />}
         </main>
@@ -1091,6 +1006,7 @@ export default function AdminDashboardPage() {
       {/* Global Audio Preview Player Dock */}
       {previewTrack && (
         <AdminAudioPlayerDock
+          key={previewTrack.id}
           track={previewTrack}
           isPlaying={isPlayingPreview}
           onTogglePlay={(playing) => setIsPlayingPreview(playing)}
@@ -1102,7 +1018,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Floating Notifications Toast Stack */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
+      <div className="fixed bottom-6 right-3 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-[calc(100%-1.5rem)] pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}

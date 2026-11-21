@@ -1,0 +1,13 @@
+.admin-workspace { min-width: 0; font-variant-numeric: tabular-nums; }
+.admin-workspace main > div, .admin-workspace section, .admin-workspace article { min-width: 0; }
+.admin-workspace main .grid > *, .admin-workspace main .flex > * { min-width: 0; }
+.admin-workspace main p, .admin-workspace main h2, .admin-workspace main h3 { overflow-wrap: anywhere; }
+.admin-workspace main table { width: 100%; }
+.admin-workspace main input, .admin-workspace main select, .admin-workspace main textarea { max-width: 100%; }
+.admin-workspace button:focus-visible, .admin-workspace a:focus-visible { outline: 2px solid #ff5500; outline-offset: 3px; }
+@media (max-width: 767px) {
+  .admin-sidebar > div:nth-child(2) { display: flex; overflow-x: auto; gap: .375rem; padding: .75rem; }
+  .admin-sidebar > div:nth-child(2) > div { display: none; }
+  .admin-sidebar > div:nth-child(2) > button { width: auto; flex-shrink: 0; gap: .75rem; white-space: nowrap; }
+  .admin-sidebar > div:last-child { display: none; }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Clock,
   Play,
@@ -23,11 +23,11 @@ import {
   clearMyListeningHistory,
   addToLibrary,
   removeFromLibrary,
-  isTrackInLibrary,
+  fetchLikedTrackIds,
   type UserListeningHistoryItem,
   type UserListeningHistorySummary,
 } from "@/lib/api-client";
-import { usePlayer, type PlayerTrack } from "@/components/dashboard/player-context";
+import { usePlayerState, type PlayerTrack } from "@/components/dashboard/player-context";
 import TrackActionMenu from "@/components/dashboard/track-action-menu";
 import { InteractiveBarChart } from "@/components/dashboard/charts/interactive-bar-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
@@ -91,7 +91,7 @@ function getTimeGroup(dateStr?: string): "Hôm nay" | "Hôm qua" | "Tuần này"
 }
 
 export default function UserListeningHistoryPage() {
-  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayerState();
 
   const [historyItems, setHistoryItems] = useState<UserListeningHistoryItem[]>([]);
   const [summary, setSummary] = useState<UserListeningHistorySummary | null>(null);
@@ -107,48 +107,35 @@ export default function UserListeningHistoryPage() {
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Load history from API
-  const loadHistory = useCallback(async (query = searchQuery, isSilent = false) => {
+  const historyRequestRef = useRef<AbortController | null>(null);
+  const loadHistory = useCallback(async (query: string, isSilent = false) => {
+    historyRequestRef.current?.abort();
+    const controller = new AbortController();
+    historyRequestRef.current = controller;
+    const { signal } = controller;
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
-
     try {
-      const data = await fetchMyListeningHistory({
-        page: 0,
-        size: 50,
-        search: query.trim() || undefined,
-      });
-      const items = data.items || [];
-      setHistoryItems(items);
+      const data = await fetchMyListeningHistory({ page: 0, size: 50, search: query.trim() || undefined, signal });
+      if (signal.aborted) return;
+      setHistoryItems(data.items || []);
       setSummary(data.summary || null);
-
-      // Check liked status in background
-      const trackIds = items.map((it) => it.spotifyId || it.trackId).filter(Boolean);
-      const uniqueIds = Array.from(new Set(trackIds));
-      const checks = await Promise.allSettled(
-        uniqueIds.slice(0, 30).map(async (id) => {
-          const liked = await isTrackInLibrary(id);
-          return { id, liked };
-        })
-      );
-      const newLikedMap: Record<string, boolean> = {};
-      checks.forEach((res) => {
-        if (res.status === "fulfilled") {
-          newLikedMap[res.value.id] = res.value.liked;
-        }
-      });
-      setLikedMap((prev) => ({ ...prev, ...newLikedMap }));
-    } catch (err) {
-      console.error("Lỗi khi tải lịch sử nghe:", err);
-    } finally {
       setLoading(false);
       setRefreshing(false);
+      const likedIds = await fetchLikedTrackIds(signal);
+      if (!signal.aborted) setLikedMap(Object.fromEntries(likedIds.map((id) => [id, true])));
+    } catch (error) {
+      if (!signal.aborted) console.error("Lỗi khi tải lịch sử nghe:", error);
+    } finally {
+      if (!signal.aborted) { setLoading(false); setRefreshing(false); }
     }
-  }, [searchQuery]);
+  }, []);
 
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    historyRequestRef.current?.abort();
+    const timeout = window.setTimeout(() => void loadHistory(searchQuery), searchQuery.trim() ? 300 : 0);
+    return () => { window.clearTimeout(timeout); historyRequestRef.current?.abort(); };
+  }, [searchQuery, loadHistory]);
 
   // Toggle favorite / like track
   const handleToggleLike = async (e: React.MouseEvent, item: UserListeningHistoryItem) => {
@@ -603,7 +590,7 @@ export default function UserListeningHistoryPage() {
                         {/* Cover Image */}
                         <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-white/5 border border-white/10">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={
                               item.coverUrl ||
                               "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240"

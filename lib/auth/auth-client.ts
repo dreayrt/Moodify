@@ -1,4 +1,6 @@
+import { readSessionCached, invalidateSessionReads } from "../session-read-cache";
 import { getDeviceIdentity, getCurrentDeviceUuid, type DevicePlatform } from "./device-helper";
+import type { AgreementDetails } from "../agreement-details";
 
 export type AuthResponse = {
   accessToken: string;
@@ -125,6 +127,12 @@ function cacheUserProfile(profile: UserProfileResponse, epoch: number) {
 }
 
 const STORAGE_KEY = "moodify.auth.session";
+let verifiedAccessToken: string | null = null;
+
+export function hasVerifiedAuthSession(): boolean {
+  const session = getStoredAuthSession();
+  return Boolean(session && session.accessTokenExpiresAt > Date.now() && session.accessToken === verifiedAccessToken);
+}
 const USER_STORAGE_KEY = "moodify.auth.user";
 
 // Bumped on every clearAuthSession() so async token refreshes that started
@@ -132,12 +140,12 @@ const USER_STORAGE_KEY = "moodify.auth.user";
 let authSessionEpoch = 0;
 
 type RequestOptions = {
-  timeoutMs?: number;
   body?: unknown;
   extraHeaders?: Record<string, string>;
   keepalive?: boolean;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   token?: string;
+  timeoutMs?: number;
 };
 
 export function getStoredAuthSession(): StoredAuthSession | null {
@@ -223,6 +231,9 @@ export function saveAuthSession(auth: AuthResponse) {
     return;
   }
 
+  const wasVerified = hasVerifiedAuthSession();
+  const previousUser = window.localStorage.getItem(USER_STORAGE_KEY);
+  const hadSession = Boolean(getStoredAuthSession());
   const now = Date.now();
   const session: StoredAuthSession = {
     accessToken: auth.accessToken,
@@ -231,6 +242,7 @@ export function saveAuthSession(auth: AuthResponse) {
     refreshTokenExpiresAt: now + auth.refreshExpiresIn * 1000,
   };
 
+  verifiedAccessToken = wasVerified ? auth.accessToken : null;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   window.localStorage.setItem(
     USER_STORAGE_KEY,
@@ -268,6 +280,9 @@ export function saveAuthSession(auth: AuthResponse) {
     Math.max(0, auth.refreshExpiresIn) +
     "; SameSite=Lax" +
     secure;
+  if (!hadSession || previousUser !== window.localStorage.getItem(USER_STORAGE_KEY)) {
+    window.dispatchEvent(new Event("moodify-auth-changed"));
+  }
 }
 
 export function clearAuthSession() {
@@ -279,6 +294,7 @@ export function clearAuthSession() {
   // never resurrect cookies and keep the middleware bouncing the user back.
   authSessionEpoch += 1;
 
+  verifiedAccessToken = null;
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
   window.localStorage.removeItem("accessToken");
@@ -289,6 +305,7 @@ export function clearAuthSession() {
   for (const name of ["moodify_token", "moodify_refresh", "moodify_role", "accessToken", "token"]) {
     document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax${secure}`;
   }
+  window.dispatchEvent(new Event("moodify-auth-changed"));
 }
 
 
@@ -365,6 +382,7 @@ export async function fetchMyDevices(): Promise<UserDeviceSummary> {
 export async function registerCurrentDevice(): Promise<void> {
   if (typeof window === "undefined") return;
   const token = await getValidAccessToken();
+  if (!token) return;
   const device = getDeviceIdentity();
   await requestJson("/api/auth/devices/register", {
     method: "POST",
@@ -383,6 +401,7 @@ export async function revokeMyDevice(deviceId: number): Promise<void> {
 
 export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
   const token = await getValidAccessToken();
+  if (!token || !hasVerifiedAuthSession()) throw new Error("Vui lòng đăng nhập lại để tiếp tục.");
   const deviceUuid = getCurrentDeviceUuid();
   return requestJson<{ revokedCount: number }>("/api/auth/devices/revoke-others", {
     method: "POST",
@@ -393,7 +412,7 @@ export async function revokeOtherDevices(): Promise<{ revokedCount: number }> {
 
 export async function pingDeviceStatus(): Promise<{ active: boolean } | null> {
   const token = await getValidAccessToken();
-  if (!token) return null;
+  if (!token || !hasVerifiedAuthSession()) return null;
   return requestJson<{ active: boolean }>("/api/auth/devices/ping", {
     method: "GET",
     token,
@@ -507,6 +526,7 @@ export async function uploadAvatar(
   }
 
   const profile = (await response.json()) as UserProfileResponse;
+  invalidateSessionReads();
   cacheUserProfile(profile, epoch);
   return profile;
 }
@@ -605,6 +625,7 @@ export async function submitModeratorDecision(
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;
+    rightsVerified?: boolean;
   },
   token?: string
 ) {
@@ -621,9 +642,10 @@ export async function submitModeratorDecision(
 
 export async function getCurrentUser(accessToken: string) {
   const epoch = authSessionEpoch;
-  const profile = await requestJson<UserProfileResponse>("/api/auth/me", {
+  const profile = await readSessionCached("profile", accessToken, () => requestJson<UserProfileResponse>("/api/auth/me", {
     token: accessToken,
-  });
+  }));
+  if (getStoredAuthSession()?.accessToken === accessToken) verifiedAccessToken = accessToken;
   cacheUserProfile(profile, epoch);
   return profile;
 }
@@ -650,6 +672,7 @@ export const uploadContentLeadTrack = uploadArtistTrack;
 
 export interface OcrExtractLicenseResponse {
   success: boolean;
+  agreementDetails?: AgreementDetails | null;
   licenseType?: string;
   copyrightOwner?: string;
   distributorId?: number;
@@ -771,16 +794,8 @@ async function deliverListeningSessionTelemetry(payload: {
   }
 }
 
-export async function seedDemoTraffic(count = 150, token?: string) {
-  const validToken = token || (await getValidAccessToken());
-  return requestJson<{ success: boolean; inserted: number; message: string }>(
-    `/api/analytics/seed-traffic?count=${count}`,
-    {
-      method: "POST",
-      token: validToken ?? undefined,
-    },
-  );
-}
+let refreshInFlight: { token: string; promise: Promise<string | null> } | null = null;
+
 export async function getValidAccessToken(): Promise<string | null> {
   const session = getStoredAuthSession();
   if (!session) {
@@ -797,19 +812,36 @@ export async function getValidAccessToken(): Promise<string | null> {
     return null;
   }
 
-  try {
-    const epoch = authSessionEpoch;
-    const refreshed = await refresh(session.refreshToken);
-    if (epoch !== authSessionEpoch) {
-      // The user logged out while this refresh was in flight — discard it.
-      return null;
-    }
-    saveAuthSession(refreshed);
-    return refreshed.accessToken;
-  } catch {
-    clearAuthSession();
-    return null;
-  }
+  const epoch = authSessionEpoch;
+  if (refreshInFlight?.token === session.refreshToken) return refreshInFlight.promise;
+  const job = {
+    token: session.refreshToken,
+    promise: (async () => {
+      try {
+        const refreshed = await refresh(session.refreshToken);
+        if (epoch !== authSessionEpoch) return null;
+        const current = getStoredAuthSession();
+        // An old refresh must never resurrect logout or overwrite a newer login.
+        if (current?.refreshToken !== session.refreshToken || current.accessToken !== session.accessToken) {
+          if (refreshInFlight?.token === session.refreshToken) refreshInFlight = null;
+          return getValidAccessToken();
+        }
+        saveAuthSession(refreshed);
+        return refreshed.accessToken;
+      } catch {
+        const current = getStoredAuthSession();
+        if (current?.refreshToken === session.refreshToken && current.accessToken === session.accessToken) {
+          clearAuthSession();
+          return null;
+        }
+        if (refreshInFlight?.token === session.refreshToken) refreshInFlight = null;
+        return getValidAccessToken();
+      }
+    })(),
+  };
+  refreshInFlight = job;
+  try { return await job.promise; }
+  finally { if (refreshInFlight === job) refreshInFlight = null; }
 }
 
 async function requestJson<T>(
@@ -850,7 +882,7 @@ async function requestJson<T>(
   console.log(`[RequestJson] 📥 Response status:`, response.status, response.statusText);
 
   if (!response.ok) {
-    const errorMsg = await extractErrorMessage(response, path);
+    const errorMsg = await extractErrorMessage(response, path, authToken);
     if (response.status >= 500) {
       console.error(`[RequestJson] ❌ Server error (${response.status}):`, errorMsg);
     } else {
@@ -875,7 +907,7 @@ async function requestJson<T>(
   }
 }
 
-async function extractErrorMessage(response: Response, path?: string) {
+async function extractErrorMessage(response: Response, path?: string, requestToken?: string) {
   try {
     const text = await response.text();
     if (!text) {
@@ -900,16 +932,17 @@ async function extractErrorMessage(response: Response, path?: string) {
         detail?: string;
       };
 
-      if (response.status === 403) {
-        if (payload.error === "DEVICE_REVOKED" || payload.message?.includes("thiết bị") || payload.detail?.includes("thiết bị")) {
-          const alertMsg = payload.message || payload.detail || "Thiết bị này đã bị thu hồi quyền truy cập do tài khoản đã đăng nhập trên thiết bị khác vượt quá hạn mức thiết bị.";
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("moodify:device-revoked", {
-              detail: { message: alertMsg }
-            }));
+      if (response.status === 403 && payload.error === "DEVICE_REVOKED") {
+        const current = getStoredAuthSession();
+        if (requestToken && current?.accessToken === requestToken) {
+          if (hasVerifiedAuthSession()) {
+            window.dispatchEvent(new CustomEvent("moodify:device-revoked"));
+          } else {
+            // A saved token is not proof of an active sign-in. Return silently to guest mode.
+            clearAuthSession();
           }
-          return alertMsg;
         }
+        return "Phiên sử dụng trên thiết bị này không còn hiệu lực. Vui lòng đăng nhập lại.";
       }
 
       if (payload.message && payload.message.trim() && payload.message !== "Not Found") {

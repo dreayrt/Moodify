@@ -738,17 +738,6 @@ export default function UserSettingsModal({
                   </div>
                 </div>
 
-                {user?.role === "ADMIN" && (
-                  <Link
-                    href="/dashboard/admin"
-                    onClick={onClose}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 transition-all shadow-sm"
-                  >
-                    <span>Vào Admin Console</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                )}
-
                 {(user?.role === "CONTENT_LEAD" || user?.role === "ARTIST") && (
                   <Link
                     href="/dashboard/content-lead"

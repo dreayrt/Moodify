@@ -38,11 +38,22 @@ function expectRedirect(path, cookies, destination) {
   return response;
 }
 
-test("middleware covers the root and dashboards, excluding unrelated routes", () => {
-  for (const path of ["/", "/dashboard", "/dashboard/user", "/dashboard/admin"]) {
+test("middleware covers the root, dashboards, and public admin-confined routes, excluding APIs/assets", () => {
+  for (const path of [
+    "/",
+    "/dashboard",
+    "/dashboard/user",
+    "/dashboard/admin",
+    "/dashboard/admin/recommendations",
+    "/track/123",
+    "/download",
+    "/privacy",
+    "/terms",
+    "/data-deletion",
+  ]) {
     assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: path }), true, path);
   }
-  for (const path of ["/track/123", "/api/proxy-image", "/favicon.ico", "/_next/static/main.js"]) {
+  for (const path of ["/api/proxy-image", "/favicon.ico", "/_next/static/main.js"]) {
     assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: path }), false, path);
   }
 });
@@ -102,10 +113,33 @@ test("role restrictions on protected dashboards remain enforced", () => {
   expectRedirect("/dashboard/moderator", { moodify_token: token("USER") }, "/dashboard/user");
   expectRedirect("/dashboard/content-lead", { moodify_token: token("USER") }, "/dashboard/user");
   assert.equal(visit("/dashboard/admin", { moodify_token: token("ADMIN") }).headers.get("x-middleware-next"), "1");
+  assert.equal(visit("/dashboard/admin/recommendations", { moodify_token: token("ADMIN") }).headers.get("x-middleware-next"), "1");
 });
 
-test("the public music dashboard remains directly accessible to staff", () => {
-  assert.equal(visit("/dashboard/user", { moodify_token: token("ADMIN") }).headers.get("x-middleware-next"), "1");
+test("ADMIN is strictly confined to /dashboard/admin/** and bounced from user/staff/public routes", () => {
+  for (const path of [
+    "/dashboard/user",
+    "/dashboard/search",
+    "/dashboard/library",
+    "/dashboard/karaoke",
+    "/dashboard/moderator",
+    "/dashboard/content-lead",
+    "/dashboard/artist",
+    "/track/123",
+    "/download",
+    "/privacy",
+    "/terms",
+    "/data-deletion",
+  ]) {
+    expectRedirect(path, { moodify_token: token("ADMIN") }, "/dashboard/admin");
+  }
+});
+
+test("non-admin staff and guests retain access to public music and info routes", () => {
+  assert.equal(visit("/dashboard/user", { moodify_token: token("MODERATOR") }).headers.get("x-middleware-next"), "1");
+  assert.equal(visit("/dashboard/user", { moodify_token: token("CONTENT_LEAD") }).headers.get("x-middleware-next"), "1");
+  assert.equal(visit("/track/123").headers.get("x-middleware-next"), "1");
+  assert.equal(visit("/download").headers.get("x-middleware-next"), "1");
 });
 
 const authClientSource = fs.readFileSync(new URL("../lib/auth/auth-client.ts", import.meta.url), "utf8");
@@ -130,15 +164,22 @@ function browserAuth(fetch) {
       else cookies.set(name, pair.slice(separator + 1));
     },
   };
+  const cacheExports = {};
+  vm.runInNewContext(ts.transpileModule(
+    fs.readFileSync(new URL("../lib/session-read-cache.ts", import.meta.url), "utf8"),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
+  ).outputText, { exports: cacheExports, Date, Map, Promise });
   const exports = {};
   vm.runInNewContext(authClientCode, {
-    exports, document, AbortSignal, process: { env: {} },
+    exports, document, AbortSignal, Event, process: { env: {} },
     console: { log() {}, warn() {}, error() {} },
     require(id) {
+      if (id === "../session-read-cache") return cacheExports;
       assert.equal(id, "./device-helper");
       return { getCurrentDeviceUuid: () => "test-device" };
     },
     window: {
+      dispatchEvent() { return true; },
       localStorage: {
         getItem: (name) => storage.get(name) ?? null,
         setItem: (name, value) => storage.set(name, value),

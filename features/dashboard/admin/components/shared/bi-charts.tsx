@@ -36,9 +36,8 @@ export function EmotionDonutChart({ tracks, size = 180 }: EmotionDonutChartProps
     };
 
     tracks.forEach((t) => {
-      const v = t.vibeCategory || "Chill";
-      if (counts[v] !== undefined) counts[v] += 1;
-      else counts.Chill += 1;
+      const v = t.vibeCategory;
+      if (v && counts[v] !== undefined) counts[v] += 1;
     });
 
     const total = tracks.length || 1;

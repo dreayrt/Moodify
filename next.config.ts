@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   images: {
     qualities: [75, 88, 95],
     remotePatterns: [
+      { protocol: "https", hostname: "api.moodify.click", pathname: "/uploads/**" },
+      {
+        protocol: "https",
+        hostname: "moodify.click",
+        pathname: "/uploads/**",
+      },
       {
         protocol: "https",
         hostname: "images.unsplash.com",

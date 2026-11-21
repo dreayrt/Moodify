@@ -24,6 +24,8 @@ const dependencies = {
   scheduler: 'scheduler/cjs/scheduler.development.js',
 };
 const modules = Object.entries(dependencies).map(([id,file]) => `${JSON.stringify(id)}:function(module,exports,require){\n${fs.readFileSync(path.join(root,'node_modules',file),'utf8')}\n}`);
+const retiredCompiled = ts.transpileModule(fs.readFileSync(path.join(root,'lib/retired-catalog.ts'),'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+modules.push(`"@/lib/retired-catalog":function(module,exports,require){\n${retiredCompiled}\n}`);
 modules.push(`player:function(module,exports,require){\n${compiled}\n}`);
 const bundle = `
 const process={env:{NODE_ENV:'development'}};
@@ -36,15 +38,15 @@ const api={FREE_ENTITLEMENTS:free,resolveTrackAudioUrl:t=>location.origin+'/audi
  getTrackStreamUrl:id=>location.origin+'/audio/'+id+'.wav',getBackendFileUrl:v=>v,
  fetchTrackById:async()=>null,fetchActiveAdCampaigns:async()=>[],recordAdImpression:async()=>{},
  fetchMySubscription:async()=>({isPremium:true,tier:'INDIVIDUAL_FULL',entitlements:{...free,tier:'INDIVIDUAL_FULL',adPolicy:'NO_ADS',skipPolicy:'UNLIMITED'}})};
-const auth={recordPlatformVisit:()=>{},recordListeningSessionTelemetry:payload=>{
+const auth={hasVerifiedAuthSession:()=>window.signedIn===true,getStoredAuthSession:()=>window.signedIn?{accessToken:'fixture-token'}:null,recordPlatformVisit:()=>{},recordListeningSessionTelemetry:payload=>{
  window.telemetry.push(payload);
  if(window.deferTelemetry) return new Promise(resolve=>window.deferredTelemetry.push({payload,resolve}));
  return Promise.resolve({success:true,historyId:window.telemetry.length,qualified:false});
 },pingDeviceStatus:async()=>{},revokeOtherDevices:async()=>{}};
 function require(id){
  if(id==='@/lib/api-client')return api;
+ if(id==='@/lib/recommendation-client')return {recommendationRequest:async()=>({valid:true}),createRecommendationQueue:async()=>({tracks:[]}),queuePlayerTracks:()=>[],prepareRecommendationTrack:async track=>track};
  if(id==='@/lib/auth/auth-client')return auth;
- if(id==='@/lib/recommendation-client')return {prepareRecommendationTrack:async track=>track};
  if(id==='next/image')return ()=>null;
  if(id==='lucide-react')return {Crown:()=>null,Laptop:()=>null};
  if(cache[id])return cache[id].exports;
@@ -67,8 +69,10 @@ if(!location.search.includes('native=1')) {
 } else window.Audio=function(){const audio=new NativeAudio();window.audios.push(audio);return audio;};
 window.music=()=>window.audios[window.audios.length-1];
 const React=require('react'),dom=require('react-dom/client'),playerModule=require('player');
+window.stateRenders=0;
+function StateProbe(){(playerModule.usePlayerState || playerModule.usePlayer)();window.stateRenders++;return null;}
 function Probe(){const state=playerModule.usePlayer();React.useLayoutEffect(()=>{window.player=state;});return null;}
-window.mount=()=>{window.root=dom.createRoot(document.getElementById('root'));const tree=React.createElement(playerModule.PlayerProvider,null,React.createElement(Probe));window.root.render(location.search.includes('strict=1')?React.createElement(React.StrictMode,null,tree):tree);};
+window.mount=()=>{window.root=dom.createRoot(document.getElementById('root'));const tree=React.createElement(playerModule.PlayerProvider,null,React.createElement(React.Fragment,null,React.createElement(Probe),React.createElement(StateProbe)));window.root.render(location.search.includes('strict=1')?React.createElement(React.StrictMode,null,tree):tree);};
 window.mount();
 `;
 function wave(seconds) {
@@ -80,7 +84,7 @@ function wave(seconds) {
 }
 const audioBytes=wave(8);
 async function run() {
-  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||undefined,args:['--autoplay-policy=no-user-gesture-required']});
+  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||process.env.PLAYWRIGHT_EXECUTABLE_PATH||undefined,args:['--autoplay-policy=no-user-gesture-required']});
   const passed=[];
   const base='https://player-fixture.test';
   const step=async(page,fn)=>{await page.evaluate(fn);await page.waitForTimeout(30);};
@@ -112,6 +116,55 @@ async function run() {
       assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('moodify_playback_state')).currentTime),0);
     });
     if(process.argv.includes('--baseline'))return;
+    if(!process.env.PLAYER_SOURCE) {
+      await check('clock ticks do not rerender state-only consumers',async page=>{
+        await start(page);
+        const before=await page.evaluate(()=>window.stateRenders);
+        for(let i=1;i<=20;i++)await step(page,()=>music().tick(music().currentTime+.25));
+        assert.equal(await page.evaluate(()=>player.currentTime),5);
+        assert.equal(await page.evaluate(()=>window.stateRenders),before);
+      });
+      await check('time updates write only small progress while preserving the full queue',async page=>{
+        await start(page);
+        const before=await page.evaluate(()=>localStorage.getItem('moodify_playback_state'));
+        await step(page,()=>music().tick(24));
+        assert.equal(await page.evaluate(()=>localStorage.getItem('moodify_playback_state')),before);
+        const progress=await page.evaluate(()=>JSON.parse(localStorage.getItem('moodify_playback_progress')));
+        assert.equal(progress.currentTime,24);assert.equal(progress.trackId,'A');assert.ok(!('queue' in progress));
+        await step(page,()=>player.seek(39));
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('moodify_playback_state')).queue.length),3);
+      });
+      for(const matching of [true,false])await check('progress recovery '+(matching?'restores matching newer time':'ignores another track'),async page=>{
+        await start(page);await step(page,()=>player.pause());
+        await page.evaluate(matching=>{
+          const saved=JSON.parse(localStorage.getItem('moodify_playback_state'));
+          saved.currentTime=12;localStorage.setItem('moodify_playback_state',JSON.stringify(saved));
+          window.root.unmount();
+          localStorage.setItem('moodify_playback_state',JSON.stringify(saved));
+          localStorage.setItem('moodify_playback_progress',JSON.stringify({trackId:matching?'A':'B',currentTime:47,duration:180,savedAt:Date.now()+1000}));
+          window.mount();
+        },matching);
+        await page.waitForFunction(()=>window.player?.currentTrack?.id==='A');
+        await step(page,()=>music().metadata());
+        assert.equal(await page.evaluate(()=>music().currentTime),matching?47:12);
+      });
+    }
+    await check('guest ignores device revocation events',async page=>{
+      await step(page,()=>{window.signedIn=false;window.dispatchEvent(new Event('moodify:device-revoked'));});
+      assert.equal(await page.getByRole('dialog').count(),0);
+    });
+    await check('verified session shows clear device notice and dismisses on logout',async page=>{
+      await step(page,()=>{window.signedIn=true;window.dispatchEvent(new Event('moodify:device-revoked'));});
+      await page.getByRole('dialog',{name:'Phiên nghe nhạc đã tạm dừng'}).waitFor();
+      assert.equal(await page.getByText('Nâng cấp gói VIP',{exact:true}).count(),0);
+      await step(page,()=>{window.signedIn=false;window.dispatchEvent(new Event('moodify-auth-changed'));});
+      assert.equal(await page.getByRole('dialog').count(),0);
+    });
+    await check('withdrawn catalog songs cannot play or enter the queue',async page=>{
+      await step(page,()=>{const old={...tracks[0],id:'6a8323513cccfc45cd62ce5c'};player.playTrack(old,[old,...tracks]);player.addToQueue(old);});
+      assert.equal(await page.evaluate(()=>player.currentTrack),null);
+      assert.equal(await page.evaluate(()=>player.queue.length),0);
+    });
     await check('auto advance starts an already visited song at zero',async page=>{
       await start(page);await step(page,()=>{player.playTrack(tracks[1],tracks);music().metadata();music().tick(52);});
       await step(page,()=>{player.playTrack(tracks[0],tracks);music().metadata();});

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { prepareRecommendationTrack } from "@/lib/recommendation-client";
+import { isRetiredCatalogTrack } from "@/lib/retired-catalog";
 import { Crown, Laptop } from "lucide-react";
 import {
   getTrackStreamUrl,
@@ -16,7 +17,7 @@ import {
   resolveTrackAudioUrl,
   type PackageEntitlements,
 } from "@/lib/api-client";
-import { recordPlatformVisit, recordListeningSessionTelemetry, revokeOtherDevices, pingDeviceStatus } from "@/lib/auth/auth-client";
+import { recordPlatformVisit, recordListeningSessionTelemetry, revokeOtherDevices, pingDeviceStatus, hasVerifiedAuthSession, getStoredAuthSession } from "@/lib/auth/auth-client";
 
 export type PlayerTrack = {
   id?: string;
@@ -102,7 +103,9 @@ interface PlayerContextType {
   prevTrack: () => void;
 }
 
-const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
+type PlayerState = Omit<PlayerContextType, "currentTime">;
+const PlayerContext = createContext<PlayerState | undefined>(undefined);
+const PlaybackTimeContext = createContext(0);
 
 // ── Daily Quota Storage Helpers ──────────────────────────────
 function getTodayKey() {
@@ -141,6 +144,7 @@ function recordDailySkip(): number {
 
 // ── Playback State Persistence Helpers ───────────────────────
 const PLAYBACK_STATE_KEY = "moodify_playback_state";
+const PLAYBACK_PROGRESS_KEY = "moodify_playback_progress";
 const PLAYER_BAR_HIDDEN_KEY = "moodify-player-bar-hidden";
 
 export interface PersistedPlaybackState {
@@ -164,6 +168,22 @@ function loadPersistedPlaybackState(): PersistedPlaybackState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed.queue)) parsed.queue = parsed.queue.filter((track: PlayerTrack) => !isRetiredCatalogTrack(track));
+      if (isRetiredCatalogTrack(parsed.currentTrack)) {
+        parsed.currentTrack = null; parsed.currentTime = 0; parsed.duration = 0; parsed.queueIndex = 0;
+      } else if (parsed.currentTrack && Array.isArray(parsed.queue)) {
+        const index = parsed.queue.findIndex((track: PlayerTrack) => sameTrack(track, parsed.currentTrack));
+        parsed.queueIndex = Math.max(0, index);
+      }
+      try {
+        const progress = JSON.parse(localStorage.getItem(PLAYBACK_PROGRESS_KEY) || "null");
+        const trackId = parsed.currentTrack?.id || parsed.currentTrack?.spotifyId;
+        if (trackId && progress?.trackId === trackId && progress.savedAt >= parsed.savedAt &&
+            Number.isFinite(progress.currentTime) && progress.currentTime >= 0) {
+          parsed.currentTime = progress.currentTime;
+          if (Number.isFinite(progress.duration) && progress.duration > 0) parsed.duration = progress.duration;
+        }
+      } catch { /* Keep compatibility with the original snapshot if progress is corrupt. */ }
       return parsed as PersistedPlaybackState;
     }
   } catch (_) {}
@@ -192,7 +212,18 @@ function savePersistedPlaybackState(state: Partial<PersistedPlaybackState>) {
       savedAt: Date.now(),
     };
     localStorage.setItem(PLAYBACK_STATE_KEY, JSON.stringify(updated));
+    localStorage.removeItem(PLAYBACK_PROGRESS_KEY);
   } catch (_) {}
+}
+
+function savePlaybackProgress(track: PlayerTrack | null, currentTime: number, duration: number) {
+  if (!track) return;
+  try {
+    // Progress changes frequently; the queue is only serialized when its state changes.
+    localStorage.setItem(PLAYBACK_PROGRESS_KEY, JSON.stringify({
+      trackId: track.id || track.spotifyId, currentTime, duration, savedAt: Date.now(),
+    }));
+  } catch { /* Storage may be unavailable or full; playback must continue. */ }
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
@@ -393,13 +424,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const [deviceRevokedNotice, setDeviceRevokedNotice] = useState<{ show: boolean; message: string } | null>(null);
   const [isReclaimingDevice, setIsReclaimingDevice] = useState(false);
+  const [deviceActionError, setDeviceActionError] = useState("");
 
   useEffect(() => {
-    const handleDeviceRevoked = (e: Event) => {
-      const customEvent = e as CustomEvent<{ message?: string }>;
-      const msg =
-        customEvent.detail?.message ||
-        "Thiết bị này đã bị thu hồi quyền truy cập do tài khoản đã đăng nhập trên thiết bị khác vượt quá hạn mức thiết bị của gói cước.";
+    const handleDeviceRevoked = () => {
+      if (!hasVerifiedAuthSession()) return;
+      setDeviceActionError("");
+      const msg = "Quyền sử dụng của thiết bị này đã thay đổi nên phiên nghe nhạc đã tạm dừng. Bạn có thể tiếp tục nghe trên thiết bị này.";
 
       if (audioRef.current) {
         try {
@@ -423,16 +454,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
+    const clearDeviceNotice = () => { setDeviceRevokedNotice(null); setDeviceActionError(""); };
+    const onStorage = () => { if (!hasVerifiedAuthSession()) clearDeviceNotice(); };
+    window.addEventListener("moodify-auth-changed", clearDeviceNotice);
+    window.addEventListener("storage", onStorage);
     window.addEventListener("moodify:device-revoked", handleDeviceRevoked);
     return () => {
+      window.removeEventListener("moodify-auth-changed", clearDeviceNotice);
+      window.removeEventListener("storage", onStorage);
       window.removeEventListener("moodify:device-revoked", handleDeviceRevoked);
     };
   }, [clearRetry]);
 
   const handleReclaimDevice = useCallback(async () => {
+    if (!hasVerifiedAuthSession()) { setDeviceRevokedNotice(null); return; }
+    const sessionToken = getStoredAuthSession()?.accessToken;
+    setDeviceActionError("");
     try {
       setIsReclaimingDevice(true);
       await revokeOtherDevices();
+      if (!hasVerifiedAuthSession() || getStoredAuthSession()?.accessToken !== sessionToken) return;
       setDeviceRevokedNotice(null);
       if (audioRef.current && currentTrack) {
         playbackIntentRef.current = true;
@@ -441,8 +482,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           .then(() => setIsPlaying(true))
           .catch(() => {});
       }
-    } catch (err) {
-      console.error("Could not reclaim device:", err);
+    } catch {
+      if (hasVerifiedAuthSession() && getStoredAuthSession()?.accessToken === sessionToken) {
+        setDeviceActionError("Chưa thể tiếp tục trên thiết bị này. Vui lòng thử lại sau.");
+      }
     } finally {
       setIsReclaimingDevice(false);
     }
@@ -519,9 +562,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Check user subscription status + tải quảng cáo ACTIVE từ backend
   useEffect(() => {
+    let subscriptionRequest = 0;
     const checkSub = () => {
+      const request = ++subscriptionRequest;
       fetchMySubscription()
         .then((info) => {
+          if (request !== subscriptionRequest) return;
           const isVip = Boolean(info?.isPremium);
           setIsPremiumUser(isVip);
           const tier = (info?.tier as SubTier) || "FREE";
@@ -540,6 +586,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           }
         })
         .catch(() => {
+          if (request !== subscriptionRequest) return;
           setIsPremiumUser(false);
           setSubTier("FREE");
           setEntitlements(FREE_ENTITLEMENTS);
@@ -548,8 +595,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     checkSub();
     window.addEventListener("moodify-subscription-updated", checkSub);
+    window.addEventListener("moodify-auth-changed", checkSub);
     return () => {
+      subscriptionRequest++;
       window.removeEventListener("moodify-subscription-updated", checkSub);
+      window.removeEventListener("moodify-auth-changed", checkSub);
     };
   }, []);
 
@@ -742,11 +792,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       if (now - lastTimeSaveRef.current > 2000) {
         lastTimeSaveRef.current = now;
-        savePersistedPlaybackState({
-          currentTrack: currentTrackRef.current,
-          currentTime: cur,
-          duration: audio.duration && !isNaN(audio.duration) ? audio.duration : undefined,
-        });
+        savePlaybackProgress(currentTrackRef.current, cur, audio.duration);
       }
     };
 
@@ -1198,6 +1244,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [executePlayTrack, currentTrack, subTier, isPremiumUser, adSecondsRemaining]);
 
   const playTrack = useCallback((track: PlayerTrack, playlist?: PlayerTrack[]) => {
+    if (isRetiredCatalogTrack(track)) return;
+    if (playlist) playlist = playlist.filter(item => !isRetiredCatalogTrack(item));
     if (isAdPlayingRef.current) {
       pendingTrackRef.current = { track, playlist };
       return;
@@ -1563,6 +1611,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Keep a ref for ended listener callback to avoid stale closure
   const nextTrackRef = useRef(nextTrack);
   const addToQueue = useCallback((track: PlayerTrack) => {
+    if (isRetiredCatalogTrack(track)) return;
     if (queueRef.current.some(item => sameTrack(item, track))) return;
     queueRef.current = [...queueRef.current, track];
     shuffleRemainingRef.current = null;
@@ -1573,15 +1622,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     nextTrackRef.current = nextTrack;
   }, [nextTrack]);
 
-  return (
-    <PlayerContext.Provider
-      value={{
+  const manualNextTrack = useCallback(() => nextTrack(false), [nextTrack]);
+  const playerState = useMemo<PlayerState>(() => ({
         currentTrack,
         isPlayerBarHidden,
         setPlayerBarHidden,
         isPlaying,
         isBuffering,
-        currentTime,
         duration,
         volume: isMuted ? 0 : volume,
         isMuted,
@@ -1613,10 +1660,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setPlaybackRate,
         toggleShuffle,
         toggleRepeat,
-        nextTrack: () => nextTrack(false),
+        nextTrack: manualNextTrack,
         prevTrack,
-      }}
-    >
+      }), [currentTrack, isPlayerBarHidden, setPlayerBarHidden, isPlaying, isBuffering,
+        duration, volume, isMuted, playbackRate, isShuffle, repeatMode, queue, queueIndex,
+        isAdPlaying, adSecondsRemaining, adTotalDuration, isPremiumUser, subTier, adReason,
+        dailyTracksCount, dailySkipsCount, skipLimitNotice, clearSkipLimitNotice, skipAd,
+        triggerAd, playTrack, addToQueue, togglePlay, pause, resume, seek, setVolume,
+        toggleMute, setPlaybackRate, toggleShuffle, toggleRepeat, manualNextTrack, prevTrack]);
+
+  return (
+    <PlayerContext.Provider value={playerState}>
+      <PlaybackTimeContext.Provider value={currentTime}>
       {children}
       {skipLimitNotice?.show && (
         <div className="fixed top-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] rounded-2xl p-[1px] bg-gradient-to-b from-white/25 via-white/10 to-transparent shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-2xl animate-in fade-in slide-in-from-top-4 duration-300">
@@ -1663,7 +1718,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       )}
 
       {deviceRevokedNotice?.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div role="dialog" aria-modal="true" aria-labelledby="device-session-title" aria-describedby="device-session-description" onKeyDown={event => { if (event.key === "Escape" && !isReclaimingDevice) setDeviceRevokedNotice(null); }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="max-w-md w-full rounded-3xl p-[1px] bg-gradient-to-b from-amber-400/40 via-white/10 to-transparent shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-200">
             <div className="rounded-[calc(1.5rem-1px)] bg-[#0d0e15] p-6 border border-white/10 flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10">
@@ -1672,16 +1727,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-400 block mb-1">
-                  RÀNG BUỘC THIẾT BỊ
+                  PHIÊN SỬ DỤNG
                 </span>
-                <h3 className="text-lg font-bold text-white">
-                  Giới Hạn Thiết Bị Đã Vượt Quá
+                <h3 id="device-session-title" className="text-lg font-bold text-white">
+                  Phiên nghe nhạc đã tạm dừng
                 </h3>
-                <p className="text-xs text-white/70 mt-2 leading-relaxed">
+                <p id="device-session-description" className="text-sm text-white/70 mt-2 leading-relaxed">
                   {deviceRevokedNotice.message}
                 </p>
               </div>
 
+              <p className="text-xs leading-relaxed text-white/50">Nếu tiếp tục tại đây, các thiết bị khác sẽ cần đăng nhập lại.</p>
+              {deviceActionError && <p role="alert" className="text-sm text-rose-300">{deviceActionError}</p>}
               <div className="w-full h-px bg-white/10 my-1" />
 
               <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
@@ -1689,36 +1746,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                   type="button"
                   disabled={isReclaimingDevice}
                   onClick={handleReclaimDevice}
+                  autoFocus
                   className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  {isReclaimingDevice ? "Đang kích hoạt..." : "Sử dụng trên thiết bị này"}
+                  {isReclaimingDevice ? "Đang kết nối lại…" : "Tiếp tục trên thiết bị này"}
                 </button>
 
-                <a
-                  href="/dashboard/premium"
-                  onClick={() => setDeviceRevokedNotice(null)}
-                  className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold shadow-lg shadow-amber-400/20 active:scale-95 transition-all text-center"
-                >
-                  Nâng cấp gói VIP
-                </a>
+                <button type="button" disabled={isReclaimingDevice} onClick={() => setDeviceRevokedNotice(null)}
+                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl border border-white/15 text-white/75 hover:bg-white/5 text-xs font-semibold disabled:opacity-50">
+                  Để sau
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setDeviceRevokedNotice(null)}
-                className="text-xs text-white/40 hover:text-white/80 transition-colors cursor-pointer pt-1"
-              >
-                Đóng thông báo
-              </button>
             </div>
           </div>
         </div>
       )}
+      </PlaybackTimeContext.Provider>
     </PlayerContext.Provider>
   );
 }
 
 export function usePlayer() {
+  const state = usePlayerState();
+  const currentTime = usePlaybackTime();
+  return useMemo(() => ({ ...state, currentTime }), [state, currentTime]);
+}
+
+export function usePlaybackTime() {
+  return useContext(PlaybackTimeContext);
+}
+
+export function usePlayerState() {
   const context = useContext(PlayerContext);
   if (!context) {
     throw new Error("usePlayer must be used within a PlayerProvider");
@@ -1727,5 +1786,11 @@ export function usePlayer() {
 }
 
 export function useOptionalPlayer() {
+  const state = useContext(PlayerContext);
+  const currentTime = usePlaybackTime();
+  return useMemo(() => state ? { ...state, currentTime } : undefined, [state, currentTime]);
+}
+
+export function useOptionalPlayerState() {
   return useContext(PlayerContext);
 }

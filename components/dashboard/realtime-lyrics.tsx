@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { PlayerTrack, usePlayer } from "./player-context";
+import { PlayerTrack, usePlayerState } from "./player-context";
 import { useVipTheme } from "@/lib/theme";
 import { Play, Pause, Music, Mic2, ArrowDown, Share2 } from "lucide-react";
 import ShareSongCardModal from "./share-song-card-modal";
@@ -118,7 +118,7 @@ export default function RealtimeLyrics({
   onTogglePlay,
   className = "",
 }: RealtimeLyricsProps) {
-  const { isPremiumUser } = usePlayer();
+  const { isPremiumUser } = usePlayerState();
   const { vipButtonsEnabled, currentVipTheme } = useVipTheme();
   const isVipButtonsActive = Boolean(isPremiumUser) && vipButtonsEnabled;
 
@@ -182,8 +182,8 @@ export default function RealtimeLyrics({
     }
   }, [activeIndex, userIsScrolling, scrollToActiveLine]);
 
-  // Handle user manual scroll
-  const handleScroll = () => {
+  // Only input intent pauses following; scroll events also fire for auto-scroll.
+  const handleManualScroll = () => {
     setUserIsScrolling(true);
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
@@ -388,7 +388,16 @@ export default function RealtimeLyrics({
       {/* Scrolling lyrics body with Spotify-style gradient mask */}
       <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
+        tabIndex={0}
+        onWheel={handleManualScroll}
+        onTouchMove={handleManualScroll}
+        onPointerDown={(event) => {
+          const el = event.currentTarget;
+          if (event.clientX >= el.getBoundingClientRect().left + el.clientWidth) handleManualScroll();
+        }}
+        onKeyDown={(event) => {
+          if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) handleManualScroll();
+        }}
         className="relative h-[290px] md:h-[340px] overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 select-none py-10"
         style={{
           WebkitMaskImage:

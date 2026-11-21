@@ -18,6 +18,7 @@ type ModeratorDecisionModalProps = {
     rejectionReason?: string;
     internalNote?: string;
     explicitTag?: boolean;
+    rightsVerified?: boolean;
   }) => Promise<void> | void;
 };
 
@@ -79,6 +80,7 @@ export function ModeratorDecisionModal({
     ViolationCategory[]
   >([]);
   const [internalNote, setInternalNote] = useState("");
+  const [rightsVerified,setRightsVerified]=useState(false);
   const [assignExplicit, setAssignExplicit] = useState(
     track.explicitFlagByArtist || track.aiAssessment.explicitLyricsDetected
   );
@@ -89,6 +91,7 @@ export function ModeratorDecisionModal({
 
     setSelectedCategories([]);
     setInternalNote("");
+    setRightsVerified(false);
     setAssignExplicit(
       track.explicitFlagByArtist || track.aiAssessment.explicitLyricsDetected
     );
@@ -104,6 +107,7 @@ export function ModeratorDecisionModal({
 
   const isApprove = actionType === "approve";
   const isReject = actionType === "reject";
+  const simulated=track.licenseType?.toUpperCase()==="DEMO_SIMULATED";
 
   const toggleViolationCategory = (category: ViolationCategory) => {
     setSelectedCategories((current) =>
@@ -129,6 +133,7 @@ export function ModeratorDecisionModal({
           : undefined,
         internalNote: isApprove ? internalNote : undefined,
         explicitTag: assignExplicit,
+        rightsVerified: isApprove && !simulated && rightsVerified,
       });
       onClose();
     } catch {
@@ -213,12 +218,17 @@ export function ModeratorDecisionModal({
                 </label>
               </div>
 
+              {simulated ? <p className="text-sm text-amber-200">Hồ sơ mô phỏng. Phê duyệt nội dung này chỉ dùng trong chế độ mô phỏng, không xác nhận quyền khai thác thật.</p> : <label className="flex items-start gap-3 text-sm text-white/80">
+                <input type="checkbox" checked={rightsVerified} onChange={e=>setRightsVerified(e.target.checked)} required={isApprove} />
+                <span>Tôi đã đối chiếu chủ thể cấp quyền, chữ ký, bản ghi và thời hạn trong tài liệu; đây là hồ sơ quyền thật.</span>
+              </label>}
               {/* Internal Note */}
               <div>
                 <label className="block text-[12px] font-medium text-white/70">
-                  Ghi chú nội bộ thẩm định (Tùy chọn)
+                  Căn cứ xác minh hồ sơ quyền
                 </label>
                 <textarea
+                  required={isApprove && !simulated}
                   value={internalNote}
                   onChange={(e) => setInternalNote(e.target.value)}
                   placeholder="Nhập ghi chú cho đội ngũ QA hoặc ca trực sau..."
@@ -280,7 +290,7 @@ export function ModeratorDecisionModal({
             {isApprove && (
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (!simulated && (!rightsVerified || !internalNote.trim()))}
                 className="flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-2 text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] transition hover:bg-emerald-400 active:scale-95 disabled:opacity-50"
               >
                 <CheckCircle2 className="h-4 w-4" />

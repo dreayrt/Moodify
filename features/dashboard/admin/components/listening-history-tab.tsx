@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminCoverImage } from "./shared/admin-cover-image";
+
 import React, { useEffect, useState } from "react";
 import {
   Activity,
@@ -45,14 +47,14 @@ function formatDuration(seconds: number): string {
 }
 
 function parseDurationToSeconds(durationStr?: string): number {
-  if (!durationStr) return 210; // default 3:30
+  if (!durationStr) return 0;
   const parts = durationStr.split(":");
   if (parts.length === 2) {
     const m = parseInt(parts[0], 10) || 0;
     const s = parseInt(parts[1], 10) || 0;
     return m * 60 + s;
   }
-  return 210;
+  return 0;
 }
 
 function getSourceBadge(source: string) {
@@ -206,9 +208,9 @@ export function ListeningHistoryTab({
   const displayedItems = items.filter((item) => {
     if (completionFilter === "ALL") return true;
     const trackSec = parseDurationToSeconds(item.totalDuration);
-    const rate = trackSec > 0 ? (item.listenedDurationSeconds / trackSec) * 100 : 100;
-    if (completionFilter === "COMPLETED") return rate >= 75;
-    if (completionFilter === "DROPPED") return rate < 40;
+    const rate = trackSec > 0 ? (item.listenedDurationSeconds / trackSec) * 100 : null;
+    if (completionFilter === "COMPLETED") return rate != null && rate >= 75;
+    if (completionFilter === "DROPPED") return rate != null && rate < 40;
     return true;
   });
 
@@ -405,9 +407,9 @@ export function ListeningHistoryTab({
                   const trackSec = parseDurationToSeconds(session.totalDuration);
                   const completionRate = trackSec > 0
                     ? Math.min(100, Math.round((session.listenedDurationSeconds / trackSec) * 100))
-                    : 100;
-                  const isCompleted = completionRate >= 75;
-                  const isDroppedEarly = completionRate < 40;
+                    : null;
+                  const isCompleted = completionRate != null && completionRate >= 75;
+                  const isDroppedEarly = completionRate != null && completionRate < 40;
 
                   return (
                     <tr
@@ -441,7 +443,7 @@ export function ListeningHistoryTab({
                         <div className="flex items-center gap-2.5">
                           <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-zinc-900">
                             {session.coverUrl ? (
-                              <img
+                              <AdminCoverImage
                                 src={session.coverUrl}
                                 alt={session.trackTitle}
                                 className="h-full w-full object-cover"
@@ -470,7 +472,7 @@ export function ListeningHistoryTab({
                           {formatDuration(session.listenedDurationSeconds)}
                         </div>
                         <div className="text-[10px] text-zinc-500">
-                          Độ dài bài: {session.totalDuration || "3:30"}
+                          Độ dài bài: {session.totalDuration || "Chưa có thông tin"}
                         </div>
                       </td>
 
@@ -486,10 +488,10 @@ export function ListeningHistoryTab({
                                 : "text-amber-400"
                             }`}
                           >
-                            {completionRate}%
+                            {completionRate == null ? "—" : `${completionRate}%`}
                           </span>
                           <span className="text-[10px] text-zinc-500">
-                            {isCompleted ? "Trọn vẹn" : isDroppedEarly ? "Bỏ dở sớm" : "Một phần"}
+                            {completionRate == null ? "Chưa có thời lượng" : isCompleted ? "Trọn vẹn" : isDroppedEarly ? "Bỏ dở sớm" : "Một phần"}
                           </span>
                         </div>
                         <div className="h-1.5 w-24 bg-white/5 rounded-full overflow-hidden">
@@ -501,7 +503,7 @@ export function ListeningHistoryTab({
                                 ? "bg-rose-400"
                                 : "bg-amber-400"
                             }`}
-                            style={{ width: `${completionRate}%` }}
+                            style={{ width: `${completionRate == null ? "—" : `${completionRate}%`}` }}
                           />
                         </div>
                       </td>

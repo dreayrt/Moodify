@@ -32,7 +32,7 @@ import {
   type ArtistReview,
   type Track,
 } from "@/lib/api-client";
-import { usePlayer } from "@/components/dashboard/player-context";
+import { usePlayerState } from "@/components/dashboard/player-context";
 import AlbumCard from "@/components/dashboard/album-card";
 import AlbumDetailModal from "@/components/dashboard/album-detail-modal";
 
@@ -41,7 +41,7 @@ export default function ArtistDetailPage() {
   const router = useRouter();
   const artistId = typeof params?.id === "string" ? params.id : "";
 
-  const { playTrack } = usePlayer();
+  const { playTrack } = usePlayerState();
 
   const [profile, setProfile] = useState<ArtistPublicProfile | null>(null);
   const [reviews, setReviews] = useState<ArtistReview[]>([]);
@@ -273,7 +273,7 @@ export default function ArtistDetailPage() {
       <div className="relative w-full rounded-2xl overflow-hidden border border-slate-800/60 shadow-2xl bg-slate-950 mb-8">
         {/* Banner image with overlay */}
         <div className="relative h-64 sm:h-80 md:h-96 w-full">
-          <img
+          <img loading="lazy" decoding="async"
             src={profile.bannerUrl || profile.imageUrl || ""}
             alt={profile.name}
             className="w-full h-full object-cover object-center filter brightness-90"
@@ -286,7 +286,7 @@ export default function ArtistDetailPage() {
           {/* Avatar with Glow */}
           <div className="relative group shrink-0">
             <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full overflow-hidden border-4 border-slate-900 shadow-2xl ring-4 ring-cyan-500/30 bg-slate-900">
-              <img
+              <img loading="lazy" decoding="async"
                 src={profile.imageUrl || ""}
                 alt={profile.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -486,7 +486,7 @@ export default function ArtistDetailPage() {
                       </button>
 
                       {/* Track Image */}
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={track.imageUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100"}
                         alt={track.name}
                         className="w-11 h-11 rounded-lg object-cover bg-slate-800 shrink-0"
@@ -540,7 +540,7 @@ export default function ArtistDetailPage() {
                     onClick={() => handlePlaySingleTrack(track)}
                     className="p-3 rounded-xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 flex items-center gap-3 cursor-pointer hover:bg-slate-900/60 transition-all"
                   >
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={track.imageUrl || ""}
                       alt={track.name}
                       className="w-12 h-12 rounded-lg object-cover shrink-0"
@@ -716,7 +716,7 @@ export default function ArtistDetailPage() {
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700">
                         {rev.userAvatar ? (
-                          <img src={rev.userAvatar} alt={rev.userName} className="w-full h-full object-cover" />
+                          <img loading="lazy" decoding="async" src={rev.userAvatar} alt={rev.userName} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">
                             {rev.userName?.slice(0, 1)?.toUpperCase() || "U"}

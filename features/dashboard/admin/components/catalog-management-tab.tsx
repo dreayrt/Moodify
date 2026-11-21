@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminCoverImage } from "./shared/admin-cover-image";
+
 import React, { useEffect, useState } from "react";
 import {
   AlertOctagon,
@@ -28,16 +30,10 @@ import { ModalPortal } from "./shared/modal-portal";
 
 export function normalizeGenre(genre?: string, title?: string, artist?: string): string {
   if (!genre || genre.trim().toLowerCase() === "other") {
-    const text = `${title || ""} ${artist || ""}`.toLowerCase();
-    if (text.includes("remix") || text.includes("dj ") || text.includes("wrc") || text.includes("drum") || text.includes("edm") || text.includes("vinahouse")) return "EDM / Remix";
-    if (text.includes("đen") || text.includes("b ray") || text.includes("binz") || text.includes("pháp kiều") || text.includes("coldzy") || text.includes("bigdaddy") || text.includes("hieuthuhai") || text.includes("rap") || text.includes("dick") || text.includes("hurrykng")) return "Rap / Hip-Hop";
-    if (text.includes("ngọt") || text.includes("the flob") || text.includes("indiek") || text.includes("lucidrari") || text.includes("ronboogz") || text.includes("yedira") || text.includes("ashen") || text.includes("t.r.i") || text.includes("cheyenne") || text.includes("vẫn thế") || text.includes("trong bao nỗi buồn")) return "Indie";
-    if (text.includes("wren evans") || text.includes("kimmese") || text.includes("grey d")) return "R&B / Soul";
-    if (text.includes("phạm hồng phước") || text.includes("hà nhi") || text.includes("duongg") || text.includes("buồn") || text.includes("mưa") || text.includes("nỗi buồn")) return "Ballad";
-    return "V-Pop";
+    return "Chưa phân loại";
   }
   const lower = genre.trim().toLowerCase();
-  if (lower === "vpop" || lower === "v-pop" || lower === "pop") return "V-Pop";
+  if (lower === "vpop" || lower === "v-pop") return "V-Pop";
   if (lower === "indie") return "Indie";
   if (lower.includes("rap") || lower.includes("hiphop") || lower.includes("hip-hop")) return "Rap / Hip-Hop";
   if (lower.includes("r&b") || lower.includes("rnb")) return "R&B / Soul";
@@ -281,7 +277,7 @@ export function CatalogManagementTab({
                         <div className="flex items-center gap-3">
                           <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black shadow group">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <AdminCoverImage
                               src={track.coverUrl}
                               alt={track.title}
                               className="h-full w-full object-cover transition-transform group-hover:scale-105"
@@ -458,7 +454,7 @@ export function CatalogManagementTab({
             <div className="relative my-auto w-full max-w-xl rounded-2xl border border-[#222432] bg-[#12131a] p-6 shadow-2xl">
               <div className="flex items-start justify-between border-b border-[#222432] pb-4">
                 <div className="flex items-center gap-3.5">
-                  <img
+                  <AdminCoverImage
                     src={inspectingTrack.coverUrl}
                     alt={inspectingTrack.title}
                     className="h-16 w-16 rounded-xl object-cover border border-[#222432] shadow-md shrink-0"
