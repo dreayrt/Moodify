@@ -1,6 +1,5 @@
 import { readSessionCached, invalidateSessionReads } from "../session-read-cache";
 import { getDeviceIdentity, getCurrentDeviceUuid, type DevicePlatform } from "./device-helper";
-import type { AgreementDetails } from "../agreement-details";
 
 export type AuthResponse = {
   accessToken: string;
@@ -672,7 +671,6 @@ export const uploadContentLeadTrack = uploadArtistTrack;
 
 export interface OcrExtractLicenseResponse {
   success: boolean;
-  agreementDetails?: AgreementDetails | null;
   licenseType?: string;
   copyrightOwner?: string;
   distributorId?: number;

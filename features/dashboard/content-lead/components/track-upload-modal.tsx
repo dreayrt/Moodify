@@ -25,7 +25,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { uploadArtistTrack, extractLicenseFromDoc } from "@/lib/auth/auth-client";
-import { AGREEMENT_FIELDS, AGREEMENT_GROUPS, readAgreementDetails, type AgreementDetails } from "@/lib/agreement-details";
 import { parseLyricsContent, readLyricsFile } from "@/lib/lyrics-import";
 import {
   ArtistTrack,
@@ -142,7 +141,6 @@ export function TrackUploadModal({
   // Step 2: License Metadata matching MySQL `song_licenses` table
   const [licenseType, setLicenseType] = useState<string>("DIGITAL_STREAMING");
   const [copyrightOwner, setCopyrightOwner] = useState("");
-  const [agreementDetails, setAgreementDetails] = useState<AgreementDetails>({});
   const [distributorId, setDistributorId] = useState<string>("");
   const [ocrDistributorName, setOcrDistributorName] = useState<string | null>(null);
   const [ocrDirectLicensing, setOcrDirectLicensing] = useState(false);
@@ -223,9 +221,6 @@ export function TrackUploadModal({
       if (requestId !== ocrRequestRef.current) return;
       if (res && res.success) {
         const fields: string[] = [];
-        const extractedAgreement = readAgreementDetails(res.agreementDetails);
-        setAgreementDetails(extractedAgreement);
-        fields.push(...Object.keys(extractedAgreement));
         if (res.licenseType) {
           setLicenseType(res.licenseType);
           fields.push("licenseType");
@@ -301,7 +296,6 @@ export function TrackUploadModal({
     setAcquisitionCostVnd("");
     setCostEvidence("");
     setOcrExtractedFields([]);
-    setAgreementDetails({});
     setCopyrightOwner("");
     // A newly attached agreement must not inherit a distributor from the previous upload.
     setDistributorId("");
@@ -449,10 +443,6 @@ export function TrackUploadModal({
       // License Info
       formData.append("licenseType", licenseType);
       formData.append("copyrightOwner", copyrightOwner.trim());
-      const submittedAgreement = readAgreementDetails(agreementDetails);
-      if (Object.keys(submittedAgreement).length) {
-        formData.append("agreementDetails", JSON.stringify(submittedAgreement));
-      }
       if (acquisitionCostVnd !== "") formData.append("acquisitionCostVnd", acquisitionCostVnd);
       if (distributorId && distributorId !== "0") {
         formData.append("distributorId", distributorId);
@@ -555,7 +545,6 @@ export function TrackUploadModal({
     ocrRequestRef.current += 1;
     setLicenseType("DIGITAL_STREAMING");
     setCopyrightOwner("");
-    setAgreementDetails({});
     setDistributorId("");
     setOcrDistributorName(null);
     setOcrDirectLicensing(false);
@@ -1302,33 +1291,6 @@ export function TrackUploadModal({
                       />
                     </div>
                   </div>
-
-                  <section className="space-y-4 border-t border-white/10 pt-4" aria-labelledby="agreement-details-heading">
-                    <div>
-                      <h3 id="agreement-details-heading" className="text-sm font-semibold text-white">Thông tin các bên và lịch ký</h3>
-                      <p className="mt-1 text-xs text-white/55">Không bắt buộc. Kiểm tra nội dung OCR điền và sửa nếu cần.</p>
-                    </div>
-                    {AGREEMENT_GROUPS.map((group) => (
-                      <fieldset key={group} className="grid gap-3 sm:grid-cols-2" disabled={isExtractingOcr}>
-                        <legend className="mb-2 text-xs font-semibold text-white/80">{group}</legend>
-                        {AGREEMENT_FIELDS.filter((field) => field.group === group).map(({ key, label, maxLength }) => (
-                          <label key={key} className={`space-y-1 ${key.endsWith("Address") ? "sm:col-span-2" : ""}`}>
-                            <span className="block text-xs text-white/65">{label}</span>
-                            <input
-                              type={key === "plannedSigningDate" ? "date" : "text"}
-                              value={agreementDetails[key] ?? ""}
-                              maxLength={maxLength}
-                              onChange={(event) => {
-                                const value = event.currentTarget.value;
-                                setAgreementDetails((previous) => ({ ...previous, [key]: value }));
-                              }}
-                              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-[#ff8b4d]/50 [color-scheme:dark]"
-                            />
-                          </label>
-                        ))}
-                      </fieldset>
-                    ))}
-                  </section>
                 </div>
 
               </div>
