@@ -70,11 +70,6 @@ const LICENSE_TYPES: Array<{
   },
 ];
 
-/** Mirrors the backend rule: a document that reads as test/demo data must be declared DEMO_SIMULATED. */
-function looksSimulated(owner: string, contractCode: string): boolean {
-  return /(giả\s+định|\bsimulated\b|\bdemo\b|\btest-)/iu.test(`${owner} ${contractCode}`.toLowerCase());
-}
-
 const DISTRIBUTOR_OPTIONS = [
   { id: "", name: "Không qua đơn vị phân phối (Tự phát hành độc lập)", share: "100%" },
 ];
@@ -1166,11 +1161,6 @@ export function TrackUploadModal({
                       </select>
                       {licenseType === "DEMO_SIMULATED" && (
                         <p className="mt-2 text-xs text-amber-200">Hồ sơ mô phỏng không xác nhận quyền thương mại. Chi phí thực tế được ghi nhận bằng 0 và chỉ được phát trong chế độ demo.</p>
-                      )}
-                      {licenseType !== "DEMO_SIMULATED" && looksSimulated(copyrightOwner, distributionContractCode) && (
-                        <p className="mt-2 text-xs text-amber-200">
-                          Tài liệu này có dấu hiệu là dữ liệu thử nghiệm (“giả định”, “demo”, “test-”). Vẫn có thể tải lên; hệ thống sẽ lưu như hồ sơ mô phỏng (chi phí ghi nhận bằng 0, chỉ phát trong chế độ demo).
-                        </p>
                       )}
                     </div>
                   </div>
