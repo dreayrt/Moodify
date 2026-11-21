@@ -61,7 +61,8 @@ jobs:
             echo "🚀 Starting Frontend CI/CD deployment to Google Cloud VM on main..."
             cd /opt/moodify/frontend
             git fetch origin main
-            git checkout --detach ${{ github.sha }}
+            # -f overwrites untracked files left on the VM (e.g. manually copied) that collide with the new commit
+            git checkout -f --detach ${{ github.sha }}
             cd /opt/moodify
             docker compose build moodify-frontend
             docker compose up -d --no-deps moodify-frontend
