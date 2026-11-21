@@ -70,6 +70,11 @@ const LICENSE_TYPES: Array<{
   },
 ];
 
+/** Mirrors the backend rule: a document that reads as test/demo data must be declared DEMO_SIMULATED. */
+function looksSimulated(owner: string, contractCode: string): boolean {
+  return /(giả\s+định|\bsimulated\b|\bdemo\b|\btest-)/iu.test(`${owner} ${contractCode}`.toLowerCase());
+}
+
 const DISTRIBUTOR_OPTIONS = [
   { id: "", name: "Không qua đơn vị phân phối (Tự phát hành độc lập)", share: "100%" },
 ];
@@ -408,6 +413,10 @@ export function TrackUploadModal({
     }
     if (!distributionContractCode.trim()) {
       setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
+      return;
+    }
+    if (licenseType !== "DEMO_SIMULATED" && looksSimulated(copyrightOwner, distributionContractCode)) {
+      setStepError("Chủ sở hữu hoặc mã hợp đồng có dấu hiệu là dữ liệu thử nghiệm (“giả định”, “demo”, “test-”). Hãy chọn loại “Dữ liệu mô phỏng”, hoặc nhập thông tin thật theo tài liệu.");
       return;
     }
 
@@ -1161,6 +1170,18 @@ export function TrackUploadModal({
                       </select>
                       {licenseType === "DEMO_SIMULATED" && (
                         <p className="mt-2 text-xs text-amber-200">Hồ sơ mô phỏng không xác nhận quyền thương mại. Chi phí thực tế được ghi nhận bằng 0 và chỉ được phát trong chế độ demo.</p>
+                      )}
+                      {licenseType !== "DEMO_SIMULATED" && looksSimulated(copyrightOwner, distributionContractCode) && (
+                        <p className="mt-2 text-xs text-amber-200">
+                          Tài liệu này có dấu hiệu là dữ liệu thử nghiệm (“giả định”, “demo”, “test-”) nên phải khai báo là hồ sơ mô phỏng.{" "}
+                          <button
+                            type="button"
+                            onClick={() => setLicenseType("DEMO_SIMULATED")}
+                            className="font-semibold underline underline-offset-2 hover:text-amber-100"
+                          >
+                            Chuyển sang “Dữ liệu mô phỏng”
+                          </button>
+                        </p>
                       )}
                     </div>
                   </div>
