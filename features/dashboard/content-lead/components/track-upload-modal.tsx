@@ -415,10 +415,6 @@ export function TrackUploadModal({
       setStepError("Vui lòng nhập mã hợp đồng khi chọn đơn vị phân phối.");
       return;
     }
-    if (licenseType !== "DEMO_SIMULATED" && looksSimulated(copyrightOwner, distributionContractCode)) {
-      setStepError("Chủ sở hữu hoặc mã hợp đồng có dấu hiệu là dữ liệu thử nghiệm (“giả định”, “demo”, “test-”). Hãy chọn loại “Dữ liệu mô phỏng”, hoặc nhập thông tin thật theo tài liệu.");
-      return;
-    }
 
     setIsSubmitting(true);
     setStepError(null);
@@ -1173,14 +1169,7 @@ export function TrackUploadModal({
                       )}
                       {licenseType !== "DEMO_SIMULATED" && looksSimulated(copyrightOwner, distributionContractCode) && (
                         <p className="mt-2 text-xs text-amber-200">
-                          Tài liệu này có dấu hiệu là dữ liệu thử nghiệm (“giả định”, “demo”, “test-”) nên phải khai báo là hồ sơ mô phỏng.{" "}
-                          <button
-                            type="button"
-                            onClick={() => setLicenseType("DEMO_SIMULATED")}
-                            className="font-semibold underline underline-offset-2 hover:text-amber-100"
-                          >
-                            Chuyển sang “Dữ liệu mô phỏng”
-                          </button>
+                          Tài liệu này có dấu hiệu là dữ liệu thử nghiệm (“giả định”, “demo”, “test-”). Vẫn có thể tải lên; hệ thống sẽ lưu như hồ sơ mô phỏng (chi phí ghi nhận bằng 0, chỉ phát trong chế độ demo).
                         </p>
                       )}
                     </div>
