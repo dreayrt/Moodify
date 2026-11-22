@@ -107,10 +107,7 @@ function TrackEditForm({
                   {title || track.title}
                 </p>
                 <p className="text-[11px] text-white/50 truncate mt-0.5">
-                  {track.artist || "You (Artist)"}
-                </p>
-                <p className="text-[10px] text-[#ffb488] font-mono mt-0.5">
-                  ID: {track.id}
+                  {track.artist || "Nghệ sĩ"}
                 </p>
               </div>
             </div>
@@ -357,7 +354,7 @@ export function TrackEditModal({
               <h3 className="font-graphik text-[18px] sm:text-[20px] font-semibold text-white">
                 {t("dashboard.artist.trackCatalog.modal.editTitle")}
               </h3>
-              <p className="text-[12px] text-white/50">{track.id}</p>
+              <p className="text-[12px] text-white/50">{track.title}</p>
             </div>
           </div>
           <button

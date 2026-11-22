@@ -201,22 +201,22 @@ export function FavoritesManagementTab({
 
   const leaderboardTitle =
     activeType === "ALBUM"
-      ? "Bảng Xếp Hạng Album Được Yêu Thích Nhất"
+      ? "Album được yêu thích nhất"
       : activeType === "ARTIST"
-      ? "Bảng Xếp Hạng Nghệ Sĩ Được Yêu Thích Nhất"
-      : "Bảng Xếp Hạng Bài Hát Được Yêu Thích Nhất";
+      ? "Nghệ sĩ được yêu thích nhất"
+      : "Bài hát được yêu thích nhất";
 
   const leaderboardSubtitle =
     activeType === "ALBUM"
-      ? "Các album tuyển tập được cộng đồng thính giả Moodify tương tác và thả tim nhiều nhất"
+      ? "Các album được người nghe yêu thích nhiều nhất"
       : activeType === "ARTIST"
-      ? "Các nghệ sĩ tài năng được cộng đồng người nghe theo dõi và yêu mến nhất"
-      : "Các tác phẩm âm nhạc được cộng đồng thính giả Moodify tương tác và thả tim nhiều nhất";
+      ? "Các nghệ sĩ được người nghe theo dõi và yêu thích nhiều nhất"
+      : "Các bài hát được người nghe yêu thích nhiều nhất";
 
   return (
     <div className="space-y-6 anim-fade-up">
       {/* 1. Header Leaderboard: Most Liked Tracks / Albums / Artists */}
-      <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-sm">
+      <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#ff5500]/10 text-[#ff5500]">
@@ -239,7 +239,7 @@ export function FavoritesManagementTab({
             {[1, 2, 3, 4, 5].map((n) => (
               <div
                 key={n}
-                className="h-56 rounded-xl border border-[#222432] bg-[#171822] animate-pulse"
+                className="h-56 rounded-xl border border-white/[0.08] bg-[#171923] animate-pulse"
               />
             ))}
           </div>
@@ -256,8 +256,8 @@ export function FavoritesManagementTab({
             </button>
           </div>
         ) : leaderboard.length === 0 ? (
-          <div className="py-6 text-center text-xs text-zinc-500 font-mono">
-            Chưa có bảng xếp hạng cho mục này
+          <div className="py-6 text-center text-xs text-zinc-500">
+            Chưa có dữ liệu xếp hạng cho mục này.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -333,52 +333,52 @@ export function FavoritesManagementTab({
       </div>
 
       {/* 2. Type Selector Tabs (SONG / ARTIST / ALBUM) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#222432] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => handleSelectType("SONG")}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
               activeType === "SONG"
                 ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/20"
                 : "bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
             }`}
           >
-            <Music className="h-3.5 w-3.5" /> Bài Hát Yêu Thích
+            <Music className="h-3.5 w-3.5" /> Bài hát
           </button>
 
           <button
             type="button"
             onClick={() => handleSelectType("ARTIST")}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
               activeType === "ARTIST"
                 ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/20"
                 : "bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
             }`}
           >
-            <Users className="h-3.5 w-3.5" /> Nghệ Sĩ Yêu Thích
+            <Users className="h-3.5 w-3.5" /> Nghệ sĩ
           </button>
 
           <button
             type="button"
             onClick={() => handleSelectType("ALBUM")}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
               activeType === "ALBUM"
                 ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/20"
                 : "bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
             }`}
           >
-            <Disc className="h-3.5 w-3.5" /> Album Yêu Thích
+            <Disc className="h-3.5 w-3.5" /> Album
           </button>
         </div>
 
-        <div className="text-xs font-mono text-zinc-400">
+        <div className="text-xs text-zinc-400 tabular-nums">
           Tổng cộng: <strong className="text-white">{totalItems}</strong> lượt yêu thích
         </div>
       </div>
 
-      {/* 3. SoundCloud Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#222432] bg-[#12131a] p-3.5">
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-[#12141c] p-3.5">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
           <input
@@ -387,12 +387,12 @@ export function FavoritesManagementTab({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               activeType === "ALBUM"
-                ? "Tìm theo tên album, tên người dùng, email..."
+                ? "Tìm theo tên album, người dùng, email..."
                 : activeType === "ARTIST"
-                ? "Tìm theo tên nghệ sĩ, tên người dùng, email..."
+                ? "Tìm theo tên nghệ sĩ, người dùng, email..."
                 : "Tìm theo tên bài hát, người dùng, email..."
             }
-            className="w-full rounded-lg border border-[#222432] bg-[#171822] pl-10 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:border-[#ff5500] focus:outline-none transition"
+            className="w-full rounded-lg border border-white/[0.08] bg-[#171923] pl-10 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:border-[#ff5500] focus:outline-none transition"
           />
           {searchQuery && (
             <button
@@ -409,7 +409,7 @@ export function FavoritesManagementTab({
           <button
             type="button"
             onClick={handleResetFilters}
-            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-mono text-zinc-300 hover:bg-white/10 hover:text-white transition"
+            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition"
           >
             <RotateCcw className="h-3 w-3" /> Đặt lại tìm kiếm
           </button>
@@ -422,7 +422,7 @@ export function FavoritesManagementTab({
           {[1, 2, 3, 4].map((n) => (
             <div
               key={n}
-              className="h-16 rounded-xl border border-[#222432] bg-[#12131a] animate-pulse"
+              className="h-16 rounded-xl border border-white/[0.08] bg-[#12141c] animate-pulse"
             />
           ))}
         </div>
@@ -440,24 +440,24 @@ export function FavoritesManagementTab({
           </button>
         </div>
       ) : favorites.length === 0 ? (
-        <div className="rounded-xl border border-[#222432] bg-[#12131a] p-12 text-center">
+        <div className="rounded-xl border border-white/[0.08] bg-[#12141c] p-12 text-center">
           <Heart className="mx-auto h-10 w-10 text-zinc-600 mb-3" />
           <h3 className="text-base font-bold text-white">Chưa có lượt yêu thích nào</h3>
           <p className="mt-1 text-xs text-zinc-400 max-w-sm mx-auto">
-            Không tìm thấy bản ghi yêu thích nào tương ứng với tìm kiếm hiện tại.
+            Không tìm thấy lượt yêu thích nào phù hợp.
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-[#222432] bg-[#12131a] overflow-hidden">
+        <div className="rounded-xl border border-white/[0.08] bg-[#12141c] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-white/5 bg-white/[0.02] text-zinc-400 font-mono text-[11px] uppercase tracking-wider">
-                  <th className="py-3.5 px-4 font-semibold">Người Dùng Thả Tim</th>
-                  <th className="py-3.5 px-4 font-semibold">Nội Dung Được Thích</th>
-                  <th className="py-3.5 px-4 font-semibold">Phân Loại</th>
-                  <th className="py-3.5 px-4 font-semibold">Thời Điểm</th>
-                  <th className="py-3.5 px-4 font-semibold text-right">Thao Tác</th>
+                <tr className="border-b border-white/[0.06] bg-white/[0.02] text-zinc-400 text-xs font-medium">
+                  <th className="py-3.5 px-4 font-semibold">Người dùng</th>
+                  <th className="py-3.5 px-4 font-semibold">Nội dung đã thích</th>
+                  <th className="py-3.5 px-4 font-semibold">Loại</th>
+                  <th className="py-3.5 px-4 font-semibold">Thời gian</th>
+                  <th className="py-3.5 px-4 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -552,24 +552,24 @@ export function FavoritesManagementTab({
                       {/* Type */}
                       <td className="py-3 px-4">
                         {fav.type === "SONG" && (
-                          <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                            <Music className="h-2.5 w-2.5" /> BÀI HÁT
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-300">
+                            <Music className="h-3.5 w-3.5" /> Bài hát
                           </span>
                         )}
                         {fav.type === "ARTIST" && (
-                          <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                            <Users className="h-2.5 w-2.5" /> NGHỆ SĨ
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                            <Users className="h-3.5 w-3.5" /> Nghệ sĩ
                           </span>
                         )}
                         {fav.type === "ALBUM" && (
-                          <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                            <Disc className="h-2.5 w-2.5" /> ALBUM
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300">
+                            <Disc className="h-3.5 w-3.5" /> Album
                           </span>
                         )}
                       </td>
 
                       {/* Timestamp */}
-                      <td className="py-3 px-4 text-zinc-400 font-mono text-xs">
+                      <td className="py-3 px-4 text-zinc-400 font-mono text-xs tabular-nums">
                         {fav.createdAt}
                       </td>
 
@@ -632,7 +632,7 @@ export function FavoritesManagementTab({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Xóa lượt yêu thích</h3>
-                  <p className="text-xs text-zinc-400">Xóa bản ghi này khỏi cơ sở dữ liệu MySQL.</p>
+                  <p className="text-xs text-zinc-400">Lượt yêu thích này sẽ bị xóa khỏi hệ thống.</p>
                 </div>
               </div>
 

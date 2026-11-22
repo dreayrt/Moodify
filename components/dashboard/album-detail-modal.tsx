@@ -208,15 +208,12 @@ export default function AlbumDetailModal({
                   alt={album.title}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[9px] font-bold text-cyan-300">
-                  ALBUM
-                </div>
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-400">
-                  <Disc className="w-4 h-4 animate-spin-slow" />
-                  <span>Album Tuyển Tập</span>
+                  <Disc className="w-4 h-4" />
+                  <span>Album</span>
                   {album.releaseDate && (
                     <span className="text-slate-400 font-normal">
                       • {album.releaseDate.split("-")[0]}

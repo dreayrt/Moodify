@@ -585,7 +585,7 @@ export async function fetchKaraokeTracks(options?: {
   } catch (error) {
     if (timedOut) {
       throw new Error(
-        "Kho bài Karaoke không phản hồi sau 10 giây. Hãy kiểm tra backend và dịch vụ MongoDB.",
+        "Kho bài Karaoke không phản hồi sau 10 giây. Vui lòng kiểm tra kết nối máy chủ.",
       );
     }
     throw error;

@@ -78,7 +78,7 @@ export default function AdInterstitialBanner() {
                       ? "SONIC IDENT"
                       : isBasicUpsell
                       ? "HẾT HẠN MỨC NGÀY"
-                      : "SPONSORED SESSION"}
+                      : "NỘI DUNG TÀI TRỢ"}
                   </span>
                 </div>
 
@@ -87,7 +87,7 @@ export default function AdInterstitialBanner() {
                     ? "Moodify • Âm Nhạc Theo Cách Của Bạn"
                     : isBasicUpsell
                     ? "Đã nghe hết 15 bài hôm nay"
-                    : "Mở khóa trải nghiệm âm nhạc chuẩn studio"}
+                    : "Nghe nhạc chất lượng cao, không quảng cáo"}
                 </h4>
 
                 <p className="text-xs text-white/60 font-light leading-snug line-clamp-1 mt-0.5">

@@ -88,7 +88,7 @@ export default function PremiumPage() {
     } catch (err: any) {
       console.error("Lỗi tạo đơn thanh toán SePay:", err);
       alert(
-        err.message || "Không thể tạo đơn thanh toán SePay. Vui lòng thử lại!",
+        err.message || "Không thể tạo đơn thanh toán SePay. Vui lòng thử lại.",
       );
       setIsModalOpen(false);
     } finally {
@@ -225,11 +225,11 @@ export default function PremiumPage() {
       } else {
         window.dispatchEvent(new Event("moodify-notifications-updated"));
         alert(
-          "Hệ thống chưa nhận được thanh toán. Vui lòng đảm bảo bạn đã chuyển đúng số tiền và nội dung!",
+          "Hệ thống chưa nhận được thanh toán. Vui lòng đảm bảo bạn đã chuyển đúng số tiền và nội dung.",
         );
       }
     } catch (err: any) {
-      alert("Hệ thống vẫn đang kiểm tra tự động. Vui lòng đợi trong giây lát!");
+      alert("Hệ thống vẫn đang kiểm tra tự động. Vui lòng đợi trong giây lát.");
     }
   };
 
@@ -437,7 +437,7 @@ export default function PremiumPage() {
                 <li className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
-                    Chuyển bài (Skip) <strong>hoàn toàn vô hạn</strong>
+                    Chuyển bài <strong>không giới hạn</strong>
                   </span>
                 </li>
                 <li className="flex items-center gap-2.5">
@@ -448,14 +448,13 @@ export default function PremiumPage() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
                     Chất lượng âm thanh{" "}
-                    <strong>Ultra HD 320 kbps Lossless</strong>
+                    <strong>cao nhất</strong>
                   </span>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
-                    Mở khóa Theme hào quang <strong>Obsidian Royal Gold</strong>{" "}
-                    & Huy hiệu VIP
+                    Mở khóa giao diện nổi bật và huy hiệu thành viên
                   </span>
                 </li>
                 <li className="flex items-center gap-2.5">
@@ -470,7 +469,7 @@ export default function PremiumPage() {
             onClick={() => fullPkg && handleOpenCheckout(fullPkg)}
             className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>{getActionLabel(fullPkg, "Nâng Cấp Cá Nhân FULL")}</span>
+            <span>{getActionLabel(fullPkg, "Nâng cấp gói Cá nhân")}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -575,7 +574,7 @@ export default function PremiumPage() {
             onClick={() => famPkg && handleOpenCheckout(famPkg)}
             className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>{getActionLabel(famPkg, "Nâng Cấp Gia Đình (6 Người)")}</span>
+            <span>{getActionLabel(famPkg, "Nâng cấp gói Gia đình (6 người)")}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -921,7 +920,7 @@ export default function PremiumPage() {
                   </div>
                   {checkoutData.discountApplied && (
                     <div className="flex justify-between text-emerald-300">
-                      <span>Ưu đãi cùng tier</span>
+                      <span>Ưu đãi cùng hạng gói</span>
                       <span>
                         -{checkoutData.discountAmount.toLocaleString("vi-VN")} đ
                       </span>
@@ -937,8 +936,7 @@ export default function PremiumPage() {
                       alt="VietQR SePay"
                       className="w-48 h-48 md:w-52 md:h-52 object-contain rounded-xl"
                     />
-                    <div className="absolute -top-2.5 -right-2.5 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-slate-950 uppercase shadow-md flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping"></span>
+                    <div className="absolute -top-2.5 -right-2.5 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-bold text-slate-950 uppercase shadow-md">
                       VietQR
                     </div>
                   </div>
@@ -949,11 +947,11 @@ export default function PremiumPage() {
                       <Clock className="w-3.5 h-3.5" />
                       <span>
                         Hết hạn sau:{" "}
-                        <strong>{formatCountdown(countdownSeconds)}</strong>
+                        <strong className="tabular-nums">{formatCountdown(countdownSeconds)}</strong>
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                       <span>Đang chờ thanh toán</span>
                     </div>
                   </div>

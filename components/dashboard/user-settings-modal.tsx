@@ -477,7 +477,7 @@ export default function UserSettingsModal({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-bold text-white truncate">
-                      Chủ Đề Hoàng Kim (Obsidian Royal Gold)
+                      Giao diện Vàng Kim
                     </p>
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
                       VIP
@@ -487,7 +487,7 @@ export default function UserSettingsModal({
                     {isPremium
                       ? goldThemeEnabled
                         ? "Đang bật tông màu vàng kim hoàng gia sang trọng."
-                        : "Đang tắt, hiển thị nền Studio Deep Obsidian mặc định."
+                        : "Đang tắt, hiển thị giao diện tối mặc định."
                       : "Dành riêng cho thành viên VIP. Nâng cấp để mở khóa ánh sáng hào quang hoàng kim."}
                   </p>
                 </div>
@@ -732,8 +732,14 @@ export default function UserSettingsModal({
                   </div>
                   <div>
                     <span className="text-[10.5px] text-white/50 block">Vai trò tài khoản:</span>
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      {user?.role || "USER"}
+                    <span className="text-xs font-semibold text-white">
+                      {user?.role === "ADMIN"
+                        ? "Quản trị viên"
+                        : user?.role === "MODERATOR"
+                          ? "Kiểm duyệt viên"
+                          : user?.role === "CONTENT_LEAD" || user?.role === "ARTIST"
+                            ? "Quản lý nội dung"
+                            : "Người nghe"}
                     </span>
                   </div>
                 </div>
@@ -744,7 +750,7 @@ export default function UserSettingsModal({
                     onClick={onClose}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all shadow-sm"
                   >
-                    <span>Vào Content Studio</span>
+                    <span>Quản lý nội dung</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 )}
@@ -755,7 +761,7 @@ export default function UserSettingsModal({
                     onClick={onClose}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-500/30 hover:bg-sky-500/25 transition-all shadow-sm"
                   >
-                    <span>Vào Kênh Kiểm Duyệt</span>
+                    <span>Kiểm duyệt bài hát</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 )}

@@ -1,7 +1,7 @@
 import AdminDashboardPage from "@/features/dashboard/admin/components/admin-dashboard-page";
 
 export const metadata = {
-  title: "Admin Console | Moodify Studio & Governance",
+  title: "Quản trị | Moodify",
   description: "Trang quản trị vận hành hệ thống âm nhạc cảm xúc Moodify.",
 };
 

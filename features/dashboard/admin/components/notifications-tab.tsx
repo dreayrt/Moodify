@@ -28,11 +28,15 @@ const NOTIFICATION_TYPES: { value: NotificationType; label: string; color: strin
 
 const TARGET_ROLES = [
   { value: "ALL", label: "Tất cả người dùng" },
-  { value: "USER", label: "Chỉ Người nghe (USER)" },
-  { value: "CONTENT_LEAD", label: "Chỉ Nghệ sĩ / Content Lead" },
-  { value: "MODERATOR", label: "Chỉ Kiểm duyệt viên" },
-  { value: "ADMIN", label: "Chỉ Quản trị viên" },
+  { value: "USER", label: "Người nghe" },
+  { value: "CONTENT_LEAD", label: "Quản lý nội dung" },
+  { value: "MODERATOR", label: "Kiểm duyệt viên" },
+  { value: "ADMIN", label: "Quản trị viên" },
 ];
+
+const TARGET_ROLE_LABELS: Record<string, string> = Object.fromEntries(
+  TARGET_ROLES.map((r) => [r.value, r.label])
+);
 
 type ToastFn = (message: string, type?: "success" | "error" | "info" | "warning") => void;
 
@@ -123,16 +127,16 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
       <div>
         <h1 className="font-graphik text-[22px] font-semibold text-white flex items-center gap-2.5">
           <BellRing className="h-5 w-5 text-[#ff5500]" />
-          Quản Lý Thông Báo
+          Thông báo
         </h1>
         <p className="mt-1 text-[13px] text-zinc-400">
-          Gửi thông báo tức thời tới người dùng toàn sàn hoặc theo vai trò. Thông báo hiển thị ngay trên chuông thông báo của từng người dùng.
+          Gửi thông báo tới toàn bộ người dùng hoặc theo từng nhóm vai trò.
         </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start">
         {/* Broadcast History */}
-        <section className="rounded-2xl border border-[#222432] bg-[#12131a] p-5">
+        <section className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <Megaphone className="h-4 w-4 text-[#ff5500]" />
@@ -141,7 +145,7 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
             <button
               type="button"
               onClick={() => void loadHistory()}
-              className="text-[11px] font-semibold text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg border border-[#222432] hover:border-[#ff5500]/50 transition cursor-pointer"
+              className="text-xs font-medium text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg border border-white/[0.08] hover:border-[#ff5500]/50 transition cursor-pointer"
             >
               Làm mới
             </button>
@@ -150,7 +154,7 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
           {isLoading ? (
             <div className="flex items-center justify-center py-14 text-zinc-500">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              <span className="text-[13px]">Đang tải lịch sử từ máy chủ...</span>
+              <span className="text-[13px]">Đang tải lịch sử...</span>
             </div>
           ) : historyError ? (
             <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-5 text-center">
@@ -159,7 +163,7 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
               <button
                 type="button"
                 onClick={() => void loadHistory()}
-                className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/25 transition cursor-pointer"
+                className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/25 transition cursor-pointer"
               >
                 Thử lại
               </button>
@@ -173,27 +177,28 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
             <div className="space-y-2.5 max-h-[560px] overflow-y-auto moodify-scroll pr-1">
               {history.map((item) => {
                 const meta = typeMeta(item.type);
+                const roleLabel = TARGET_ROLE_LABELS[item.targetRole] || item.targetRole;
                 return (
-                  <div key={item.id} className="rounded-xl border border-[#222432] bg-[#0e0f14] p-3.5">
+                  <div key={item.id} className="rounded-xl border border-white/[0.08] bg-[#0e1017] p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${meta.color}`}>
+                        <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                          <span className={`font-semibold px-2 py-0.5 rounded border ${meta.color}`}>
                             {meta.label}
                           </span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.06] text-zinc-400">
-                            {item.targetRole}
+                          <span className="text-zinc-400">
+                            {roleLabel}
                           </span>
                         </div>
                         <p className="mt-2 text-[13px] font-semibold text-white truncate">{item.title}</p>
                         <p className="mt-0.5 text-[12px] text-zinc-400 line-clamp-2 leading-relaxed">{item.message}</p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-[#ff5500] justify-end">
+                        <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-[#ff5500] justify-end tabular-nums">
                           <Users className="h-3 w-3" />
                           {item.recipients}
                         </div>
-                        <div className="text-[10px] text-zinc-500 mt-1 font-mono">
+                        <div className="text-[11px] text-zinc-500 mt-1 font-mono tabular-nums">
                           {item.lastSentAt ? new Date(item.lastSentAt).toLocaleString("vi-VN") : "—"}
                         </div>
                       </div>
@@ -206,7 +211,7 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
         </section>
 
         {/* Compose Form */}
-        <section className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 xl:sticky xl:top-20">
+        <section className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 xl:sticky xl:top-20">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Send className="h-4 w-4 text-[#ff5500]" />
             Soạn thông báo mới
@@ -214,41 +219,41 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Tiêu đề *</label>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Tiêu đề *</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="VD: Bảo trì hệ thống đêm nay"
                 maxLength={200}
-                className="w-full rounded-xl border border-[#222432] bg-[#0e0f14] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#ff5500]/60 transition"
+                className="w-full rounded-xl border border-white/[0.08] bg-[#0e1017] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#ff5500]/60 transition"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Nội dung *</label>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Nội dung *</label>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Nội dung thông báo gửi tới người dùng..."
                 rows={5}
                 maxLength={1000}
-                className="w-full rounded-xl border border-[#222432] bg-[#0e0f14] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#ff5500]/60 transition resize-none"
+                className="w-full rounded-xl border border-white/[0.08] bg-[#0e1017] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#ff5500]/60 transition resize-none"
               />
-              <div className="text-right text-[10px] font-mono text-zinc-600 mt-1">{message.length}/1000</div>
+              <div className="text-right text-[11px] font-mono text-zinc-600 mt-1 tabular-nums">{message.length}/1000</div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Loại thông báo</label>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Loại thông báo</label>
               <div className="flex flex-wrap gap-1.5">
                 {NOTIFICATION_TYPES.map((t) => (
                   <button
                     key={t.value}
                     type="button"
                     onClick={() => setType(t.value)}
-                    className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
+                    className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
                       type === t.value
                         ? "bg-[#ff5500] text-white border-[#ff5500]"
-                        : "bg-white/[0.03] text-zinc-400 border-[#222432] hover:text-white hover:border-zinc-600"
+                        : "bg-white/[0.03] text-zinc-400 border-white/[0.08] hover:text-white hover:border-zinc-600"
                     }`}
                   >
                     {t.label}
@@ -258,11 +263,11 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Người nhận</label>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Người nhận</label>
               <select
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
-                className="w-full rounded-xl border border-[#222432] bg-[#0e0f14] px-3.5 py-2.5 text-[13px] text-white focus:outline-none focus:border-[#ff5500]/60 transition cursor-pointer"
+                className="w-full rounded-xl border border-white/[0.08] bg-[#0e1017] px-3.5 py-2.5 text-[13px] text-white focus:outline-none focus:border-[#ff5500]/60 transition cursor-pointer"
               >
                 {TARGET_ROLES.map((r) => (
                   <option key={r.value} value={r.value}>{r.label}</option>
@@ -271,12 +276,12 @@ export function NotificationsTab({ onToast }: { onToast: ToastFn }) {
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Liên kết đính kèm (tùy chọn)</label>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Liên kết đính kèm (tùy chọn)</label>
               <input
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 placeholder="/dashboard/premium"
-                className="w-full rounded-xl border border-[#222432] bg-[#0e0f14] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#ff5500]/60 transition"
+                className="w-full rounded-xl border border-white/[0.08] bg-[#0e1017] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#ff5500]/60 transition"
               />
             </div>
 

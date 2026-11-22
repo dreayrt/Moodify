@@ -114,26 +114,26 @@ export function ModeratorHistoryTab({ history }: ModeratorHistoryTabProps) {
       </div>
 
       {/* History Audit Table */}
-      <div className="overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.03] shadow-[0_20px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#12141c]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px]">
-            <thead className="border-b border-white/8 bg-white/[0.02] text-[11px] uppercase tracking-wider text-white/40">
+            <thead className="border-b border-white/[0.08] bg-white/[0.02] text-xs font-medium text-white/50">
               <tr>
-                <th className="py-4 pl-6 pr-4">Bài hát & Nghệ sĩ</th>
-                <th className="px-4 py-4">Thể loại</th>
-                <th className="px-4 py-4">Quyết định</th>
-                <th className="px-4 py-4">Thời gian nghe</th>
-                <th className="px-4 py-4">Thời điểm thẩm định</th>
-                <th className="px-4 py-4">Ghi chú / Phản hồi</th>
-                <th className="py-4 pl-4 pr-6 text-right">Thao tác</th>
+                <th className="py-3.5 pl-6 pr-4">Bài hát & Nghệ sĩ</th>
+                <th className="px-4 py-3.5">Thể loại</th>
+                <th className="px-4 py-3.5">Kết quả</th>
+                <th className="px-4 py-3.5">Thời gian nghe</th>
+                <th className="px-4 py-3.5">Thời gian duyệt</th>
+                <th className="px-4 py-3.5">Ghi chú</th>
+                <th className="py-3.5 pl-4 pr-6 text-right">Chi tiết</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/6 text-white/80">
+            <tbody className="divide-y divide-white/[0.06] text-white/80">
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-white/40">
-                    <History className="mx-auto h-8 w-8 text-white/20 mb-2" />
-                    Chưa có nhật ký kiểm duyệt nào phù hợp.
+                  <td colSpan={7} className="py-12 text-center text-white/45">
+                    <History className="mx-auto mb-2 h-8 w-8 text-white/25" />
+                    Chưa có lịch sử duyệt bài nào phù hợp.
                   </td>
                 </tr>
               ) : (
@@ -154,7 +154,7 @@ export function ModeratorHistoryTab({ history }: ModeratorHistoryTabProps) {
                           <p className="truncate font-semibold text-white">
                             {item.trackTitle}
                           </p>
-                          <p className="truncate text-[12px] text-white/50">
+                          <p className="truncate text-xs text-white/50">
                             {item.artistName}
                           </p>
                         </div>
@@ -187,17 +187,17 @@ export function ModeratorHistoryTab({ history }: ModeratorHistoryTabProps) {
                     </td>
 
                     {/* Review Duration */}
-                    <td className="px-4 py-3.5 font-mono text-white/60">
-                      {formatSecs(item.reviewDurationSec)}
+                    <td className="px-4 py-3.5 font-mono text-white/60 tabular-nums">
+                      {item.reviewDurationSec > 0 ? formatSecs(item.reviewDurationSec) : "—"}
                     </td>
 
                     {/* Reviewed At */}
-                    <td className="px-4 py-3.5 text-[12px] text-white/50">
+                    <td className="px-4 py-3.5 text-xs text-white/55 tabular-nums">
                       {item.reviewedAt}
                     </td>
 
                     {/* Note / Rejection snippet */}
-                    <td className="px-4 py-3.5 max-w-xs truncate text-[12px] text-white/60">
+                    <td className="px-4 py-3.5 max-w-xs truncate text-xs text-white/60">
                       {item.rejectionReason || item.internalNote || "—"}
                     </td>
 
@@ -206,10 +206,10 @@ export function ModeratorHistoryTab({ history }: ModeratorHistoryTabProps) {
                       <button
                         type="button"
                         onClick={() => setSelectedAuditItem(item)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white cursor-pointer"
                       >
                         <Eye className="h-3.5 w-3.5 text-[#ff8b4d]" />
-                        <span>Xem lại</span>
+                        <span>Xem</span>
                       </button>
                     </td>
                   </tr>

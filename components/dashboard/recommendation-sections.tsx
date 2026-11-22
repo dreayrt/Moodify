@@ -14,7 +14,6 @@ import {
   EyeOff,
   UserPlus,
   UserCheck,
-  Disc,
   Sparkles,
   Flame,
   Radio,
@@ -121,12 +120,8 @@ function PersonalizedMixCard({
       ref={ref}
       className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-4.5 border border-white/[0.08] hover:border-white/20 transition-all duration-300 hover:shadow-2xl hover:shadow-black/60`}
     >
-      {/* Top row: Badge + Hide button */}
-      <div className="flex items-center justify-between gap-2 z-10">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-white/10 text-white/90 backdrop-blur-md border border-white/10">
-          <Disc size={11} className="text-purple-300 animate-spin-slow" />
-          Bản phối riêng
-        </span>
+      {/* Top row: Hide button */}
+      <div className="flex items-center justify-end gap-2 z-10">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -648,7 +643,7 @@ export default function RecommendationSections() {
           className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/90 border border-white/10 px-4 py-3 text-xs text-white/80 shadow-2xl backdrop-blur-md anim-fade-up"
         >
           <span className="flex items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
             Đã ẩn <strong className="text-white">{lastHidden.item.title}</strong> khỏi danh sách đề xuất.
           </span>
           <button

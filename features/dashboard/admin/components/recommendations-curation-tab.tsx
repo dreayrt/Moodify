@@ -409,10 +409,10 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
         <div>
           <h2 className="font-graphik text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
             <Sparkles className="h-6 w-6 text-[#ff5500]" />
-            Tuyển Chọn Âm Nhạc Theo Đợt
+            Tuyển chọn âm nhạc
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
-            Điều phối chiến dịch âm nhạc theo sự kiện, thời điểm và quản lý công tắc động cơ đề xuất.
+            Quản lý các đợt tuyển chọn bài hát nổi bật và bật hoặc tắt tính năng gợi ý nhạc.
           </p>
         </div>
 
@@ -421,7 +421,7 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
             type="button"
             disabled={refreshing}
             onClick={() => void loadAll(false)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:border-white/20 transition cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:border-white/20 transition cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Làm mới
@@ -431,70 +431,70 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
             onClick={openCreateModal}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-bold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] transition cursor-pointer active:scale-[0.98]"
           >
-            <Plus className="h-4 w-4" /> Tạo Đợt Tuyển Chọn
+            <Plus className="h-4 w-4" /> Tạo đợt tuyển chọn
           </button>
         </div>
       </div>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-200 font-mono">
+        <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-200">
           {error}
         </div>
       )}
 
       {/* KPI Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1.5">
-            <span>Đợt Đang Diễn Ra</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1.5">
+            <span>Đợt đang diễn ra</span>
             <CalendarDays className="h-4 w-4 text-[#ff5500]" />
           </div>
-          <div className="font-display text-2xl font-bold text-white">
+          <div className="font-display text-2xl font-bold text-white tabular-nums">
             {runningCount} <span className="text-sm text-zinc-400 font-normal">/ {campaigns.length} đợt</span>
           </div>
-          <p className="text-[11px] font-mono text-zinc-500 mt-1">
+          <p className="text-xs text-zinc-500 mt-1 tabular-nums">
             {scheduledCount} đợt đã lên lịch sắp tới
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1.5">
-            <span>Kho Đủ Điều Kiện</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1.5">
+            <span>Bài hát đủ điều kiện</span>
             <Disc3 className="h-4 w-4 text-emerald-400" />
           </div>
-          <div className="font-display text-2xl font-bold text-emerald-400">
+          <div className="font-display text-2xl font-bold text-emerald-400 tabular-nums">
             {readiness ? `${readiness.eligibleTracks}/${readiness.catalogTracks}` : "—"}
           </div>
-          <p className="text-[11px] font-mono text-zinc-500 mt-1">
-            {readiness ? `${readiness.publicPlaylists} playlist công khai (${eligibleRatio}%)` : "Đang tải kho nhạc"}
+          <p className="text-xs text-zinc-500 mt-1 tabular-nums">
+            {readiness ? `${readiness.publicPlaylists} danh sách phát công khai (${eligibleRatio}%)` : "Đang tải kho nhạc"}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1.5">
-            <span>Động Cơ Đề Xuất</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1.5">
+            <span>Gợi ý nhạc</span>
             <Activity className="h-4 w-4 text-sky-400" />
           </div>
           <div className="font-display text-2xl font-bold text-white">
-            {operations ? (operations.runtime.flags.enabled ? "Đang Bật" : "Tạm Dừng") : "—"}
+            {operations ? (operations.runtime.flags.enabled ? "Đang bật" : "Tạm dừng") : "—"}
           </div>
-          <p className="text-[11px] font-mono text-zinc-500 mt-1">
+          <p className="text-xs text-zinc-500 mt-1">
             {operations
-              ? `CF: ${operations.runtime.flags.collaborative ? "Bật" : "Tắt"} · Campaign: ${operations.runtime.flags.campaigns ? "Bật" : "Tắt"}`
-              : "Đang kiểm tra trạng thái"}
+              ? `Cá nhân hóa: ${operations.runtime.flags.collaborative ? "Bật" : "Tắt"} · Đợt tuyển chọn: ${operations.runtime.flags.campaigns ? "Bật" : "Tắt"}`
+              : "Đang kiểm tra"}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1.5">
-            <span>Hàng Đợi Outcome</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1.5">
+            <span>Hàng đợi cập nhật</span>
             <Server className="h-4 w-4 text-amber-400" />
           </div>
-          <div className="font-display text-2xl font-bold text-white">
+          <div className="font-display text-2xl font-bold text-white tabular-nums">
             {operations ? `${operations.outcomeQueue.queued}/${operations.outcomeQueue.capacity}` : "—"}
           </div>
-          <p className="text-[11px] font-mono text-zinc-500 mt-1">
-            {operations?.outcomeQueue.circuitOpen ? "Đang ngắt mạch chờ khôi phục" : "Đang tiếp nhận phản hồi nghe"}
+          <p className="text-xs text-zinc-500 mt-1">
+            {operations?.outcomeQueue.circuitOpen ? "Tạm ngưng do lỗi kết nối" : "Đang hoạt động bình thường"}
           </p>
         </div>
       </div>
@@ -503,24 +503,19 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Runtime Controls Card */}
         <section
-          aria-label="Vận hành đề xuất"
-          className="lg:col-span-6 rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl flex flex-col justify-between space-y-4"
+          aria-label="Cấu hình gợi ý nhạc"
+          className="lg:col-span-6 rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl flex flex-col justify-between space-y-4"
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div>
                 <h3 className="font-graphik text-sm font-bold text-white">
-                  Điều Khiển Vận Hành Đề Xuất
+                  Bật / tắt tính năng gợi ý
                 </h3>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  Bật/tắt thời gian thực các thành phần đề xuất và giám sát cảnh báo.
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Điều chỉnh trực tiếp các chế độ hiển thị nhạc gợi ý cho người nghe.
                 </p>
               </div>
-              {operations && (
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-300">
-                  Rev #{operations.runtime.flags.revision}
-                </span>
-              )}
             </div>
 
             {operations ? (
@@ -529,54 +524,54 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                   [
                     {
                       key: "enabled" as const,
-                      label: "Hệ thống tạo gợi ý chung",
-                      desc: "Cho phép sinh gợi ý bài hát cho người nghe trên toàn nền tảng",
+                      label: "Hệ thống gợi ý nhạc",
+                      desc: "Hiển thị mục gợi ý nhạc trên trang chủ người nghe",
                       active: operations.runtime.flags.enabled,
                     },
                     {
                       key: "collaborative" as const,
-                      label: "Lọc cộng tác (Collaborative Filtering)",
-                      desc: "Phối hợp hành vi nghe tương đồng giữa các người dùng",
+                      label: "Gợi ý theo sở thích chung",
+                      desc: "Đề xuất dựa trên thói quen nghe tương đồng giữa các người dùng",
                       active: operations.runtime.flags.collaborative,
                     },
                     {
                       key: "campaigns" as const,
-                      label: "Ưu tiên đợt tuyển chọn (Campaigns)",
-                      desc: "Áp dụng trọng số cho các chiến dịch đang trong khung giờ hiệu lực",
+                      label: "Ưu tiên đợt tuyển chọn",
+                      desc: "Hiển thị các bài hát trong đợt tuyển chọn đang có hiệu lực",
                       active: operations.runtime.flags.campaigns,
                     },
                   ]
                 ).map((item) => (
                   <div
                     key={item.key}
-                    className="flex items-center justify-between gap-4 rounded-xl border border-[#222432] bg-[#171822]/70 px-4 py-3"
+                    className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-[#171923]/70 px-4 py-3"
                   >
                     <div className="min-w-0">
                       <div className="text-xs font-semibold text-white">{item.label}</div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">{item.desc}</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">{item.desc}</div>
                     </div>
                     <button
                       type="button"
                       disabled={controlsBusy}
                       onClick={() => void handleToggleControlFlag(item.key)}
-                      className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-mono font-bold transition cursor-pointer disabled:opacity-50 ${
+                      className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer disabled:opacity-50 ${
                         item.active
                           ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
                           : "bg-zinc-800 text-zinc-400 border border-white/10 hover:text-white"
                       }`}
                     >
-                      {item.active ? "ĐANG BẬT" : "ĐANG TẮT"}
+                      {item.active ? "Đang bật" : "Đang tắt"}
                     </button>
                   </div>
                 ))}
 
                 {operations.monitor?.alerts && operations.monitor.alerts.length > 0 && (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-1">
-                    <div className="text-[11px] font-mono font-bold text-amber-300 uppercase">
-                      Cảnh báo giám sát ({operations.monitor.alerts.length})
+                    <div className="text-xs font-semibold text-amber-300">
+                      Cảnh báo ({operations.monitor.alerts.length})
                     </div>
                     {operations.monitor.alerts.map((code) => (
-                      <p key={code} className="text-xs font-mono text-amber-200">
+                      <p key={code} className="text-xs text-amber-200">
                         • {code}
                       </p>
                     ))}
@@ -584,8 +579,8 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                 )}
               </div>
             ) : (
-              <div className="py-8 flex items-center justify-center text-xs font-mono text-zinc-500 gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Đang tải trạng thái vận hành...
+              <div className="py-8 flex items-center justify-center text-xs text-zinc-500 gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Đang tải trạng thái...
               </div>
             )}
           </div>
@@ -594,22 +589,22 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
         {/* Catalog Readiness Card */}
         <section
           aria-label="Tình trạng kho nhạc"
-          className="lg:col-span-6 rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl flex flex-col justify-between space-y-4"
+          className="lg:col-span-6 rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl flex flex-col justify-between space-y-4"
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div>
                 <h3 className="font-graphik text-sm font-bold text-white flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                  Tình Trạng Kho Nhạc Cho Đề Xuất
+                  Tình trạng kho nhạc cho gợi ý
                 </h3>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  Chỉ các bài hát đáp ứng đủ xuất bản, duyệt nội dung và bản quyền mới tham gia đề xuất.
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Chỉ những bài hát đã xuất bản, được duyệt và đủ bản quyền mới xuất hiện trong gợi ý.
                 </p>
               </div>
               {readiness?.demoCatalog && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300">
-                  DEMO MODE
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                  Chế độ thử nghiệm
                 </span>
               )}
             </div>
@@ -617,9 +612,9 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
             {readiness ? (
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-zinc-300">Tỷ lệ bài hát hợp lệ</span>
-                    <span className="text-emerald-400 font-bold">
+                    <span className="text-emerald-400 font-bold tabular-nums">
                       {readiness.eligibleTracks} / {readiness.catalogTracks} ({eligibleRatio}%)
                     </span>
                   </div>
@@ -632,8 +627,8 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                 </div>
 
                 {readiness.demoCatalog && (
-                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                    Đang phục vụ catalog DEMO · {readiness.standardEligibleTracks ?? 0} bài đủ điều kiện quyền chuẩn.
+                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 tabular-nums">
+                    Đang dùng danh mục thử nghiệm · {readiness.standardEligibleTracks ?? 0} bài đủ điều kiện quyền chuẩn.
                   </p>
                 )}
 
@@ -649,42 +644,42 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                     .map(([code, count]) => (
                       <div
                         key={code}
-                        className="flex items-center justify-between rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-xs"
+                        className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-xs"
                       >
                         <span className="text-zinc-300 truncate pr-2">{ISSUE_LABELS[code] || code}</span>
-                        <span className="font-mono font-bold text-amber-300 shrink-0">{count}</span>
+                        <span className="font-mono font-bold text-amber-300 shrink-0 tabular-nums">{count}</span>
                       </div>
                     ))}
                 </div>
                 {Object.values(readiness.issues).every((c) => c === 0) && (
-                  <p className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+                  <p className="text-xs text-emerald-400 flex items-center gap-1.5">
                     <CheckCircle2 className="h-4 w-4" /> Tất cả bài hát đều đủ điều kiện đề xuất.
                   </p>
                 )}
               </div>
             ) : (
-              <div className="py-8 flex items-center justify-center text-xs font-mono text-zinc-500 gap-2">
+              <div className="py-8 flex items-center justify-center text-xs text-zinc-500 gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Đang kiểm tra kho nhạc...
               </div>
             )}
           </div>
-          <p className="text-[11px] font-mono text-zinc-500 border-t border-white/[0.06] pt-3">
-            Một bài hát có thể thiếu nhiều điều kiện cùng lúc. Yêu cầu quyền bản quyền: {readiness?.requireActiveLicense ? "Bật" : "Tắt"}.
+          <p className="text-xs text-zinc-500 border-t border-white/[0.06] pt-3">
+            Một bài hát có thể thiếu nhiều điều kiện cùng lúc. Kiểm tra bản quyền: {readiness?.requireActiveLicense ? "Bật" : "Tắt"}.
           </p>
         </section>
       </div>
 
       {/* Campaigns Filter + Table */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#222432] bg-[#12131a] p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#12141c] p-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
             <input
               type="text"
               value={listSearch}
               onChange={(e) => setListSearch(e.target.value)}
-              placeholder="Tìm tên chiến dịch hoặc thể loại..."
-              className="w-full rounded-xl border border-[#222432] bg-[#171822] pl-10 pr-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#ff5500] focus:outline-none"
+              placeholder="Tìm tên đợt tuyển chọn hoặc thể loại..."
+              className="w-full rounded-xl border border-white/[0.08] bg-[#171923] pl-10 pr-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#ff5500] focus:outline-none"
             />
           </div>
 
@@ -702,10 +697,10 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                 key={f.id}
                 type="button"
                 onClick={() => setStatusFilter(f.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                   statusFilter === f.id
                     ? "bg-[#ff5500] text-white shadow-sm"
-                    : "bg-[#171822] text-zinc-400 hover:text-white border border-[#222432]"
+                    : "bg-[#171923] text-zinc-400 hover:text-white border border-white/[0.08]"
                 }`}
               >
                 {f.label}
@@ -715,29 +710,29 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-12 flex items-center justify-center gap-2 text-xs font-mono text-zinc-400">
+          <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-12 flex items-center justify-center gap-2 text-xs text-zinc-400">
             <Loader2 className="h-4 w-4 animate-spin text-[#ff5500]" /> Đang tải các đợt tuyển chọn...
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-[#222432] bg-[#12131a] shadow-xl">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#12141c] shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-[#222432] bg-[#171822] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                <thead className="border-b border-white/[0.08] bg-[#171923] text-xs font-medium text-zinc-400">
                   <tr>
-                    <th className="px-5 py-3.5">Đợt Tuyển Chọn</th>
-                    <th className="px-4 py-3.5">Thời Gian Hiệu Lực</th>
-                    <th className="px-4 py-3.5">Ưu Tiên</th>
-                    <th className="px-4 py-3.5">Nội Dung Áp Dụng</th>
-                    <th className="px-4 py-3.5">Trạng Thái</th>
-                    <th className="px-5 py-3.5 text-right">Thao Tác</th>
+                    <th className="px-5 py-3.5">Đợt tuyển chọn</th>
+                    <th className="px-4 py-3.5">Thời gian hiệu lực</th>
+                    <th className="px-4 py-3.5">Độ ưu tiên</th>
+                    <th className="px-4 py-3.5">Nội dung áp dụng</th>
+                    <th className="px-4 py-3.5">Trạng thái</th>
+                    <th className="px-5 py-3.5 text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#222432]/60">
+                <tbody className="divide-y divide-white/[0.06]">
                   {paginatedCampaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-zinc-400 font-mono">
+                      <td colSpan={6} className="py-12 text-center text-zinc-400">
                         {campaigns.length === 0
-                          ? "Chưa có đợt tuyển chọn nào. Nhấn \"Tạo Đợt Tuyển Chọn\" để bắt đầu."
+                          ? "Chưa có đợt tuyển chọn nào. Nhấn \"Tạo đợt tuyển chọn\" để bắt đầu."
                           : "Không tìm thấy đợt tuyển chọn phù hợp."}
                       </td>
                     </tr>
@@ -756,34 +751,27 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                       const isBusy = busyCampaignId === campaign.id;
 
                       return (
-                        <tr key={campaign.id} className="hover:bg-[#171822]/60 transition">
+                        <tr key={campaign.id} className="hover:bg-[#171923]/60 transition">
                           <td className="px-5 py-3.5">
                             <div className="font-semibold text-white text-sm">{campaign.name}</div>
                             {campaign.genres && campaign.genres.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {campaign.genres.map((g) => (
-                                  <span
-                                    key={g}
-                                    className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-zinc-400"
-                                  >
-                                    {g}
-                                  </span>
-                                ))}
+                              <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-zinc-400">
+                                {campaign.genres.join(" · ")}
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3.5 font-mono text-[11px] text-zinc-300">
+                          <td className="px-4 py-3.5 font-mono text-[11px] text-zinc-300 tabular-nums">
                             <div>Từ: {new Date(campaign.startsAt).toLocaleString("vi-VN")}</div>
                             <div className="text-zinc-400">Đến: {new Date(campaign.endsAt).toLocaleString("vi-VN")}</div>
                           </td>
-                          <td className="px-4 py-3.5 font-mono">
+                          <td className="px-4 py-3.5 font-mono tabular-nums">
                             <span className="px-2 py-0.5 rounded-md bg-[#ff5500]/15 border border-[#ff5500]/30 text-[#ff9966] font-bold">
                               {campaign.priority}/100
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 font-mono text-zinc-300">
-                            <span>{campaign.targets?.length || 0} mục tiêu</span>
-                            <div className="text-[10px] text-zinc-500 truncate max-w-[200px] mt-0.5">
+                          <td className="px-4 py-3.5 text-zinc-300 tabular-nums">
+                            <span>{campaign.targets?.length || 0} mục</span>
+                            <div className="text-[11px] text-zinc-500 truncate max-w-[200px] mt-0.5">
                               {campaign.targets
                                 .slice(0, 2)
                                 .map((t) =>
@@ -795,8 +783,8 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                               {(campaign.targets?.length || 0) > 2 ? "..." : ""}
                             </div>
                           </td>
-                          <td className="px-4 py-3.5 font-mono">
-                            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${statusBadge.cls}`}>
+                          <td className="px-4 py-3.5">
+                            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${statusBadge.cls}`}>
                               {lifecycle === "ACTIVE" && <CheckCircle2 className="h-3 w-3" />}
                               {lifecycle === "SCHEDULED" && <Clock className="h-3 w-3" />}
                               {statusBadge.label}
@@ -807,7 +795,7 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                               <button
                                 type="button"
                                 onClick={() => openEditModal(campaign)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:border-[#ff5500]/50 hover:text-white transition cursor-pointer"
+                                className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#171923] px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:border-[#ff5500]/50 hover:text-white transition cursor-pointer"
                               >
                                 <Edit2 className="h-3.5 w-3.5 text-[#ff5500]" /> Sửa
                               </button>
@@ -815,7 +803,7 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => void handleToggleCampaignActive(campaign)}
-                                className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-mono font-semibold transition cursor-pointer disabled:opacity-50 ${
+                                className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer disabled:opacity-50 ${
                                   campaign.active
                                     ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
                                     : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
@@ -871,7 +859,7 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                 <div>
                   <h3 className="font-graphik text-lg font-bold text-white flex items-center gap-2">
                     <CalendarDays className="h-5 w-5 text-[#ff5500]" />
-                    {editingCampaign ? "Chỉnh Sửa Đợt Tuyển Chọn" : "Tạo Đợt Tuyển Chọn Âm Nhạc"}
+                    {editingCampaign ? "Chỉnh sửa đợt tuyển chọn" : "Tạo đợt tuyển chọn âm nhạc"}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
                     Chọn khung thời gian hiệu lực, mức ưu tiên và bài hát / playlist mục tiêu.
@@ -1038,13 +1026,13 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-[#222432] pt-4">
+              <div className="flex items-center justify-end gap-3 border-t border-white/[0.08] pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-full border border-[#222432] px-5 py-2 text-xs font-semibold text-zinc-400 hover:bg-[#171822] transition cursor-pointer"
+                  className="rounded-full border border-white/[0.08] px-5 py-2 text-xs font-semibold text-zinc-400 hover:bg-[#171923] transition cursor-pointer"
                 >
-                  Hủy Bỏ
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1052,7 +1040,7 @@ export function RecommendationsCurationTab({ onToast }: RecommendationsCurationT
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-6 py-2 text-xs font-bold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] disabled:opacity-50 transition cursor-pointer"
                 >
                   {savingModal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                  {editingCampaign ? "Lưu Thay Đổi" : "Lên Lịch Tuyển Chọn"}
+                  {editingCampaign ? "Lưu thay đổi" : "Lên lịch tuyển chọn"}
                 </button>
               </div>
             </form>

@@ -330,7 +330,7 @@ export function TrackInlineActions({
         typeof document !== "undefined" &&
         createPortal(
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[10000] px-4 py-2.5 rounded-full bg-slate-950/95 border border-cyan-400/30 text-white text-xs font-semibold shadow-[0_12px_40px_rgba(0,0,0,0.8),0_0_20px_rgba(56,189,248,0.25)] backdrop-blur-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
             <span>{toastMessage}</span>
           </div>,
           document.body

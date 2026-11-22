@@ -35,6 +35,18 @@ import { fetchAdminSubscriptionTiers, updateAdminSubscriptionTier } from "@/lib/
 import { InteractiveAreaChart } from "@/components/dashboard/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
+const TIER_LABELS: Record<string, string> = {
+  FREE: "Miễn phí",
+  INDIVIDUAL_BASIC: "Cá nhân cơ bản",
+  INDIVIDUAL_FULL: "Cá nhân nâng cao",
+  FAMILY: "Gia đình",
+};
+
+function getTierLabel(tierId?: string | null): string {
+  if (!tierId) return "—";
+  return TIER_LABELS[tierId] || tierId;
+}
+
 type MonetizationTabProps = {
   packages: ServicePackage[];
   transactions: PaymentTransaction[];
@@ -91,26 +103,26 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
   const bullets: string[] = [];
 
   if (ent.adPolicy === "NO_ADS") {
-    bullets.push("100% Không quảng cáo vô hạn 24/7");
+    bullets.push("Không quảng cáo");
   } else if (ent.adPolicy === "DAILY_QUOTA") {
-    bullets.push(`${ent.adFreeDailyLimit} bài hát/ngày không quảng cáo (sau đó 1 QC/${ent.adIntervalAfterLimit} bài)`);
+    bullets.push(`${ent.adFreeDailyLimit} bài hát/ngày không quảng cáo (sau đó 1 quảng cáo/${ent.adIntervalAfterLimit} bài)`);
   } else {
-    bullets.push("Phát kèm quảng cáo tài trợ thông thường");
+    bullets.push("Phát kèm quảng cáo thông thường");
   }
 
   if (ent.skipPolicy === "UNLIMITED") {
-    bullets.push("Chuyển bài không giới hạn (Unlimited Skips)");
+    bullets.push("Chuyển bài không giới hạn");
   } else {
     bullets.push(`${ent.skipDailyLimit} lượt chuyển bài mỗi ngày`);
   }
 
   if (ent.offlineAllowed) {
     const trackStr = ent.offlineMaxTracks >= 9999 ? "không giới hạn bài hát" : `${ent.offlineMaxTracks} bài hát`;
-    bullets.push(`Tải offline ${trackStr} trên ${ent.maxDevices} thiết bị`);
+    bullets.push(`Tải ngoại tuyến ${trackStr} trên ${ent.maxDevices} thiết bị`);
   }
 
   if (ent.syncedLyrics) {
-    bullets.push("Lời bài hát Karaoke đồng bộ thời gian thực");
+    bullets.push("Lời bài hát chạy theo nhạc");
   }
 
   if (ent.familySharing) {
@@ -118,18 +130,18 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
   }
 
   if (ent.vipBadge) {
-    bullets.push("Huy hiệu VIP vương miện vàng trên hồ sơ");
+    bullets.push("Huy hiệu VIP trên hồ sơ");
   }
 
   return bullets;
 }
 
 const POPULAR_BENEFITS = [
-  "Nghe nhạc không quảng cáo ngắt quãng",
-  "Tải offline lưu trữ trên máy",
-  "Chuyển bài không giới hạn (Unlimited Skips)",
-  "Lời bài hát Karaoke đồng bộ thời gian thực",
-  "Huy hiệu VIP vương miện trên hồ sơ",
+  "Nghe nhạc không quảng cáo",
+  "Tải nhạc nghe ngoại tuyến",
+  "Chuyển bài không giới hạn",
+  "Lời bài hát chạy theo nhạc",
+  "Huy hiệu VIP trên hồ sơ",
   "Chia sẻ nhiều thiết bị đồng thời",
 ];
 
@@ -224,18 +236,18 @@ function TierInheritedPreview({
     <div className="border-t border-white/10 pt-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h4 className="text-xs font-mono uppercase tracking-wider font-semibold text-white flex items-center gap-2">
+          <h4 className="text-xs font-semibold text-white flex items-center gap-2">
             <Sliders className="w-3.5 h-3.5 text-[#ff5500]" />
-            Quyền Lợi Kế Thừa Từ Tầng ({tierId})
+            Quyền lợi theo hạng gói ({getTierLabel(tierId)})
           </h4>
-          <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
-            Quyền hạn thực thi do tầng dịch vụ quyết định. Sửa tại{" "}
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Quyền hạn áp dụng theo cấu hình chung. Chỉnh sửa tại{" "}
             <button
               type="button"
               onClick={onNavigateToTiers}
               className="text-[#ff5500] underline hover:brightness-110 cursor-pointer"
             >
-              Tầng Quyền Lợi
+              Hạng gói
             </button>
             .
           </p>
@@ -243,42 +255,42 @@ function TierInheritedPreview({
         <button
           type="button"
           onClick={onSyncToBullets}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#ff5500]/40 bg-[#ff5500]/10 text-[#ff5500] hover:bg-[#ff5500]/20 text-xs font-mono font-semibold transition active:scale-[0.98] cursor-pointer"
-          title="Tự động đồng bộ các quyền này thành danh sách gạch đầu dòng giới thiệu cho người dùng"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#ff5500]/40 bg-[#ff5500]/10 text-[#ff5500] hover:bg-[#ff5500]/20 text-xs font-semibold transition active:scale-[0.98] cursor-pointer"
+          title="Tự động cập nhật danh sách mô tả quyền lợi theo cấu hình hạng gói"
         >
-          <RefreshCcw className="w-3 h-3" /> Đồng bộ gạch đầu dòng
+          <RefreshCcw className="w-3 h-3" /> Đồng bộ mô tả quyền lợi
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 rounded-xl border border-[#222432] bg-[#12131a] p-3 text-[11px] font-mono">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 rounded-xl border border-white/[0.08] bg-[#12141c] p-3 text-xs">
         <div>
           <span className="text-zinc-500 block">Quảng cáo</span>
-          <strong className="text-amber-300">
+          <strong className="text-amber-300 tabular-nums">
             {entitlements.adPolicy === "NO_ADS"
               ? "Không quảng cáo"
               : entitlements.adPolicy === "DAILY_QUOTA"
-              ? `${entitlements.adFreeDailyLimit} bài/ngày ko QC`
-              : "Quảng cáo tiêu chuẩn"}
+              ? `${entitlements.adFreeDailyLimit} bài/ngày không QC`
+              : "Có quảng cáo"}
           </strong>
         </div>
         <div>
           <span className="text-zinc-500 block">Chuyển bài</span>
-          <strong className="text-sky-300">
+          <strong className="text-sky-300 tabular-nums">
             {entitlements.skipPolicy === "UNLIMITED"
               ? "Không giới hạn"
               : `${entitlements.skipDailyLimit} lượt/ngày`}
           </strong>
         </div>
         <div>
-          <span className="text-zinc-500 block">Offline &amp; Thiết bị</span>
-          <strong className="text-emerald-300">
+          <span className="text-zinc-500 block">Nghe ngoại tuyến &amp; thiết bị</span>
+          <strong className="text-emerald-300 tabular-nums">
             {entitlements.offlineAllowed
-              ? `${entitlements.offlineMaxTracks >= 9999 ? "Vô hạn" : entitlements.offlineMaxTracks + " bài"} · ${entitlements.maxDevices} máy`
-              : `Không offline · ${entitlements.maxDevices} máy`}
+              ? `${entitlements.offlineMaxTracks >= 9999 ? "Không giới hạn" : entitlements.offlineMaxTracks + " bài"} · ${entitlements.maxDevices} máy`
+              : `Không hỗ trợ · ${entitlements.maxDevices} máy`}
           </strong>
         </div>
         <div>
-          <span className="text-zinc-500 block">Lyrics đồng bộ</span>
+          <span className="text-zinc-500 block">Lời bài hát chạy theo nhạc</span>
           <strong className={entitlements.syncedLyrics ? "text-white" : "text-zinc-500"}>
             {entitlements.syncedLyrics ? "Có hỗ trợ" : "Không"}
           </strong>
@@ -291,7 +303,7 @@ function TierInheritedPreview({
         </div>
         <div>
           <span className="text-zinc-500 block">Chia sẻ gia đình</span>
-          <strong className={entitlements.familySharing ? "text-amber-300" : "text-zinc-400"}>
+          <strong className={entitlements.familySharing ? "text-amber-300 tabular-nums" : "text-zinc-400"}>
             {entitlements.familySharing ? `${entitlements.familyMembers || 6} thành viên` : "Cá nhân"}
           </strong>
         </div>
@@ -721,7 +733,7 @@ export function MonetizationTab({
         <div>
           <div className="flex items-center gap-3">
             <h2 className="font-graphik text-2xl font-bold text-white tracking-tight">
-              Gói Dịch Vụ &amp; Doanh Thu
+              Gói dịch vụ &amp; Doanh thu
             </h2>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
@@ -737,55 +749,55 @@ export function MonetizationTab({
               onClick={handleOpenCreate}
               className="flex items-center gap-2 rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
             >
-              <Plus className="h-4 w-4" /> Thêm Gói Mới
+              <Plus className="h-4 w-4" /> Thêm gói mới
             </button>
           )}
 
           {/* Subtab Toggle Buttons */}
-          <div className="flex items-center rounded-xl border border-[#222432] bg-[#12131a] p-1">
+          <div className="flex flex-wrap items-center rounded-xl border border-white/[0.08] bg-[#12141c] p-1">
             <button
               type="button"
               onClick={() => setActiveSubTab("packages")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer tabular-nums ${
                 activeSubTab === "packages"
                   ? "bg-[#ff5500] text-white shadow"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <CreditCard className="h-3.5 w-3.5" /> Gói Dịch Vụ ({packages.length})
+              <CreditCard className="h-3.5 w-3.5" /> Gói dịch vụ ({packages.length})
             </button>
             <button
               type="button"
               onClick={() => setActiveSubTab("tiers")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer tabular-nums ${
                 activeSubTab === "tiers"
                   ? "bg-[#ff5500] text-white shadow"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <Layers className="h-3.5 w-3.5" /> Tầng Quyền Lợi ({tiers.length})
+              <Layers className="h-3.5 w-3.5" /> Hạng gói ({tiers.length})
             </button>
             <button
               type="button"
               onClick={() => setActiveSubTab("transactions")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer tabular-nums ${
                 activeSubTab === "transactions"
                   ? "bg-[#ff5500] text-white shadow"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <Receipt className="h-3.5 w-3.5" /> Lịch Sử Giao Dịch ({transactions.length})
+              <Receipt className="h-3.5 w-3.5" /> Giao dịch ({transactions.length})
             </button>
             <button
               type="button"
               onClick={() => setActiveSubTab("subscriptions")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer tabular-nums ${
                 activeSubTab === "subscriptions"
                   ? "bg-[#ff5500] text-white shadow"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <Users className="h-3.5 w-3.5" /> Thuê Bao Người Dùng ({subscriptions.length})
+              <Users className="h-3.5 w-3.5" /> Thuê bao ({subscriptions.length})
             </button>
           </div>
         </div>
@@ -795,16 +807,16 @@ export function MonetizationTab({
       <div className="space-y-5">
         {/* 4 Executive KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Tổng Doanh Thu</span>
+          <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+              <span>Tổng doanh thu</span>
               <DollarSign className="w-4 h-4 text-emerald-400" />
             </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
+            <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
               {formatVND(totalRevenue)}
             </div>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono flex items-center justify-between gap-2">
-              <span>Kỳ {revenueDays} ngày: {formatVND(periodRevenue)}</span>
+            <p className="text-[11px] text-zinc-400 mt-1 flex items-center justify-between gap-2 tabular-nums">
+              <span>Trong {revenueDays} ngày: {formatVND(periodRevenue)}</span>
               {growthPercent !== 0 && (
                 <span className={growthPercent > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
                   {growthPercent > 0 ? `+${growthPercent}%` : `${growthPercent}%`}
@@ -813,41 +825,41 @@ export function MonetizationTab({
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Giao Dịch Thanh Toán</span>
+          <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+              <span>Giao dịch thanh toán</span>
               <Receipt className="w-4 h-4 text-sky-400" />
             </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
-              {totalTxCount} GD
+            <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
+              {totalTxCount} giao dịch
             </div>
-            <p className="text-[11px] text-sky-400 mt-1 font-mono">
+            <p className="text-[11px] text-sky-400 mt-1 tabular-nums">
               {successCount} thành công ({successRate}%) · {pendingCount} chờ · {failedCount} lỗi/hủy
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Thuê Bao Hoạt Động</span>
+          <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+              <span>Thuê bao đang dùng</span>
               <Users className="w-4 h-4 text-amber-400" />
             </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
+            <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
               {activeSubsCount} người
             </div>
-            <p className="text-[11px] text-zinc-400 mt-1 font-mono">
-              {paidUsersCount} khách trả phí · TB/đơn: {formatVND(avgOrderValue)}
+            <p className="text-[11px] text-zinc-400 mt-1 tabular-nums">
+              {paidUsersCount} khách trả phí · Trung bình/đơn: {formatVND(avgOrderValue)}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-              <span>Gói Hoạt Động</span>
+          <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl relative overflow-hidden group hover:border-[#ff5500]/40 transition">
+            <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+              <span>Gói đang bán</span>
               <CreditCard className="w-4 h-4 text-purple-400" />
             </div>
-            <div className="font-display text-2xl font-bold text-white tracking-tight">
+            <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
               {activePackagesCount} / {packages.length} gói
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1 font-mono">
+            <p className="text-[11px] text-zinc-500 mt-1 tabular-nums">
               {loadingRevenueStats ? "Đang cập nhật thống kê..." : `Kỳ thống kê: ${revenueDays} ngày`}
             </p>
           </div>
@@ -857,8 +869,8 @@ export function MonetizationTab({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           <div className="lg:col-span-7">
             <InteractiveAreaChart
-              title="Doanh Thu Theo Thời Gian"
-              subtitle={`Biểu đồ biến động doanh thu thanh toán thành công trong ${revenueDays} ngày qua.`}
+              title="Doanh thu theo thời gian"
+              subtitle={`Biến động doanh thu trong ${revenueDays} ngày qua.`}
               data={revenueChartData}
               metricLabel="Doanh thu (VND)"
               accentColor="#ff5500"
@@ -871,10 +883,10 @@ export function MonetizationTab({
           </div>
           <div className="lg:col-span-5">
             <InteractiveDonutChart
-              title="Doanh Thu Theo Gói Cước"
+              title="Doanh thu theo gói"
               subtitle="Tỷ lệ doanh thu của từng gói dịch vụ."
               data={packageRevenueDonutData}
-              centerLabel="Doanh Thu"
+              centerLabel="Doanh thu"
               size={180}
               strokeWidth={22}
               formatValue={formatVND}
@@ -884,36 +896,36 @@ export function MonetizationTab({
         </div>
 
         {/* Working Revenue Summary Breakdown Table */}
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] shadow-xl overflow-hidden">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] shadow-xl overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-4">
             <div>
               <h3 className="font-graphik text-sm font-bold text-white">
-                Bảng Thống Kê Doanh Thu Chi Tiết
+                Thống kê doanh thu chi tiết
               </h3>
-              <p className="text-[11px] text-zinc-400 mt-0.5">
-                Phân tích doanh thu theo gói dịch vụ, theo từng ngày trong kỳ {revenueDays} ngày và theo cổng thanh toán.
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Phân tích theo gói dịch vụ, theo ngày trong {revenueDays} ngày và theo cổng thanh toán.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               {revenueBreakdownMode === "daily" && (
-                <label className="inline-flex items-center gap-1.5 rounded-lg border border-[#222432] bg-[#171822] px-2.5 py-1.5 text-[11px] font-mono text-zinc-300 cursor-pointer">
+                <label className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#171923] px-2.5 py-1.5 text-xs text-zinc-300 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={onlyNonZeroDaily}
                     onChange={(e) => setOnlyNonZeroDaily(e.target.checked)}
                     className="accent-[#ff5500]"
                   />
-                  <span>Chỉ ngày có GD</span>
+                  <span>Chỉ ngày có giao dịch</span>
                 </label>
               )}
 
-              <div className="flex items-center rounded-xl border border-[#222432] bg-[#171822] p-1 text-[11px] font-mono">
+              <div className="flex items-center rounded-xl border border-white/[0.08] bg-[#171923] p-1 text-xs">
                 {(
                   [
-                    { id: "package", label: "Theo Gói" },
-                    { id: "daily", label: "Theo Ngày" },
-                    { id: "provider", label: "Theo Cổng TT" },
+                    { id: "package", label: "Theo gói" },
+                    { id: "daily", label: "Theo ngày" },
+                    { id: "provider", label: "Theo cổng thanh toán" },
                   ] as const
                 ).map((mode) => (
                   <button
@@ -936,21 +948,21 @@ export function MonetizationTab({
           <div className="overflow-x-auto">
             {revenueBreakdownMode === "package" && (
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                <thead className="border-b border-white/[0.08] bg-white/[0.02] text-xs font-medium text-zinc-400">
                   <tr>
-                    <th className="px-5 py-3">Gói Dịch Vụ</th>
-                    <th className="px-4 py-3">Tầng (Tier)</th>
-                    <th className="px-4 py-3">Giá Niêm Yết</th>
-                    <th className="px-4 py-3">Thuê Bao Đang Dùng</th>
-                    <th className="px-4 py-3">Đơn Thành Công / Tổng</th>
-                    <th className="px-4 py-3">Doanh Thu</th>
-                    <th className="px-5 py-3 min-w-[140px]">Tỷ Trọng (%)</th>
+                    <th className="px-5 py-3">Gói dịch vụ</th>
+                    <th className="px-4 py-3">Hạng gói</th>
+                    <th className="px-4 py-3">Giá niêm yết</th>
+                    <th className="px-4 py-3">Đang sử dụng</th>
+                    <th className="px-4 py-3">Đơn thành công / Tổng</th>
+                    <th className="px-4 py-3">Doanh thu</th>
+                    <th className="px-5 py-3 min-w-[140px]">Tỷ trọng</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-white/[0.06]">
                   {(!revenueStats?.byPackage || revenueStats.byPackage.length === 0) ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center font-mono text-zinc-500">
+                      <td colSpan={7} className="py-8 text-center text-zinc-500">
                         Chưa có dữ liệu doanh thu theo gói dịch vụ.
                       </td>
                     </tr>
@@ -960,23 +972,23 @@ export function MonetizationTab({
                         <td className="px-5 py-3 font-semibold text-white">
                           {row.packageName}
                           <span
-                            className={`ml-2 text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            className={`ml-2 text-[11px] font-medium px-1.5 py-0.5 rounded ${
                               row.packageStatus === "ACTIVE"
                                 ? "bg-emerald-500/10 text-emerald-400"
                                 : "bg-zinc-700/40 text-zinc-400"
                             }`}
                           >
-                            {row.packageStatus}
+                            {row.packageStatus === "ACTIVE" ? "Đang bán" : "Tạm ẩn"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-amber-300">{row.tierId}</td>
-                        <td className="px-4 py-3 font-mono text-zinc-300">{formatVND(row.packagePrice)}</td>
-                        <td className="px-4 py-3 font-mono text-sky-300 font-bold">{row.activeSubscriptions}</td>
-                        <td className="px-4 py-3 font-mono text-zinc-300">
+                        <td className="px-4 py-3 text-amber-300">{getTierLabel(row.tierId)}</td>
+                        <td className="px-4 py-3 font-mono text-zinc-300 tabular-nums">{formatVND(row.packagePrice)}</td>
+                        <td className="px-4 py-3 font-mono text-sky-300 font-bold tabular-nums">{row.activeSubscriptions}</td>
+                        <td className="px-4 py-3 font-mono text-zinc-300 tabular-nums">
                           <span className="text-emerald-400 font-bold">{row.successCount}</span> / {row.totalCount}
                         </td>
-                        <td className="px-4 py-3 font-mono font-bold text-white">{formatVND(row.revenue)}</td>
-                        <td className="px-5 py-3 font-mono">
+                        <td className="px-4 py-3 font-mono font-bold text-white tabular-nums">{formatVND(row.revenue)}</td>
+                        <td className="px-5 py-3 font-mono tabular-nums">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
                               <div
@@ -991,9 +1003,9 @@ export function MonetizationTab({
                     ))
                   )}
                 </tbody>
-                <tfoot className="border-t border-white/10 bg-[#171822]/70 font-mono text-xs">
+                <tfoot className="border-t border-white/10 bg-[#171923]/70 font-mono text-xs tabular-nums">
                   <tr>
-                    <td colSpan={3} className="px-5 py-3 font-bold text-zinc-300">TỔNG CỘNG</td>
+                    <td colSpan={3} className="px-5 py-3 font-sans font-bold text-zinc-300">Tổng cộng</td>
                     <td className="px-4 py-3 font-bold text-sky-300">{activeSubsCount}</td>
                     <td className="px-4 py-3 font-bold text-zinc-200">{successCount} / {totalTxCount}</td>
                     <td className="px-4 py-3 font-bold text-emerald-400">{formatVND(totalRevenue)}</td>
@@ -1006,20 +1018,20 @@ export function MonetizationTab({
             {revenueBreakdownMode === "daily" && (
               <div className="max-h-80 overflow-y-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="border-b border-white/10 bg-[#171822] sticky top-0 font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                  <thead className="border-b border-white/[0.08] bg-[#171923] sticky top-0 text-xs font-medium text-zinc-400">
                     <tr>
                       <th className="px-5 py-3">Ngày</th>
-                      <th className="px-4 py-3">Thành Công</th>
-                      <th className="px-4 py-3">Đang Chờ</th>
-                      <th className="px-4 py-3">Thất Bại / Hủy</th>
-                      <th className="px-4 py-3">Hoàn Tiền</th>
-                      <th className="px-5 py-3 text-right">Doanh Thu Ngày</th>
+                      <th className="px-4 py-3">Thành công</th>
+                      <th className="px-4 py-3">Đang chờ</th>
+                      <th className="px-4 py-3">Thất bại / Hủy</th>
+                      <th className="px-4 py-3">Hoàn tiền</th>
+                      <th className="px-5 py-3 text-right">Doanh thu ngày</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 font-mono">
+                  <tbody className="divide-y divide-white/[0.06] font-mono tabular-nums">
                     {dailyRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-zinc-500">
+                        <td colSpan={6} className="py-8 text-center font-sans text-zinc-500">
                           Không có giao dịch phát sinh trong khoảng thời gian đã chọn.
                         </td>
                       </tr>
@@ -1044,19 +1056,19 @@ export function MonetizationTab({
 
             {revenueBreakdownMode === "provider" && (
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                <thead className="border-b border-white/[0.08] bg-white/[0.02] text-xs font-medium text-zinc-400">
                   <tr>
-                    <th className="px-5 py-3">Cổng Thanh Toán</th>
-                    <th className="px-4 py-3">Phương Thức</th>
-                    <th className="px-4 py-3">Đơn Thành Công / Tổng</th>
-                    <th className="px-4 py-3">Doanh Thu</th>
-                    <th className="px-5 py-3 min-w-[140px]">Tỷ Trọng (%)</th>
+                    <th className="px-5 py-3">Cổng thanh toán</th>
+                    <th className="px-4 py-3">Phương thức</th>
+                    <th className="px-4 py-3">Đơn thành công / Tổng</th>
+                    <th className="px-4 py-3">Doanh thu</th>
+                    <th className="px-5 py-3 min-w-[140px]">Tỷ trọng</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 font-mono">
+                <tbody className="divide-y divide-white/[0.06] font-mono tabular-nums">
                   {(!revenueStats?.byProvider || revenueStats.byProvider.length === 0) ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-zinc-500">
+                      <td colSpan={5} className="py-8 text-center font-sans text-zinc-500">
                         Chưa có dữ liệu giao dịch theo cổng thanh toán.
                       </td>
                     </tr>
@@ -1211,43 +1223,43 @@ export function MonetizationTab({
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-zinc-400">Trạng thái:</span>
+              <span className="text-xs text-zinc-400">Trạng thái:</span>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setTxPage(1);
                 }}
-                className="rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                className="rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
               >
                 <option value="ALL">Tất cả ({transactions.length})</option>
-                <option value="SUCCESS">Thành công (SUCCESS)</option>
-                <option value="PENDING">Đang chờ (PENDING)</option>
-                <option value="FAILED">Thất bại (FAILED)</option>
-                <option value="CANCELLED">Đã hủy (CANCELLED)</option>
-                <option value="REFUNDED">Đã hoàn tiền (REFUNDED)</option>
+                <option value="SUCCESS">Thành công</option>
+                <option value="PENDING">Đang chờ</option>
+                <option value="FAILED">Thất bại</option>
+                <option value="CANCELLED">Đã hủy</option>
+                <option value="REFUNDED">Đã hoàn tiền</option>
               </select>
 
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 font-mono text-xs text-emerald-300 font-semibold">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300 font-semibold tabular-nums">
                 Tổng thu: {formatVND(totalRevenue)}
               </div>
             </div>
           </div>
 
           {/* Transactions Table */}
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0c1017] shadow-xl">
+          <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#12141c] shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-white/80">
-                <thead className="border-b border-white/10 bg-white/[0.02] font-mono text-xs text-zinc-400 uppercase tracking-wider">
+                <thead className="border-b border-white/[0.08] bg-white/[0.02] text-xs font-medium text-zinc-400">
                   <tr>
-                    <th className="px-5 py-3.5">Mã GD</th>
-                    <th className="px-5 py-3.5">Khách Hàng</th>
-                    <th className="px-5 py-3.5">Gói Cước</th>
-                    <th className="px-5 py-3.5">Số Tiền</th>
-                    <th className="px-5 py-3.5">Cổng TT</th>
-                    <th className="px-5 py-3.5">Thời Gian</th>
-                    <th className="px-5 py-3.5">Trạng Thái</th>
-                    <th className="px-5 py-3.5 text-right">Phương Thức</th>
+                    <th className="px-5 py-3.5">Mã giao dịch</th>
+                    <th className="px-5 py-3.5">Khách hàng</th>
+                    <th className="px-5 py-3.5">Gói dịch vụ</th>
+                    <th className="px-5 py-3.5">Số tiền</th>
+                    <th className="px-5 py-3.5">Cổng thanh toán</th>
+                    <th className="px-5 py-3.5">Thời gian</th>
+                    <th className="px-5 py-3.5">Trạng thái</th>
+                    <th className="px-5 py-3.5 text-right">Phương thức</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-sans">
@@ -1335,36 +1347,36 @@ export function MonetizationTab({
       {/* SUBTAB 3: SUBSCRIPTION TIERS */}
       {activeSubTab === "tiers" && (
         <div className="space-y-6 anim-fade-up">
-          <div className="rounded-2xl border border-white/10 bg-[#12131a] p-5 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/[0.08] pb-4">
               <div>
                 <h3 className="font-graphik text-lg font-bold text-white flex items-center gap-2">
                   <Layers className="w-5 h-5 text-[#ff5500]" />
-                  Tầng Quyền Lợi Thuê Bao
+                  Hạng gói dịch vụ
                 </h3>
                 <p className="mt-1 text-xs text-zinc-400">
-                  Cấu hình các mức quyền lợi áp dụng cho tài khoản người dùng và các gói dịch vụ.
+                  Cấu hình các mức quyền lợi áp dụng cho tài khoản người dùng và từng gói dịch vụ.
                 </p>
               </div>
             </div>
 
             {/* Grid of Tiers */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              {tiersLoading && <p role="status" className="text-sm text-zinc-400">Đang tải tầng quyền lợi…</p>}
+              {tiersLoading && <p role="status" className="text-sm text-zinc-400">Đang tải danh sách hạng gói…</p>}
               {tierError && <p role="alert" className="text-sm text-rose-300">{tierError}</p>}
-              {!tiersLoading && !tierError && tiers.length === 0 && <p className="text-sm text-zinc-400">Chưa có tầng quyền lợi trong hệ thống.</p>}
+              {!tiersLoading && !tierError && tiers.length === 0 && <p className="text-sm text-zinc-400">Chưa có hạng gói nào.</p>}
               {tiers.map((tier) => (
                 <div
                   key={tier.id}
-                  className="flex flex-col justify-between rounded-2xl border border-[#222432] bg-[#171822] p-5 shadow-lg hover:border-[#ff5500]/40 transition"
+                  className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-[#171923] p-5 shadow-lg hover:border-[#ff5500]/40 transition"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
-                        {tier.id}
+                      <span className="text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+                        {getTierLabel(tier.id)}
                       </span>
-                      <span className="text-[11px] font-mono text-zinc-400">
-                        {packages.filter((p) => p.tierId === tier.id).length} gói cước
+                      <span className="text-xs text-zinc-400 tabular-nums">
+                        {packages.filter((p) => p.tierId === tier.id).length} gói
                       </span>
                     </div>
 
@@ -1378,11 +1390,11 @@ export function MonetizationTab({
                     </div>
 
                     {/* Matrix Specs */}
-                    <div className="space-y-2 pt-2 border-t border-white/5 text-xs font-mono">
+                    <div className="space-y-2 pt-2 border-t border-white/5 text-xs tabular-nums">
                       <div className="flex items-center justify-between text-zinc-300">
                         <span className="text-zinc-500">Quảng cáo:</span>
                         <span className={tier.adPolicy === "NO_ADS" ? "text-emerald-400 font-semibold" : tier.adPolicy === "DAILY_QUOTA" ? "text-amber-300 font-semibold" : "text-zinc-400"}>
-                          {tier.adPolicy === "NO_ADS" ? "Không quảng cáo" : tier.adPolicy === "DAILY_QUOTA" ? `${tier.adFreeDailyLimit} bài/ngày ko QC` : "Quảng cáo tiêu chuẩn"}
+                          {tier.adPolicy === "NO_ADS" ? "Không quảng cáo" : tier.adPolicy === "DAILY_QUOTA" ? `${tier.adFreeDailyLimit} bài/ngày không QC` : "Có quảng cáo"}
                         </span>
                       </div>
 
@@ -1394,7 +1406,7 @@ export function MonetizationTab({
                       </div>
 
                       <div className="flex items-center justify-between text-zinc-300">
-                        <span className="text-zinc-500">Tải offline:</span>
+                        <span className="text-zinc-500">Tải ngoại tuyến:</span>
                         <span className={tier.offlineAllowed ? "text-teal-300" : "text-zinc-500"}>
                           {tier.offlineAllowed ? `${tier.offlineMaxTracks >= 9999 ? "Không giới hạn" : `${tier.offlineMaxTracks} bài`}` : "Không hỗ trợ"}
                         </span>
@@ -1406,14 +1418,14 @@ export function MonetizationTab({
                       </div>
 
                       <div className="flex items-center justify-between text-zinc-300">
-                        <span className="text-zinc-500">Gói gia đình:</span>
+                        <span className="text-zinc-500">Chia sẻ gia đình:</span>
                         <span className={tier.familySharing ? "text-yellow-400 font-bold" : "text-zinc-500"}>
                           {tier.familySharing ? `${tier.familyMembers || 6} thành viên` : "Cá nhân"}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between text-zinc-300">
-                        <span className="text-zinc-500">Lyrics đồng bộ:</span>
+                        <span className="text-zinc-500">Lời bài hát chạy theo nhạc:</span>
                         <span className={tier.syncedLyrics ? "text-white font-semibold" : "text-zinc-500"}>
                           {tier.syncedLyrics ? "Có hỗ trợ" : "Không"}
                         </span>
@@ -1431,9 +1443,9 @@ export function MonetizationTab({
                   <button
                     type="button"
                     onClick={() => setEditingTier(tier)}
-                    className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#222432]/50 hover:bg-[#ff5500]/15 hover:border-[#ff5500]/50 py-2 text-xs font-mono font-semibold text-white transition active:scale-[0.98] cursor-pointer"
+                    className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#222432]/50 hover:bg-[#ff5500]/15 hover:border-[#ff5500]/50 py-2 text-xs font-semibold text-white transition active:scale-[0.98] cursor-pointer"
                   >
-                    <Edit2 className="w-3.5 h-3.5 text-[#ff5500]" /> Cấu Hình Quyền Lợi Tầng
+                    <Edit2 className="w-3.5 h-3.5 text-[#ff5500]" /> Chỉnh sửa quyền lợi
                   </button>
                 </div>
               ))}
@@ -1446,46 +1458,46 @@ export function MonetizationTab({
       {activeSubTab === "subscriptions" && (
         <div className="space-y-4 anim-fade-up">
           {/* Filter Bar */}
-          <div className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-[#0b0e16] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-[#12141c] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
               <input
                 type="text"
-                placeholder="Tìm theo người dùng, email, gói cước..."
+                placeholder="Tìm theo người dùng, email, tên gói..."
                 value={subSearch}
                 onChange={(e) => setSubSearch(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#12141c] pl-10 pr-4 py-2 text-xs text-white placeholder-white/30 focus:border-[#ff5500] focus:outline-none"
+                className="w-full rounded-xl border border-white/10 bg-[#0e1017] pl-10 pr-4 py-2 text-xs text-white placeholder-white/30 focus:border-[#ff5500] focus:outline-none"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-white/50 font-mono">Trạng thái:</span>
+              <span className="text-xs text-white/50">Trạng thái:</span>
               <select
                 value={subStatusFilter}
                 onChange={(e) => setSubStatusFilter(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                className="rounded-xl border border-white/10 bg-[#0e1017] px-3 py-2 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
               >
                 <option value="ALL">Tất cả ({subscriptions?.length || 0})</option>
-                <option value="ACTIVE">Đang hoạt động (ACTIVE)</option>
-                <option value="EXPIRED">Đã hết hạn (EXPIRED)</option>
-                <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="EXPIRED">Đã hết hạn</option>
+                <option value="CANCELLED">Đã hủy</option>
               </select>
             </div>
           </div>
 
           {/* Subscriptions Table */}
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#12131a] shadow-xl">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#12141c] shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/[0.02] text-zinc-400 font-mono uppercase tracking-wider">
-                    <th className="px-5 py-3.5">Mã #</th>
-                    <th className="px-5 py-3.5">Người Dùng</th>
-                    <th className="px-5 py-3.5">Gói Đăng Ký</th>
-                    <th className="px-5 py-3.5">Tầng Quyền Lợi</th>
-                    <th className="px-5 py-3.5">Thời Hạn</th>
-                    <th className="px-5 py-3.5">Tự Động Gia Hạn</th>
-                    <th className="px-5 py-3.5">Trạng Thái</th>
-                    <th className="px-5 py-3.5 text-right">Thao Tác</th>
+                  <tr className="border-b border-white/[0.08] bg-white/[0.02] text-zinc-400 font-medium">
+                    <th className="px-5 py-3.5">Mã</th>
+                    <th className="px-5 py-3.5">Người dùng</th>
+                    <th className="px-5 py-3.5">Gói đăng ký</th>
+                    <th className="px-5 py-3.5">Hạng gói</th>
+                    <th className="px-5 py-3.5">Thời hạn</th>
+                    <th className="px-5 py-3.5">Gia hạn tự động</th>
+                    <th className="px-5 py-3.5">Trạng thái</th>
+                    <th className="px-5 py-3.5 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -1585,10 +1597,10 @@ export function MonetizationTab({
                 <div>
                   <h3 className="font-graphik text-xl font-bold text-white flex items-center gap-2">
                     <Sliders className="w-5 h-5 text-[#ff5500]" />
-                    Chỉnh Sửa Bậc Quyền Lợi: {editingTier.id}
+                    Chỉnh sửa hạng gói: {getTierLabel(editingTier.id)}
                   </h3>
-                  <p className="font-mono text-xs text-zinc-400 mt-1">
-                    Cập nhật trực tiếp vào bảng <code className="text-amber-300">subscription_tiers</code>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Thiết lập quyền lợi mặc định cho các gói thuộc hạng này
                   </p>
                 </div>
                 <button
@@ -1600,24 +1612,24 @@ export function MonetizationTab({
                 </button>
               </div>
 
-              <div className="space-y-4 text-xs font-mono">
+              <div className="space-y-4 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Tên Tầng</label>
+                    <label className="block text-zinc-400 mb-1">Tên hạng gói</label>
                     <input
                       type="text"
                       value={editingTier.name}
                       onChange={(e) => setEditingTier({ ...editingTier, name: e.target.value })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
                     />
                   </div>
                   <div>
-                    <label className="block text-zinc-400 mb-1">Mô Tả Tóm Tắt</label>
+                    <label className="block text-zinc-400 mb-1">Mô tả tóm tắt</label>
                     <input
                       type="text"
                       value={editingTier.description || ""}
                       onChange={(e) => setEditingTier({ ...editingTier, description: e.target.value })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
                     />
                   </div>
                 </div>
@@ -1625,15 +1637,15 @@ export function MonetizationTab({
                 {/* Ad Policy */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Chính Sách Quảng Cáo</label>
+                    <label className="block text-zinc-400 mb-1">Chính sách quảng cáo</label>
                     <select
                       value={editingTier.adPolicy}
                       onChange={(e) => setEditingTier({ ...editingTier, adPolicy: e.target.value as SubscriptionTier["adPolicy"] })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500] cursor-pointer"
                     >
-                      <option value="NO_ADS">NO_ADS (100% Không QC)</option>
-                      <option value="DAILY_QUOTA">DAILY_QUOTA (Hạn ngạch bài/ngày)</option>
-                      <option value="FULL_ADS">FULL_ADS (Quảng cáo tiêu chuẩn)</option>
+                      <option value="NO_ADS">Không quảng cáo</option>
+                      <option value="DAILY_QUOTA">Giới hạn theo ngày</option>
+                      <option value="FULL_ADS">Có quảng cáo</option>
                     </select>
                   </div>
                   <div>
@@ -1643,7 +1655,7 @@ export function MonetizationTab({
                       value={editingTier.adFreeDailyLimit}
                       onChange={(e) => setEditingTier({ ...editingTier, adFreeDailyLimit: Number(e.target.value) })}
                       disabled={editingTier.adPolicy !== "DAILY_QUOTA"}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -1651,38 +1663,38 @@ export function MonetizationTab({
                 {/* Skip & Quality */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Chính Sách Chuyển Bài (Skip)</label>
+                    <label className="block text-zinc-400 mb-1">Chính sách chuyển bài</label>
                     <select
                       value={editingTier.skipPolicy}
                       onChange={(e) => setEditingTier({ ...editingTier, skipPolicy: e.target.value as SubscriptionTier["skipPolicy"] })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500] cursor-pointer"
                     >
-                      <option value="UNLIMITED">UNLIMITED (Vô hạn skip)</option>
-                      <option value="LIMITED">LIMITED (Giới hạn lượt/ngày)</option>
+                      <option value="UNLIMITED">Không giới hạn</option>
+                      <option value="LIMITED">Giới hạn mỗi ngày</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-zinc-400 mb-1">Số lượt skip/ngày</label>
+                    <label className="block text-zinc-400 mb-1">Số lượt chuyển bài/ngày</label>
                     <input
                       type="number"
                       value={editingTier.skipDailyLimit}
                       onChange={(e) => setEditingTier({ ...editingTier, skipDailyLimit: Number(e.target.value) })}
                       disabled={editingTier.skipPolicy !== "LIMITED"}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
                     />
                   </div>
                 </div>
 
                 {/* Devices */}
                 <div>
-                  <label className="block text-zinc-400 mb-1">Số Thiết Bị Tối Đa</label>
+                  <label className="block text-zinc-400 mb-1">Số thiết bị tối đa</label>
                   <input
                     type="number"
                     min={1}
                     max={10}
                     value={editingTier.maxDevices}
                     onChange={(e) => setEditingTier({ ...editingTier, maxDevices: Number(e.target.value) })}
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500]"
                   />
                 </div>
 
@@ -1693,18 +1705,18 @@ export function MonetizationTab({
                       type="checkbox"
                       checked={editingTier.offlineAllowed}
                       onChange={(e) => setEditingTier({ ...editingTier, offlineAllowed: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
                     />
-                    <span>Cho phép tải nhạc ngoại tuyến</span>
+                    <span>Cho phép tải nghe ngoại tuyến</span>
                   </label>
                   <div>
-                    <label className="block text-zinc-400 mb-1">Số bài offline tối đa</label>
+                    <label className="block text-zinc-400 mb-1">Số bài ngoại tuyến tối đa</label>
                     <input
                       type="number"
                       value={editingTier.offlineMaxTracks}
                       onChange={(e) => setEditingTier({ ...editingTier, offlineMaxTracks: Number(e.target.value) })}
                       disabled={!editingTier.offlineAllowed}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -1716,9 +1728,9 @@ export function MonetizationTab({
                       type="checkbox"
                       checked={editingTier.familySharing}
                       onChange={(e) => setEditingTier({ ...editingTier, familySharing: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
                     />
-                    <span>Chia sẻ gói Gia Đình</span>
+                    <span>Chia sẻ gói gia đình</span>
                   </label>
                   <div>
                     <label className="block text-zinc-400 mb-1">Số thành viên gia đình</label>
@@ -1727,28 +1739,28 @@ export function MonetizationTab({
                       value={editingTier.familyMembers}
                       onChange={(e) => setEditingTier({ ...editingTier, familyMembers: Number(e.target.value) })}
                       disabled={!editingTier.familySharing}
-                      className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2 text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
                     />
                   </div>
                 </div>
 
                 {/* Synced Lyrics & VIP Badge */}
                 <div className="grid grid-cols-2 gap-3 pt-1">
-                  <label className="flex items-center gap-2 rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
+                  <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
                     <input
                       type="checkbox"
                       checked={editingTier.syncedLyrics}
                       onChange={(e) => setEditingTier({ ...editingTier, syncedLyrics: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
                     />
-                    <span>Lyrics Karaoke đồng bộ</span>
+                    <span>Lời bài hát chạy theo nhạc</span>
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
+                  <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
                     <input
                       type="checkbox"
                       checked={editingTier.vipBadge}
                       onChange={(e) => setEditingTier({ ...editingTier, vipBadge: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 text-[#ff5500]"
+                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
                     />
                     <span>Huy hiệu VIP</span>
                   </label>
@@ -1885,8 +1897,8 @@ export function MonetizationTab({
               <div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                      Tầng Quyền Lợi (Tier)
+                    <label className="block text-xs text-white/70 mb-2 font-semibold">
+                      Hạng gói
                     </label>
                     <select
                       value={formData.tierId}
@@ -1900,46 +1912,46 @@ export function MonetizationTab({
                           featureItems: generateBulletPointsFromEntitlements(newEnts),
                         });
                       }}
-                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none cursor-pointer"
                     >
                       {(tiers.length > 0
                         ? tiers.filter((t) => t.id !== "FREE" || formData.tierId === "FREE")
                         : [
-                            { id: "INDIVIDUAL_BASIC", name: "Tiết Kiệm" },
-                            { id: "INDIVIDUAL_FULL", name: "Cá Nhân FULL" },
-                            { id: "FAMILY", name: "Gói Gia Đình" },
+                            { id: "INDIVIDUAL_BASIC", name: "Cá nhân cơ bản" },
+                            { id: "INDIVIDUAL_FULL", name: "Cá nhân nâng cao" },
+                            { id: "FAMILY", name: "Gia đình" },
                           ]
                       ).map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.id} ({t.name})
+                          {getTierLabel(t.id)} ({t.name})
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                      Thứ Tự Hiển Thị
+                    <label className="block text-xs text-white/70 mb-2 font-semibold">
+                      Thứ tự hiển thị
                     </label>
                     <input
                       type="number"
                       value={formData.displayOrder}
                       onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                      Trạng Thái
+                    <label className="block text-xs text-white/70 mb-2 font-semibold">
+                      Trạng thái
                     </label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as "ACTIVE" | "INACTIVE" })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
                     >
-                      <option value="ACTIVE">ACTIVE (Kích hoạt)</option>
-                      <option value="INACTIVE">INACTIVE (Tạm ngưng)</option>
+                      <option value="ACTIVE">Đang bán</option>
+                      <option value="INACTIVE">Tạm ẩn</option>
                     </select>
                   </div>
                 </div>
@@ -2160,8 +2172,8 @@ export function MonetizationTab({
               <div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                      Tầng Quyền Lợi (Tier)
+                    <label className="block text-xs text-white/70 mb-2 font-semibold">
+                      Hạng gói
                     </label>
                     <select
                       value={formData.tierId}
@@ -2175,46 +2187,46 @@ export function MonetizationTab({
                           featureItems: generateBulletPointsFromEntitlements(newEnts),
                         });
                       }}
-                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none cursor-pointer"
                     >
                       {(tiers.length > 0
                         ? tiers.filter((t) => t.id !== "FREE" || formData.tierId === "FREE")
                         : [
-                            { id: "INDIVIDUAL_BASIC", name: "Tiết Kiệm" },
-                            { id: "INDIVIDUAL_FULL", name: "Cá Nhân FULL" },
-                            { id: "FAMILY", name: "Gói Gia Đình" },
+                            { id: "INDIVIDUAL_BASIC", name: "Cá nhân cơ bản" },
+                            { id: "INDIVIDUAL_FULL", name: "Cá nhân nâng cao" },
+                            { id: "FAMILY", name: "Gia đình" },
                           ]
                       ).map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.id} ({t.name})
+                          {getTierLabel(t.id)} ({t.name})
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                      Thứ Tự Hiển Thị
+                    <label className="block text-xs text-white/70 mb-2 font-semibold">
+                      Thứ tự hiển thị
                     </label>
                     <input
                       type="number"
                       value={formData.displayOrder}
                       onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                      Trạng Thái
+                    <label className="block text-xs text-white/70 mb-2 font-semibold">
+                      Trạng thái
                     </label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as "ACTIVE" | "INACTIVE" })}
-                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2.5 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
                     >
-                      <option value="ACTIVE">ACTIVE (Kích hoạt)</option>
-                      <option value="INACTIVE">INACTIVE (Tạm ngưng)</option>
+                      <option value="ACTIVE">Đang bán</option>
+                      <option value="INACTIVE">Tạm ẩn</option>
                     </select>
                   </div>
                 </div>
@@ -2356,7 +2368,7 @@ export function MonetizationTab({
             <p className="text-sm text-white/70 leading-relaxed">
               Bạn có chắc chắn muốn hủy gói dịch vụ <strong className="text-white font-semibold">{selectedSubForCancel.packageName}</strong> của người dùng{" "}
               <strong className="text-white">{selectedSubForCancel.userName || selectedSubForCancel.userEmail}</strong>?
-              Sau khi hủy, trạng thái gói sẽ chuyển sang CANCELLED và người dùng sẽ trở về tài khoản FREE.
+              Sau khi hủy, gói sẽ ngừng hiệu lực và tài khoản sẽ chuyển về gói Miễn phí.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
