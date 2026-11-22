@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { readAgreementDetails } from "@/lib/agreement-details";
 import { RotateCcw } from "lucide-react";
 import { ToastNotification } from "../../content-lead/components/toast-notification";
 import {
@@ -271,7 +270,6 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
     expiryDate: readString(item.expiryDate) || undefined,
     licenseStatus: readString(item.licenseStatus) || undefined,
     licenseDocumentUrl: resolveMediaUrl(readString(item.licenseDocumentUrl)),
-    agreementDetails: readAgreementDetails(item.agreementDetails),
     audioFeatures: hasRealFeatures ? parsedFeatures : undefined,
   };
 }

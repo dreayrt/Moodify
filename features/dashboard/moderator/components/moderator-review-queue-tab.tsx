@@ -1,6 +1,5 @@
 "use client";
 
-import { AGREEMENT_FIELDS } from "@/lib/agreement-details";
 
 import { useState } from "react";
 import {
@@ -321,24 +320,6 @@ export function ModeratorReviewQueueTab({
                       </p>
                     </div>
                   </div>
-
-                  {selectedTrack.agreementDetails && Object.keys(selectedTrack.agreementDetails).length > 0 && (
-                    <section className="mt-4 border-t border-white/10 pt-3" aria-label="Thông tin các bên và lịch ký">
-                      <h4 className="mb-3 text-sm font-medium text-white">Thông tin các bên và lịch ký</h4>
-                      <dl className="grid gap-3 text-xs sm:grid-cols-2">
-                        {AGREEMENT_FIELDS.map(({ key, label }) => {
-                          const value = selectedTrack.agreementDetails?.[key];
-                          if (!value) return null;
-                          return (
-                            <div key={key}>
-                              <dt className="text-white/50">{label}</dt>
-                              <dd className="mt-1 break-words text-white/90">{value}</dd>
-                            </div>
-                          );
-                        })}
-                      </dl>
-                    </section>
-                  )}
 
                   {selectedTrack.licenseDocumentUrl && (
                     <div className="mt-4 flex items-center justify-between border-t border-white/[0.08] pt-3">
