@@ -31,7 +31,12 @@ import {
 } from "../types";
 import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
-import { fetchAdminSubscriptionTiers, updateAdminSubscriptionTier } from "@/lib/api/admin-client";
+import {
+  fetchAdminSubscriptionTiers,
+  createAdminSubscriptionTier,
+  updateAdminSubscriptionTier,
+  deleteAdminSubscriptionTier,
+} from "@/lib/api/admin-client";
 import { InteractiveAreaChart } from "@/components/dashboard/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/dashboard/charts/interactive-donut-chart";
 
@@ -42,8 +47,10 @@ const TIER_LABELS: Record<string, string> = {
   FAMILY: "Gia đình",
 };
 
-function getTierLabel(tierId?: string | null): string {
+function getTierLabel(tierId?: string | null, tiers: SubscriptionTier[] = []): string {
   if (!tierId) return "—";
+  const matched = tiers.find((t) => t.id === tierId);
+  if (matched?.name) return matched.name;
   return TIER_LABELS[tierId] || tierId;
 }
 
@@ -52,12 +59,13 @@ type MonetizationTabProps = {
   transactions: PaymentTransaction[];
   onTogglePackageStatus: (packageId: number) => void;
   onUpdatePackagePrice: (packageId: number, newPrice: number) => void;
-  onCreatePackage?: (data: Partial<ServicePackage>) => void;
-  onUpdatePackageDetails?: (packageId: number, data: Partial<ServicePackage>) => void;
+  onCreatePackage?: (data: Partial<ServicePackage>) => Promise<boolean> | void;
+  onUpdatePackageDetails?: (packageId: number, data: Partial<ServicePackage>) => Promise<boolean> | void;
   onDeletePackage?: (packageId: number) => void;
   onRefundTransaction?: (transactionId: number) => void;
   subscriptions?: AdminUserSubscription[];
   onCancelSubscription?: (subscriptionId: number) => void;
+  onTiersChanged?: () => Promise<void> | void;
   revenueStats?: AdminRevenueStats | null;
   revenueDays?: 7 | 30 | 90;
   onRevenueDaysChange?: (days: 7 | 30 | 90) => void;
@@ -68,7 +76,7 @@ type MonetizationTabProps = {
 export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlements {
   if (pkg.entitlements && pkg.entitlements.adPolicy) {
     return {
-      tier: (pkg.tierId as PackageEntitlements["tier"]) || pkg.entitlements.tier,
+      tier: pkg.tierId || pkg.entitlements.tier,
       ...pkg.entitlements,
     };
   }
@@ -78,7 +86,7 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
       const parsed = JSON.parse(pkg.featuresJson);
       if (parsed && typeof parsed === "object" && parsed.adPolicy && parsed.skipPolicy) {
         return {
-          tier: (pkg.tierId as PackageEntitlements["tier"]) || parsed.tier,
+          tier: pkg.tierId || parsed.tier,
           adPolicy: parsed.adPolicy || "FULL_ADS",
           adFreeDailyLimit: parsed.adFreeDailyLimit ?? 0,
           adIntervalAfterLimit: parsed.adIntervalAfterLimit ?? 0,
@@ -87,10 +95,10 @@ export function getEffectiveEntitlements(pkg: ServicePackage): PackageEntitlemen
           offlineAllowed: parsed.offlineAllowed ?? false,
           offlineMaxTracks: parsed.offlineMaxTracks ?? 0,
           maxDevices: parsed.maxDevices ?? 1,
-          syncedLyrics: parsed.syncedLyrics ?? false,
-          vipBadge: parsed.vipBadge ?? false,
-          familySharing: parsed.familySharing ?? false,
-          familyMembers: parsed.familyMembers ?? 1,
+          syncedLyrics: true,
+          vipBadge: (pkg.tierId || parsed.tier) !== "FREE",
+          familySharing: false,
+          familyMembers: 0,
         };
       }
     } catch (_) {}
@@ -105,9 +113,9 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
   if (ent.adPolicy === "NO_ADS") {
     bullets.push("Không quảng cáo");
   } else if (ent.adPolicy === "DAILY_QUOTA") {
-    bullets.push(`${ent.adFreeDailyLimit} bài hát/ngày không quảng cáo (sau đó 1 quảng cáo/${ent.adIntervalAfterLimit} bài)`);
+    bullets.push(`${ent.adFreeDailyLimit} bài hát/ngày không quảng cáo`);
   } else {
-    bullets.push("Phát kèm quảng cáo thông thường");
+    bullets.push("Phát kèm quảng cáo");
   }
 
   if (ent.skipPolicy === "UNLIMITED") {
@@ -118,19 +126,18 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
 
   if (ent.offlineAllowed) {
     const trackStr = ent.offlineMaxTracks >= 9999 ? "không giới hạn bài hát" : `${ent.offlineMaxTracks} bài hát`;
-    bullets.push(`Tải ngoại tuyến ${trackStr} trên ${ent.maxDevices} thiết bị`);
+    bullets.push(`Tải nghe ngoại tuyến (${trackStr})`);
   }
 
-  if (ent.syncedLyrics) {
-    bullets.push("Lời bài hát chạy theo nhạc");
-  }
+  const deviceCount = Math.max(1, ent.maxDevices || 1);
+  bullets.push(
+    deviceCount > 1
+      ? `Sử dụng tối đa ${deviceCount} thiết bị đồng thời`
+      : "Sử dụng trên 1 thiết bị"
+  );
 
-  if (ent.familySharing) {
-    bullets.push(`Chia sẻ gói cho ${ent.familyMembers || 6} thành viên gia đình`);
-  }
-
-  if (ent.vipBadge) {
-    bullets.push("Huy hiệu VIP trên hồ sơ");
+  if (ent.tier !== "FREE" && ent.vipBadge !== false) {
+    bullets.push("Giao diện và huy hiệu thành viên VIP");
   }
 
   return bullets;
@@ -138,12 +145,206 @@ export function generateBulletPointsFromEntitlements(ent: PackageEntitlements): 
 
 const POPULAR_BENEFITS = [
   "Nghe nhạc không quảng cáo",
-  "Tải nhạc nghe ngoại tuyến",
   "Chuyển bài không giới hạn",
-  "Lời bài hát chạy theo nhạc",
-  "Huy hiệu VIP trên hồ sơ",
-  "Chia sẻ nhiều thiết bị đồng thời",
+  "Tải nhạc nghe ngoại tuyến",
+  "Sử dụng nhiều thiết bị đồng thời",
+  "Giao diện và huy hiệu thành viên VIP",
 ];
+
+type EntitlementFormValues = {
+  adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
+  adFreeDailyLimit: number;
+  skipPolicy: "UNLIMITED" | "LIMITED";
+  skipDailyLimit: number;
+  offlineAllowed: boolean;
+  offlineMaxTracks: number;
+  maxDevices: number;
+};
+
+function validateEntitlementValues(val: EntitlementFormValues): string | null {
+  if (!Number.isInteger(val.maxDevices) || val.maxDevices < 1 || val.maxDevices > 10) {
+    return "Số thiết bị tối đa phải từ 1 đến 10.";
+  }
+  if (val.adPolicy === "DAILY_QUOTA" && (!Number.isInteger(val.adFreeDailyLimit) || val.adFreeDailyLimit < 1 || val.adFreeDailyLimit > 500)) {
+    return "Hạn mức bài không quảng cáo/ngày phải từ 1 đến 500.";
+  }
+  if (val.skipPolicy === "LIMITED" && (!Number.isInteger(val.skipDailyLimit) || val.skipDailyLimit < 1 || val.skipDailyLimit > 500)) {
+    return "Hạn mức lượt chuyển bài/ngày phải từ 1 đến 500.";
+  }
+  if (val.offlineAllowed && (!Number.isInteger(val.offlineMaxTracks) || val.offlineMaxTracks < 1 || val.offlineMaxTracks > 9999)) {
+    return "Số bài ngoại tuyến tối đa phải từ 1 đến 9999.";
+  }
+  return null;
+}
+
+function normalizeEntitlementPayload(val: EntitlementFormValues, isFree: boolean) {
+  return {
+    adPolicy: val.adPolicy,
+    adFreeDailyLimit: val.adPolicy === "DAILY_QUOTA" ? val.adFreeDailyLimit : 0,
+    skipPolicy: val.skipPolicy,
+    skipDailyLimit: val.skipPolicy === "LIMITED" ? val.skipDailyLimit : 0,
+    offlineAllowed: val.offlineAllowed,
+    offlineMaxTracks: val.offlineAllowed ? val.offlineMaxTracks : 0,
+    maxDevices: val.maxDevices,
+    syncedLyrics: true,
+    vipBadge: !isFree,
+    familySharing: !isFree && val.maxDevices > 1,
+    familyMembers: !isFree && val.maxDevices > 1 ? val.maxDevices : 0,
+  };
+}
+
+function EntitlementEditorFields({
+  value,
+  onChange,
+  isFree = false,
+}: {
+  value: EntitlementFormValues;
+  onChange: (next: EntitlementFormValues) => void;
+  isFree?: boolean;
+}) {
+  return (
+    <div className="space-y-4 text-xs">
+      {/* 1. Quảng cáo */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-zinc-400 mb-1">Chính sách quảng cáo</label>
+          <select
+            value={value.adPolicy}
+            onChange={(e) => {
+              const nextPolicy = e.target.value as EntitlementFormValues["adPolicy"];
+              onChange({
+                ...value,
+                adPolicy: nextPolicy,
+                adFreeDailyLimit: nextPolicy === "DAILY_QUOTA" ? Math.max(1, value.adFreeDailyLimit || 15) : 0,
+              });
+            }}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500] cursor-pointer"
+          >
+            <option value="NO_ADS">Không quảng cáo</option>
+            <option value="DAILY_QUOTA">Giới hạn bài không quảng cáo/ngày</option>
+            <option value="FULL_ADS">Có quảng cáo thông thường</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-zinc-400 mb-1">Số bài/ngày không quảng cáo</label>
+          <input
+            type="number"
+            min={value.adPolicy === "DAILY_QUOTA" ? 1 : 0}
+            max={500}
+            value={value.adPolicy === "DAILY_QUOTA" ? value.adFreeDailyLimit : 0}
+            onChange={(e) => onChange({ ...value, adFreeDailyLimit: Number(e.target.value) })}
+            disabled={value.adPolicy !== "DAILY_QUOTA"}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-45"
+          />
+        </div>
+      </div>
+
+      {/* 2. Chuyển bài */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-zinc-400 mb-1">Chính sách chuyển bài</label>
+          <select
+            value={value.skipPolicy}
+            onChange={(e) => {
+              const nextPolicy = e.target.value as EntitlementFormValues["skipPolicy"];
+              onChange({
+                ...value,
+                skipPolicy: nextPolicy,
+                skipDailyLimit: nextPolicy === "LIMITED" ? Math.max(1, value.skipDailyLimit || 30) : 0,
+              });
+            }}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500] cursor-pointer"
+          >
+            <option value="UNLIMITED">Không giới hạn</option>
+            <option value="LIMITED">Giới hạn mỗi ngày</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-zinc-400 mb-1">Số lượt chuyển bài/ngày</label>
+          <input
+            type="number"
+            min={value.skipPolicy === "LIMITED" ? 1 : 0}
+            max={500}
+            value={value.skipPolicy === "LIMITED" ? value.skipDailyLimit : 0}
+            onChange={(e) => onChange({ ...value, skipDailyLimit: Number(e.target.value) })}
+            disabled={value.skipPolicy !== "LIMITED"}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-45"
+          />
+        </div>
+      </div>
+
+      {/* 3. Tải nghe ngoại tuyến */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+        <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
+          <input
+            type="checkbox"
+            checked={value.offlineAllowed}
+            onChange={(e) => {
+              const allowed = e.target.checked;
+              onChange({
+                ...value,
+                offlineAllowed: allowed,
+                offlineMaxTracks: allowed ? (value.offlineMaxTracks > 0 ? value.offlineMaxTracks : 100) : 0,
+              });
+            }}
+            className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
+          />
+          <span>Cho phép tải nghe ngoại tuyến</span>
+        </label>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-zinc-400">Số bài ngoại tuyến tối đa</label>
+            {value.offlineAllowed && (
+              <label className="inline-flex items-center gap-1 text-[11px] text-amber-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={value.offlineMaxTracks >= 9999}
+                  onChange={(e) =>
+                    onChange({ ...value, offlineMaxTracks: e.target.checked ? 9999 : 100 })
+                  }
+                  className="accent-[#ff5500]"
+                />
+                <span>Không giới hạn</span>
+              </label>
+            )}
+          </div>
+          <input
+            type="number"
+            min={value.offlineAllowed ? 1 : 0}
+            max={9999}
+            value={value.offlineAllowed ? value.offlineMaxTracks : 0}
+            onChange={(e) => onChange({ ...value, offlineMaxTracks: Number(e.target.value) })}
+            disabled={!value.offlineAllowed}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-45"
+          />
+        </div>
+      </div>
+
+      {/* 4. Số thiết bị */}
+      <div>
+        <label className="block text-zinc-400 mb-1">Số thiết bị hoạt động đồng thời (1–10)</label>
+        <input
+          type="number"
+          min={1}
+          max={10}
+          value={value.maxDevices}
+          onChange={(e) => onChange({ ...value, maxDevices: Number(e.target.value) })}
+          className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500]"
+        />
+      </div>
+
+      {/* Quyền lợi giao diện VIP gộp sẵn (không chỉnh tay từng cờ) */}
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3.5 py-2.5 flex items-center gap-2.5 text-xs">
+        <Crown className={`w-4 h-4 shrink-0 ${isFree ? "text-zinc-500" : "text-amber-300"}`} />
+        <p className={isFree ? "text-zinc-400" : "text-amber-200/90"}>
+          {isFree
+            ? "Hạng Miễn phí không bao gồm quyền lợi giao diện VIP."
+            : "Quyền lợi giao diện VIP (huy hiệu VIP và chủ đề giao diện nổi bật) tự động đi kèm mọi gói trả phí."}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function buildEntitlementsFromTier(
   tierId: string,
@@ -153,81 +354,54 @@ function buildEntitlementsFromTier(
   const matched = tiers.find((t) => t.id === tierId);
   if (matched) {
     return {
-      tier: matched.id as PackageEntitlements["tier"],
+      tier: matched.id,
       adPolicy: matched.adPolicy,
       adFreeDailyLimit: matched.adFreeDailyLimit ?? 0,
-      adIntervalAfterLimit: 7,
+      adIntervalAfterLimit: matched.adPolicy === "DAILY_QUOTA" ? 7 : matched.adPolicy === "FULL_ADS" ? 2 : 0,
       skipPolicy: matched.skipPolicy,
       skipDailyLimit: matched.skipDailyLimit ?? 0,
       offlineAllowed: Boolean(matched.offlineAllowed),
       offlineMaxTracks: matched.offlineMaxTracks ?? 0,
       maxDevices: matched.maxDevices ?? 1,
-      syncedLyrics: Boolean(matched.syncedLyrics),
-      vipBadge: Boolean(matched.vipBadge),
-      familySharing: Boolean(matched.familySharing),
-      familyMembers: matched.familyMembers ?? 1,
-    };
-  }
-  if (tierId === "INDIVIDUAL_FULL") {
-    return {
-      tier: "INDIVIDUAL_FULL",
-      adPolicy: "NO_ADS",
-      adFreeDailyLimit: 0,
-      adIntervalAfterLimit: 0,
-      skipPolicy: "UNLIMITED",
-      skipDailyLimit: 0,
-      offlineAllowed: true,
-      offlineMaxTracks: 9999,
-      maxDevices: 2,
       syncedLyrics: true,
-      vipBadge: true,
+      vipBadge: matched.id !== "FREE",
       familySharing: false,
-      familyMembers: 1,
+      familyMembers: 0,
     };
   }
-  if (tierId === "FAMILY") {
+  if (fallback) {
     return {
-      tier: "FAMILY",
-      adPolicy: "NO_ADS",
-      adFreeDailyLimit: 0,
-      adIntervalAfterLimit: 0,
-      skipPolicy: "UNLIMITED",
-      skipDailyLimit: 0,
-      offlineAllowed: true,
-      offlineMaxTracks: 9999,
-      maxDevices: 6,
-      syncedLyrics: true,
-      vipBadge: true,
-      familySharing: true,
-      familyMembers: 6,
+      ...fallback,
+      tier: tierId || fallback.tier,
+      vipBadge: (tierId || fallback.tier) !== "FREE",
     };
   }
-  return (
-    fallback ?? {
-      tier: (tierId || "INDIVIDUAL_BASIC") as PackageEntitlements["tier"],
-      adPolicy: "DAILY_QUOTA",
-      adFreeDailyLimit: 15,
-      adIntervalAfterLimit: 7,
-      skipPolicy: "LIMITED",
-      skipDailyLimit: 30,
-      offlineAllowed: true,
-      offlineMaxTracks: 50,
-      maxDevices: 1,
-      syncedLyrics: true,
-      vipBadge: true,
-      familySharing: false,
-      familyMembers: 1,
-    }
-  );
+  return {
+    tier: tierId || "INDIVIDUAL_FULL",
+    adPolicy: "NO_ADS",
+    adFreeDailyLimit: 0,
+    adIntervalAfterLimit: 0,
+    skipPolicy: "UNLIMITED",
+    skipDailyLimit: 0,
+    offlineAllowed: true,
+    offlineMaxTracks: 9999,
+    maxDevices: 1,
+    syncedLyrics: true,
+    vipBadge: (tierId || "INDIVIDUAL_FULL") !== "FREE",
+    familySharing: false,
+    familyMembers: 0,
+  };
 }
 
 function TierInheritedPreview({
   tierId,
+  tiers,
   entitlements,
   onSyncToBullets,
   onNavigateToTiers,
 }: {
   tierId: string;
+  tiers: SubscriptionTier[];
   entitlements: PackageEntitlements;
   onSyncToBullets: () => void;
   onNavigateToTiers: () => void;
@@ -238,7 +412,7 @@ function TierInheritedPreview({
         <div>
           <h4 className="text-xs font-semibold text-white flex items-center gap-2">
             <Sliders className="w-3.5 h-3.5 text-[#ff5500]" />
-            Quyền lợi theo hạng gói ({getTierLabel(tierId)})
+            Quyền lợi theo hạng gói ({getTierLabel(tierId, tiers)})
           </h4>
           <p className="text-xs text-zinc-400 mt-0.5">
             Quyền hạn áp dụng theo cấu hình chung. Chỉnh sửa tại{" "}
@@ -282,29 +456,23 @@ function TierInheritedPreview({
           </strong>
         </div>
         <div>
-          <span className="text-zinc-500 block">Nghe ngoại tuyến &amp; thiết bị</span>
+          <span className="text-zinc-500 block">Tải nghe ngoại tuyến</span>
           <strong className="text-emerald-300 tabular-nums">
             {entitlements.offlineAllowed
-              ? `${entitlements.offlineMaxTracks >= 9999 ? "Không giới hạn" : entitlements.offlineMaxTracks + " bài"} · ${entitlements.maxDevices} máy`
-              : `Không hỗ trợ · ${entitlements.maxDevices} máy`}
+              ? entitlements.offlineMaxTracks >= 9999
+                ? "Không giới hạn"
+                : `${entitlements.offlineMaxTracks} bài`
+              : "Không hỗ trợ"}
           </strong>
         </div>
         <div>
-          <span className="text-zinc-500 block">Lời bài hát chạy theo nhạc</span>
-          <strong className={entitlements.syncedLyrics ? "text-white" : "text-zinc-500"}>
-            {entitlements.syncedLyrics ? "Có hỗ trợ" : "Không"}
-          </strong>
+          <span className="text-zinc-500 block">Số thiết bị đồng thời</span>
+          <strong className="text-white tabular-nums">{Math.max(1, entitlements.maxDevices || 1)} máy</strong>
         </div>
-        <div>
-          <span className="text-zinc-500 block">Huy hiệu VIP</span>
-          <strong className={entitlements.vipBadge ? "text-yellow-300" : "text-zinc-500"}>
-            {entitlements.vipBadge ? "Bật" : "Tắt"}
-          </strong>
-        </div>
-        <div>
-          <span className="text-zinc-500 block">Chia sẻ gia đình</span>
-          <strong className={entitlements.familySharing ? "text-amber-300 tabular-nums" : "text-zinc-400"}>
-            {entitlements.familySharing ? `${entitlements.familyMembers || 6} thành viên` : "Cá nhân"}
+        <div className="col-span-2 sm:col-span-2">
+          <span className="text-zinc-500 block">Giao diện &amp; huy hiệu VIP</span>
+          <strong className={tierId === "FREE" ? "text-zinc-400" : "text-yellow-300"}>
+            {tierId === "FREE" ? "Không áp dụng" : "Tự động kèm mọi gói trả phí"}
           </strong>
         </div>
       </div>
@@ -322,6 +490,7 @@ export function MonetizationTab({
   onDeletePackage,
   subscriptions = [],
   onCancelSubscription,
+  onTiersChanged,
   revenueStats,
   revenueDays = 30,
   onRevenueDaysChange,
@@ -339,12 +508,33 @@ export function MonetizationTab({
   const [subPageSize, setSubPageSize] = useState(10);
   const [selectedSubForCancel, setSelectedSubForCancel] = useState<AdminUserSubscription | null>(null);
 
-  // Normalized Subscription Tiers
+  // Subscription Tiers
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [editingTier, setEditingTier] = useState<SubscriptionTier | null>(null);
+  const [isCreateTierModalOpen, setIsCreateTierModalOpen] = useState(false);
+  const [createTierDraft, setCreateTierDraft] = useState<{
+    name: string;
+    description: string;
+    entitlements: EntitlementFormValues;
+  }>({
+    name: "",
+    description: "",
+    entitlements: {
+      adPolicy: "NO_ADS",
+      adFreeDailyLimit: 0,
+      skipPolicy: "UNLIMITED",
+      skipDailyLimit: 0,
+      offlineAllowed: true,
+      offlineMaxTracks: 100,
+      maxDevices: 1,
+    },
+  });
+  const [tierToDelete, setTierToDelete] = useState<SubscriptionTier | null>(null);
   const [tierSaving, setTierSaving] = useState(false);
   const [tierError, setTierError] = useState("");
   const [packageError, setPackageError] = useState("");
+  const [packageModalError, setPackageModalError] = useState("");
+  const [packageSaving, setPackageSaving] = useState(false);
   const [tiersLoading, setTiersLoading] = useState(true);
 
   useEffect(() => {
@@ -352,37 +542,38 @@ export function MonetizationTab({
       .then((data) => {
         if (Array.isArray(data)) setTiers(data);
       })
-      .catch((err) => setTierError(err instanceof Error ? err.message : "Không tải được tầng quyền lợi"))
+      .catch((err) => setTierError(err instanceof Error ? err.message : "Không tải được danh sách hạng gói"))
       .finally(() => setTiersLoading(false));
   }, []);
 
   // Modals state
   const [editingPackage, setEditingPackage] = useState<ServicePackage | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [entitlementMode, setEntitlementMode] = useState<"shared" | "custom">("shared");
 
-  // Form states for full package editor / creator
+  // Form states for package editor / creator
   const [formData, setFormData] = useState({
     name: "",
     price: 0,
     durationDays: 30,
     displayOrder: 1,
     status: "ACTIVE" as "ACTIVE" | "INACTIVE",
-    tierId: "INDIVIDUAL_BASIC",
+    tierId: "INDIVIDUAL_FULL",
     description: "",
     featureItems: [] as string[],
     entitlements: {
-      adPolicy: "DAILY_QUOTA",
-      adFreeDailyLimit: 15,
-      adIntervalAfterLimit: 7,
-      skipPolicy: "LIMITED",
-      skipDailyLimit: 30,
+      adPolicy: "NO_ADS",
+      adFreeDailyLimit: 0,
+      adIntervalAfterLimit: 0,
+      skipPolicy: "UNLIMITED",
+      skipDailyLimit: 0,
       offlineAllowed: true,
-      offlineMaxTracks: 50,
+      offlineMaxTracks: 9999,
       maxDevices: 1,
       syncedLyrics: true,
       vipBadge: true,
       familySharing: false,
-      familyMembers: 1,
+      familyMembers: 0,
     } as PackageEntitlements,
   });
 
@@ -583,7 +774,12 @@ export function MonetizationTab({
     let ents: PackageEntitlements;
     try { ents = getEffectiveEntitlements(pkg); setPackageError(""); }
     catch (error) { setPackageError(error instanceof Error ? error.message : "Không đọc được cấu hình quyền lợi"); return; }
-    const tierId = pkg.tierId || ents.tier || "INDIVIDUAL_BASIC";
+    const tierId = pkg.tierId || ents.tier || "INDIVIDUAL_FULL";
+    const isSingleCustomTier =
+      tierId.startsWith("CUSTOM_") &&
+      packages.filter((p) => p.tierId === tierId).length <= 1;
+    setEntitlementMode(isSingleCustomTier ? "custom" : "shared");
+    setPackageModalError("");
     setEditingPackage(pkg);
     setFormData({
       name: pkg.name,
@@ -591,38 +787,32 @@ export function MonetizationTab({
       durationDays: pkg.durationDays,
       displayOrder: pkg.displayOrder,
       status: pkg.status,
-      tierId: tierId,
+      tierId,
       description: pkg.description,
       featureItems: features,
-      entitlements: { ...ents, tier: tierId as PackageEntitlements["tier"] },
+      entitlements: { ...ents, tier: tierId },
     });
     setNewFeatureInput("");
   };
 
   const handleOpenCreate = () => {
+    const paidTiers = tiers.filter((t) => t.id !== "FREE");
+    const defaultTierId =
+      paidTiers.find((t) => t.id === "INDIVIDUAL_FULL")?.id ||
+      paidTiers[0]?.id ||
+      "INDIVIDUAL_FULL";
+    const defaultEnts = buildEntitlementsFromTier(defaultTierId, tiers);
+    setEntitlementMode("shared");
+    setPackageModalError("");
     setIsCreateModalOpen(true);
-    const defaultEnts: PackageEntitlements = {
-      adPolicy: "DAILY_QUOTA",
-      adFreeDailyLimit: 15,
-      adIntervalAfterLimit: 7,
-      skipPolicy: "LIMITED",
-      skipDailyLimit: 30,
-      offlineAllowed: true,
-      offlineMaxTracks: 50,
-      maxDevices: 1,
-      syncedLyrics: true,
-      vipBadge: true,
-      familySharing: false,
-      familyMembers: 1,
-    };
     setFormData({
-      name: "Moodify VIP Mới",
-      price: 59000,
+      name: "",
+      price: 29000,
       durationDays: 30,
       displayOrder: packages.length + 1,
       status: "ACTIVE",
-      tierId: "INDIVIDUAL_BASIC",
-      description: "Gói dịch vụ âm nhạc nâng cao",
+      tierId: defaultTierId,
+      description: "",
       featureItems: generateBulletPointsFromEntitlements(defaultEnts),
       entitlements: defaultEnts,
     });
@@ -652,73 +842,112 @@ export function MonetizationTab({
   const serializeFeatureItems = (items: string[]) =>
     items.length > 0 ? items.map((item) => `• ${item}`).join("\n") : "";
 
-  const handleSaveEditPackage = () => {
-    if (!editingPackage) return;
+  const handleSavePackageModal = async () => {
+    const isEditing = Boolean(editingPackage);
     const cleanName = formData.name.trim();
     if (!cleanName) {
-      onToast?.("Vui lòng nhập tên gói cước.", "warning");
+      const msg = isEditing ? "Vui lòng nhập tên gói dịch vụ." : "Vui lòng nhập tên gói dịch vụ mới.";
+      setPackageModalError(msg);
+      onToast?.(msg, "warning");
       return;
     }
     if (!Number.isFinite(formData.price) || formData.price < 0) {
-      onToast?.("Đơn giá gói cước không hợp lệ.", "warning");
+      const msg = "Đơn giá gói dịch vụ không hợp lệ.";
+      setPackageModalError(msg);
+      onToast?.(msg, "warning");
       return;
     }
-    if (!Number.isFinite(formData.durationDays) || formData.durationDays < 1) {
-      onToast?.("Chu kỳ gói cước phải tối thiểu 1 ngày.", "warning");
+    if (!Number.isFinite(formData.durationDays) || formData.durationDays < 1 || formData.durationDays > 3650) {
+      const msg = "Chu kỳ gói dịch vụ phải từ 1 đến 3650 ngày.";
+      setPackageModalError(msg);
+      onToast?.(msg, "warning");
       return;
     }
 
-    const finalDesc = serializeFeatureItems(formData.featureItems);
-    const featuresJsonStr = JSON.stringify(formData.entitlements);
+    const customEntValues: EntitlementFormValues = {
+      adPolicy: formData.entitlements.adPolicy,
+      adFreeDailyLimit: formData.entitlements.adFreeDailyLimit,
+      skipPolicy: formData.entitlements.skipPolicy,
+      skipDailyLimit: formData.entitlements.skipDailyLimit,
+      offlineAllowed: formData.entitlements.offlineAllowed,
+      offlineMaxTracks: formData.entitlements.offlineMaxTracks,
+      maxDevices: formData.entitlements.maxDevices,
+    };
+    if (entitlementMode === "custom") {
+      const validationError = validateEntitlementValues(customEntValues);
+      if (validationError) {
+        setPackageModalError(validationError);
+        onToast?.(validationError, "warning");
+        return;
+      }
+    }
 
-    if (onUpdatePackageDetails) {
-      onUpdatePackageDetails(editingPackage.id, {
+    setPackageSaving(true);
+    setPackageModalError("");
+    try {
+      let resolvedTierId = formData.tierId;
+      let tierChanged = false;
+
+      if (entitlementMode === "custom") {
+        const tierPayload = {
+          name: cleanName.slice(0, 100),
+          description: `Quyền lợi tùy chỉnh cho ${cleanName}`.slice(0, 255),
+          ...normalizeEntitlementPayload(customEntValues, false),
+        };
+        const canUpdateExistingCustomTier =
+          Boolean(editingPackage?.tierId?.startsWith("CUSTOM_")) &&
+          packages.filter((p) => p.tierId === editingPackage?.tierId).length <= 1;
+
+        if (canUpdateExistingCustomTier && editingPackage?.tierId) {
+          await updateAdminSubscriptionTier(editingPackage.tierId, tierPayload);
+          resolvedTierId = editingPackage.tierId;
+          tierChanged = true;
+        } else {
+          const created = await createAdminSubscriptionTier(tierPayload);
+          if (!created.tier?.id) {
+            throw new Error("Không tạo được cấu hình quyền lợi riêng cho gói này.");
+          }
+          resolvedTierId = created.tier.id;
+          tierChanged = true;
+        }
+        const refreshedTiers = await fetchAdminSubscriptionTiers();
+        if (Array.isArray(refreshedTiers)) setTiers(refreshedTiers);
+      }
+
+      const payload: Partial<ServicePackage> = {
         name: cleanName,
         price: formData.price,
         durationDays: formData.durationDays,
-        displayOrder: formData.displayOrder,
+        displayOrder: Math.max(0, formData.displayOrder || 1),
         status: formData.status,
-        tierId: formData.tierId,
-        description: finalDesc,
-        featuresJson: featuresJsonStr,
-      });
-    } else {
-      onUpdatePackagePrice(editingPackage.id, formData.price);
-    }
-    setEditingPackage(null);
-  };
+        tierId: resolvedTierId,
+        description: serializeFeatureItems(formData.featureItems),
+      };
 
-  const handleSaveCreatePackage = () => {
-    const cleanName = formData.name.trim();
-    if (!cleanName) {
-      onToast?.("Vui lòng nhập tên gói cước mới.", "warning");
-      return;
+      if (isEditing && editingPackage) {
+        if (onUpdatePackageDetails) {
+          const ok = await onUpdatePackageDetails(editingPackage.id, payload);
+          if (ok === false) return;
+        } else {
+          onUpdatePackagePrice(editingPackage.id, formData.price);
+        }
+        if (tierChanged) await onTiersChanged?.();
+        setEditingPackage(null);
+      } else {
+        if (onCreatePackage) {
+          const ok = await onCreatePackage(payload);
+          if (ok === false) return;
+        }
+        if (tierChanged) await onTiersChanged?.();
+        setIsCreateModalOpen(false);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Không thể lưu thông tin gói dịch vụ.";
+      setPackageModalError(msg);
+      onToast?.(msg, "error");
+    } finally {
+      setPackageSaving(false);
     }
-    if (!Number.isFinite(formData.price) || formData.price < 0) {
-      onToast?.("Đơn giá gói cước không hợp lệ.", "warning");
-      return;
-    }
-    if (!Number.isFinite(formData.durationDays) || formData.durationDays < 1) {
-      onToast?.("Chu kỳ gói cước phải tối thiểu 1 ngày.", "warning");
-      return;
-    }
-
-    const finalDesc = serializeFeatureItems(formData.featureItems);
-    const featuresJsonStr = JSON.stringify(formData.entitlements);
-
-    if (onCreatePackage) {
-      onCreatePackage({
-        name: cleanName,
-        price: formData.price,
-        durationDays: formData.durationDays,
-        displayOrder: formData.displayOrder,
-        status: formData.status,
-        tierId: formData.tierId,
-        description: finalDesc,
-        featuresJson: featuresJsonStr,
-      });
-    }
-    setIsCreateModalOpen(false);
   };
 
   const handleDeletePackage = (pkg: ServicePackage) => {
@@ -1358,6 +1587,29 @@ export function MonetizationTab({
                   Cấu hình các mức quyền lợi áp dụng cho tài khoản người dùng và từng gói dịch vụ.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTierError("");
+                  setCreateTierDraft({
+                    name: "",
+                    description: "",
+                    entitlements: {
+                      adPolicy: "NO_ADS",
+                      adFreeDailyLimit: 0,
+                      skipPolicy: "UNLIMITED",
+                      skipDailyLimit: 0,
+                      offlineAllowed: true,
+                      offlineMaxTracks: 100,
+                      maxDevices: 1,
+                    },
+                  });
+                  setIsCreateTierModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Thêm hạng gói mới
+              </button>
             </div>
 
             {/* Grid of Tiers */}
@@ -1365,18 +1617,21 @@ export function MonetizationTab({
               {tiersLoading && <p role="status" className="text-sm text-zinc-400">Đang tải danh sách hạng gói…</p>}
               {tierError && <p role="alert" className="text-sm text-rose-300">{tierError}</p>}
               {!tiersLoading && !tierError && tiers.length === 0 && <p className="text-sm text-zinc-400">Chưa có hạng gói nào.</p>}
-              {tiers.map((tier) => (
+              {tiers.map((tier) => {
+                const linkedCount = packages.filter((p) => p.tierId === tier.id).length;
+                const isFree = tier.id === "FREE";
+                return (
                 <div
                   key={tier.id}
                   className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-[#171923] p-5 shadow-lg hover:border-[#ff5500]/40 transition"
                 >
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
-                        {getTierLabel(tier.id)}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full truncate">
+                        {isFree ? "Mặc định" : tier.id.startsWith("CUSTOM_") ? "Tùy chỉnh riêng" : "Hạng trả phí"}
                       </span>
-                      <span className="text-xs text-zinc-400 tabular-nums">
-                        {packages.filter((p) => p.tierId === tier.id).length} gói
+                      <span className="text-xs text-zinc-400 tabular-nums shrink-0">
+                        {linkedCount} gói
                       </span>
                     </div>
 
@@ -1389,7 +1644,7 @@ export function MonetizationTab({
                       </p>
                     </div>
 
-                    {/* Matrix Specs */}
+                    {/* Matrix Specs — 4 real business entitlements + bundled VIP UI */}
                     <div className="space-y-2 pt-2 border-t border-white/5 text-xs tabular-nums">
                       <div className="flex items-center justify-between text-zinc-300">
                         <span className="text-zinc-500">Quảng cáo:</span>
@@ -1418,37 +1673,39 @@ export function MonetizationTab({
                       </div>
 
                       <div className="flex items-center justify-between text-zinc-300">
-                        <span className="text-zinc-500">Chia sẻ gia đình:</span>
-                        <span className={tier.familySharing ? "text-yellow-400 font-bold" : "text-zinc-500"}>
-                          {tier.familySharing ? `${tier.familyMembers || 6} thành viên` : "Cá nhân"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-zinc-300">
-                        <span className="text-zinc-500">Lời bài hát chạy theo nhạc:</span>
-                        <span className={tier.syncedLyrics ? "text-white font-semibold" : "text-zinc-500"}>
-                          {tier.syncedLyrics ? "Có hỗ trợ" : "Không"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-zinc-300">
-                        <span className="text-zinc-500">Huy hiệu VIP:</span>
-                        <span className={tier.vipBadge ? "text-yellow-300 font-semibold" : "text-zinc-500"}>
-                          {tier.vipBadge ? "Bật" : "Tắt"}
+                        <span className="text-zinc-500">Giao diện VIP:</span>
+                        <span className={isFree ? "text-zinc-500" : "text-yellow-300 font-semibold"}>
+                          {isFree ? "Không áp dụng" : "Tự động kèm gói"}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setEditingTier(tier)}
-                    className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#222432]/50 hover:bg-[#ff5500]/15 hover:border-[#ff5500]/50 py-2 text-xs font-semibold text-white transition active:scale-[0.98] cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 text-[#ff5500]" /> Chỉnh sửa quyền lợi
-                  </button>
+                  <div className="mt-4 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTierError("");
+                        setEditingTier(tier);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#222432]/50 hover:bg-[#ff5500]/15 hover:border-[#ff5500]/50 py-2 text-xs font-semibold text-white transition active:scale-[0.98] cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-[#ff5500]" /> Chỉnh sửa quyền lợi
+                    </button>
+                    {!isFree && linkedCount === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setTierToDelete(tier)}
+                        title="Xóa hạng gói chưa sử dụng"
+                        className="p-2 rounded-xl border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40 transition cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1510,6 +1767,7 @@ export function MonetizationTab({
                   ) : (
                     paginatedSubscriptions.map((sub) => {
                       const isActive = sub.status === "ACTIVE";
+                      const isPending = sub.status === "PENDING";
                       const isCancelled = sub.status === "CANCELLED";
                       const isExpired = sub.status === "EXPIRED";
 
@@ -1525,8 +1783,8 @@ export function MonetizationTab({
                             <div className="text-[11px] font-mono text-emerald-400">{formatVND(sub.price)}</div>
                           </td>
                           <td className="px-5 py-4">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] font-mono text-amber-300">
-                              <Crown className="h-3 w-3" /> {sub.tierName}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] text-amber-300">
+                              <Crown className="h-3 w-3" /> {sub.tierName || getTierLabel(sub.tierId, tiers)}
                             </span>
                           </td>
                           <td className="px-5 py-4 font-mono text-zinc-300 text-[11px]">
@@ -1546,6 +1804,11 @@ export function MonetizationTab({
                                 <CheckCircle2 className="h-3 w-3" /> Đang dùng
                               </span>
                             )}
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-300">
+                                <Clock className="h-3 w-3" /> Chờ thanh toán
+                              </span>
+                            )}
                             {isCancelled && (
                               <span className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-rose-300">
                                 <XCircle className="h-3 w-3" /> Đã hủy
@@ -1558,13 +1821,13 @@ export function MonetizationTab({
                             )}
                           </td>
                           <td className="px-5 py-4 text-right">
-                            {isActive && (
+                            {(isActive || isPending) && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedSubForCancel(sub)}
-                                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
+                                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
                               >
-                                Hủy Gói
+                                Hủy gói
                               </button>
                             )}
                           </td>
@@ -1588,6 +1851,120 @@ export function MonetizationTab({
         </div>
       )}
 
+      {/* MODAL: CREATE SUBSCRIPTION TIER */}
+      {isCreateTierModalOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-graphik text-xl font-bold text-white flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-[#ff5500]" />
+                    Tạo hạng gói mới
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Định nghĩa tập quyền lợi tùy chỉnh để dùng chung cho một hoặc nhiều gói dịch vụ
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateTierModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Tên hạng gói</label>
+                    <input
+                      type="text"
+                      value={createTierDraft.name}
+                      onChange={(e) => setCreateTierDraft({ ...createTierDraft, name: e.target.value })}
+                      placeholder="Ví dụ: Cá nhân Tiêu chuẩn"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 mb-1">Mô tả tóm tắt</label>
+                    <input
+                      type="text"
+                      value={createTierDraft.description}
+                      onChange={(e) => setCreateTierDraft({ ...createTierDraft, description: e.target.value })}
+                      placeholder="Ví dụ: Không quảng cáo, dùng trên 2 thiết bị"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500]"
+                    />
+                  </div>
+                </div>
+
+                <EntitlementEditorFields
+                  value={createTierDraft.entitlements}
+                  onChange={(next) => setCreateTierDraft({ ...createTierDraft, entitlements: next })}
+                  isFree={false}
+                />
+              </div>
+
+              {tierError && (
+                <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                  {tierError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateTierModalOpen(false)}
+                  className="rounded-xl px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={tierSaving}
+                  onClick={async () => {
+                    const cleanName = createTierDraft.name.trim();
+                    if (!cleanName) {
+                      setTierError("Vui lòng nhập tên hạng gói.");
+                      return;
+                    }
+                    const validationMsg = validateEntitlementValues(createTierDraft.entitlements);
+                    if (validationMsg) {
+                      setTierError(validationMsg);
+                      return;
+                    }
+                    setTierSaving(true);
+                    setTierError("");
+                    try {
+                      await createAdminSubscriptionTier({
+                        name: cleanName,
+                        description: createTierDraft.description.trim(),
+                        ...normalizeEntitlementPayload(createTierDraft.entitlements, false),
+                      });
+                      const res = await fetchAdminSubscriptionTiers();
+                      if (Array.isArray(res)) setTiers(res);
+                      await onTiersChanged?.();
+                      onToast?.(`Đã tạo hạng gói "${cleanName}".`, "success");
+                      setIsCreateTierModalOpen(false);
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Lỗi khi tạo hạng gói.";
+                      setTierError(msg);
+                      onToast?.(msg, "error");
+                    } finally {
+                      setTierSaving(false);
+                    }
+                  }}
+                  className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] transition cursor-pointer disabled:opacity-50"
+                >
+                  {tierSaving ? "Đang tạo..." : "Tạo hạng gói"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
       {/* MODAL: EDIT SUBSCRIPTION TIER */}
       {editingTier && (
         <ModalPortal>
@@ -1597,10 +1974,10 @@ export function MonetizationTab({
                 <div>
                   <h3 className="font-graphik text-xl font-bold text-white flex items-center gap-2">
                     <Sliders className="w-5 h-5 text-[#ff5500]" />
-                    Chỉnh sửa hạng gói: {getTierLabel(editingTier.id)}
+                    Chỉnh sửa hạng gói: {editingTier.name}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-1">
-                    Thiết lập quyền lợi mặc định cho các gói thuộc hạng này
+                    Các gói gắn hạng gói này sẽ áp dụng quyền lợi mới ngay lập tức
                   </p>
                 </div>
                 <button
@@ -1613,7 +1990,7 @@ export function MonetizationTab({
               </div>
 
               <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-zinc-400 mb-1">Tên hạng gói</label>
                     <input
@@ -1634,137 +2011,19 @@ export function MonetizationTab({
                   </div>
                 </div>
 
-                {/* Ad Policy */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Chính sách quảng cáo</label>
-                    <select
-                      value={editingTier.adPolicy}
-                      onChange={(e) => setEditingTier({ ...editingTier, adPolicy: e.target.value as SubscriptionTier["adPolicy"] })}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500] cursor-pointer"
-                    >
-                      <option value="NO_ADS">Không quảng cáo</option>
-                      <option value="DAILY_QUOTA">Giới hạn theo ngày</option>
-                      <option value="FULL_ADS">Có quảng cáo</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Số bài/ngày không QC</label>
-                    <input
-                      type="number"
-                      value={editingTier.adFreeDailyLimit}
-                      onChange={(e) => setEditingTier({ ...editingTier, adFreeDailyLimit: Number(e.target.value) })}
-                      disabled={editingTier.adPolicy !== "DAILY_QUOTA"}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-
-                {/* Skip & Quality */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Chính sách chuyển bài</label>
-                    <select
-                      value={editingTier.skipPolicy}
-                      onChange={(e) => setEditingTier({ ...editingTier, skipPolicy: e.target.value as SubscriptionTier["skipPolicy"] })}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 text-white outline-none focus:border-[#ff5500] cursor-pointer"
-                    >
-                      <option value="UNLIMITED">Không giới hạn</option>
-                      <option value="LIMITED">Giới hạn mỗi ngày</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Số lượt chuyển bài/ngày</label>
-                    <input
-                      type="number"
-                      value={editingTier.skipDailyLimit}
-                      onChange={(e) => setEditingTier({ ...editingTier, skipDailyLimit: Number(e.target.value) })}
-                      disabled={editingTier.skipPolicy !== "LIMITED"}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-
-                {/* Devices */}
-                <div>
-                  <label className="block text-zinc-400 mb-1">Số thiết bị tối đa</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={editingTier.maxDevices}
-                    onChange={(e) => setEditingTier({ ...editingTier, maxDevices: Number(e.target.value) })}
-                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500]"
-                  />
-                </div>
-
-                {/* Offline Downloads */}
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center gap-2 text-white cursor-pointer mt-3">
-                    <input
-                      type="checkbox"
-                      checked={editingTier.offlineAllowed}
-                      onChange={(e) => setEditingTier({ ...editingTier, offlineAllowed: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
-                    />
-                    <span>Cho phép tải nghe ngoại tuyến</span>
-                  </label>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Số bài ngoại tuyến tối đa</label>
-                    <input
-                      type="number"
-                      value={editingTier.offlineMaxTracks}
-                      onChange={(e) => setEditingTier({ ...editingTier, offlineMaxTracks: Number(e.target.value) })}
-                      disabled={!editingTier.offlineAllowed}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-
-                {/* Family Sharing */}
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center gap-2 text-white cursor-pointer mt-3">
-                    <input
-                      type="checkbox"
-                      checked={editingTier.familySharing}
-                      onChange={(e) => setEditingTier({ ...editingTier, familySharing: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
-                    />
-                    <span>Chia sẻ gói gia đình</span>
-                  </label>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Số thành viên gia đình</label>
-                    <input
-                      type="number"
-                      value={editingTier.familyMembers}
-                      onChange={(e) => setEditingTier({ ...editingTier, familyMembers: Number(e.target.value) })}
-                      disabled={!editingTier.familySharing}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2 font-mono text-white outline-none focus:border-[#ff5500] disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-
-                {/* Synced Lyrics & VIP Badge */}
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
-                    <input
-                      type="checkbox"
-                      checked={editingTier.syncedLyrics}
-                      onChange={(e) => setEditingTier({ ...editingTier, syncedLyrics: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
-                    />
-                    <span>Lời bài hát chạy theo nhạc</span>
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-white cursor-pointer hover:border-white/15">
-                    <input
-                      type="checkbox"
-                      checked={editingTier.vipBadge}
-                      onChange={(e) => setEditingTier({ ...editingTier, vipBadge: e.target.checked })}
-                      className="rounded border-zinc-700 bg-zinc-900 accent-[#ff5500]"
-                    />
-                    <span>Huy hiệu VIP</span>
-                  </label>
-                </div>
+                <EntitlementEditorFields
+                  value={{
+                    adPolicy: editingTier.adPolicy,
+                    adFreeDailyLimit: editingTier.adFreeDailyLimit,
+                    skipPolicy: editingTier.skipPolicy,
+                    skipDailyLimit: editingTier.skipDailyLimit,
+                    offlineAllowed: editingTier.offlineAllowed,
+                    offlineMaxTracks: editingTier.offlineMaxTracks,
+                    maxDevices: editingTier.maxDevices,
+                  }}
+                  onChange={(next) => setEditingTier({ ...editingTier, ...next })}
+                  isFree={editingTier.id === "FREE"}
+                />
               </div>
 
               {tierError && (
@@ -1777,33 +2036,68 @@ export function MonetizationTab({
                 <button
                   type="button"
                   onClick={() => setEditingTier(null)}
-                  className="rounded-xl px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white"
+                  className="rounded-xl px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white"
                 >
-                  Hủy Bỏ
+                  Hủy
                 </button>
                 <button
                   type="button"
                   disabled={tierSaving}
                   onClick={async () => {
+                    const cleanName = editingTier.name.trim();
+                    if (!cleanName) {
+                      setTierError("Tên hạng gói không được để trống.");
+                      return;
+                    }
+                    const validationMsg = validateEntitlementValues({
+                      adPolicy: editingTier.adPolicy,
+                      adFreeDailyLimit: editingTier.adFreeDailyLimit,
+                      skipPolicy: editingTier.skipPolicy,
+                      skipDailyLimit: editingTier.skipDailyLimit,
+                      offlineAllowed: editingTier.offlineAllowed,
+                      offlineMaxTracks: editingTier.offlineMaxTracks,
+                      maxDevices: editingTier.maxDevices,
+                    });
+                    if (validationMsg) {
+                      setTierError(validationMsg);
+                      return;
+                    }
                     setTierSaving(true);
                     setTierError("");
                     try {
-                      await updateAdminSubscriptionTier(editingTier.id, editingTier);
+                      const isFree = editingTier.id === "FREE";
+                      await updateAdminSubscriptionTier(editingTier.id, {
+                        name: cleanName,
+                        description: (editingTier.description || "").trim(),
+                        ...normalizeEntitlementPayload(
+                          {
+                            adPolicy: editingTier.adPolicy,
+                            adFreeDailyLimit: editingTier.adFreeDailyLimit,
+                            skipPolicy: editingTier.skipPolicy,
+                            skipDailyLimit: editingTier.skipDailyLimit,
+                            offlineAllowed: editingTier.offlineAllowed,
+                            offlineMaxTracks: editingTier.offlineMaxTracks,
+                            maxDevices: editingTier.maxDevices,
+                          },
+                          isFree
+                        ),
+                      });
                       const res = await fetchAdminSubscriptionTiers();
                       if (Array.isArray(res)) setTiers(res);
-                      onToast?.(`Đã cập nhật tầng quyền lợi ${editingTier.id}.`, "success");
+                      await onTiersChanged?.();
+                      onToast?.(`Đã cập nhật quyền lợi hạng gói "${cleanName}".`, "success");
                       setEditingTier(null);
                     } catch (err) {
-                      const msg = err instanceof Error ? err.message : "Lỗi khi lưu tầng dịch vụ.";
+                      const msg = err instanceof Error ? err.message : "Lỗi khi lưu hạng gói.";
                       setTierError(msg);
                       onToast?.(msg, "error");
                     } finally {
                       setTierSaving(false);
                     }
                   }}
-                  className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-mono font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] transition cursor-pointer"
+                  className="rounded-full bg-[#ff5500] px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] transition cursor-pointer disabled:opacity-50"
                 >
-                  {tierSaving ? "Đang lưu..." : "Lưu Quyền Lợi Bậc"}
+                  {tierSaving ? "Đang lưu..." : "Lưu quyền lợi"}
                 </button>
               </div>
             </div>
@@ -1811,139 +2105,163 @@ export function MonetizationTab({
         </ModalPortal>
       )}
 
-      {/* MODAL 1: FULL DETAIL PACKAGE EDITOR */}
-      {editingPackage && (
+      {/* CONFIRMATION MODAL: DELETE SUBSCRIPTION TIER */}
+      {tierToDelete && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
+            <div className="relative my-auto w-full max-w-md rounded-2xl border border-rose-500/30 bg-[#0e111a] p-6 shadow-2xl space-y-4">
+              <div className="flex items-center gap-3 text-rose-400">
+                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Xóa hạng gói</h3>
+              </div>
+              <p className="text-sm text-zinc-300 leading-relaxed">
+                Bạn có chắc chắn muốn xóa hạng gói <strong className="text-white">{tierToDelete.name}</strong>? Hạng gói chưa gắn với gói dịch vụ nào sẽ bị xóa khỏi danh sách.
+              </p>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setTierToDelete(null)}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/5"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={tierSaving}
+                  onClick={async () => {
+                    const target = tierToDelete;
+                    setTierSaving(true);
+                    try {
+                      await deleteAdminSubscriptionTier(target.id);
+                      const res = await fetchAdminSubscriptionTiers();
+                      if (Array.isArray(res)) setTiers(res);
+                      await onTiersChanged?.();
+                      onToast?.(`Đã xóa hạng gói "${target.name}".`, "success");
+                      setTierToDelete(null);
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Không thể xóa hạng gói.";
+                      onToast?.(msg, "error");
+                    } finally {
+                      setTierSaving(false);
+                    }
+                  }}
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500 transition cursor-pointer disabled:opacity-50"
+                >
+                  {tierSaving ? "Đang xóa..." : "Xác nhận xóa"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* UNIFIED MODAL: CREATE OR EDIT SERVICE PACKAGE */}
+      {(editingPackage || isCreateModalOpen) && (
         <ModalPortal>
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
             <div className="relative my-auto w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h3 className="font-graphik text-xl font-bold text-white">
-                  Chỉnh Sửa Toàn Diện Gói Cước
-                </h3>
-                <p className="font-mono text-xs text-white/50 mt-1">
-                  Mã gói: #{editingPackage.id} · Cập nhật trực tiếp vào danh mục gói cước hệ thống
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingPackage(null)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Tên Gói Cước
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none font-semibold"
-                />
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-graphik text-xl font-bold text-white">
+                    {editingPackage ? "Chỉnh sửa gói dịch vụ" : "Tạo gói dịch vụ mới"}
+                  </h3>
+                  <p className="text-xs text-white/50 mt-1">
+                    {editingPackage
+                      ? `Mã gói: #${editingPackage.id} · Cập nhật thông tin bán hàng và quyền lợi`
+                      : "Thêm gói dịch vụ mới và cấu hình quyền lợi áp dụng cho người mua"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPackage(null);
+                    setIsCreateModalOpen(false);
+                    setPackageModalError("");
+                  }}
+                  className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              {/* Price */}
-              <div>
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Đơn Giá (VNĐ)
-                </label>
-                <input
-                  type="number"
-                  step="1000"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold focus:border-[#ff5500] focus:outline-none"
-                />
-              </div>
-
-              {/* Duration Days */}
-              <div>
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Chu Kỳ Gói Cước
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={[30, 90, 180, 365].includes(formData.durationDays) ? formData.durationDays : "custom"}
-                    onChange={(e) => {
-                      if (e.target.value !== "custom") {
-                        setFormData({ ...formData, durationDays: Number(e.target.value) });
-                      }
-                    }}
-                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
-                  >
-                    <option value={30} className="bg-[#12131a]">1 Tháng (30 ngày)</option>
-                    <option value={90} className="bg-[#12131a]">3 Tháng (90 ngày)</option>
-                    <option value={180} className="bg-[#12131a]">6 Tháng (180 ngày)</option>
-                    <option value={365} className="bg-[#12131a]">1 Năm (365 ngày)</option>
-                    <option value="custom" className="bg-[#12131a]">Tùy chỉnh số ngày...</option>
-                  </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs text-white/70 mb-2 font-semibold">
+                    Tên gói dịch vụ
+                  </label>
                   <input
-                    type="number"
-                    value={formData.durationDays}
-                    onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
-                    placeholder="Số ngày..."
-                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ví dụ: Gói Cá nhân 3 tháng"
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none font-semibold"
                   />
                 </div>
-              </div>
 
-              {/* Tier, Display Order & Status */}
-              <div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs text-white/70 mb-2 font-semibold">
-                      Hạng gói
-                    </label>
+                <div>
+                  <label className="block text-xs text-white/70 mb-2 font-semibold">
+                    Đơn giá (VNĐ)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="1000"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold tabular-nums focus:border-[#ff5500] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-white/70 mb-2 font-semibold">
+                    Chu kỳ gói dịch vụ
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
                     <select
-                      value={formData.tierId}
+                      value={[30, 90, 180, 365].includes(formData.durationDays) ? formData.durationDays : "custom"}
                       onChange={(e) => {
-                        const selectedTier = e.target.value;
-                        const newEnts = buildEntitlementsFromTier(selectedTier, tiers, formData.entitlements);
-                        setFormData({
-                          ...formData,
-                          tierId: selectedTier,
-                          entitlements: newEnts,
-                          featureItems: generateBulletPointsFromEntitlements(newEnts),
-                        });
+                        if (e.target.value !== "custom") {
+                          setFormData({ ...formData, durationDays: Number(e.target.value) });
+                        }
                       }}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none cursor-pointer"
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
                     >
-                      {(tiers.length > 0
-                        ? tiers.filter((t) => t.id !== "FREE" || formData.tierId === "FREE")
-                        : [
-                            { id: "INDIVIDUAL_BASIC", name: "Cá nhân cơ bản" },
-                            { id: "INDIVIDUAL_FULL", name: "Cá nhân nâng cao" },
-                            { id: "FAMILY", name: "Gia đình" },
-                          ]
-                      ).map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {getTierLabel(t.id)} ({t.name})
-                        </option>
-                      ))}
+                      <option value={30} className="bg-[#12131a]">1 tháng (30 ngày)</option>
+                      <option value={90} className="bg-[#12131a]">3 tháng (90 ngày)</option>
+                      <option value={180} className="bg-[#12131a]">6 tháng (180 ngày)</option>
+                      <option value={365} className="bg-[#12131a]">1 năm (365 ngày)</option>
+                      <option value="custom" className="bg-[#12131a]">Tùy chỉnh số ngày...</option>
                     </select>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3650}
+                      value={formData.durationDays}
+                      onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
+                      placeholder="Số ngày..."
+                      className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2 text-xs font-mono tabular-nums text-white focus:border-[#ff5500] focus:outline-none"
+                    />
                   </div>
+                </div>
 
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-white/70 mb-2 font-semibold">
                       Thứ tự hiển thị
                     </label>
                     <input
                       type="number"
+                      min={0}
                       value={formData.displayOrder}
                       onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-4 py-2.5 font-mono tabular-nums text-sm text-white focus:border-[#ff5500] focus:outline-none"
                     />
                   </div>
-
                   <div>
                     <label className="block text-xs text-white/70 mb-2 font-semibold">
-                      Trạng thái
+                      Trạng thái bán
                     </label>
                     <select
                       value={formData.status}
@@ -1956,494 +2274,363 @@ export function MonetizationTab({
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Read-only Tier Entitlements Inheritance Preview */}
-            <TierInheritedPreview
-              tierId={formData.tierId}
-              entitlements={buildEntitlementsFromTier(formData.tierId, tiers, formData.entitlements)}
-              onSyncToBullets={() =>
-                setFormData((prev) => ({
-                  ...prev,
-                  featureItems: generateBulletPointsFromEntitlements(
-                    buildEntitlementsFromTier(prev.tierId, tiers, prev.entitlements)
-                  ),
-                }))
-              }
-              onNavigateToTiers={() => {
-                setEditingPackage(null);
-                setActiveSubTab("tiers");
-              }}
-            />
-
-            {/* Feature items editor */}
-            <div className="border-t border-white/10 pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider font-semibold">
-                  Danh Sách Quyền Lợi &amp; Tính Năng Gói ({formData.featureItems.length})
-                </label>
-                <span className="text-[11px] font-mono text-zinc-400">Nhập hoặc chọn gợi ý bên dưới</span>
-              </div>
-
-              <div className="flex gap-2 mb-2.5">
-                <input
-                  type="text"
-                  value={newFeatureInput}
-                  onChange={(e) => setNewFeatureInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddFeatureItem();
-                    }
-                  }}
-                  placeholder="Ví dụ: Tải nhạc chất lượng FLAC không giới hạn..."
-                  className="flex-1 rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-[#ff5500] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleAddFeatureItem()}
-                  disabled={!newFeatureInput.trim()}
-                  className={`px-4 py-2.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
-                    newFeatureInput.trim()
-                      ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] cursor-pointer"
-                      : "bg-white/10 text-white/40 cursor-not-allowed"
-                  }`}
-                >
-                  <Plus className="h-4 w-4" /> Thêm Quyền Lợi
-                </button>
-              </div>
-
-              {/* Quick suggestion dropdown */}
-              <div className="mb-3">
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) handleAddFeatureItem(e.target.value);
-                  }}
-                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-zinc-400 outline-none focus:border-[#ff5500] cursor-pointer"
-                >
-                  <option value="" className="bg-[#12131a]">-- Chọn nhanh quyền lợi mẫu để thêm --</option>
-                  {POPULAR_BENEFITS.filter((item) => !formData.featureItems.includes(item)).map((item) => (
-                    <option key={item} value={item} className="bg-[#12131a] text-white">
-                      + {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-[#171822] border border-[#222432]">
-                {formData.featureItems.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-zinc-500 font-mono italic">
-                    Chưa có quyền lợi nào. Hãy nhập ở trên hoặc bấm vào gợi ý nhanh để thêm.
-                  </p>
-                ) : (
-                  formData.featureItems.map((feat, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#12131a] text-xs text-white/90 border border-[#222432]/60">
-                      <span className="flex items-center gap-2 font-medium">
-                        <Check className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFeatureItem(idx)}
-                        className="p-1 rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
-                        title="Xóa quyền lợi này"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between border-t border-[#222432] pt-4">
-              <button
-                type="button"
-                onClick={() => setPackageToDelete(editingPackage)}
-                className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> Xóa Gói Cước Này
-              </button>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingPackage(null)}
-                  className="rounded-full border border-[#222432] px-5 py-2.5 text-sm font-semibold text-zinc-400 hover:bg-[#171822] transition"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEditPackage}
-                  className="rounded-full bg-[#ff5500] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
-                >
-                  Lưu Thay Đổi
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
-    )}
-
-      {/* MODAL 2: CREATE NEW PACKAGE */}
-      {isCreateModalOpen && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
-            <div className="relative my-auto w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-[#0e111a] p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h3 className="font-graphik text-xl font-bold text-white">
-                  Tạo Mới Gói Cước Thuê Bao
-                </h3>
-                <p className="font-mono text-xs text-white/50 mt-1">
-                  Đăng ký thêm gói cước dịch vụ mới vào danh mục hệ thống
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Tên Gói Cước
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ví dụ: Moodify Family Pro"
-                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Đơn Giá (VNĐ)
-                </label>
-                <input
-                  type="number"
-                  step="1000"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 font-mono text-sm text-emerald-400 font-bold focus:border-[#ff5500] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-2 font-semibold">
-                  Chu Kỳ Gói Cước
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={[30, 90, 180, 365].includes(formData.durationDays) ? formData.durationDays : "custom"}
-                    onChange={(e) => {
-                      if (e.target.value !== "custom") {
-                        setFormData({ ...formData, durationDays: Number(e.target.value) });
-                      }
-                    }}
-                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
-                  >
-                    <option value={30} className="bg-[#12131a]">1 Tháng (30 ngày)</option>
-                    <option value={90} className="bg-[#12131a]">3 Tháng (90 ngày)</option>
-                    <option value={180} className="bg-[#12131a]">6 Tháng (180 ngày)</option>
-                    <option value={365} className="bg-[#12131a]">1 Năm (365 ngày)</option>
-                    <option value="custom" className="bg-[#12131a]">Tùy chỉnh số ngày...</option>
-                  </select>
-                  <input
-                    type="number"
-                    value={formData.durationDays}
-                    onChange={(e) => setFormData({ ...formData, durationDays: Number(e.target.value) })}
-                    placeholder="Số ngày..."
-                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2 text-xs font-mono text-white focus:border-[#ff5500] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Tier, Display Order & Status */}
-              <div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs text-white/70 mb-2 font-semibold">
-                      Hạng gói
-                    </label>
-                    <select
-                      value={formData.tierId}
-                      onChange={(e) => {
-                        const selectedTier = e.target.value;
-                        const newEnts = buildEntitlementsFromTier(selectedTier, tiers, formData.entitlements);
-                        setFormData({
-                          ...formData,
-                          tierId: selectedTier,
+              {/* 2-mode Entitlement Selection: Shared Tier vs Custom Per-Package */}
+              <div className="border-t border-white/10 pt-4 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-white">Cấu hình quyền lợi gói</span>
+                  <div className="inline-flex rounded-xl border border-white/[0.08] bg-[#12141c] p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEntitlementMode("shared");
+                        const nonCustomTiers = tiers.filter((t) => t.id !== "FREE" && (!t.id.startsWith("CUSTOM_") || t.id === formData.tierId));
+                        const targetTierId = nonCustomTiers.find((t) => t.id === formData.tierId)?.id || nonCustomTiers[0]?.id || formData.tierId;
+                        const newEnts = buildEntitlementsFromTier(targetTierId, tiers, formData.entitlements);
+                        setFormData((prev) => ({
+                          ...prev,
+                          tierId: targetTierId,
                           entitlements: newEnts,
                           featureItems: generateBulletPointsFromEntitlements(newEnts),
-                        });
+                        }));
                       }}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none cursor-pointer"
+                      className={`px-3 py-1 rounded-lg transition cursor-pointer font-medium ${
+                        entitlementMode === "shared" ? "bg-[#ff5500] text-white" : "text-zinc-400 hover:text-white"
+                      }`}
                     >
-                      {(tiers.length > 0
-                        ? tiers.filter((t) => t.id !== "FREE" || formData.tierId === "FREE")
-                        : [
-                            { id: "INDIVIDUAL_BASIC", name: "Cá nhân cơ bản" },
-                            { id: "INDIVIDUAL_FULL", name: "Cá nhân nâng cao" },
-                            { id: "FAMILY", name: "Gia đình" },
-                          ]
-                      ).map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {getTierLabel(t.id)} ({t.name})
-                        </option>
-                      ))}
-                    </select>
+                      Chọn hạng gói có sẵn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEntitlementMode("custom")}
+                      className={`px-3 py-1 rounded-lg transition cursor-pointer font-medium ${
+                        entitlementMode === "custom" ? "bg-[#ff5500] text-white" : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      Tùy chỉnh quyền lợi riêng
+                    </button>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-xs text-white/70 mb-2 font-semibold">
-                      Thứ tự hiển thị
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.displayOrder}
-                      onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-4 py-2.5 font-mono text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                {entitlementMode === "shared" ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-white/70 mb-2 font-semibold">
+                        Hạng gói áp dụng
+                      </label>
+                      <select
+                        value={formData.tierId}
+                        onChange={(e) => {
+                          const selectedTier = e.target.value;
+                          const newEnts = buildEntitlementsFromTier(selectedTier, tiers, formData.entitlements);
+                          setFormData({
+                            ...formData,
+                            tierId: selectedTier,
+                            entitlements: newEnts,
+                            featureItems: generateBulletPointsFromEntitlements(newEnts),
+                          });
+                        }}
+                        className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-amber-300 font-semibold focus:border-[#ff5500] focus:outline-none cursor-pointer"
+                      >
+                        {tiers
+                          .filter((t) => t.id !== "FREE" && (!t.id.startsWith("CUSTOM_") || t.id === formData.tierId))
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <TierInheritedPreview
+                      tierId={formData.tierId}
+                      tiers={tiers}
+                      entitlements={buildEntitlementsFromTier(formData.tierId, tiers, formData.entitlements)}
+                      onSyncToBullets={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          featureItems: generateBulletPointsFromEntitlements(
+                            buildEntitlementsFromTier(prev.tierId, tiers, prev.entitlements)
+                          ),
+                        }))
+                      }
+                      onNavigateToTiers={() => {
+                        setEditingPackage(null);
+                        setIsCreateModalOpen(false);
+                        setActiveSubTab("tiers");
+                      }}
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-xs text-white/70 mb-2 font-semibold">
-                      Trạng thái
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as "ACTIVE" | "INACTIVE" })}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#12141c] px-3 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
-                    >
-                      <option value="ACTIVE">Đang bán</option>
-                      <option value="INACTIVE">Tạm ẩn</option>
-                    </select>
+                ) : (
+                  <div className="space-y-3 rounded-xl border border-white/[0.08] bg-[#12141c] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-zinc-400">
+                        Tùy biến trực tiếp các quyền lợi thực tế riêng cho gói này.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            featureItems: generateBulletPointsFromEntitlements({
+                              ...prev.entitlements,
+                              tier: "CUSTOM",
+                              vipBadge: true,
+                            }),
+                          }))
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#ff5500]/40 bg-[#ff5500]/10 text-[#ff5500] hover:bg-[#ff5500]/20 text-xs font-semibold transition cursor-pointer"
+                      >
+                        <RefreshCcw className="w-3 h-3" /> Đồng bộ mô tả quyền lợi
+                      </button>
+                    </div>
+                    <EntitlementEditorFields
+                      value={{
+                        adPolicy: formData.entitlements.adPolicy,
+                        adFreeDailyLimit: formData.entitlements.adFreeDailyLimit,
+                        skipPolicy: formData.entitlements.skipPolicy,
+                        skipDailyLimit: formData.entitlements.skipDailyLimit,
+                        offlineAllowed: formData.entitlements.offlineAllowed,
+                        offlineMaxTracks: formData.entitlements.offlineMaxTracks,
+                        maxDevices: formData.entitlements.maxDevices,
+                      }}
+                      onChange={(next) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          entitlements: {
+                            ...prev.entitlements,
+                            ...next,
+                            vipBadge: true,
+                            syncedLyrics: true,
+                          },
+                        }))
+                      }
+                      isFree={false}
+                    />
                   </div>
+                )}
+              </div>
+
+              {/* Feature items editor */}
+              <div className="border-t border-white/10 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs text-white/70 font-semibold">
+                    Mô tả nổi bật hiển thị trên thẻ gói ({formData.featureItems.length})
+                  </label>
+                  <span className="text-[11px] text-zinc-400">Nhập thêm hoặc chọn gợi ý</span>
+                </div>
+
+                <div className="flex gap-2 mb-2.5">
+                  <input
+                    type="text"
+                    value={newFeatureInput}
+                    onChange={(e) => setNewFeatureInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddFeatureItem();
+                      }
+                    }}
+                    placeholder="Ví dụ: Nghe nhạc không quảng cáo..."
+                    className="flex-1 rounded-xl border border-[#222432] bg-[#171822] px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-[#ff5500] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddFeatureItem()}
+                    disabled={!newFeatureInput.trim()}
+                    className={`px-4 py-2.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
+                      newFeatureInput.trim()
+                        ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] cursor-pointer"
+                        : "bg-white/10 text-white/40 cursor-not-allowed"
+                    }`}
+                  >
+                    <Plus className="h-4 w-4" /> Thêm mô tả
+                  </button>
+                </div>
+
+                <div className="mb-3">
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) handleAddFeatureItem(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs text-zinc-400 outline-none focus:border-[#ff5500] cursor-pointer"
+                  >
+                    <option value="" className="bg-[#12131a]">-- Chọn nhanh mô tả mẫu để thêm --</option>
+                    {POPULAR_BENEFITS.filter((item) => !formData.featureItems.includes(item)).map((item) => (
+                      <option key={item} value={item} className="bg-[#12131a] text-white">
+                        + {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-[#171822] border border-[#222432]">
+                  {formData.featureItems.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-zinc-500 italic">
+                      Chưa có dòng mô tả nào. Bấm &quot;Đồng bộ mô tả quyền lợi&quot; hoặc nhập ở trên.
+                    </p>
+                  ) : (
+                    formData.featureItems.map((feat, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#12131a] text-xs text-white/90 border border-[#222432]/60">
+                        <span className="flex items-center gap-2 font-medium">
+                          <Check className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFeatureItem(idx)}
+                          className="p-1 rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                          title="Xóa dòng mô tả này"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {packageModalError && (
+                <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                  {packageModalError}
+                </div>
+              )}
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between border-t border-[#222432] pt-4">
+                {editingPackage ? (
+                  <button
+                    type="button"
+                    disabled={packageSaving}
+                    onClick={() => setPackageToDelete(editingPackage)}
+                    className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Xóa gói
+                  </button>
+                ) : (
+                  <span />
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={packageSaving}
+                    onClick={() => {
+                      setEditingPackage(null);
+                      setIsCreateModalOpen(false);
+                      setPackageModalError("");
+                    }}
+                    className="rounded-full border border-[#222432] px-5 py-2.5 text-sm font-semibold text-zinc-400 hover:bg-[#171822] transition"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={packageSaving}
+                    onClick={() => void handleSavePackageModal()}
+                    className="rounded-full bg-[#ff5500] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer disabled:opacity-50"
+                  >
+                    {packageSaving ? "Đang lưu..." : editingPackage ? "Lưu thay đổi" : "Tạo gói dịch vụ"}
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* Read-only Tier Entitlements Inheritance Preview */}
-            <TierInheritedPreview
-              tierId={formData.tierId}
-              entitlements={buildEntitlementsFromTier(formData.tierId, tiers, formData.entitlements)}
-              onSyncToBullets={() =>
-                setFormData((prev) => ({
-                  ...prev,
-                  featureItems: generateBulletPointsFromEntitlements(
-                    buildEntitlementsFromTier(prev.tierId, tiers, prev.entitlements)
-                  ),
-                }))
-              }
-              onNavigateToTiers={() => {
-                setIsCreateModalOpen(false);
-                setActiveSubTab("tiers");
-              }}
-            />
-
-            {/* Feature items */}
-            <div className="border-t border-[#222432] pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider font-semibold">
-                  Quyền Lợi Gói Mới ({formData.featureItems.length})
-                </label>
-                <span className="text-[11px] font-mono text-zinc-400">Nhập hoặc chọn gợi ý bên dưới</span>
-              </div>
-
-              <div className="flex gap-2 mb-2.5">
-                <input
-                  type="text"
-                  value={newFeatureInput}
-                  onChange={(e) => setNewFeatureInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddFeatureItem();
-                    }
-                  }}
-                  placeholder="Nhập quyền lợi nổi bật..."
-                  className="flex-1 rounded-xl border border-[#222432] bg-[#12131a] px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-[#ff5500] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleAddFeatureItem()}
-                  disabled={!newFeatureInput.trim()}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-[0.98] ${
-                    newFeatureInput.trim()
-                      ? "bg-[#ff5500] text-white shadow-md shadow-[#ff5500]/25 hover:brightness-110 cursor-pointer"
-                      : "bg-white/10 text-white/40 cursor-not-allowed"
-                  }`}
-                >
-                  <Plus className="h-4 w-4" /> Thêm Quyền Lợi
-                </button>
-              </div>
-
-              {/* Quick suggestion dropdown */}
-              <div className="mb-3">
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) handleAddFeatureItem(e.target.value);
-                  }}
-                  className="w-full rounded-xl border border-[#222432] bg-[#12131a] px-3 py-2 text-xs font-mono text-zinc-400 outline-none focus:border-[#ff5500] cursor-pointer"
-                >
-                  <option value="" className="bg-[#12131a]">-- Chọn nhanh quyền lợi mẫu để thêm --</option>
-                  {POPULAR_BENEFITS.filter((item) => !formData.featureItems.includes(item)).map((item) => (
-                    <option key={item} value={item} className="bg-[#12131a] text-white">
-                      + {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-[#12131a] border border-[#222432]">
-                {formData.featureItems.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-white/40 font-mono italic">
-                    Chưa có quyền lợi nào. Hãy nhập ở trên hoặc bấm vào gợi ý nhanh để thêm.
-                  </p>
-                ) : (
-                  formData.featureItems.map((feat, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#171822] text-xs text-white/90 border border-[#222432]/60">
-                      <span className="flex items-center gap-2 font-medium">
-                        <Check className="h-3.5 w-3.5 shrink-0 text-[#ff5500]" /> {feat}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFeatureItem(idx)}
-                        className="p-1 rounded-md text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition"
-                        title="Xóa quyền lợi này"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5 transition"
-              >
-                Hủy Bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCreatePackage}
-                className="rounded-full bg-[#ff5500] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
-              >
-                Tạo Gói Cước
-              </button>
-            </div>
           </div>
-        </div>
-      </ModalPortal>
-    )}
+        </ModalPortal>
+      )}
 
       {/* CANCEL SUBSCRIPTION MODAL */}
       {selectedSubForCancel && (
         <ModalPortal>
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
             <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-rose-500/30 bg-[#0e111a] p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-rose-500/10 border border-rose-500/20">
-                <XCircle className="h-5 w-5" />
+              <div className="flex items-center gap-3 text-rose-400">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <XCircle className="h-5 w-5" />
+                </div>
+                <h3 className="font-graphik text-lg font-bold text-white">Xác nhận hủy gói thuê bao</h3>
               </div>
-              <h3 className="font-graphik text-lg font-bold text-white">Xác Nhận Hủy Gói Thuê Bao</h3>
-            </div>
 
-            <p className="text-sm text-white/70 leading-relaxed">
-              Bạn có chắc chắn muốn hủy gói dịch vụ <strong className="text-white font-semibold">{selectedSubForCancel.packageName}</strong> của người dùng{" "}
-              <strong className="text-white">{selectedSubForCancel.userName || selectedSubForCancel.userEmail}</strong>?
-              Sau khi hủy, gói sẽ ngừng hiệu lực và tài khoản sẽ chuyển về gói Miễn phí.
-            </p>
+              <p className="text-sm text-white/70 leading-relaxed">
+                Bạn có chắc chắn muốn hủy gói dịch vụ <strong className="text-white font-semibold">{selectedSubForCancel.packageName}</strong> của người dùng{" "}
+                <strong className="text-white">{selectedSubForCancel.userName || selectedSubForCancel.userEmail}</strong>?
+                Sau khi hủy, gói sẽ ngừng hiệu lực và tài khoản sẽ chuyển về gói Miễn phí.
+              </p>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setSelectedSubForCancel(null)}
-                className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white/60 hover:bg-white/5"
-              >
-                Đóng
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onCancelSubscription) onCancelSubscription(selectedSubForCancel.id);
-                  setSelectedSubForCancel(null);
-                }}
-                className="rounded-xl bg-rose-500 px-5 py-2 text-sm font-bold text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20"
-              >
-                Xác Nhận Hủy Gói
-              </button>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubForCancel(null)}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white/60 hover:bg-white/5"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onCancelSubscription) onCancelSubscription(selectedSubForCancel.id);
+                    setSelectedSubForCancel(null);
+                  }}
+                  className="rounded-xl bg-rose-500 px-5 py-2 text-sm font-bold text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20"
+                >
+                  Xác nhận hủy gói
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </ModalPortal>
-    )}
+        </ModalPortal>
+      )}
 
       {/* CONFIRMATION MODAL: DELETE PACKAGE */}
       {packageToDelete && (
         <ModalPortal>
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-md anim-fade-in">
             <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-rose-500/30 bg-[#0c1017] p-6 shadow-2xl">
-            <div className="flex items-center gap-3 text-rose-400 mb-4">
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                <Trash2 className="h-6 w-6 text-rose-500" />
+              <div className="flex items-center gap-3 text-rose-400 mb-4">
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <Trash2 className="h-6 w-6 text-rose-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Xác nhận xóa gói dịch vụ</h3>
+                  <p className="text-xs text-rose-400/80">Chỉ xóa được gói chưa phát sinh giao dịch</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Xác Nhận Xóa Gói Cước</h3>
-                <p className="text-xs text-rose-400/80 font-mono">Dọn dẹp liên kết & xóa vĩnh viễn</p>
+
+              <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
+                Bạn có chắc chắn muốn xóa gói <strong className="text-white">&quot;{packageToDelete.name}&quot;</strong> (giá {formatVND(packageToDelete.price)})?
+                Nếu gói đã phát sinh giao dịch thanh toán hoặc còn người đang sử dụng, hệ thống sẽ giữ lại dữ liệu và bạn nên chuyển gói sang Tạm ẩn.
+              </p>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setPackageToDelete(null)}
+                  className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/5 transition"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetId = packageToDelete.id;
+                    setPackageToDelete(null);
+                    setEditingPackage(null);
+                    if (onDeletePackage) {
+                      onDeletePackage(targetId);
+                    } else {
+                      onTogglePackageStatus(targetId);
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-900/30 hover:brightness-110 active:scale-95 transition cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" /> Xác nhận xóa
+                </button>
               </div>
-            </div>
-
-            <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
-              Bạn có chắc chắn muốn xóa gói cước <strong className="text-white">"{packageToDelete.name}"</strong> (ID: #{packageToDelete.id}, giá {formatVND(packageToDelete.price)}) khỏi hệ thống? Dữ liệu gói cước và quan hệ con sẽ được dọn dẹp sạch sẽ.
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setPackageToDelete(null)}
-                className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/5 transition"
-              >
-                Hủy Bỏ
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const targetId = packageToDelete.id;
-                  setPackageToDelete(null);
-                  setEditingPackage(null);
-                  if (onDeletePackage) {
-                    onDeletePackage(targetId);
-                  } else {
-                    onTogglePackageStatus(targetId);
-                  }
-                }}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-900/30 hover:brightness-110 active:scale-95 transition cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4" /> Xác Nhận Xóa Gói Cước
-              </button>
             </div>
           </div>
-        </div>
-      </ModalPortal>
-    )}
+        </ModalPortal>
+      )}
     </div>
   );
 }

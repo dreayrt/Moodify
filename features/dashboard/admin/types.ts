@@ -98,7 +98,7 @@ export type CatalogTrack = {
 };
 
 export type PackageEntitlements = {
-  tier?: "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE";
+  tier?: "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE" | string;
   adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
   adFreeDailyLimit: number; // số bài hát nghe không quảng cáo mỗi ngày
   adIntervalAfterLimit: number; // sau hạn mức, bao nhiêu bài có 1 quảng cáo

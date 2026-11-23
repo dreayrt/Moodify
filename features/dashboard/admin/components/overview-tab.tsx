@@ -415,7 +415,7 @@ export function OverviewTab({
               onClick={() => onNavigateTab("recommendations")}
               className="text-xs font-semibold text-[#ff5500] hover:underline flex items-center gap-1 cursor-pointer"
             >
-              Tuyển chọn nhạc <ArrowUpRight className="h-3.5 w-3.5" />
+              Quản lý gợi ý nhạc <ArrowUpRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

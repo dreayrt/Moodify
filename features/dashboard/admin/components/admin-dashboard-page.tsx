@@ -143,7 +143,6 @@ export default function AdminDashboardPage({
   // Live Database Sync States
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [dataErrors, setDataErrors] = useState<string[]>([]);
-  const [lastSyncTime, setLastSyncTime] = useState<string>("");
   const [dbStatus, setDbStatus] = useState<"connected" | "connecting" | "error">("connecting");
 
   // Toast System
@@ -301,15 +300,8 @@ export default function AdminDashboardPage({
         );
       }
 
-      const syncStr = new Intl.DateTimeFormat("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }).format(new Date());
-
       if (successCount > 0 && failures.length === 0) {
         setDbStatus("connected");
-        setLastSyncTime(syncStr);
         if (!silent) {
           addToast("Đã cập nhật dữ liệu quản trị từ máy chủ.", "success");
         }
@@ -619,7 +611,7 @@ export default function AdminDashboardPage({
     }
   };
 
-  const handleCreatePackage = async (data: Partial<ServicePackage>) => {
+  const handleCreatePackage = async (data: Partial<ServicePackage>): Promise<boolean> => {
     try {
       await createAdminPackage(data);
       const realPackages = await fetchAdminPackages();
@@ -629,13 +621,15 @@ export default function AdminDashboardPage({
       recordAudit("CREATE_PACKAGE", data.name || "Gói mới", `Tạo gói dịch vụ mới với giá ${Number(data.price || 0).toLocaleString()} đ`, "BILLING", "info");
       addToast(`Đã tạo gói dịch vụ "${data.name || "mới"}".`, "success");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi tạo gói dịch vụ: ${msg}`, "error");
+      return false;
     }
   };
 
-  const handleUpdatePackageDetails = async (packageId: number, data: Partial<ServicePackage>) => {
+  const handleUpdatePackageDetails = async (packageId: number, data: Partial<ServicePackage>): Promise<boolean> => {
     try {
       await updateAdminPackageDetails(packageId, data);
       const realPackages = await fetchAdminPackages();
@@ -645,9 +639,28 @@ export default function AdminDashboardPage({
       recordAudit("UPDATE_PACKAGE", `PKG-00${packageId}`, `Cập nhật thông tin và quyền lợi gói dịch vụ`, "BILLING", "info");
       addToast("Đã cập nhật chi tiết gói dịch vụ.", "success");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi cập nhật gói dịch vụ: ${msg}`, "error");
+      return false;
+    }
+  };
+
+  const handleRefreshPackagesAndRevenue = async () => {
+    try {
+      const [realPackages, stats] = await Promise.all([
+        fetchAdminPackages(),
+        fetchAdminRevenueStats(revenueDays),
+      ]);
+      if (Array.isArray(realPackages)) {
+        setPackages(realPackages);
+      }
+      if (stats) {
+        setRevenueStats(stats);
+      }
+    } catch {
+      // Best-effort refresh after tier update
     }
   };
 
@@ -787,7 +800,7 @@ export default function AdminDashboardPage({
     { key: "overview", label: "Tổng quan", icon: LayoutDashboard },
     { key: "users", label: "Người dùng", count: users.length, icon: Users },
     { key: "monetization", label: "Gói dịch vụ", count: packages.length, icon: DollarSign },
-    { key: "recommendations", label: "Tuyển chọn nhạc", icon: Sparkles },
+    { key: "recommendations", label: "Gợi ý nhạc", icon: Sparkles },
     { key: "karaoke-resources", label: "Tài nguyên karaoke", icon: Layers },
     { key: "favorites", label: "Yêu thích", count: overviewData?.totalFavorites, icon: Heart },
     { key: "notifications", label: "Thông báo", icon: Megaphone },
@@ -938,7 +951,6 @@ export default function AdminDashboardPage({
             <ul className="mt-2 list-inside list-disc space-y-1">{dataErrors.map((message) => <li key={message}>{message}</li>)}</ul>
             <button type="button" disabled={isLoadingData} onClick={() => void loadRealData()} className="mt-3 rounded-md border border-rose-300/30 px-3 py-2 disabled:opacity-50">Tải lại dữ liệu</button>
           </div>}
-          {!isLoadingData && dataErrors.length === 0 && lastSyncTime && <p className="mb-5 text-xs text-zinc-500">Cập nhật lúc {lastSyncTime}</p>}
           {activeTab === "overview" && (
             <OverviewTab
               users={users}
@@ -994,6 +1006,7 @@ export default function AdminDashboardPage({
               onUpdatePackageDetails={handleUpdatePackageDetails}
               onDeletePackage={handleDeletePackage}
               onCancelSubscription={handleCancelSubscription}
+              onTiersChanged={handleRefreshPackagesAndRevenue}
             />
           )}
 

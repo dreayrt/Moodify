@@ -429,13 +429,14 @@ function MascotAccountTrigger({
   };
 
   const displayName = user?.fullName || user?.username || "Người dùng Moodify";
+  const hasVipInterface = Boolean(subInfo?.isPremium) && subInfo?.entitlements?.vipBadge !== false;
 
   return (
     <div className="relative" ref={menuRef}>
       {/* Interactive Mascot as the sole Account Trigger */}
       <MoodifyMascot
         size={54}
-        isVip={Boolean(subInfo?.isPremium) || Boolean(mascot.isVip)}
+        isVip={hasVipInterface || Boolean(mascot.isVip)}
         onClick={() => setOpen(!open)}
         className="cursor-pointer hover:scale-105 transition-transform"
       />
@@ -460,12 +461,12 @@ function MascotAccountTrigger({
               <span className="text-white/40">Linh vật:</span>
               <span className="font-semibold text-cyan-300">{mascot.name}</span>
             </div>
-            {subInfo?.isPremium && (
+            {hasVipInterface && (
               <div className="mt-1.5 pt-1.5 border-t border-amber-400/20 flex items-center justify-between text-[10.5px]">
                 <span className="text-amber-300/80 flex items-center gap-1 font-semibold">
                   <Crown className="w-3 h-3 text-amber-400" /> VIP
                 </span>
-                <span className="font-bold text-amber-300 truncate max-w-[130px]">{subInfo.packageName}</span>
+                <span className="font-bold text-amber-300 truncate max-w-[130px]">{subInfo?.packageName}</span>
               </div>
             )}
           </div>
@@ -909,10 +910,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isSearchHistory = pathname.startsWith("/dashboard/search-history");
 
   const { goldThemeEnabled, vipShellEnabled, currentVipTheme, normalTheme } = useVipTheme();
-  const isVipShellActive = Boolean(subInfo?.isPremium) && vipShellEnabled;
+  const hasVipInterface = Boolean(subInfo?.isPremium) && subInfo?.entitlements?.vipBadge !== false;
+  const isVipShellActive = hasVipInterface && vipShellEnabled;
   const currentShellTheme = isVipShellActive ? currentVipTheme : normalTheme;
-  const isGoldActive = Boolean(subInfo?.isPremium) && goldThemeEnabled;
-  const isPre = Boolean(subInfo?.isPremium);
+  const isGoldActive = hasVipInterface && goldThemeEnabled;
+  const isPre = hasVipInterface;
 
   // Tone-matched dynamic LED frame for sidebar:
   // For Pre: Flowing Royal Gold / Champagne or chosen VIP theme
