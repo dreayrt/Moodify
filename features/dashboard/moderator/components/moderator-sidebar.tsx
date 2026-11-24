@@ -42,13 +42,13 @@ export function ModeratorSidebar({
     },
     {
       key: "queue" as TabKey,
-      label: "Kiểm duyệt bài hát",
+      label: "Hàng chờ duyệt",
       icon: Music2,
       badge: pendingCount > 0 ? pendingCount : null,
     },
     {
       key: "history" as TabKey,
-      label: "Lịch sử đánh giá",
+      label: "Lịch sử duyệt",
       icon: History,
       badge: null,
     },
@@ -65,73 +65,70 @@ export function ModeratorSidebar({
     setMobileOpen(false);
   };
 
+  const initials = (profile.fullName || "K")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
   const sidebarContent = (
     <div className="flex h-full flex-col justify-between p-5">
-      {/* Top section: Logo, Studio & Profile */}
       <div className="space-y-6">
-        {/* Studio Branding */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-tr from-[#ff5500] via-[#ff7a2c] to-[#ffa066] text-white shadow-[0_8px_24px_rgba(255,122,44,0.35)]">
-              <ShieldCheck className="h-6 w-6" strokeWidth={2.2} />
-              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#090a10] bg-emerald-400" />
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#ff5500] text-white shadow-[0_6px_20px_rgba(255,85,0,0.28)]">
+              <ShieldCheck className="h-5 w-5" strokeWidth={2.2} />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-display text-lg font-bold tracking-tight text-white">
-                  Moodify
-                </span>
-                <span className="rounded-md border border-[#ff7a2c]/30 bg-[#ff7a2c]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#ff9e66] uppercase">
-                  Studio
-                </span>
-              </div>
-              <p className="text-[11px] font-medium tracking-wide text-white/40">
-                Bộ Phận Kiểm Duyệt
+              <span className="font-display text-base font-bold tracking-tight text-white">
+                Moodify
+              </span>
+              <p className="text-[11px] font-medium text-white/45">
+                Kiểm duyệt bài hát
               </p>
             </div>
           </div>
 
-          {/* Close button for mobile */}
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
             className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
+            aria-label="Đóng menu"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Staff Shift Card */}
-        <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
+        {/* Staff Account Card */}
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-3.5">
           <div className="flex items-center gap-3">
-            <div className="relative shrink-0">
+            {profile.avatarUrl ? (
               <img
                 src={profile.avatarUrl}
                 alt={profile.fullName}
-                className="h-10 w-10 rounded-xl object-cover border border-white/12 shadow-sm"
+                className="h-10 w-10 shrink-0 rounded-xl object-cover border border-white/10"
               />
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-[#090a10]"></span>
-              </span>
-            </div>
+            ) : (
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-semibold text-white">
+                {initials}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold text-white">
                 {profile.fullName}
               </p>
-              <div className="flex items-center gap-1.5 text-[11px] text-white/50">
-                <span className="truncate">{profile.staffId}</span>
-                <span>•</span>
-                <span className="text-emerald-400 font-medium">Trực ca</span>
-              </div>
+              <p className="truncate text-[11px] text-white/45">
+                {profile.username ? `@${profile.username}` : profile.roleTitle}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Navigation Menu */}
         <div className="space-y-1">
-          <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-white/35">
-            Bảng Điều Khiển
+          <p className="px-3 text-[11px] font-medium text-white/40">
+            Danh mục
           </p>
           <nav className="mt-2 space-y-1">
             {navItems.map((item) => {
@@ -143,10 +140,10 @@ export function ModeratorSidebar({
                   key={item.key}
                   type="button"
                   onClick={() => handleTabClick(item.key)}
-                  className={`group relative flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-[13px] font-medium transition-all ${
+                  className={`group relative flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-[13px] font-medium transition active:scale-[0.99] cursor-pointer ${
                     isActive
-                      ? "bg-gradient-to-r from-[#ff7a2c] to-[#ff944d] text-white font-semibold shadow-[0_6px_20px_rgba(255,122,44,0.3)]"
-                      : "text-white/60 hover:bg-white/[0.05] hover:text-white"
+                      ? "bg-[#ff5500] text-white font-semibold shadow-[0_6px_20px_rgba(255,85,0,0.25)]"
+                      : "text-white/65 hover:bg-white/[0.05] hover:text-white"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -154,7 +151,7 @@ export function ModeratorSidebar({
                       className={`h-4 w-4 transition ${
                         isActive
                           ? "text-white"
-                          : "text-white/40 group-hover:text-white"
+                          : "text-white/45 group-hover:text-white"
                       }`}
                       strokeWidth={isActive ? 2.2 : 1.8}
                     />
@@ -163,10 +160,10 @@ export function ModeratorSidebar({
 
                   {item.badge !== null && (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
                         isActive
-                          ? "bg-black/30 text-white"
-                          : "bg-[#ff7a2c]/20 text-[#ff944d] border border-[#ff7a2c]/30"
+                          ? "bg-black/25 text-white"
+                          : "bg-[#ff5500]/15 text-[#ff8b4d]"
                       }`}
                     >
                       {item.badge}
@@ -219,7 +216,7 @@ export function ModeratorSidebar({
             </div>
             <div>
               <p className="font-display text-sm font-bold text-white">Moodify</p>
-              <p className="text-[10px] text-white/50">Moderation Studio</p>
+              <p className="text-[11px] text-white/50">Kiểm duyệt bài hát</p>
             </div>
           </div>
         </div>

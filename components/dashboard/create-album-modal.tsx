@@ -12,23 +12,23 @@ interface CreateAlbumModalProps {
 
 const PRESET_ALBUM_COVERS = [
   {
-    label: "Studio Master",
+    label: "Tối giản",
     url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop",
   },
   {
-    label: "Acoustic Warmth",
+    label: "Acoustic ấm áp",
     url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop",
   },
   {
-    label: "Midnight City",
+    label: "Đêm thành phố",
     url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop",
   },
   {
-    label: "Sunset Indie",
+    label: "Hoàng hôn Indie",
     url: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=600&auto=format&fit=crop",
   },
   {
-    label: "Cyber Bass",
+    label: "Nhịp điện tử",
     url: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop",
   },
 ];
@@ -101,7 +101,7 @@ export default function CreateAlbumModal({
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 text-cyan-400">
-            <Disc className="w-6 h-6 animate-spin-slow" />
+            <Disc className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Tạo Album Mới</h2>

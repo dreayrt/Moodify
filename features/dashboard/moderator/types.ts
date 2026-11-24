@@ -42,7 +42,7 @@ export type ModerationTrack = {
   durationSec: number;
   coverUrl?: string;
   audioUrl?: string;
-  waveform: number[]; // Amplitude points (e.g. 40-60 values between 0.1 and 1.0)
+  waveform?: number[];
   submittedAt: string;
   priority: ModerationPriority;
   status: ModerationStatus;
@@ -50,9 +50,8 @@ export type ModerationTrack = {
   releaseType: "Single" | "EP Track" | "Album Track";
   explicitFlagByArtist: boolean;
   lyricsPlain?: string;
-  audioSpec: AudioSpec;
-  aiAssessment: AiSafetyAssessment;
-  // Song license details from MySQL
+  audioSpec?: AudioSpec;
+  aiAssessment?: AiSafetyAssessment;
   licenseRecordExists: boolean;
   licenseType?: string;
   copyrightOwner?: string;
@@ -82,13 +81,14 @@ export type ModerationHistoryItem = {
   genre: string;
   coverUrl?: string;
   reviewedAt: string;
+  reviewedAtIso?: string;
   reviewerId: string;
   reviewerName: string;
   decision: "approved" | "rejected" | "needs_revision";
   violationCategory?: ViolationCategory;
   rejectionReason?: string;
   internalNote?: string;
-  reviewDurationSec: number; // Thời gian thẩm định (giây)
+  reviewDurationSec: number;
   assignedExplicitTag?: boolean;
 };
 
@@ -100,10 +100,6 @@ export type ModeratorProfile = {
   phone: string;
   avatarUrl: string;
   roleTitle: string;
-  badge: string;
-  staffId: string;
-  department: string;
-  joinedDate: string;
   totalReviewed: number;
   approvalRate: number;
   avgReviewTimeMin: number;
@@ -122,8 +118,6 @@ export type ModerationStats = {
   rejectedToday: number;
   avgReviewTimeMinutes: number;
   approvalPercentage: number;
-  shiftTarget: number;
-  shiftCompleted: number;
   violationsDistribution: {
     category: string;
     label: string;

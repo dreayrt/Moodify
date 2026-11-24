@@ -54,9 +54,9 @@ export function ModeratorAuditDetailModal({
             </div>
             <div>
               <h3 className="font-display text-base font-semibold text-white">
-                Chi Tiết Phiên Thẩm Định
+                Chi tiết lượt duyệt
               </h3>
-              <p className="text-[12px] text-white/50">Mã phiên: {item.id}</p>
+              <p className="text-xs text-white/50 tabular-nums">Mã lượt duyệt: {item.id}</p>
             </div>
           </div>
           <button
@@ -82,14 +82,10 @@ export function ModeratorAuditDetailModal({
                 {item.trackTitle}
               </h4>
               <p className="text-[13px] text-white/70">{item.artistName}</p>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/60">
-                  {item.genre}
-                </span>
+              <div className="mt-1 flex items-center gap-2 text-xs text-white/55">
+                <span>{item.genre}</span>
                 {item.assignedExplicitTag && (
-                  <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-400">
-                    EXPLICIT
-                  </span>
+                  <span className="font-semibold text-red-400">• Nội dung 18+</span>
                 )}
               </div>
             </div>
@@ -155,19 +151,19 @@ export function ModeratorAuditDetailModal({
             <div className="rounded-xl border border-white/6 bg-white/[0.02] p-2.5">
               <div className="flex items-center gap-1.5 text-white/40">
                 <Clock className="h-3.5 w-3.5" />
-                <span>Thời gian nghe thử</span>
+                <span>Thời gian nghe</span>
               </div>
-              <p className="mt-1 font-medium text-white">
-                {formatSecs(item.reviewDurationSec)}
+              <p className="mt-1 font-medium text-white tabular-nums">
+                {item.reviewDurationSec > 0 ? formatSecs(item.reviewDurationSec) : "—"}
               </p>
             </div>
 
             <div className="col-span-2 rounded-xl border border-white/6 bg-white/[0.02] p-2.5">
               <div className="flex items-center gap-1.5 text-white/40">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Thời điểm thực hiện</span>
+                <span>Thời gian duyệt</span>
               </div>
-              <p className="mt-1 font-medium text-white">{item.reviewedAt}</p>
+              <p className="mt-1 font-medium text-white tabular-nums">{item.reviewedAt}</p>
             </div>
           </div>
         </div>

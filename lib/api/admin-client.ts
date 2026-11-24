@@ -421,15 +421,38 @@ export async function fetchAdminSubscriptionTiers(): Promise<SubscriptionTier[]>
   return adminRequest<SubscriptionTier[]>("/api/admin/subscription-tiers");
 }
 
+export async function createAdminSubscriptionTier(
+  data: Partial<SubscriptionTier>
+): Promise<{ success: boolean; tier?: SubscriptionTier; message: string }> {
+  return adminRequest<{ success: boolean; tier?: SubscriptionTier; message: string }>(
+    "/api/admin/subscription-tiers",
+    {
+      method: "POST",
+      body: data,
+    }
+  );
+}
+
 export async function updateAdminSubscriptionTier(
   tierId: string,
   data: Partial<SubscriptionTier>
 ): Promise<{ success: boolean; message: string }> {
   return adminRequest<{ success: boolean; message: string }>(
-    `/api/admin/subscription-tiers/${tierId}`,
+    `/api/admin/subscription-tiers/${encodeURIComponent(tierId)}`,
     {
       method: "PUT",
       body: data,
+    }
+  );
+}
+
+export async function deleteAdminSubscriptionTier(
+  tierId: string
+): Promise<{ success: boolean; message: string }> {
+  return adminRequest<{ success: boolean; message: string }>(
+    `/api/admin/subscription-tiers/${encodeURIComponent(tierId)}`,
+    {
+      method: "DELETE",
     }
   );
 }

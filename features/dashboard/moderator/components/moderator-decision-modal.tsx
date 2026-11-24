@@ -25,47 +25,47 @@ type ModeratorDecisionModalProps = {
 const VIOLATION_OPTIONS: { category: ViolationCategory; label: string }[] = [
   {
     category: "copyright_infringement",
-    label: "Vi phạm bản quyền tác quyền / Content ID",
+    label: "Vi phạm bản quyền",
   },
   {
     category: "poor_audio_quality",
-    label: "Chất lượng âm thanh không đạt chuẩn",
+    label: "Chất lượng âm thanh kém",
   },
   {
     category: "hate_speech_offensive",
-    label: "Ngôn từ thù địch / Vi phạm tiêu chuẩn",
+    label: "Ngôn từ thù địch hoặc vi phạm tiêu chuẩn",
   },
   {
     category: "explicit_unlabeled",
-    label: "Nội dung người lớn nhưng chưa gắn Explicit",
+    label: "Chưa gắn nhãn nội dung 18+",
   },
   {
     category: "metadata_mismatch",
-    label: "Sai lệch thông tin metadata / Cover Art",
+    label: "Thông tin bài hát / Ảnh bìa không khớp",
   },
   {
     category: "artist_impersonation",
-    label: "Mạo danh nghệ sĩ / giả giọng trái phép",
+    label: "Mạo danh nghệ sĩ hoặc giả giọng trái phép",
   },
   {
     category: "violent_or_dangerous_content",
-    label: "Đe dọa, kích động bạo lực hoặc hành vi nguy hiểm",
+    label: "Nội dung bạo lực hoặc hành vi nguy hiểm",
   },
   {
     category: "harassment_or_privacy_violation",
-    label: "Quấy rối cá nhân / tiết lộ thông tin riêng tư",
+    label: "Quấy rối hoặc tiết lộ thông tin riêng tư",
   },
   {
     category: "spam_or_deceptive_content",
-    label: "Spam, lừa đảo hoặc nội dung gây hiểu nhầm",
+    label: "Spam hoặc nội dung gây hiểu nhầm",
   },
   {
     category: "non_compliant_cover_art",
-    label: "Ảnh bìa có hình ảnh tình dục hoặc bạo lực đồ họa",
+    label: "Ảnh bìa không phù hợp",
   },
   {
     category: "other",
-    label: "Lý do kiểm duyệt khác",
+    label: "Lý do khác",
   },
 ];
 
@@ -80,9 +80,9 @@ export function ModeratorDecisionModal({
     ViolationCategory[]
   >([]);
   const [internalNote, setInternalNote] = useState("");
-  const [rightsVerified,setRightsVerified]=useState(false);
+  const [rightsVerified, setRightsVerified] = useState(false);
   const [assignExplicit, setAssignExplicit] = useState(
-    track.explicitFlagByArtist || track.aiAssessment.explicitLyricsDetected
+    Boolean(track.explicitFlagByArtist || track.aiAssessment?.explicitLyricsDetected)
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -93,14 +93,14 @@ export function ModeratorDecisionModal({
     setInternalNote("");
     setRightsVerified(false);
     setAssignExplicit(
-      track.explicitFlagByArtist || track.aiAssessment.explicitLyricsDetected
+      Boolean(track.explicitFlagByArtist || track.aiAssessment?.explicitLyricsDetected)
     );
   }, [
     actionType,
     isOpen,
     track.id,
     track.explicitFlagByArtist,
-    track.aiAssessment.explicitLyricsDetected,
+    track.aiAssessment?.explicitLyricsDetected,
   ]);
 
   if (!isOpen) return null;
@@ -168,8 +168,8 @@ export function ModeratorDecisionModal({
             )}
             <div>
               <h2 className="font-display text-lg font-semibold text-white">
-                {isApprove && "Xác Nhận Phê Duyệt Bài Hát"}
-                {isReject && "Từ Chối Bài Hát & Báo Cáo Vi Phạm"}
+                {isApprove && "Xác nhận duyệt bài hát"}
+                {isReject && "Từ chối phát hành bài hát"}
               </h2>
               <p className="text-[12px] text-white/50">
                 {track.title} • {track.artist}
@@ -192,9 +192,7 @@ export function ModeratorDecisionModal({
           {isApprove && (
             <div className="space-y-4">
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4 text-[13px] text-emerald-300/90 leading-relaxed">
-                Bài hát sẽ được xuất bản công khai lên kho nhạc Moodify và thông
-                báo chúc mừng sẽ được gửi trực tiếp đến nghệ sĩ qua email và hệ
-                thống.
+                Bài hát sẽ được phát hành trên Moodify và gửi thông báo tới nghệ sĩ.
               </div>
 
               {simulated ? <p className="text-sm text-amber-200">Hồ sơ mô phỏng. Phê duyệt nội dung này chỉ dùng trong chế độ mô phỏng, không xác nhận quyền khai thác thật.</p> : <label className="flex items-start gap-3 text-sm text-white/80">
@@ -210,7 +208,7 @@ export function ModeratorDecisionModal({
                   required={isApprove && !simulated}
                   value={internalNote}
                   onChange={(e) => setInternalNote(e.target.value)}
-                  placeholder="Nhập ghi chú cho đội ngũ QA hoặc ca trực sau..."
+                  placeholder="Nhập ghi chú đối chiếu hồ sơ bản quyền..."
                   rows={3}
                   className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[13px] text-white placeholder-white/30 focus:border-[#ff7a2c] focus:outline-none"
                 />

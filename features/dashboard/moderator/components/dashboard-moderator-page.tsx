@@ -2,16 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  RotateCcw,
-  Clock,
-} from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { ToastNotification } from "../../content-lead/components/toast-notification";
-import {
-  INITIAL_MODERATOR_PROFILE,
-  INITIAL_MODERATOR_STATS,
-  INITIAL_PENDING_TRACKS,
-} from "../mock-moderator-data";
 import {
   ModerationHistoryItem,
   ModerationStats,
@@ -35,6 +27,45 @@ import { ModeratorHistoryTab } from "./moderator-history-tab";
 import { ModeratorAccountTab } from "./moderator-account-tab";
 import { ModeratorDecisionModal } from "./moderator-decision-modal";
 import { resolveMediaUrl } from "./moderator-track-cover";
+
+const EMPTY_MODERATOR_STATS: ModerationStats = {
+  pendingCount: 0,
+  urgentCount: 0,
+  approvedToday: 0,
+  rejectedToday: 0,
+  avgReviewTimeMinutes: 0,
+  approvalPercentage: 0,
+  violationsDistribution: [],
+};
+
+function createEmptyProfile(seed?: {
+  id?: unknown;
+  fullName?: unknown;
+  name?: unknown;
+  username?: unknown;
+  email?: unknown;
+  phone?: unknown;
+  avatarUrl?: unknown;
+} | null): ModeratorProfile {
+  return {
+    id: seed?.id != null ? String(seed.id) : "",
+    fullName: readString(seed?.fullName) || readString(seed?.name) || "Kiểm duyệt viên",
+    username: readString(seed?.username),
+    email: readString(seed?.email),
+    phone: readString(seed?.phone),
+    avatarUrl: resolveMediaUrl(readString(seed?.avatarUrl)),
+    roleTitle: "Kiểm duyệt viên",
+    totalReviewed: 0,
+    approvalRate: 0,
+    avgReviewTimeMin: 0,
+    preferences: {
+      autoPlayOnSelect: false,
+      defaultPlaybackRate: 1,
+      volumeLevel: 0.85,
+      urgentNotifications: true,
+    },
+  };
+}
 
 function readString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value : fallback;
@@ -79,6 +110,7 @@ function formatHistoryDate(value: unknown) {
 }
 
 function mapHistoryItem(item: Record<string, unknown>): ModerationHistoryItem {
+  const rawReviewedAt = readString(item.reviewedAt);
   return {
     id: readString(item.id, `hist-${readString(item.trackId, "unknown")}`),
     trackId: readString(item.trackId),
@@ -87,6 +119,7 @@ function mapHistoryItem(item: Record<string, unknown>): ModerationHistoryItem {
     genre: readString(item.genre, "Pop"),
     coverUrl: resolveMediaUrl(readString(item.coverUrl)) || undefined,
     reviewedAt: formatHistoryDate(item.reviewedAt),
+    reviewedAtIso: rawReviewedAt || undefined,
     reviewerId: readString(item.reviewerId),
     reviewerName: readString(item.reviewerName, "Kiểm duyệt viên"),
     decision: readDecision(item.decision),
@@ -100,10 +133,77 @@ function mapHistoryItem(item: Record<string, unknown>): ModerationHistoryItem {
   };
 }
 
+function isSameLocalDay(isoValue?: string): boolean {
+  if (!isoValue) return false;
+  const parsed = new Date(isoValue);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const now = new Date();
+  return (
+    parsed.getFullYear() === now.getFullYear() &&
+    parsed.getMonth() === now.getMonth() &&
+    parsed.getDate() === now.getDate()
+  );
+}
+
+function computeModerationStats(
+  queue: ModerationTrack[],
+  historyItems: ModerationHistoryItem[],
+): ModerationStats {
+  const todayItems = historyItems.filter((item) => isSameLocalDay(item.reviewedAtIso));
+  const approvedToday = todayItems.filter((item) => item.decision === "approved").length;
+  const rejectedToday = todayItems.filter(
+    (item) => item.decision === "rejected" || item.decision === "needs_revision",
+  ).length;
+  const todayTotal = approvedToday + rejectedToday;
+  const approvedAll = historyItems.filter((item) => item.decision === "approved").length;
+  const approvalPercentage =
+    todayTotal > 0
+      ? Math.round((approvedToday / todayTotal) * 100)
+      : historyItems.length > 0
+      ? Math.round((approvedAll / historyItems.length) * 100)
+      : 0;
+
+  const timedItems = historyItems.filter((item) => item.reviewDurationSec > 0);
+  const avgReviewTimeMinutes =
+    timedItems.length > 0
+      ? Math.round(
+          (timedItems.reduce((sum, item) => sum + item.reviewDurationSec, 0) /
+            timedItems.length /
+            60) *
+            10,
+        ) / 10
+      : 0;
+
+  const reasonCounts = new Map<string, number>();
+  historyItems.forEach((item) => {
+    if (item.decision === "approved" || !item.rejectionReason) return;
+    const label = item.rejectionReason.split(";")[0]?.trim();
+    if (!label) return;
+    reasonCounts.set(label, (reasonCounts.get(label) || 0) + 1);
+  });
+  const totalReasons = Array.from(reasonCounts.values()).reduce((sum, count) => sum + count, 0);
+  const violationsDistribution = Array.from(reasonCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([label, count], idx) => ({
+      category: `reason-${idx}`,
+      label,
+      count,
+      percentage: totalReasons > 0 ? Math.round((count / totalReasons) * 100) : 0,
+    }));
+
+  return {
+    pendingCount: queue.length,
+    urgentCount: queue.filter((t) => t.priority === "urgent").length,
+    approvedToday,
+    rejectedToday,
+    avgReviewTimeMinutes,
+    approvalPercentage,
+    violationsDistribution,
+  };
+}
+
 function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
-  const waveform = Array.isArray(item.waveform)
-    ? item.waveform.filter((point): point is number => typeof point === "number")
-    : [];
   const hasLicenseFieldsFromOlderApi = Boolean(
     readString(item.copyrightOwner) ||
       readNumber(item.distributorId) > 0 ||
@@ -112,17 +212,34 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
       readString(item.expiryDate) ||
       readString(item.licenseDocumentUrl),
   );
+  const rawFeatures =
+    item.audioFeatures && typeof item.audioFeatures === "object"
+      ? (item.audioFeatures as Record<string, unknown>)
+      : null;
+  const parsedFeatures = rawFeatures
+    ? {
+        bpm: typeof rawFeatures.bpm === "number" && Number.isFinite(rawFeatures.bpm) ? rawFeatures.bpm : undefined,
+        keySignature: readString(rawFeatures.keySignature) || undefined,
+        energy: typeof rawFeatures.energy === "number" && Number.isFinite(rawFeatures.energy) ? rawFeatures.energy : undefined,
+        danceability: typeof rawFeatures.danceability === "number" && Number.isFinite(rawFeatures.danceability) ? rawFeatures.danceability : undefined,
+        valence: typeof rawFeatures.valence === "number" && Number.isFinite(rawFeatures.valence) ? rawFeatures.valence : undefined,
+        acousticness: typeof rawFeatures.acousticness === "number" && Number.isFinite(rawFeatures.acousticness) ? rawFeatures.acousticness : undefined,
+      }
+    : undefined;
+  const hasRealFeatures = Boolean(
+    parsedFeatures &&
+      Object.values(parsedFeatures).some((val) => val !== undefined),
+  );
 
   return {
     id: readString(item.id),
     title: readString(item.title, "Bài hát chưa đặt tên"),
     artist: readString(item.artist, "Nghệ sĩ"),
     genre: readString(item.genre, "Pop"),
-    duration: readString(item.duration, "3:30"),
-    durationSec: readNumber(item.durationSec, 210),
+    duration: readString(item.duration, "—"),
+    durationSec: readNumber(item.durationSec, 0),
     coverUrl: resolveMediaUrl(readString(item.coverUrl)),
     audioUrl: resolveMediaUrl(readString(item.audioUrl)),
-    waveform: waveform.length > 0 ? waveform : [0.3, 0.6, 0.8, 0.4, 0.7, 0.5, 0.9, 0.6, 0.4, 0.5],
     submittedAt: readString(item.submittedAt, "Hôm nay"),
     priority:
       item.priority === "urgent" || item.priority === "high" || item.priority === "normal"
@@ -141,18 +258,6 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
         : "Single",
     explicitFlagByArtist: readBoolean(item.explicitFlagByArtist),
     lyricsPlain: readString(item.lyricsPlain),
-    audioSpec: {
-      peakDb: -0.2,
-      durationSec: readNumber(item.durationSec, 210),
-    },
-    aiAssessment: {
-      riskScore: 5,
-      copyrightMatchPercent: 0,
-      explicitLyricsDetected: readBoolean(item.explicitFlagByArtist),
-      flaggedKeywords: [],
-      audioQualityScore: 95,
-      notes: "Bài hát gửi lên từ Nghệ sĩ kèm hồ sơ bản quyền hợp lệ.",
-    },
     licenseRecordExists:
       item.licenseRecordExists === true || hasLicenseFieldsFromOlderApi,
     licenseType: readString(item.licenseType) || undefined,
@@ -165,17 +270,7 @@ function mapQueueTrack(item: Record<string, unknown>): ModerationTrack {
     expiryDate: readString(item.expiryDate) || undefined,
     licenseStatus: readString(item.licenseStatus) || undefined,
     licenseDocumentUrl: resolveMediaUrl(readString(item.licenseDocumentUrl)),
-    audioFeatures:
-      item.audioFeatures && typeof item.audioFeatures === "object"
-        ? {
-            bpm: readNumber((item.audioFeatures as Record<string, unknown>).bpm, 128),
-            keySignature: readString((item.audioFeatures as Record<string, unknown>).keySignature, "A Major"),
-            energy: readNumber((item.audioFeatures as Record<string, unknown>).energy, 0.8),
-            danceability: readNumber((item.audioFeatures as Record<string, unknown>).danceability, 0.75),
-            valence: readNumber((item.audioFeatures as Record<string, unknown>).valence, 0.7),
-            acousticness: readNumber((item.audioFeatures as Record<string, unknown>).acousticness, 0.2),
-          }
-        : undefined,
+    audioFeatures: hasRealFeatures ? parsedFeatures : undefined,
   };
 }
 
@@ -189,33 +284,22 @@ export default function DashboardModeratorPage() {
       try {
         const rawUser = window.localStorage.getItem("moodify.auth.user");
         if (rawUser) {
-          const userObj = JSON.parse(rawUser);
-          if (userObj && (userObj.fullName || userObj.name)) {
-            return {
-              ...INITIAL_MODERATOR_PROFILE,
-              fullName: userObj.fullName || userObj.name || INITIAL_MODERATOR_PROFILE.fullName,
-              email: userObj.email || INITIAL_MODERATOR_PROFILE.email,
-              username: userObj.username || INITIAL_MODERATOR_PROFILE.username,
-              phone: userObj.phone || "",
-              avatarUrl: userObj.avatarUrl || INITIAL_MODERATOR_PROFILE.avatarUrl,
-              staffId: userObj.id ? `MOD-${userObj.id}` : INITIAL_MODERATOR_PROFILE.staffId,
-            };
-          }
+          return createEmptyProfile(JSON.parse(rawUser));
         }
       } catch {}
     }
-    return INITIAL_MODERATOR_PROFILE;
+    return createEmptyProfile();
   });
-  const [stats, setStats] = useState<ModerationStats>(INITIAL_MODERATOR_STATS);
+  const [stats, setStats] = useState<ModerationStats>(EMPTY_MODERATOR_STATS);
   const [pendingTracks, setPendingTracks] = useState<ModerationTrack[]>([]);
   const [selectedTrack, setSelectedTrack] = useState<ModerationTrack | null>(null);
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [moderatorToken, setModeratorToken] = useState<string | null>(null);
   const [history, setHistory] = useState<ModerationHistoryItem[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [currentTime, setCurrentTime] = useState<string>("");
 
-  const fetchModerationQueue = async (tokenOverride?: string) => {
+  const fetchModerationQueue = async (tokenOverride?: string): Promise<ModerationTrack[]> => {
     try {
       setIsLoadingQueue(true);
       const token = tokenOverride ?? moderatorToken;
@@ -224,42 +308,32 @@ export default function DashboardModeratorPage() {
       }
 
       const data = await getModeratorQueue(token);
-      if (Array.isArray(data) && data.length > 0) {
-        const mappedTracks = data.map(mapQueueTrack);
-        setPendingTracks(mappedTracks);
-        setSelectedTrack((prev) =>
-          prev ? mappedTracks.find((t) => t.id === prev.id) || mappedTracks[0] : mappedTracks[0]
-        );
-        setStats((prev) => ({
-          ...prev,
-          pendingCount: mappedTracks.length,
-          urgentCount: mappedTracks.filter((t) => t.priority === "urgent").length,
-        }));
-      } else {
-        // If server returns empty, fallback to empty
-        setPendingTracks([]);
-        setSelectedTrack(null);
-        setStats((prev) => ({ ...prev, pendingCount: 0, urgentCount: 0 }));
-      }
+      const mappedTracks = Array.isArray(data) ? data.map(mapQueueTrack) : [];
+      setPendingTracks(mappedTracks);
+      setSelectedTrack((prev) =>
+        prev ? mappedTracks.find((t) => t.id === prev.id) || mappedTracks[0] || null : mappedTracks[0] || null
+      );
+      setLoadError(null);
+      return mappedTracks;
     } catch (err) {
       console.warn("Could not fetch moderator queue from backend:", err);
+      setPendingTracks([]);
+      setSelectedTrack(null);
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Không thể tải danh sách bài hát chờ duyệt từ máy chủ.";
+      setLoadError(message);
       if (isAuthFailure(err)) {
-        setPendingTracks([]);
-        setSelectedTrack(null);
-        setStats((prev) => ({ ...prev, pendingCount: 0, urgentCount: 0 }));
         throw err;
       }
-      // If backend not available yet, provide INITIAL_PENDING_TRACKS as graceful fallback
-      if (pendingTracks.length === 0) {
-        setPendingTracks(INITIAL_PENDING_TRACKS);
-        setSelectedTrack(INITIAL_PENDING_TRACKS[0] || null);
-      }
+      return [];
     } finally {
       setIsLoadingQueue(false);
     }
   };
 
-  const fetchModerationHistory = async (tokenOverride?: string) => {
+  const fetchModerationHistory = async (tokenOverride?: string): Promise<ModerationHistoryItem[]> => {
     try {
       const token = tokenOverride ?? moderatorToken;
       if (!token) {
@@ -269,6 +343,13 @@ export default function DashboardModeratorPage() {
       const data = await getModeratorHistory(token);
       const mappedHistory = Array.isArray(data) ? data.map(mapHistoryItem) : [];
       setHistory(mappedHistory);
+      const timed = mappedHistory.filter((item) => item.reviewDurationSec > 0);
+      const avgMin =
+        timed.length > 0
+          ? Math.round(
+              (timed.reduce((sum, item) => sum + item.reviewDurationSec, 0) / timed.length / 60) * 10
+            ) / 10
+          : 0;
       setProfile((prev) => ({
         ...prev,
         totalReviewed: mappedHistory.length,
@@ -279,13 +360,19 @@ export default function DashboardModeratorPage() {
                   mappedHistory.length) *
                   1000
               ) / 10
-            : prev.approvalRate,
+            : 0,
+        avgReviewTimeMin: avgMin,
       }));
+      return mappedHistory;
     } catch (err) {
       console.warn("Could not fetch moderator history from backend:", err);
       throw err;
     }
   };
+
+  useEffect(() => {
+    setStats(computeModerationStats(pendingTracks, history));
+  }, [pendingTracks, history]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -322,8 +409,7 @@ export default function DashboardModeratorPage() {
           email: currentUser.email || prev.email,
           username: currentUser.username || prev.username,
           phone: currentUser.phone || "",
-          avatarUrl: currentUser.avatarUrl || prev.avatarUrl,
-          staffId: `MOD-${currentUser.id}`,
+          avatarUrl: resolveMediaUrl(readString(currentUser.avatarUrl)) || prev.avatarUrl,
         }));
 
         try {
@@ -353,23 +439,6 @@ export default function DashboardModeratorPage() {
     return () => {
       isCancelled = true;
     };
-  }, []);
-
-  // Update real-time clock
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
   }, []);
 
   // Decision modal state
@@ -437,7 +506,7 @@ export default function DashboardModeratorPage() {
       addToast(
         err instanceof Error
           ? err.message
-          : "Không thể lưu quyết định kiểm duyệt xuống database",
+          : "Không thể lưu quyết định kiểm duyệt.",
         "error"
       );
       throw err;
@@ -445,13 +514,13 @@ export default function DashboardModeratorPage() {
 
     if (actionType === "approve") {
       addToast(
-        `Đã phê duyệt và phát hành bài hát "${trackTitle}" thành công!`,
+        `Đã duyệt và phát hành bài hát "${trackTitle}".`,
         "success"
       );
     } else {
       addToast(
-        `Đã từ chối bài hát "${trackTitle}". Lịch sử đã được lưu xuống database.`,
-        "error"
+        `Đã từ chối bài hát "${trackTitle}".`,
+        "info"
       );
     }
 
@@ -463,7 +532,7 @@ export default function DashboardModeratorPage() {
     } catch (err) {
       console.error("Decision was saved, but moderator data could not refresh:", err);
       addToast(
-        "Quyết định đã được lưu, nhưng không thể làm mới hàng chờ và lịch sử.",
+        "Quyết định đã được lưu, nhưng chưa thể làm mới hàng chờ và lịch sử.",
         "warning"
       );
     }
@@ -479,10 +548,10 @@ export default function DashboardModeratorPage() {
         fetchModerationQueue(moderatorToken || undefined),
         fetchModerationHistory(moderatorToken || undefined),
       ]);
-      addToast("Đã đồng bộ hàng chờ và lịch sử từ máy chủ!", "info");
+      addToast("Đã cập nhật hàng chờ và lịch sử mới nhất.", "info");
     } catch (err) {
       addToast(
-        err instanceof Error ? err.message : "Không thể đồng bộ dữ liệu kiểm duyệt.",
+        err instanceof Error ? err.message : "Không thể tải dữ liệu kiểm duyệt.",
         "error",
       );
     }
@@ -490,28 +559,27 @@ export default function DashboardModeratorPage() {
 
   const urgentTracks = pendingTracks.filter((t) => t.priority === "urgent");
 
-  // Page title mapping based on active tab
   const getTabTitle = () => {
     switch (activeTab) {
       case "overview":
         return {
-          title: "Tổng Quan Studio",
-          subtitle: "Trung tâm chỉ huy & hiệu suất kiểm duyệt âm nhạc Moodify",
+          title: "Tổng quan kiểm duyệt",
+          subtitle: "Theo dõi hàng chờ và kết quả duyệt bài.",
         };
       case "queue":
         return {
-          title: "Hàng Chờ Thẩm Định",
-          subtitle: "Phân tích phổ âm thanh, kiểm tra bản quyền & ra quyết định xuất bản",
+          title: "Hàng chờ duyệt bài",
+          subtitle: "Nghe thử, kiểm tra hồ sơ bản quyền và quyết định phát hành.",
         };
       case "history":
         return {
-          title: "Nhật Ký & Lịch Sử Đánh Giá",
-          subtitle: "Truy vết các quyết định kiểm duyệt, lý do từ chối và biên bản thẩm định",
+          title: "Lịch sử duyệt bài",
+          subtitle: "Danh sách các bài hát đã duyệt, yêu cầu sửa hoặc từ chối.",
         };
       case "account":
         return {
-          title: "Tài Khoản",
-          subtitle: "Thiết lập định danh kiểm duyệt viên, chứng chỉ năng lực & bảo mật",
+          title: "Tài khoản kiểm duyệt",
+          subtitle: "Thông tin cá nhân và bảo mật tài khoản.",
         };
     }
   };
@@ -520,12 +588,6 @@ export default function DashboardModeratorPage() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-[#08090d] text-white lg:flex-row">
-      {/* Ambient background lighting */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute top-[-10%] left-[20%] h-[550px] w-[550px] rounded-full bg-[#ff773b]/5 blur-[150px]" />
-        <div className="absolute bottom-[5%] right-[10%] h-[500px] w-[500px] rounded-full bg-[#427ddb]/5 blur-[150px]" />
-      </div>
-
       {/* Left Sidebar Navigation */}
       <ModeratorSidebar
         activeTab={activeTab}
@@ -537,39 +599,28 @@ export default function DashboardModeratorPage() {
 
       {/* Right Content Area */}
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        {/* Desktop Top Bar (Header khu vực làm việc) */}
-        <header className="sticky top-0 z-30 hidden border-b border-white/8 bg-[#08090d]/80 px-8 py-4 backdrop-blur-xl lg:block">
+        {/* Desktop Top Bar */}
+        <header className="sticky top-0 z-30 hidden border-b border-white/[0.08] bg-[#08090d]/90 px-8 py-4 backdrop-blur-xl lg:block">
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-lg font-bold tracking-tight text-white">
-                  {currentTabMeta.title}
-                </h1>
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-medium text-white/60">
-                  Phòng Kiểm Duyệt
-                </span>
-              </div>
-              <p className="mt-0.5 text-[12px] text-white/40">
+              <h1 className="font-display text-xl font-bold tracking-tight text-white">
+                {currentTabMeta.title}
+              </h1>
+              <p className="mt-0.5 text-xs text-white/50">
                 {currentTabMeta.subtitle}
               </p>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Shift Live Time */}
-              <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3.5 py-1.5 text-[12px] text-white/60">
-                <Clock className="h-3.5 w-3.5 text-[#ff8b4d]" />
-                <span className="font-mono text-white/80">{currentTime || "--:--:--"}</span>
-              </div>
-
-              {/* Refresh queue button */}
+            <div className="flex items-center gap-3">
               <button
                 type="button"
+                disabled={isLoadingQueue}
                 onClick={handleRefresh}
-                className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-1.5 text-[12px] font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#12141c] px-3.5 py-2 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                 title="Làm mới hàng chờ"
               >
-                <RotateCcw className="h-3.5 w-3.5 text-white/50" />
-                <span>Đồng bộ</span>
+                <RotateCcw className={`h-3.5 w-3.5 text-[#ff8b4d] ${isLoadingQueue ? "animate-spin" : ""}`} />
+                <span>Làm mới</span>
               </button>
             </div>
           </div>
@@ -577,6 +628,21 @@ export default function DashboardModeratorPage() {
 
         {/* Main Tab Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          {loadError && (
+            <div
+              role="alert"
+              className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200"
+            >
+              <span>{loadError}</span>
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                className="rounded-lg border border-rose-400/30 bg-rose-500/20 px-3 py-1 font-semibold text-white hover:bg-rose-500/30 transition cursor-pointer"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
           {activeTab === "overview" && (
             <ModeratorOverviewTab
               stats={stats}

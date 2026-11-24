@@ -62,7 +62,7 @@ export default function MoodifyMascot({
         <div className="absolute -bottom-9 right-0 whitespace-nowrap px-3 py-1 rounded-full bg-slate-950/95 border border-white/15 text-[11px] font-medium text-white/90 shadow-2xl backdrop-blur-md pointer-events-none z-50 animate-in fade-in zoom-in-95 duration-150 flex items-center gap-1.5">
           {isPlaying ? (
             <>
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
               <span>{activeMascot.name} đang chill cùng bạn 🎵</span>
             </>
           ) : (

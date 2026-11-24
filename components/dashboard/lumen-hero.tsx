@@ -12,7 +12,6 @@ import {
   Sparkles,
   ChevronDown,
   Shuffle,
-  Disc,
   Flame,
   Radio,
   Headphones,
@@ -20,7 +19,6 @@ import {
   Users,
   Heart,
   TrendingUp,
-  CheckCircle2,
   Clock,
   Compass,
   Coffee,
@@ -178,8 +176,7 @@ function SectionHeader({
     <div className="flex items-end justify-between mb-4">
       <div>
         {eyebrow && (
-          <p className="font-manrope text-[10px] tracking-[0.1em] text-purple-400 mb-1 uppercase font-bold flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+          <p className="font-manrope text-[11px] tracking-[0.06em] text-purple-300/80 mb-1 uppercase font-semibold">
             {eyebrow}
           </p>
         )}
@@ -348,11 +345,7 @@ function RankedTrackItem({
             <span className="w-1 h-5 bg-pink-400 rounded-full animate-bounce delay-75" />
             <span className="w-1 h-2.5 bg-amber-400 rounded-full animate-bounce delay-150" />
           </div>
-        ) : (
-          <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-purple-300/80 bg-purple-500/10 border border-purple-500/20">
-            HOT
-          </span>
-        )}
+        ) : null}
         <span className="text-xs font-mono text-white/40">{track.duration}</span>
         <button
           type="button"
@@ -895,7 +888,8 @@ function LumenHeroContent() {
       if (playable.length) t = playable[Math.floor(Math.random() * playable.length)];
     }
     if (!t.raw?.audioUrl && !t.raw?.localPath) {
-      alert(`Bài hát "${t.title}" hiện chưa có bản thu âm sẵn trên hệ thống. Vui lòng chọn bài hát có sẵn audio.`);
+      setSharedToast(`Bài hát "${t.title}" hiện chưa có tệp âm thanh. Vui lòng chọn bài hát khác.`);
+      setTimeout(() => setSharedToast(null), 5000);
       return;
     }
     if (index !== undefined) {
@@ -968,7 +962,7 @@ function LumenHeroContent() {
         <div className="text-center py-24" role="alert">
           <div className="text-white/80 text-xl mb-2">Không tải được danh sách nhạc</div>
           <div className="text-white/50 text-sm mb-4">
-            Hãy kiểm tra backend và kết nối cơ sở dữ liệu, rồi thử lại.
+            Không thể kết nối máy chủ. Vui lòng thử lại sau.
           </div>
           <div className="text-white/30 text-xs mb-5">{tracksLoadError}</div>
           <button
@@ -1069,11 +1063,11 @@ function LumenHeroContent() {
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] gap-8 items-center">
               {/* Left Column: Headline & Controls */}
               <div className="flex flex-col gap-4">
-                <h1 className="font-display text-white font-bold leading-[1.08] text-[32px] sm:text-[44px] md:text-[50px] tracking-[-0.03em] uppercase">
-                  Your Music,
+                <h1 className="font-display text-white font-bold leading-[1.08] text-[30px] sm:text-[42px] md:text-[46px] tracking-[-0.025em]">
+                  Âm nhạc theo
                   <br />
                   <span className="bg-gradient-to-r from-purple-300 via-pink-300 to-amber-200 bg-clip-text text-transparent">
-                    Your Mood.
+                    tâm trạng của bạn
                   </span>
                 </h1>
 
@@ -1176,7 +1170,7 @@ function LumenHeroContent() {
               <div className="hidden lg:flex flex-col items-center justify-center relative">
                 <div className="relative w-72 h-72 flex items-center justify-center">
                   {/* Vinyl outer sleeve glow */}
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-purple-600/30 to-pink-600/30 blur-2xl animate-pulse" />
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-purple-600/20 to-pink-600/20 blur-2xl" />
 
                   {/* Vinyl record disc - Spins smoothly when isPlaying is true */}
                   <div
@@ -1203,14 +1197,6 @@ function LumenHeroContent() {
                       <div className="w-6 h-6 rounded-full bg-[#06070a] border-2 border-white/70 shadow-lg z-10" />
                     </div>
                   </div>
-
-                  {/* Floating live badge */}
-                  <div className="absolute -bottom-3 px-4 py-1.5 rounded-full bg-slate-950/90 border border-white/20 backdrop-blur-xl shadow-xl flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isPlaying ? "bg-pink-400 animate-ping" : "bg-white/40"}`} />
-                    <span className="text-[11px] font-mono font-medium text-white/90">
-                      {isPlaying && currentTrack ? "Đang phát nhạc" : "Sẵn sàng phát"}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1229,7 +1215,7 @@ function LumenHeroContent() {
             className="group relative flex items-center gap-3.5 bg-white/[0.04] hover:bg-white/[0.09] rounded-xl overflow-hidden transition-all duration-300 border border-white/[0.06] hover:border-purple-500/40 shadow-md hover:shadow-xl cursor-pointer pr-4"
           >
             <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-purple-700 via-pink-600 to-indigo-800 flex items-center justify-center shadow-lg">
-              <Heart className="w-7 h-7 text-white fill-white animate-pulse" />
+              <Heart className="w-7 h-7 text-white fill-white" />
             </div>
             <div className="min-w-0 flex-1 py-2">
               <p className="text-white font-bold text-sm truncate">Bài hát đã thích</p>
@@ -1284,9 +1270,8 @@ function LumenHeroContent() {
       {/* ========================================================================= */}
       <div className="anim-fade-up">
         <SectionHeader
-          eyebrow="BẢNG XẾP HẠNG"
-          title="Hôm nay nghe gì? / Hot Hits Vietnam"
-          subtitle="Top ca khúc thịnh hành được cộng đồng nghe nhiều nhất tuần này"
+          title="Hôm nay nghe gì"
+          subtitle="Ca khúc được nghe nhiều nhất tuần này"
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
@@ -1309,9 +1294,8 @@ function LumenHeroContent() {
       {albums.length > 0 && (
         <div className="anim-fade-up">
           <SectionHeader
-            eyebrow="CURATED BY MOODIFY"
             title="Tuyển tập & Album chọn lọc"
-            subtitle="Các album tinh hoa được tuyển tập bởi đội ngũ âm nhạc Moodify"
+            subtitle="Các album được chọn lọc trên Moodify"
             onSeeAll={() => router.push("/dashboard/library?tab=albums")}
             seeAllText="Tất cả album"
           />
@@ -1332,12 +1316,6 @@ function LumenHeroContent() {
                     alt={alb.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover/album:scale-105"
                   />
-
-                  {/* Album badge */}
-                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-[10px] font-bold text-cyan-300 flex items-center gap-1">
-                    <Disc className="w-3 h-3 text-cyan-400 animate-spin-slow" />
-                    <span>ALBUM</span>
-                  </div>
 
                   {/* Play on hover */}
                   <button
@@ -1367,7 +1345,7 @@ function LumenHeroContent() {
 
       {/* Editor picks */}
       <div>
-        <SectionHeader eyebrow="KHÁM PHÁ THƯ VIỆN" title="Từ kho nhạc Moodify" />
+        <SectionHeader title="Từ kho nhạc Moodify" />
         {editorPicks.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             {editorPicks.map((t, i) => (
@@ -1387,7 +1365,7 @@ function LumenHeroContent() {
 
       {/* Hottest in genre */}
       <div>
-        <SectionHeader eyebrow="TIẾP TỤC KHÁM PHÁ" title={`Thêm nhạc ${active.label}`} />
+        <SectionHeader title={`Thêm nhạc ${active.label}`} />
         <div className="hidden md:grid md:grid-cols-2 gap-x-3 gap-y-1 items-start">
           <div className="flex flex-col gap-1 min-w-0">
             {[...tracks]
@@ -1442,9 +1420,8 @@ function LumenHeroContent() {
       <div className="anim-fade-up">
         <div className="flex items-center justify-between mb-4">
           <SectionHeader
-            eyebrow="NGHỆ SĨ TIÊU BIỂU"
             title="Nghệ sĩ Việt Nam nổi bật"
-            subtitle="Theo dõi các giọng ca hàng đầu đang tạo nên làn sóng âm nhạc"
+            subtitle="Các nghệ sĩ được yêu thích trên Moodify"
           />
         </div>
 
@@ -1481,9 +1458,8 @@ function LumenHeroContent() {
                   <h4 className="text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
                     {art.name}
                   </h4>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 fill-sky-400/20 shrink-0" />
                 </div>
-                <p className="text-[11px] text-white/50 truncate w-full mt-0.5">Nghệ sĩ xác minh</p>
+                <p className="text-[11px] text-white/50 truncate w-full mt-0.5">Nghệ sĩ</p>
               </div>
             ));
           })()}
@@ -1499,12 +1475,8 @@ function LumenHeroContent() {
       <div className="rounded-3xl border border-white/10 bg-slate-950/40 backdrop-blur-xl p-5 sm:p-6 shadow-xl anim-fade-up">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-white/10">
           <div>
-            <p className="font-manrope text-[10px] tracking-[0.1em] text-purple-400 uppercase font-bold flex items-center gap-1.5 mb-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
-              DANH MỤC CA KHÚC
-            </p>
             <h3 className="font-display font-bold text-white text-lg sm:text-xl">
-              {active.label === "TẤT CẢ" ? "Tất cả bài hát" : `Giai điệu: ${active.label}`} ({catalog.total} ca khúc)
+              {active.label === "TẤT CẢ" ? "Tất cả bài hát" : `Giai điệu: ${active.label}`} (<span className="tabular-nums">{catalog.total}</span> ca khúc)
             </h3>
           </div>
 

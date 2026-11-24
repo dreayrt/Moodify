@@ -637,7 +637,7 @@ function LibraryContent() {
                         Playlist này còn trống
                       </h4>
                       <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5">
-                        Hãy khám phá 147 ca khúc Việt Nam và thêm những giai điệu bạn yêu thích vào playlist này!
+                        Hãy khám phá kho nhạc Moodify và thêm những giai điệu bạn yêu thích vào danh sách phát này.
                       </p>
                       <button
                         onClick={() => router.push("/dashboard/search")}

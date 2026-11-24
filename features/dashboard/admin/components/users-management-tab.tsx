@@ -32,6 +32,20 @@ import { AdminPagination } from "./shared/admin-pagination";
 import { ModalPortal } from "./shared/modal-portal";
 import { fetchAdminUserDevices } from "@/lib/api/admin-client";
 
+const ROLE_LABELS: Record<string, string> = {
+  USER: "Người nghe",
+  CONTENT_LEAD: "Quản lý nội dung",
+  ARTIST: "Nghệ sĩ",
+  MODERATOR: "Kiểm duyệt viên",
+  ADMIN: "Quản trị viên",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Hoạt động",
+  INACTIVE: "Chưa kích hoạt",
+  BANNED: "Đã khóa",
+};
+
 type UsersManagementTabProps = {
   users: AdminUser[];
   devices: UserDevice[];
@@ -341,19 +355,19 @@ export function UsersManagementTab({
 
   return (
     <div className="space-y-6 anim-fade-in">
-      {/* Studio Header */}
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-graphik text-[24px] font-bold text-white tracking-tight">
-              Quản Lý Người Dùng
+              Quản lý người dùng
             </h2>
-            <span className="font-mono text-xs text-zinc-400">
+            <span className="text-xs text-zinc-400 tabular-nums">
               · {users.length} tài khoản
             </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Quản trị tài khoản người dùng, phân quyền vai trò và trạng thái hoạt động.
+            Quản lý tài khoản, vai trò và trạng thái hoạt động.
           </p>
         </div>
 
@@ -363,9 +377,9 @@ export function UsersManagementTab({
             onClick={handleOpenCreateUser}
             className="flex items-center gap-2 rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#ff5500]/25 hover:bg-[#ff6a1a] active:scale-[0.98] transition cursor-pointer"
           >
-            <UserPlus className="h-4 w-4" /> Thêm Người Dùng
+            <UserPlus className="h-4 w-4" /> Thêm người dùng
           </button>
-          <span className="text-xs font-mono text-zinc-400">
+          <span className="text-xs text-zinc-400 tabular-nums">
             Hiển thị {filteredUsers.length} / {users.length} tài khoản
           </span>
         </div>
@@ -373,55 +387,55 @@ export function UsersManagementTab({
 
       {/* 4 User Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-            <span>Tổng Người Dùng</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+            <span>Tổng người dùng</span>
             <Users className="w-4 h-4 text-sky-400" />
           </div>
-          <div className="font-display text-2xl font-bold text-white tracking-tight">
+          <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
             {users.length}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Toàn bộ tài khoản</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Tài khoản trên hệ thống</p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-            <span>Nghệ Sĩ</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+            <span>Quản lý nội dung</span>
             <UserCheck className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="font-display text-2xl font-bold text-white tracking-tight">
+          <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
             {users.filter((u) => u.role === "CONTENT_LEAD" || u.role === "ARTIST").length}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Tài khoản nghệ sĩ</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Nghệ sĩ &amp; đăng nhạc</p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-            <span>Kiểm Duyệt Viên</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+            <span>Kiểm duyệt viên</span>
             <Shield className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="font-display text-2xl font-bold text-white tracking-tight">
+          <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
             {users.filter((u) => u.role === "MODERATOR").length}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">Đội ngũ kiểm duyệt</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Kiểm duyệt bài hát</p>
         </div>
 
-        <div className="rounded-2xl border border-[#222432] bg-[#12131a] p-4 shadow-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-mono mb-1">
-            <span>Đang Hoạt Động</span>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#12141c] p-4 shadow-xl">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
+            <span>Đang hoạt động</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="font-display text-2xl font-bold text-white tracking-tight">
+          <div className="font-display text-2xl font-bold text-white tracking-tight tabular-nums">
             {users.filter((u) => u.status === "ACTIVE").length}
           </div>
-          <p className="text-[11px] text-emerald-400 mt-0.5 font-mono">
+          <p className="text-[11px] text-emerald-400 mt-0.5">
             Tài khoản hoạt động
           </p>
         </div>
       </div>
 
       {/* Filter Ribbon */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 rounded-2xl border border-[#222432] bg-[#12131a] p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 rounded-2xl border border-white/[0.08] bg-[#12141c] p-3">
         <div className="relative sm:col-span-2">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
@@ -431,8 +445,8 @@ export function UsersManagementTab({
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="Tìm theo tên, username, email, mã nghệ sĩ / nhân sự..."
-            className="w-full rounded-xl border border-[#222432] bg-[#171822] py-2.5 pl-10 pr-4 text-[13px] text-white placeholder-zinc-500 outline-none transition focus:border-[#ff5500]"
+            placeholder="Tìm theo tên, tên đăng nhập, email hoặc mã nghệ sĩ..."
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] py-2.5 pl-10 pr-4 text-[13px] text-white placeholder-zinc-500 outline-none transition focus:border-[#ff5500]"
           />
         </div>
 
@@ -444,13 +458,13 @@ export function UsersManagementTab({
               setRoleFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-[12px] font-mono text-white outline-none transition focus:border-[#ff5500]"
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-xs text-white outline-none transition focus:border-[#ff5500] cursor-pointer"
           >
-            <option value="ALL" className="bg-[#12131a]">Tất cả vai trò</option>
-            <option value="USER" className="bg-[#12131a]">Thính giả (USER)</option>
-            <option value="CONTENT_LEAD" className="bg-[#12131a]">Phụ trách Nội dung (CONTENT_LEAD)</option>
-            <option value="MODERATOR" className="bg-[#12131a]">Kiểm duyệt (MODERATOR)</option>
-            <option value="ADMIN" className="bg-[#12131a]">Quản trị (ADMIN)</option>
+            <option value="ALL" className="bg-[#12141c]">Tất cả vai trò</option>
+            <option value="USER" className="bg-[#12141c]">Người nghe</option>
+            <option value="CONTENT_LEAD" className="bg-[#12141c]">Quản lý nội dung</option>
+            <option value="MODERATOR" className="bg-[#12141c]">Kiểm duyệt viên</option>
+            <option value="ADMIN" className="bg-[#12141c]">Quản trị viên</option>
           </select>
         </div>
 
@@ -462,35 +476,35 @@ export function UsersManagementTab({
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3 py-2.5 text-[12px] font-mono text-white outline-none transition focus:border-[#ff5500]"
+            className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3 py-2.5 text-xs text-white outline-none transition focus:border-[#ff5500] cursor-pointer"
           >
-            <option value="ALL" className="bg-[#12131a]">Tất cả trạng thái</option>
-            <option value="ACTIVE" className="bg-[#12131a]">Hoạt động (ACTIVE)</option>
-            <option value="INACTIVE" className="bg-[#12131a]">Chưa kích hoạt (INACTIVE)</option>
-            <option value="BANNED" className="bg-[#12131a]">Đã khóa (BANNED)</option>
+            <option value="ALL" className="bg-[#12141c]">Tất cả trạng thái</option>
+            <option value="ACTIVE" className="bg-[#12141c]">Hoạt động</option>
+            <option value="INACTIVE" className="bg-[#12141c]">Chưa kích hoạt</option>
+            <option value="BANNED" className="bg-[#12141c]">Đã khóa</option>
           </select>
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="overflow-hidden rounded-2xl border border-[#222432] bg-[#12131a] shadow-xl">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#12141c] shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-[#222432] bg-[#171822] font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+            <thead className="border-b border-white/[0.08] bg-[#171923] text-xs font-medium text-zinc-400">
               <tr>
-                <th className="py-3.5 pl-5 pr-3">Người Dùng</th>
-                <th className="py-3.5 px-3">Liên Hệ</th>
-                <th className="py-3.5 px-3">Vai Trò</th>
-                <th className="py-3.5 px-3">Trạng Thái</th>
-                <th className="py-3.5 px-3">Mã Nghệ Sĩ</th>
-                <th className="py-3.5 px-3">Thiết Bị</th>
-                <th className="py-3.5 pl-3 pr-5 text-right">Thao Tác</th>
+                <th className="py-3.5 pl-5 pr-3">Người dùng</th>
+                <th className="py-3.5 px-3">Liên hệ</th>
+                <th className="py-3.5 px-3">Vai trò</th>
+                <th className="py-3.5 px-3">Trạng thái</th>
+                <th className="py-3.5 px-3">Mã nghệ sĩ</th>
+                <th className="py-3.5 px-3">Thiết bị</th>
+                <th className="py-3.5 pl-3 pr-5 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#222432]/60 font-sans">
+            <tbody className="divide-y divide-white/[0.06] font-sans">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-zinc-400 font-mono">
+                  <td colSpan={7} className="py-12 text-center text-zinc-400">
                     Không tìm thấy người dùng phù hợp với điều kiện tìm kiếm.
                   </td>
                 </tr>
@@ -506,7 +520,7 @@ export function UsersManagementTab({
                   return (
                     <tr
                       key={user.id}
-                      className="transition hover:bg-[#171822]/60 cursor-pointer group"
+                      className="transition hover:bg-[#171923]/60 cursor-pointer group"
                       onClick={() => setInspectingUser(user)}
                     >
                       {/* Name + Avatar */}
@@ -516,10 +530,10 @@ export function UsersManagementTab({
                             <img
                               src={user.avatarUrl}
                               alt={user.fullName}
-                              className="h-9 w-9 rounded-full object-cover border border-[#222432] shrink-0"
+                              className="h-9 w-9 rounded-full object-cover border border-white/10 shrink-0"
                             />
                           ) : (
-                            <div className="grid h-9 w-9 place-items-center rounded-full border border-[#222432] bg-[#171822] font-mono font-bold text-white/70 shrink-0">
+                            <div className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-[#171923] font-bold text-white/70 shrink-0">
                               {user.fullName.charAt(0)}
                             </div>
                           )}
@@ -527,7 +541,7 @@ export function UsersManagementTab({
                             <p className="font-semibold text-white truncate max-w-[160px] group-hover:text-[#ff5500] transition">
                               {user.fullName}
                             </p>
-                            <p className="font-mono text-[10px] text-zinc-400 truncate">@{user.username}</p>
+                            <p className="font-mono text-[11px] text-zinc-400 truncate">@{user.username}</p>
                           </div>
                         </div>
                       </td>
@@ -535,29 +549,29 @@ export function UsersManagementTab({
                       {/* Contact */}
                       <td className="py-3 px-3">
                         <p className="text-zinc-200 truncate max-w-[170px]">{user.email}</p>
-                        <p className="font-mono text-[10px] text-zinc-400">{user.phone || "Chưa cập nhật"}</p>
+                        <p className="font-mono text-[11px] text-zinc-400 tabular-nums">{user.phone || "Chưa cập nhật"}</p>
                       </td>
 
                       {/* Role */}
-                      <td className="py-3 px-3 font-mono text-[11px]">
+                      <td className="py-3 px-3 text-xs">
                         <span
                           className={
                             user.role === "ADMIN"
-                              ? "text-[#ff9966] font-semibold flex items-center gap-1"
+                              ? "text-[#ff9966] font-semibold inline-flex items-center gap-1"
                               : user.role === "MODERATOR"
                               ? "text-indigo-400 font-medium"
                               : user.role === "CONTENT_LEAD" || user.role === "ARTIST"
                               ? "text-violet-400 font-medium"
-                              : "text-zinc-400"
+                              : "text-zinc-300"
                           }
                         >
                           {user.role === "ADMIN" && <Shield className="h-3 w-3" />}
-                          {user.role}
+                          {ROLE_LABELS[user.role] || user.role}
                         </span>
                       </td>
 
                       {/* Status */}
-                      <td className="py-3 px-3 font-mono text-[11px]">
+                      <td className="py-3 px-3 text-xs">
                         <span className="inline-flex items-center gap-1.5">
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${
@@ -577,7 +591,7 @@ export function UsersManagementTab({
                                 : "text-zinc-500"
                             }
                           >
-                            {user.status === "ACTIVE" ? "Hoạt động" : user.status === "BANNED" ? "Đã khóa" : "Chưa kích hoạt"}
+                            {STATUS_LABELS[user.status] || user.status}
                           </span>
                         </span>
                       </td>
@@ -589,12 +603,12 @@ export function UsersManagementTab({
                             {user.artistSpotifyId.substring(0, 12)}...
                           </span>
                         ) : (
-                          <span className="text-zinc-600">-</span>
+                          <span className="text-zinc-600">—</span>
                         )}
                       </td>
 
                       {/* Devices */}
-                      <td className="py-3 px-3 font-mono text-xs">
+                      <td className="py-3 px-3 text-xs tabular-nums">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -612,35 +626,32 @@ export function UsersManagementTab({
                       <td className="py-3.5 pl-3 pr-5 text-right" onClick={(e) => e.stopPropagation()}>
                         {!isCurrentUser ? (
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* Sửa / Inspect */}
                             <button
                               type="button"
                               onClick={() => {
                                 setInspectingUser(user);
                                 handleStartEditProfile(user);
                               }}
-                              className="rounded-lg border border-white/15 bg-white/[0.04] px-2.5 py-1 font-mono text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition"
+                              className="rounded-lg border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition cursor-pointer"
                               title="Chỉnh sửa thông tin hồ sơ"
                             >
                               Sửa
                             </button>
 
-                            {/* Reset Password Button */}
                             <button
                               type="button"
                               onClick={() => handleOpenResetPasswordModal(user)}
-                              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 font-mono text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition"
-                              title="Cấp mật khẩu tạm ngẫu nhiên và thu hồi phiên"
+                              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition cursor-pointer"
+                              title="Cấp mật khẩu tạm ngẫu nhiên và đăng xuất các phiên cũ"
                             >
-                              Reset MK
+                              Đặt lại MK
                             </button>
 
-                            {/* Ban / Unban */}
                             {!isBanned ? (
                               <button
                                 type="button"
                                 onClick={() => handleOpenBanModal(user)}
-                                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition"
+                                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
                                 title="Khóa tài khoản"
                               >
                                 Khóa
@@ -649,25 +660,24 @@ export function UsersManagementTab({
                               <button
                                 type="button"
                                 onClick={() => onUnbanUser(user.id)}
-                                className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 font-mono text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition"
+                                className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition cursor-pointer"
                                 title="Mở khóa tài khoản"
                               >
                                 Mở
                               </button>
                             )}
 
-                            {/* Change Role */}
                             <button
                               type="button"
                               onClick={() => handleOpenRoleModal(user)}
-                              className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 font-mono text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition"
+                              className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition cursor-pointer"
                               title="Đổi vai trò"
                             >
-                              Role
+                              Vai trò
                             </button>
                           </div>
                         ) : (
-                          <span className="font-mono text-xs text-purple-400 font-semibold">Tài khoản này</span>
+                          <span className="text-xs text-purple-400 font-semibold">Tài khoản đang dùng</span>
                         )}
                       </td>
                     </tr>
@@ -696,7 +706,7 @@ export function UsersManagementTab({
             <div className="w-full max-w-md bg-[#0c0e14] border-l border-white/10 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
             <div>
               <div className="flex items-center justify-between border-b border-white/8 pb-4">
-                <h3 className="font-graphik text-[18px] font-bold text-white">Thông Tin Chi Tiết Tài Khoản</h3>
+                <h3 className="font-graphik text-[18px] font-bold text-white">Thông tin tài khoản</h3>
                 <button
                   type="button"
                   onClick={() => setInspectingUser(null)}
@@ -722,12 +732,13 @@ export function UsersManagementTab({
                 <div>
                   <h4 className="font-graphik text-[18px] font-bold text-white">{inspectingUser.fullName}</h4>
                   <p className="font-mono text-[12px] text-white/50">@{inspectingUser.username}</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white">
-                      ID: #{inspectingUser.id}
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="font-mono text-white/60 tabular-nums">
+                      #{inspectingUser.id}
                     </span>
-                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ff5500]/15 text-[#ff9966]">
-                      {inspectingUser.role}
+                    <span className="text-white/25">·</span>
+                    <span className="font-medium text-[#ff9966]">
+                      {ROLE_LABELS[inspectingUser.role] || inspectingUser.role}
                     </span>
                   </div>
                 </div>
@@ -735,9 +746,9 @@ export function UsersManagementTab({
 
               {/* Metadata Fields / Edit Form */}
               {isEditProfileMode ? (
-                <div className="mt-6 space-y-3 font-mono text-[12px] p-4 rounded-2xl border border-[#ff5500]/30 bg-[#171822]">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#222432]">
-                    <span className="font-bold text-white text-xs">Chỉnh Sửa Hồ Sơ Người Dùng</span>
+                <div className="mt-6 space-y-3 text-xs p-4 rounded-2xl border border-[#ff5500]/30 bg-[#171923]">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+                    <span className="font-semibold text-white text-xs">Chỉnh sửa hồ sơ</span>
                     <button
                       type="button"
                       disabled={savingProfile}
@@ -792,39 +803,39 @@ export function UsersManagementTab({
                   </button>
                 </div>
               ) : (
-                <div className="mt-6 space-y-3 font-mono text-[12px]">
-                  <div className="flex justify-between p-3 rounded-[12px] bg-white/[0.02] border border-white/6">
-                    <span className="text-white/40">Email:</span>
+                <div className="mt-6 space-y-3 text-xs">
+                  <div className="flex justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <span className="text-white/45">Email:</span>
                     <span className="text-white font-medium">{inspectingUser.email}</span>
                   </div>
 
-                  <div className="flex justify-between p-3 rounded-[12px] bg-white/[0.02] border border-white/6">
-                    <span className="text-white/40">Số điện thoại:</span>
-                    <span className="text-white font-medium">{inspectingUser.phone || "Chưa cập nhật"}</span>
+                  <div className="flex justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <span className="text-white/45">Số điện thoại:</span>
+                    <span className="text-white font-medium tabular-nums">{inspectingUser.phone || "Chưa cập nhật"}</span>
                   </div>
 
-                  <div className="flex justify-between p-3 rounded-[12px] bg-white/[0.02] border border-white/6">
-                    <span className="text-white/40">Trạng thái:</span>
-                    <span className={`font-bold ${inspectingUser.status === "ACTIVE" ? "text-emerald-400" : "text-rose-400"}`}>
-                      {inspectingUser.status}
+                  <div className="flex justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <span className="text-white/45">Trạng thái:</span>
+                    <span className={`font-semibold ${inspectingUser.status === "ACTIVE" ? "text-emerald-400" : "text-rose-400"}`}>
+                      {STATUS_LABELS[inspectingUser.status] || inspectingUser.status}
                     </span>
                   </div>
 
                   {inspectingUser.artistSpotifyId && (
-                    <div className="flex justify-between p-3 rounded-[12px] bg-[#ff5500]/5 border border-[#ff5500]/20">
-                      <span className="text-[#ff5500]">Mã Định Danh Nghệ Sĩ:</span>
-                      <span className="text-white font-bold">{inspectingUser.artistSpotifyId}</span>
+                    <div className="flex justify-between p-3 rounded-xl bg-[#ff5500]/5 border border-[#ff5500]/20">
+                      <span className="text-[#ff5500]">Mã nghệ sĩ:</span>
+                      <span className="text-white font-mono font-bold">{inspectingUser.artistSpotifyId}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between p-3 rounded-[12px] bg-[#12131a] border border-[#222432]">
-                    <span className="text-white/40">Lần đăng nhập cuối:</span>
-                    <span className="text-white/80">{inspectingUser.lastLoginAt || "Chưa có"}</span>
+                  <div className="flex justify-between p-3 rounded-xl bg-[#12141c] border border-white/[0.08]">
+                    <span className="text-white/45">Đăng nhập gần nhất:</span>
+                    <span className="text-white/80 tabular-nums">{inspectingUser.lastLoginAt || "Chưa có"}</span>
                   </div>
 
-                  <div className="flex justify-between p-3 rounded-[12px] bg-[#12131a] border border-[#222432]">
-                    <span className="text-white/40">Ngày tham gia:</span>
-                    <span className="text-white/80">{inspectingUser.createdAt}</span>
+                  <div className="flex justify-between p-3 rounded-xl bg-[#12141c] border border-white/[0.08]">
+                    <span className="text-white/45">Ngày tham gia:</span>
+                    <span className="text-white/80 tabular-nums">{inspectingUser.createdAt}</span>
                   </div>
                 </div>
               )}
@@ -838,54 +849,54 @@ export function UsersManagementTab({
                   inspectingUser.username.toLowerCase() === currentAdminUsername.trim().toLowerCase())
               );
               return (
-                <div className="pt-6 border-t border-[#222432] space-y-2.5">
+                <div className="pt-6 border-t border-white/[0.08] space-y-2.5">
                   {!isEditProfileMode && (
                     <button
                       type="button"
                       onClick={() => handleStartEditProfile(inspectingUser)}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#222432] bg-[#171822] py-2.5 text-xs font-semibold text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-[#171923] py-2.5 text-xs font-semibold text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98] cursor-pointer"
                     >
-                      <UserCog className="h-4 w-4 text-[#ff5500]" /> Chỉnh Sửa Thông Tin Cá Nhân
+                      <UserCog className="h-4 w-4 text-[#ff5500]" /> Chỉnh sửa thông tin
                     </button>
                   )}
 
                   {isInspectingSelf ? (
-                    <div className="rounded-xl border border-purple-500/25 bg-purple-500/10 px-3 py-2.5 text-[11px] font-mono text-purple-300 text-center">
-                      Tài khoản quản trị đang đăng nhập (không thể tự khóa, tự đổi vai trò hoặc đặt lại mật khẩu tạm).
+                    <div className="rounded-xl border border-purple-500/25 bg-purple-500/10 px-3 py-2.5 text-xs text-purple-300 text-center">
+                      Tài khoản quản trị đang đăng nhập (không thể tự khóa, đổi vai trò hoặc đặt lại mật khẩu tạm).
                     </div>
                   ) : (
                     <>
                       <button
                         type="button"
                         onClick={() => handleOpenResetPasswordModal(inspectingUser)}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-xs font-mono font-bold text-amber-300 hover:bg-amber-500/20 transition"
+                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition cursor-pointer"
                       >
-                        <Key className="h-4 w-4" /> Đặt Lại Mật Khẩu Tạm Ngẫu Nhiên
+                        <Key className="h-4 w-4" /> Đặt lại mật khẩu tạm
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleOpenRoleModal(inspectingUser)}
-                        className="w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition"
+                        className="w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition cursor-pointer"
                       >
-                        Thay Đổi Vai Trò (Role)
+                        Đổi vai trò
                       </button>
 
                       {inspectingUser.status !== "BANNED" ? (
                         <button
                           type="button"
                           onClick={() => handleOpenBanModal(inspectingUser)}
-                          className="w-full rounded-xl bg-rose-500/20 border border-rose-500/30 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition"
+                          className="w-full rounded-xl bg-rose-500/20 border border-rose-500/30 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition cursor-pointer"
                         >
-                          Khóa Tài Khoản Này
+                          Khóa tài khoản
                         </button>
                       ) : (
                         <button
                           type="button"
                           onClick={() => onUnbanUser(inspectingUser.id)}
-                          className="w-full rounded-xl bg-emerald-500/20 border border-emerald-500/30 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition"
+                          className="w-full rounded-xl bg-emerald-500/20 border border-emerald-500/30 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition cursor-pointer"
                         >
-                          Mở Khóa Phục Hồi Quyền Truy Cập
+                          Mở khóa tài khoản
                         </button>
                       )}
                     </>
@@ -964,7 +975,7 @@ export function UsersManagementTab({
           <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-black/85 backdrop-blur-md anim-fade-in">
             <div className="relative my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[26px] border border-white/12 bg-[#0c0e14] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
-              <h3 className="font-graphik text-[17px] font-semibold text-white">Bổ Nhiệm &amp; Thay Đổi Vai Trò</h3>
+              <h3 className="font-graphik text-[17px] font-semibold text-white">Đổi vai trò tài khoản</h3>
               <button
                 type="button"
                 onClick={() => setSelectedUserForRole(null)}
@@ -975,26 +986,26 @@ export function UsersManagementTab({
             </div>
 
             <div className="mt-4 space-y-4 text-[13px]">
-              <div className="rounded-[16px] border border-white/8 bg-black/40 p-3">
+              <div className="rounded-2xl border border-white/8 bg-black/40 p-3">
                 <p className="font-semibold text-white">{selectedUserForRole.fullName}</p>
-                <p className="text-[12px] text-white/50 font-mono">Vai trò hiện tại: {selectedUserForRole.role}</p>
+                <p className="text-xs text-white/55">Vai trò hiện tại: {ROLE_LABELS[selectedUserForRole.role] || selectedUserForRole.role}</p>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-white/70 mb-1.5">Chọn vai trò mới</label>
+                <label className="block text-xs font-medium text-white/70 mb-1.5">Chọn vai trò mới</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(["USER", "CONTENT_LEAD", "MODERATOR", "ADMIN"] as AdminUserRole[]).map((r) => (
                     <button
                       key={r}
                       type="button"
                       onClick={() => setTargetRole(r)}
-                      className={`rounded-xl border p-2.5 text-center text-[12px] font-medium transition ${
+                      className={`rounded-xl border p-2.5 text-center text-xs font-medium transition cursor-pointer ${
                         targetRole === r
                           ? "border-[#ff5500] bg-[#ff5500]/15 text-[#ff9966] font-semibold"
-                          : "border-[#222432] bg-[#171822] text-zinc-400 hover:text-white"
+                          : "border-white/[0.08] bg-[#171923] text-zinc-400 hover:text-white"
                       }`}
                     >
-                      {r}
+                      {ROLE_LABELS[r] || r}
                     </button>
                   ))}
                 </div>
@@ -1002,24 +1013,24 @@ export function UsersManagementTab({
 
               {(targetRole === "CONTENT_LEAD" || targetRole === "ARTIST") && (
                 <div>
-                  <label className="block text-[12px] font-medium text-white/70 mb-1">
-                    Mã Nghệ Sĩ liên kết (tùy chọn)
+                  <label className="block text-xs font-medium text-white/70 mb-1">
+                    Mã nghệ sĩ liên kết (tùy chọn)
                   </label>
                   <input
                     type="text"
                     value={artistSpotifyIdInput}
                     onChange={(e) => setArtistSpotifyIdInput(e.target.value)}
-                    placeholder="Để trống sẽ tự động tạo hồ sơ Nghệ sĩ mới"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] p-2.5 text-[13px] text-white placeholder:text-zinc-500 outline-none focus:border-[#ff5500] font-mono"
+                    placeholder="Để trống sẽ tự động tạo hồ sơ nghệ sĩ mới"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] p-2.5 text-[13px] text-white placeholder:text-zinc-500 outline-none focus:border-[#ff5500]"
                   />
-                  <p className="mt-1 text-[11px] font-mono text-zinc-400">
-                    Nếu bỏ trống, hệ thống sẽ tự tạo hồ sơ Artist trong MongoDB và đăng ký quyền tải nhạc cho tài khoản này.
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Nếu để trống, hệ thống sẽ tự tạo hồ sơ nghệ sĩ và cấp quyền tải nhạc cho tài khoản này.
                   </p>
                 </div>
               )}
 
-              <p className="text-[11px] font-mono text-amber-300/90">
-                Khi thay đổi vai trò, toàn bộ phiên đăng nhập cũ của tài khoản sẽ bị thu hồi để áp dụng quyền mới.
+              <p className="text-xs text-amber-300/90">
+                Khi đổi vai trò, toàn bộ phiên đăng nhập cũ của tài khoản sẽ bị đăng xuất để áp dụng quyền mới.
               </p>
             </div>
 
@@ -1066,13 +1077,13 @@ export function UsersManagementTab({
 
             <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
               {isLoadingDevices ? (
-                <div className="flex items-center justify-center py-8 gap-2 text-white/50 text-xs font-mono">
+                <div className="flex items-center justify-center py-8 gap-2 text-white/50 text-xs">
                   <RefreshCw className="h-4 w-4 animate-spin text-[#ff5500]" />
-                  <span>Đang tải danh sách thiết bị từ cơ sở dữ liệu...</span>
+                  <span>Đang tải danh sách thiết bị...</span>
                 </div>
               ) : activeUserDevices.length === 0 ? (
-                <p className="text-center py-6 text-white/30 text-[12px] font-mono">
-                  Chưa có thiết bị nào được đăng ký offline trong cơ sở dữ liệu.
+                <p className="text-center py-6 text-white/40 text-xs">
+                  Chưa có phiên đăng nhập nào được ghi nhận.
                 </p>
               ) : (
                 activeUserDevices.map((dev) => (
@@ -1135,9 +1146,9 @@ export function UsersManagementTab({
                 <Key className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-graphik text-lg font-bold text-white">Đặt Lại Mật Khẩu</h3>
-                <p className="font-mono text-xs text-white/50">
-                  {resetTempPassword ? "Mật khẩu tạm đã được cấp" : "Tạo mật khẩu tạm ngẫu nhiên & thu hồi phiên"}
+                <h3 className="font-graphik text-lg font-bold text-white">Đặt lại mật khẩu</h3>
+                <p className="text-xs text-white/50">
+                  {resetTempPassword ? "Mật khẩu tạm đã được tạo" : "Tạo mật khẩu tạm ngẫu nhiên & thu hồi phiên cũ"}
                 </p>
               </div>
             </div>
@@ -1149,8 +1160,8 @@ export function UsersManagementTab({
 
             {resetTempPassword ? (
               <div className="space-y-3">
-                <p className="text-xs font-mono text-emerald-300">
-                  Mật khẩu mới đã được mã hóa lưu vào hệ thống và toàn bộ phiên đăng nhập cũ đã bị thu hồi. Hãy sao chép mật khẩu tạm dưới đây để gửi cho người dùng:
+                <p className="text-xs text-emerald-300">
+                  Mật khẩu mới đã được lưu và toàn bộ phiên đăng nhập cũ đã bị đăng xuất. Hãy sao chép mật khẩu tạm dưới đây để gửi cho người dùng:
                 </p>
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
                   <code className="font-mono text-base font-bold tracking-wider text-amber-300 select-all">
@@ -1171,7 +1182,7 @@ export function UsersManagementTab({
               </div>
             ) : (
               <p className="text-sm text-white/70 leading-relaxed">
-                Hệ thống sẽ sinh một <strong className="text-amber-300 font-mono">mật khẩu tạm ngẫu nhiên 10 ký tự</strong> (mã hóa BCrypt) và thu hồi toàn bộ phiên đăng nhập hiện tại của tài khoản này.
+                Hệ thống sẽ tạo mật khẩu tạm ngẫu nhiên 10 ký tự và đăng xuất toàn bộ phiên hiện tại của tài khoản này.
               </p>
             )}
 
@@ -1223,8 +1234,8 @@ export function UsersManagementTab({
                   <UserPlus className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-graphik text-lg font-bold text-white">Thêm Người Dùng Mới</h3>
-                  <p className="font-mono text-xs text-zinc-400">Cấp mới tài khoản truy cập vào hệ thống</p>
+                  <h3 className="font-graphik text-lg font-bold text-white">Thêm người dùng mới</h3>
+                  <p className="text-xs text-zinc-400">Cấp tài khoản đăng nhập mới</p>
                 </div>
               </div>
               <button
@@ -1243,26 +1254,26 @@ export function UsersManagementTab({
               </div>
             )}
 
-            <div className="space-y-4 text-xs font-mono">
+            <div className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-zinc-300 block mb-1 font-semibold">Tên Đăng Nhập (@username) *</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Tên đăng nhập *</label>
                   <input
                     type="text"
                     value={newUserData.username}
                     onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
                     placeholder="vidu_user"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 block mb-1 font-semibold">Họ và Tên Đầy Đủ *</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Họ và tên *</label>
                   <input
                     type="text"
                     value={newUserData.fullName}
                     onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
-                    placeholder="Lâm Phước Thuận"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                    placeholder="Nguyễn Văn A"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
               </div>
@@ -1275,44 +1286,44 @@ export function UsersManagementTab({
                     value={newUserData.email}
                     onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
                     placeholder="user@moodify.com"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 block mb-1 font-semibold">Số Điện Thoại</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Số điện thoại</label>
                   <input
                     type="text"
                     value={newUserData.phone}
                     onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
                     placeholder="0912345678"
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2.5 text-sm text-white focus:border-[#ff5500] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-zinc-300 block mb-1 font-semibold">Vai Trò (Role)</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Vai trò</label>
                   <select
                     value={newUserData.role}
                     onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value as AdminUserRole })}
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
                   >
-                    <option value="USER" className="bg-[#12131a]">Thính giả (USER)</option>
-                    <option value="CONTENT_LEAD" className="bg-[#12131a]">Phụ trách Nội dung (CONTENT_LEAD)</option>
-                    <option value="MODERATOR" className="bg-[#12131a]">Kiểm duyệt viên (MODERATOR)</option>
-                    <option value="ADMIN" className="bg-[#12131a]">Quản trị viên (ADMIN)</option>
+                    <option value="USER" className="bg-[#12141c]">Người nghe</option>
+                    <option value="CONTENT_LEAD" className="bg-[#12141c]">Quản lý nội dung</option>
+                    <option value="MODERATOR" className="bg-[#12141c]">Kiểm duyệt viên</option>
+                    <option value="ADMIN" className="bg-[#12141c]">Quản trị viên</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-zinc-300 block mb-1 font-semibold">Trạng Thái Ban Đầu</label>
+                  <label className="text-zinc-300 block mb-1 font-semibold">Trạng thái ban đầu</label>
                   <select
                     value={newUserData.status}
                     onChange={(e) => setNewUserData({ ...newUserData, status: e.target.value as AdminUserStatus })}
-                    className="w-full rounded-xl border border-[#222432] bg-[#171822] px-3.5 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#171923] px-3.5 py-2.5 text-xs text-white focus:border-[#ff5500] focus:outline-none cursor-pointer"
                   >
-                    <option value="ACTIVE" className="bg-[#12131a]">Kích hoạt ngay (ACTIVE)</option>
-                    <option value="INACTIVE" className="bg-[#12131a]">Chưa kích hoạt (INACTIVE)</option>
+                    <option value="ACTIVE" className="bg-[#12141c]">Kích hoạt ngay</option>
+                    <option value="INACTIVE" className="bg-[#12141c]">Chưa kích hoạt</option>
                   </select>
                 </div>
               </div>

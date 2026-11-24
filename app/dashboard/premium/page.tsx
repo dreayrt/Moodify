@@ -5,10 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Crown,
   Check,
-  Download,
-  ShieldCheck,
-  Zap,
-  QrCode,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
@@ -22,22 +18,97 @@ import successStyles from "./payment-success.module.css";
 import SubscriptionManagement from "@/components/dashboard/subscription-management";
 import {
   fetchServicePackages,
+  fetchPublicSubscriptionTiers,
   fetchPackageQuotes,
   createCheckoutPayment,
   getPaymentStatus,
+  FREE_ENTITLEMENTS,
   type ServicePackage,
+  type PublicSubscriptionTier,
+  type PackageEntitlements,
   type PackageQuote,
   type CheckoutResponse,
   type PaymentStatusResponse,
 } from "@/lib/api-client";
+
+function formatCycleLabel(days: number): string {
+  if (days === 30) return "1 tháng";
+  if (days === 90) return "3 tháng";
+  if (days === 180) return "6 tháng";
+  if (days === 365) return "1 năm";
+  return `${days} ngày`;
+}
+
+function normalizeSentenceKey(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9à-ỹ\s]/gi, "").replace(/\s+/g, " ").trim();
+}
+
+function buildPackageBenefitBullets(pkg: ServicePackage): string[] {
+  const ent = pkg.entitlements;
+  const bullets: string[] = [];
+
+  if (ent) {
+    if (ent.adPolicy === "NO_ADS") {
+      bullets.push("Không quảng cáo");
+    } else if (ent.adPolicy === "DAILY_QUOTA") {
+      bullets.push(`${ent.adFreeDailyLimit} bài hát/ngày không quảng cáo`);
+    } else {
+      bullets.push("Phát kèm quảng cáo");
+    }
+
+    if (ent.skipPolicy === "UNLIMITED") {
+      bullets.push("Chuyển bài không giới hạn");
+    } else {
+      bullets.push(`${ent.skipDailyLimit} lượt chuyển bài mỗi ngày`);
+    }
+
+    if (ent.offlineAllowed) {
+      bullets.push(
+        ent.offlineMaxTracks >= 9999
+          ? "Tải nghe ngoại tuyến không giới hạn bài hát"
+          : `Tải nghe ngoại tuyến tối đa ${ent.offlineMaxTracks} bài hát`
+      );
+    }
+
+    const devices = Math.max(1, ent.maxDevices || 1);
+    bullets.push(
+      devices > 1
+        ? `Sử dụng đồng thời trên tối đa ${devices} thiết bị`
+        : "Sử dụng trên 1 thiết bị"
+    );
+
+    if (ent.tier !== "FREE" && ent.vipBadge !== false) {
+      bullets.push("Giao diện và huy hiệu thành viên VIP");
+    }
+  }
+
+  const seen = new Set(bullets.map(normalizeSentenceKey));
+  if (pkg.description) {
+    const extraLines = pkg.description
+      .split(/\n|;|•/)
+      .map((line) => line.replace(/^[-•\s]+/, "").trim())
+      .filter((line) => line.length > 0 && !/6 tài khoản độc lập|320\s*kbps|Lossless/i.test(line));
+    for (const line of extraLines) {
+      const key = normalizeSentenceKey(line);
+      if (!seen.has(key)) {
+        bullets.push(line);
+        seen.add(key);
+      }
+    }
+  }
+
+  return bullets;
+}
 
 export default function PremiumPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [tiers, setTiers] = useState<PublicSubscriptionTier[]>([]);
   const [packageQuotes, setPackageQuotes] = useState<PackageQuote[]>([]);
-  const [cycle, setCycle] = useState<"1month" | "3months" | "1year">("1month");
+  const [loadingPackages, setLoadingPackages] = useState(true);
+  const [selectedCycle, setSelectedCycle] = useState<number | "all">("all");
 
   // Payment modal state (SePay VietQR)
   const [selectedPkg, setSelectedPkg] = useState<ServicePackage | null>(null);
@@ -55,13 +126,20 @@ export default function PremiumPage() {
   const [successIsScheduled, setSuccessIsScheduled] = useState(false);
 
   const loadData = async () => {
+    setLoadingPackages(true);
     try {
-      const pkgs = await fetchServicePackages().catch(() => []);
-      const quotes = await fetchPackageQuotes().catch(() => []);
-      setPackages(pkgs);
-      setPackageQuotes(quotes);
+      const [pkgs, publicTiers, quotes] = await Promise.all([
+        fetchServicePackages().catch(() => []),
+        fetchPublicSubscriptionTiers().catch(() => []),
+        fetchPackageQuotes().catch(() => []),
+      ]);
+      setPackages(Array.isArray(pkgs) ? pkgs : []);
+      setTiers(Array.isArray(publicTiers) ? publicTiers : []);
+      setPackageQuotes(Array.isArray(quotes) ? quotes : []);
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoadingPackages(false);
     }
   };
 
@@ -88,7 +166,7 @@ export default function PremiumPage() {
     } catch (err: any) {
       console.error("Lỗi tạo đơn thanh toán SePay:", err);
       alert(
-        err.message || "Không thể tạo đơn thanh toán SePay. Vui lòng thử lại!",
+        err.message || "Không thể tạo đơn thanh toán SePay. Vui lòng thử lại.",
       );
       setIsModalOpen(false);
     } finally {
@@ -225,72 +303,102 @@ export default function PremiumPage() {
       } else {
         window.dispatchEvent(new Event("moodify-notifications-updated"));
         alert(
-          "Hệ thống chưa nhận được thanh toán. Vui lòng đảm bảo bạn đã chuyển đúng số tiền và nội dung!",
+          "Hệ thống chưa nhận được thanh toán. Vui lòng đảm bảo bạn đã chuyển đúng số tiền và nội dung.",
         );
       }
     } catch (err: any) {
-      alert("Hệ thống vẫn đang kiểm tra tự động. Vui lòng đợi trong giây lát!");
+      alert("Hệ thống vẫn đang kiểm tra tự động. Vui lòng đợi trong giây lát.");
     }
   };
 
-  // Find the package matching the selected tier and duration.
-  const getPackageForTier = (type: "full" | "family") => {
-    const tierId = type === "full" ? "INDIVIDUAL_FULL" : "FAMILY";
-    const inTier = packages.filter(
-      (pkg) => (pkg.tier_id || pkg.tierId) === tierId,
-    );
-    if (inTier.length > 0) {
-      const wantedDuration =
-        cycle === "1year" ? 365 : cycle === "3months" ? 90 : 30;
-      return (
-        inTier.find((pkg) => pkg.duration_days === wantedDuration) ||
-        inTier.find(
-          (pkg) => Math.abs(pkg.duration_days - wantedDuration) < 20,
-        ) ||
-        inTier[0]
-      );
-    }
+  // Distinct durations from active backend packages
+  const availableDurations = Array.from(
+    new Set(
+      packages
+        .map((pkg) => Number(pkg.durationDays ?? pkg.duration_days ?? 0))
+        .filter((d) => Number.isFinite(d) && d > 0)
+    )
+  ).sort((a, b) => a - b);
 
-    if (type === "full") {
-      if (cycle === "3months") {
-        return (
-          packages.find(
-            (pkg) => pkg.name.includes("FULL") && pkg.duration_days === 90,
-          ) || packages.find((pkg) => pkg.id === 4)
-        );
-      }
-      if (cycle === "1year") {
-        return (
-          packages.find(
-            (pkg) => pkg.name.includes("FULL") && pkg.duration_days > 100,
-          ) || packages.find((pkg) => pkg.id === 5)
-        );
-      }
-      return (
-        packages.find(
-          (pkg) => pkg.name.includes("FULL") && pkg.duration_days <= 31,
-        ) || packages.find((pkg) => pkg.id === 3)
-      );
-    }
+  const effectiveCycle =
+    selectedCycle !== "all" && !availableDurations.includes(selectedCycle)
+      ? "all"
+      : selectedCycle;
 
-    if (cycle === "1year") {
-      return (
-        packages.find(
-          (pkg) =>
-            pkg.duration_days > 100 && (pkg.tier_id || pkg.tierId) === "FAMILY",
-        ) || packages.find((pkg) => pkg.id === 7)
-      );
-    }
-    return (
-      packages.find(
-        (pkg) =>
-          pkg.duration_days <= 31 && (pkg.tier_id || pkg.tierId) === "FAMILY",
-      ) || packages.find((pkg) => pkg.id === 6)
-    );
+  const visiblePackages = [...packages]
+    .filter((pkg) => {
+      if (effectiveCycle === "all") return true;
+      return Number(pkg.durationDays ?? pkg.duration_days) === effectiveCycle;
+    })
+    .sort((a, b) => {
+      const orderDiff = (a.display_order ?? 0) - (b.display_order ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      return Number(a.price) - Number(b.price);
+    });
+
+  // Dynamic comparison matrix columns: FREE + active paid tiers
+  const freeTier: PublicSubscriptionTier = tiers.find((t) => t.id === "FREE") ?? {
+    id: "FREE",
+    name: "Tài khoản Miễn phí",
+    description: "Tài khoản mặc định",
+    adPolicy: FREE_ENTITLEMENTS.adPolicy,
+    adFreeDailyLimit: FREE_ENTITLEMENTS.adFreeDailyLimit,
+    skipPolicy: FREE_ENTITLEMENTS.skipPolicy,
+    skipDailyLimit: FREE_ENTITLEMENTS.skipDailyLimit,
+    offlineAllowed: FREE_ENTITLEMENTS.offlineAllowed,
+    offlineMaxTracks: FREE_ENTITLEMENTS.offlineMaxTracks,
+    maxDevices: FREE_ENTITLEMENTS.maxDevices,
+    vipBadge: false,
+    entitlements: FREE_ENTITLEMENTS,
   };
 
-  const fullPkg = getPackageForTier("full");
-  const famPkg = getPackageForTier("family");
+  const paidComparisonColumns = (() => {
+    const activeTierMap = new Map<
+      string,
+      { tierId: string; name: string; entitlements: PackageEntitlements; minPrice: number; minPriceDuration: number }
+    >();
+    for (const pkg of packages) {
+      const tierId = pkg.tierId || pkg.tier_id || "";
+      if (!tierId || tierId === "FREE") continue;
+      const tierFromList = tiers.find((t) => t.id === tierId);
+      const ent: PackageEntitlements = pkg.entitlements ?? tierFromList?.entitlements ?? {
+        tier: tierId,
+        adPolicy: tierFromList?.adPolicy ?? "NO_ADS",
+        adFreeDailyLimit: tierFromList?.adFreeDailyLimit ?? 0,
+        adIntervalAfterLimit: 0,
+        skipPolicy: tierFromList?.skipPolicy ?? "UNLIMITED",
+        skipDailyLimit: tierFromList?.skipDailyLimit ?? 0,
+        offlineAllowed: tierFromList?.offlineAllowed ?? false,
+        offlineMaxTracks: tierFromList?.offlineMaxTracks ?? 0,
+        maxDevices: tierFromList?.maxDevices ?? 1,
+        vipBadge: true,
+      };
+      const price = Number(pkg.price) || 0;
+      const days = Number(pkg.durationDays ?? pkg.duration_days ?? 30);
+      const existing = activeTierMap.get(tierId);
+      if (!existing) {
+        activeTierMap.set(tierId, {
+          tierId,
+          name: tierFromList?.name || pkg.tierName || pkg.tier_name || tierId,
+          entitlements: ent,
+          minPrice: price,
+          minPriceDuration: days,
+        });
+      } else if (price < existing.minPrice) {
+        existing.minPrice = price;
+        existing.minPriceDuration = days;
+      }
+    }
+    const tierOrder = tiers.map((t) => t.id);
+    return Array.from(activeTierMap.values()).sort((a, b) => {
+      const ia = tierOrder.indexOf(a.tierId);
+      const ib = tierOrder.indexOf(b.tierId);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.minPrice - b.minPrice;
+    });
+  })();
 
   if (searchParams.get("tab") === "manage") {
     return <SubscriptionManagement />;
@@ -300,428 +408,302 @@ export default function PremiumPage() {
     <div className="w-full max-w-6xl mx-auto px-4 py-6 md:py-10 space-y-8">
       {/* Top Banner */}
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-bold tracking-wider uppercase shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-semibold">
           <Crown className="w-4 h-4 text-amber-400" />
-          <span>Moodify Premium VIP</span>
+          <span>Gói thành viên Moodify</span>
         </div>
         <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">
-          Âm Nhạc Không Giới Hạn, Cảm Xúc Thăng Hoa.
+          Lựa chọn gói phù hợp với bạn
         </h1>
         <p className="text-white/60 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-          Lựa chọn gói dịch vụ phù hợp: VIP Cá nhân không giới hạn hoặc Chia sẻ
-          trọn bộ gia đình với chi phí tiết kiệm nhất.
+          Danh sách gói, giá bán và quyền lợi bên dưới được cập nhật trực tiếp từ hệ thống.
         </p>
       </div>
 
-      {/* Cycle Selector */}
-      <div className="flex justify-center">
-        <div className="grid w-full max-w-xl grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
-          <button
-            onClick={() => setCycle("1month")}
-            className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight transition-all cursor-pointer sm:px-4 sm:text-xs ${
-              cycle === "1month"
-                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            Hàng Tháng{" "}
-            <span className="ml-1 font-medium opacity-70">30 ngày</span>
-          </button>
-          <button
-            onClick={() => setCycle("3months")}
-            className={`flex min-h-11 flex-wrap items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight transition-all cursor-pointer sm:px-4 sm:text-xs ${
-              cycle === "3months"
-                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            <span>3 Tháng</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-400 text-black font-extrabold">
-              -10%
-            </span>
-          </button>
-          <button
-            onClick={() => setCycle("1year")}
-            className={`flex min-h-11 flex-wrap items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight transition-all cursor-pointer sm:px-4 sm:text-xs ${
-              cycle === "1year"
-                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            <span>1 Năm</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-400 text-black font-extrabold">
-              TẶNG 2 THÁNG
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Pricing Cards Grid - 2 Columns (Centered & Balanced) */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 max-w-5xl mx-auto">
-        {/* Card 1: Gói Cá Nhân FULL */}
-        <div className="rounded-3xl border-2 border-purple-500/60 bg-gradient-to-br from-purple-950/40 via-slate-950/90 to-purple-900/20 backdrop-blur-2xl p-7 flex flex-col justify-between shadow-2xl relative group hover:border-purple-400 transition-all">
-          <div className="absolute -top-0.5 right-6 px-3 py-1 rounded-b-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-black tracking-wider uppercase shadow-md">
-            PHỔ BIẾN NHẤT • VIP CÁ NHÂN
+      {/* Dynamic Cycle Selector */}
+      {availableDurations.length > 1 && (
+        <div className="flex justify-center">
+          <div className="inline-flex flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setSelectedCycle("all")}
+              className={`min-h-10 rounded-xl px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                effectiveCycle === "all"
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              Tất cả ({packages.length})
+            </button>
+            {availableDurations.map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => setSelectedCycle(days)}
+                className={`min-h-10 rounded-xl px-4 py-2 text-xs font-semibold transition-all cursor-pointer tabular-nums ${
+                  effectiveCycle === days
+                    ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                {formatCycleLabel(days)}
+              </button>
+            ))}
           </div>
+        </div>
+      )}
 
-          <div className="space-y-5">
-            <div>
-              <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
-                Trọn Vẹn Đặc Quyền • 1 Người
-              </span>
-              <h3 className="text-2xl font-extrabold text-white mt-0.5">
-                VIP Cá Nhân
-              </h3>
-            </div>
+      {/* Dynamic Pricing Cards Grid */}
+      {loadingPackages ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-white/60">
+          <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+          <span>Đang tải danh sách gói dịch vụ...</span>
+        </div>
+      ) : visiblePackages.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center space-y-2 max-w-2xl mx-auto">
+          <p className="text-base font-semibold text-white">Hiện chưa có gói dịch vụ nào đang mở bán</p>
+          <p className="text-xs text-white/50">Vui lòng quay lại sau hoặc liên hệ quản trị viên.</p>
+        </div>
+      ) : (
+        <div
+          className={`grid grid-cols-1 gap-6 mx-auto ${
+            visiblePackages.length === 1
+              ? "max-w-md"
+              : visiblePackages.length === 2
+              ? "md:grid-cols-2 max-w-5xl"
+              : "md:grid-cols-2 lg:grid-cols-3 max-w-6xl"
+          }`}
+        >
+          {visiblePackages.map((pkg) => {
+            const quote = getPackageQuote(pkg);
+            const displayedPrice = getDisplayedPrice(pkg) ?? Number(pkg.price);
+            const durationDays = Number(pkg.durationDays ?? pkg.duration_days ?? 30);
+            const tierName = pkg.tierName || pkg.tier_name || "Gói thành viên";
+            const tierId = pkg.tierId || pkg.tier_id || "";
+            const isHighlighted = tierId === "FAMILY" || (pkg.entitlements?.maxDevices ?? 1) > 1;
+            const monthlyEquivalent =
+              durationDays >= 60 ? Math.round(displayedPrice / (durationDays / 30)) : null;
+            const benefits = buildPackageBenefitBullets(pkg);
 
-            {/* Price */}
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-4xl font-extrabold text-white">
-                  {(
-                    getDisplayedPrice(fullPkg) ??
-                    (cycle === "1year"
-                      ? 279000
-                      : cycle === "3months"
-                        ? 79000
-                        : 29000)
-                  ).toLocaleString("vi-VN")}{" "}
-                  đ
-                </span>
-                <span className="text-xs text-white/50 font-medium">
-                  /{" "}
-                  {cycle === "1year"
-                    ? "năm"
-                    : cycle === "3months"
-                      ? "3 tháng"
-                      : "tháng"}
-                </span>
+            return (
+              <div
+                key={pkg.id}
+                className={`rounded-3xl border p-7 flex flex-col justify-between shadow-2xl relative transition-all backdrop-blur-2xl ${
+                  isHighlighted
+                    ? "border-amber-400/50 bg-gradient-to-br from-amber-500/10 via-slate-950/85 to-purple-950/35 hover:border-amber-300"
+                    : "border-purple-500/45 bg-gradient-to-br from-purple-950/35 via-slate-950/90 to-slate-900/50 hover:border-purple-400"
+                }`}
+              >
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span
+                        className={`text-[11px] font-semibold block ${
+                          isHighlighted ? "text-amber-300" : "text-purple-300"
+                        }`}
+                      >
+                        {tierName}
+                      </span>
+                      <h3 className="text-xl md:text-2xl font-bold text-white mt-0.5">
+                        {pkg.name}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/75 tabular-nums">
+                      {formatCycleLabel(durationDays)}
+                    </span>
+                  </div>
+
+                  {/* Price */}
+                  <div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl md:text-4xl font-extrabold text-white tabular-nums">
+                        {displayedPrice.toLocaleString("vi-VN")} đ
+                      </span>
+                      <span className="text-xs text-white/50 font-medium">
+                        / {formatCycleLabel(durationDays)}
+                      </span>
+                    </div>
+
+                    {monthlyEquivalent !== null && (
+                      <p
+                        className={`text-xs mt-1.5 font-medium tabular-nums ${
+                          isHighlighted ? "text-amber-300" : "text-purple-300"
+                        }`}
+                      >
+                        Tương đương ~{monthlyEquivalent.toLocaleString("vi-VN")} đ/tháng
+                      </p>
+                    )}
+
+                    {quote?.discountApplied && (
+                      <p className="mt-1 text-xs font-semibold text-emerald-300 tabular-nums">
+                        <span className="mr-1.5 text-white/35 line-through">
+                          {quote.baseAmount.toLocaleString("vi-VN")} đ
+                        </span>
+                        Ưu đãi gia hạn cùng hạng gói: giảm {quote.discountPercent}%
+                      </p>
+                    )}
+
+                    {quote?.actionDescription && (
+                      <p className="mt-1.5 text-[11px] leading-4 text-white/55">
+                        {quote.actionDescription}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Benefits from live entitlements */}
+                  <div className="pt-4 border-t border-white/10 space-y-3">
+                    <p
+                      className={`text-xs font-semibold ${
+                        isHighlighted ? "text-amber-300" : "text-purple-300"
+                      }`}
+                    >
+                      Quyền lợi áp dụng:
+                    </p>
+                    <ul className="space-y-2.5 text-xs text-white/85">
+                      {benefits.map((feat, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5">
+                          <CheckCircle2
+                            className={`w-4 h-4 shrink-0 mt-0.5 ${
+                              isHighlighted ? "text-amber-400" : "text-emerald-400"
+                            }`}
+                          />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenCheckout(pkg)}
+                  className={`mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    isHighlighted
+                      ? "text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/20"
+                      : "text-white bg-purple-600 hover:bg-purple-500 shadow-xl shadow-purple-600/25"
+                  }`}
+                >
+                  <span>{getActionLabel(pkg, `Đăng ký ${pkg.name}`)}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <p className="text-[11.5px] text-purple-300 mt-1.5 font-medium">
-                {cycle === "1year"
-                  ? "Tương đương ~23.250 đ/tháng (Tiết kiệm 69.000 đ)"
-                  : cycle === "3months"
-                    ? "Tương đương ~26.300 đ/tháng (Tiết kiệm 8.000 đ)"
-                    : "Chỉ 29.000 đ/tháng - Trọn vẹn đặc quyền không giới hạn"}
-              </p>
-              {getPackageQuote(fullPkg)?.discountApplied && (
-                <p className="mt-1 text-[10px] font-semibold text-emerald-300">
-                  <span className="mr-1 text-white/35 line-through">
-                    {getPackageQuote(fullPkg)?.baseAmount.toLocaleString(
-                      "vi-VN",
-                    )}{" "}
-                    đ
-                  </span>
-                  Gia hạn cùng nhóm quyền lợi: giảm 20%
-                </p>
-              )}
-              {getPackageQuote(fullPkg)?.actionDescription && (
-                <p className="mt-1 text-[10px] leading-4 text-white/45">
-                  {getPackageQuote(fullPkg)?.actionDescription}
-                </p>
-              )}
-            </div>
-
-            {/* Benefits */}
-            <div className="pt-4 border-t border-white/10 space-y-3">
-              <p className="text-[11px] font-bold text-purple-300 uppercase tracking-wider">
-                Đặc quyền cá nhân không giới hạn:
-              </p>
-              <ul className="space-y-2.5 text-xs text-white/80">
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="font-semibold text-white">
-                    100% Không quảng cáo vĩnh viễn
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>
-                    Chuyển bài (Skip) <strong>hoàn toàn vô hạn</strong>
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Tải nhạc ngoại tuyến không giới hạn bài hát</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>
-                    Chất lượng âm thanh{" "}
-                    <strong>Ultra HD 320 kbps Lossless</strong>
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>
-                    Mở khóa Theme hào quang <strong>Obsidian Royal Gold</strong>{" "}
-                    & Huy hiệu VIP
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-purple-300 shrink-0" />
-                  <span>Dành riêng cho 1 tài khoản cá nhân</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <button
-            onClick={() => fullPkg && handleOpenCheckout(fullPkg)}
-            className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>{getActionLabel(fullPkg, "Nâng Cấp Cá Nhân FULL")}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+            );
+          })}
         </div>
+      )}
 
-        {/* Card 2: Gói Gia Đình */}
-        <div className="rounded-3xl border-2 border-amber-400/60 bg-gradient-to-br from-amber-500/10 via-slate-950/80 to-purple-950/40 backdrop-blur-2xl p-7 flex flex-col justify-between shadow-2xl relative group overflow-hidden">
-          <div className="absolute -top-0.5 right-6 px-3 py-1 rounded-b-xl bg-gradient-to-r from-amber-400 to-amber-300 text-black text-[10px] font-black tracking-wider uppercase shadow-md">
-            TIẾT KIỆM NHẤT • 6 NGƯỜI
-          </div>
-
-          <div className="space-y-5">
-            <div>
-              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
-                Dành Cho 6 Tài Khoản Độc Lập
-              </span>
-              <h3 className="text-2xl font-extrabold text-white mt-0.5">
-                Gói Gia Đình
-              </h3>
-            </div>
-
-            {/* Price */}
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-4xl font-extrabold text-white">
-                  {(
-                    getDisplayedPrice(famPkg) ??
-                    (cycle === "1year" ? 590000 : 59000)
-                  ).toLocaleString("vi-VN")}{" "}
-                  đ
-                </span>
-                <span className="text-xs text-white/50 font-medium">
-                  / {cycle === "1year" ? "năm" : "tháng"}
-                </span>
-              </div>
-              <p className="text-[11.5px] text-amber-300 font-medium mt-1.5">
-                {cycle === "1year"
-                  ? "Chỉ ~8.200 đ / người / tháng khi chia 6 người (Tặng 2 tháng)"
-                  : "Chỉ ~9.800 đ / người / tháng khi chia 6 người"}
-              </p>
-              {getPackageQuote(famPkg)?.discountApplied && (
-                <p className="mt-1 text-[10px] font-semibold text-emerald-300">
-                  <span className="mr-1 text-white/35 line-through">
-                    {getPackageQuote(famPkg)?.baseAmount.toLocaleString(
-                      "vi-VN",
-                    )}{" "}
-                    đ
-                  </span>
-                  Gia hạn cùng nhóm quyền lợi: giảm 20%
-                </p>
-              )}
-              {getPackageQuote(famPkg)?.actionDescription && (
-                <p className="mt-1 text-[10px] leading-4 text-white/45">
-                  {getPackageQuote(famPkg)?.actionDescription}
-                </p>
-              )}
-            </div>
-
-            {/* Benefits */}
-            <div className="pt-4 border-t border-white/10 space-y-3">
-              <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
-                Đặc quyền trọn bộ gia đình:
-              </p>
-              <ul className="space-y-2.5 text-xs text-white/80">
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-semibold text-white">
-                    Chia sẻ tối đa 6 tài khoản độc lập
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>
-                    Kho nhạc, playlist & thư viện riêng tư từng thành viên
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Chặn 100% quảng cáo cho cả 6 thành viên</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>
-                    Chuyển bài & tải offline không giới hạn cho mọi thành viên
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>
-                    Chất lượng âm thanh{" "}
-                    <strong>Ultra HD 320 kbps Lossless</strong> cho tất cả
-                  </span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Huy hiệu VIP Crown cho toàn bộ 6 thành viên</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <button
-            onClick={() => famPkg && handleOpenCheckout(famPkg)}
-            className="mt-8 w-full py-3.5 px-4 rounded-xl font-bold text-xs text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200 hover:brightness-110 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>{getActionLabel(famPkg, "Nâng Cấp Gia Đình (6 Người)")}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Feature Comparison Matrix */}
+      {/* Dynamic Feature Comparison Matrix */}
       <div className="rounded-3xl border border-white/10 bg-slate-950/70 backdrop-blur-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-white/10 pb-5">
           <div>
-            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">
-              Bảng so sánh chi tiết
-            </span>
-            <h3 className="text-xl md:text-2xl font-black text-white mt-1">
-              Đặc quyền & Phân cấp các gói dịch vụ Moodify
+            <h3 className="text-xl md:text-2xl font-bold text-white">
+              So sánh quyền lợi các hạng gói
             </h3>
+            <p className="text-xs text-white/50 mt-1">
+              Mọi quyền lợi hiển thị theo cấu hình hiện hành của hệ thống.
+            </p>
           </div>
-          <p className="text-xs text-white/50 max-w-sm">
-            Tất cả quyền lợi được hệ thống tự động nhận diện và áp dụng trực
-            tiếp theo thời gian thực.
-          </p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-white/10 text-white/50 uppercase text-[10.5px] font-bold tracking-wider">
-                <th className="py-3 px-4 w-[37%]">Tính năng / Quyền lợi</th>
-                <th className="py-3 px-4 w-[21%]">Miễn phí (FREE)</th>
-                <th className="py-3 px-4 w-[21%] text-purple-300">
-                  VIP Cá Nhân (29K)
-                </th>
-                <th className="py-3 px-4 w-[21%] text-amber-300">
-                  Gia Đình (59K)
-                </th>
+              <tr className="border-b border-white/10 text-white/60 text-xs font-semibold">
+                <th className="py-3 px-4 min-w-[180px]">Quyền lợi</th>
+                <th className="py-3 px-4 min-w-[150px]">{freeTier.name}</th>
+                {paidComparisonColumns.map((col) => (
+                  <th key={col.tierId} className="py-3 px-4 min-w-[170px] text-amber-300">
+                    {col.name}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-white/80">
-              {/* Row 1: Giá cước */}
+            <tbody className="divide-y divide-white/5 text-white/80 tabular-nums">
               <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Giá cước hàng tháng
-                </td>
-                <td className="py-3.5 px-4 font-medium text-white/60">0 đ</td>
-                <td className="py-3.5 px-4 font-bold text-purple-300">
-                  29.000 đ
-                </td>
-                <td className="py-3.5 px-4 font-bold text-amber-300">
-                  59.000 đ{" "}
-                  <span className="text-[10px] block text-white/40 font-normal">
-                    (~9.8k/người)
-                  </span>
-                </td>
+                <td className="py-3.5 px-4 font-semibold text-white">Giá từ</td>
+                <td className="py-3.5 px-4 text-white/60">0 đ</td>
+                {paidComparisonColumns.map((col) => (
+                  <td key={col.tierId} className="py-3.5 px-4 font-bold text-white">
+                    {col.minPrice.toLocaleString("vi-VN")} đ{" "}
+                    <span className="font-normal text-white/50">/ {formatCycleLabel(col.minPriceDuration)}</span>
+                  </td>
+                ))}
               </tr>
 
-              {/* Row 2: Quảng cáo */}
               <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Chặn quảng cáo
-                  <span className="block text-[11px] text-white/40 font-normal">
-                    Audio lồng nhạc nền & Banner đếm ngược
-                  </span>
+                <td className="py-3.5 px-4 font-semibold text-white">Quảng cáo</td>
+                <td className="py-3.5 px-4 text-white/65">
+                  {freeTier.adPolicy === "NO_ADS"
+                    ? "Không quảng cáo"
+                    : freeTier.adPolicy === "DAILY_QUOTA"
+                    ? `${freeTier.adFreeDailyLimit} bài/ngày không QC`
+                    : "Có quảng cáo"}
                 </td>
-                <td className="py-3.5 px-4 text-red-300">
-                  Quảng cáo sau mỗi 3 bài
-                </td>
-                <td className="py-3.5 px-4 text-purple-200 font-bold">
-                  100% Không quảng cáo vĩnh viễn
-                </td>
-                <td className="py-3.5 px-4 text-amber-200 font-bold">
-                  100% Không quảng cáo (Cả 6 người)
-                </td>
+                {paidComparisonColumns.map((col) => (
+                  <td key={col.tierId} className="py-3.5 px-4 text-emerald-300 font-medium">
+                    {col.entitlements.adPolicy === "NO_ADS"
+                      ? "Không quảng cáo"
+                      : col.entitlements.adPolicy === "DAILY_QUOTA"
+                      ? `${col.entitlements.adFreeDailyLimit} bài/ngày không QC`
+                      : "Có quảng cáo"}
+                  </td>
+                ))}
               </tr>
 
-              {/* Row 3: Skip bài */}
               <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Chuyển bài hát (Skip)
+                <td className="py-3.5 px-4 font-semibold text-white">Chuyển bài</td>
+                <td className="py-3.5 px-4 text-white/65">
+                  {freeTier.skipPolicy === "UNLIMITED"
+                    ? "Không giới hạn"
+                    : `${freeTier.skipDailyLimit} lượt/ngày`}
                 </td>
-                <td className="py-3.5 px-4 text-white/60">
-                  Giới hạn 6 lượt / ngày
-                </td>
-                <td className="py-3.5 px-4 text-purple-200 font-bold">
-                  Không giới hạn (Vô hạn)
-                </td>
-                <td className="py-3.5 px-4 text-amber-200 font-bold">
-                  Không giới hạn (Cả 6 người)
-                </td>
+                {paidComparisonColumns.map((col) => (
+                  <td key={col.tierId} className="py-3.5 px-4 text-sky-300 font-medium">
+                    {col.entitlements.skipPolicy === "UNLIMITED"
+                      ? "Không giới hạn"
+                      : `${col.entitlements.skipDailyLimit} lượt/ngày`}
+                  </td>
+                ))}
               </tr>
 
-              {/* Row 4: Tải offline */}
               <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Tải nhạc ngoại tuyến (MP3)
+                <td className="py-3.5 px-4 font-semibold text-white">Tải nhạc ngoại tuyến</td>
+                <td className="py-3.5 px-4 text-white/50">
+                  {freeTier.offlineAllowed
+                    ? freeTier.offlineMaxTracks >= 9999
+                      ? "Không giới hạn"
+                      : `Tối đa ${freeTier.offlineMaxTracks} bài`
+                    : "Không hỗ trợ"}
                 </td>
-                <td className="py-3.5 px-4 text-white/40">Không hỗ trợ</td>
-                <td className="py-3.5 px-4 text-purple-200 font-bold">
-                  Không giới hạn bài hát
-                </td>
-                <td className="py-3.5 px-4 text-amber-200 font-bold">
-                  Không giới hạn bài hát
-                </td>
+                {paidComparisonColumns.map((col) => (
+                  <td key={col.tierId} className="py-3.5 px-4 text-white">
+                    {col.entitlements.offlineAllowed
+                      ? col.entitlements.offlineMaxTracks >= 9999
+                        ? "Không giới hạn"
+                        : `Tối đa ${col.entitlements.offlineMaxTracks} bài`
+                      : "Không hỗ trợ"}
+                  </td>
+                ))}
               </tr>
 
-              {/* Row 5: Chất lượng âm thanh */}
               <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Chất lượng âm thanh tối đa
-                </td>
-                <td className="py-3.5 px-4 text-white/60">Chuẩn 128 kbps</td>
-                <td className="py-3.5 px-4 text-purple-200 font-bold">
-                  Ultra HD 320 kbps Lossless
-                </td>
-                <td className="py-3.5 px-4 text-amber-200 font-bold">
-                  Ultra HD 320 kbps Lossless
-                </td>
+                <td className="py-3.5 px-4 font-semibold text-white">Số thiết bị đồng thời</td>
+                <td className="py-3.5 px-4 text-white/65">{Math.max(1, freeTier.maxDevices)} thiết bị</td>
+                {paidComparisonColumns.map((col) => (
+                  <td key={col.tierId} className="py-3.5 px-4 text-white font-semibold">
+                    {Math.max(1, col.entitlements.maxDevices)} thiết bị
+                  </td>
+                ))}
               </tr>
 
-              {/* Row 6: Thiết bị / Tài khoản */}
               <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Số lượng thiết bị / tài khoản
-                </td>
-                <td className="py-3.5 px-4 text-white/60">1 thiết bị</td>
-                <td className="py-3.5 px-4 text-white/60">
-                  1 thiết bị cá nhân
-                </td>
-                <td className="py-3.5 px-4 text-amber-300 font-bold">
-                  Tối đa 6 tài khoản độc lập
-                </td>
-              </tr>
-
-              {/* Row 7: Chủ đề VIP */}
-              <tr className="hover:bg-white/[0.02] transition-colors">
-                <td className="py-3.5 px-4 font-semibold text-white">
-                  Theme Hoàng Kim & Mascot VIP
-                  <span className="block text-[11px] text-white/40 font-normal">
-                    Hào quang Obsidian Royal Gold & Tùy biến nút phát
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 text-white/40">Khóa</td>
-                <td className="py-3.5 px-4 text-purple-200 font-bold">
-                  Mở khóa trọn bộ đặc quyền VIP
-                </td>
-                <td className="py-3.5 px-4 text-amber-200 font-bold">
-                  Mở khóa trọn bộ cho cả 6 thành viên
-                </td>
+                <td className="py-3.5 px-4 font-semibold text-white">Giao diện &amp; huy hiệu VIP</td>
+                <td className="py-3.5 px-4 text-white/45">Không</td>
+                {paidComparisonColumns.map((col) => (
+                  <td key={col.tierId} className="py-3.5 px-4 text-amber-300 font-medium">
+                    Có (Huy hiệu &amp; Chủ đề VIP)
+                  </td>
+                ))}
               </tr>
             </tbody>
           </table>
@@ -921,7 +903,7 @@ export default function PremiumPage() {
                   </div>
                   {checkoutData.discountApplied && (
                     <div className="flex justify-between text-emerald-300">
-                      <span>Ưu đãi cùng tier</span>
+                      <span>Ưu đãi cùng hạng gói</span>
                       <span>
                         -{checkoutData.discountAmount.toLocaleString("vi-VN")} đ
                       </span>
@@ -937,8 +919,7 @@ export default function PremiumPage() {
                       alt="VietQR SePay"
                       className="w-48 h-48 md:w-52 md:h-52 object-contain rounded-xl"
                     />
-                    <div className="absolute -top-2.5 -right-2.5 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-slate-950 uppercase shadow-md flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping"></span>
+                    <div className="absolute -top-2.5 -right-2.5 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-bold text-slate-950 uppercase shadow-md">
                       VietQR
                     </div>
                   </div>
@@ -949,11 +930,11 @@ export default function PremiumPage() {
                       <Clock className="w-3.5 h-3.5" />
                       <span>
                         Hết hạn sau:{" "}
-                        <strong>{formatCountdown(countdownSeconds)}</strong>
+                        <strong className="tabular-nums">{formatCountdown(countdownSeconds)}</strong>
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                       <span>Đang chờ thanh toán</span>
                     </div>
                   </div>

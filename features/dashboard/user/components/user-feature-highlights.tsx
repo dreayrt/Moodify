@@ -4,21 +4,21 @@ const FEATURES = [
   {
     title: "Bắt trọn nhịp cảm xúc",
     description:
-      "Nhận diện và phân tích tâm trạng theo thời gian thực để gợi ý danh sách nhạc tương thích, không mất thời gian tìm kiếm.",
+      "Nhận diện tâm trạng để gợi ý danh sách nhạc phù hợp, không mất thời gian tìm kiếm.",
     icon: Headphones,
     color: "purple",
   },
   {
     title: "Đồng bộ đa thiết bị",
     description:
-      "Trải nghiệm liền mạch từ không gian làm việc trên máy tính tới tai nghe di động khi di chuyển ngoài đường.",
+      "Trải nghiệm liền mạch từ máy tính đến thiết bị di động mọi lúc mọi nơi.",
     icon: Laptop,
     color: "cyan",
   },
   {
-    title: "Không gian nghệ sĩ độc lập",
+    title: "Không gian nghệ sĩ",
     description:
-      "Creator Studio hỗ trợ nghệ sĩ tải lên bài hát, tiếp cận cộng đồng thính giả có cùng rung cảm âm nhạc.",
+      "Hỗ trợ nghệ sĩ và người phụ trách nội dung tải lên bài hát, tiếp cận thính giả có cùng gu âm nhạc.",
     icon: Radio,
     color: "amber",
   },

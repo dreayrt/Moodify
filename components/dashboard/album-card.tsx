@@ -2,7 +2,7 @@
 
 import CoverImage from "./cover-image";
 
-import { Disc, Play, Heart, Music, Calendar } from "lucide-react";
+import { Play, Heart, Music, Calendar } from "lucide-react";
 import { Album } from "@/lib/api-client";
 import { useState } from "react";
 
@@ -44,12 +44,6 @@ export default function AlbumCard({
             onError={() => setImgError(true)}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-
-          {/* Album Badge */}
-          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-semibold text-cyan-300 flex items-center gap-1">
-            <Disc className="w-3 h-3 text-cyan-400 animate-spin-slow" />
-            <span>ALBUM</span>
-          </div>
 
           {/* Quick Favorite Button */}
           {onFavoriteToggle && (

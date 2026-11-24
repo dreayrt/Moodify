@@ -157,7 +157,7 @@ export function GlobalPlayerBar() {
               <div className={styles.trackText}>
                 <p className={styles.eyebrow}>{isAdPlaying ? "Nội dung tài trợ" : isPlaying ? "Đang phát" : "Đã tạm dừng"}</p>
                 <h4 className={styles.title} title={currentTrack.name}>
-                  {isAdPlaying ? (isBasicAd ? "Moodify Premium" : "Moodify Studio Sponsor") : currentTrack.name}
+                  {isAdPlaying ? (isBasicAd ? "Moodify Premium" : "Quảng cáo Moodify") : currentTrack.name}
                 </h4>
                 {!isAdPlaying && (
                   <Link

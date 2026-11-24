@@ -143,7 +143,6 @@ export default function AdminDashboardPage({
   // Live Database Sync States
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [dataErrors, setDataErrors] = useState<string[]>([]);
-  const [lastSyncTime, setLastSyncTime] = useState<string>("");
   const [dbStatus, setDbStatus] = useState<"connected" | "connecting" | "error">("connecting");
 
   // Toast System
@@ -301,15 +300,8 @@ export default function AdminDashboardPage({
         );
       }
 
-      const syncStr = new Intl.DateTimeFormat("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }).format(new Date());
-
       if (successCount > 0 && failures.length === 0) {
         setDbStatus("connected");
-        setLastSyncTime(syncStr);
         if (!silent) {
           addToast("Đã cập nhật dữ liệu quản trị từ máy chủ.", "success");
         }
@@ -483,8 +475,8 @@ export default function AdminDashboardPage({
             : u
         )
       );
-      recordAudit("UNBAN_USER", `@${target?.username}`, `Mở khóa khôi phục quyền truy cập cho tài khoản.`, "IAM", "info");
-      addToast(`Đã mở khóa tài khoản "${target?.username}" thành công.`, "success");
+      recordAudit("UNBAN_USER", `@${target?.username}`, `Mở khóa quyền truy cập cho tài khoản.`, "IAM", "info");
+      addToast(`Đã mở khóa tài khoản "${target?.username}".`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi mở khóa: ${msg}`, "error");
@@ -516,8 +508,16 @@ export default function AdminDashboardPage({
           )
         );
       }
-      recordAudit("CHANGE_ROLE", `@${target?.username}`, `Chuyển vai trò từ ${target?.role} sang ${newRole}`, "IAM", "info");
-      addToast(`Đã cập nhật vai trò của "${target?.username}" thành ${newRole} và làm mới phiên đăng nhập.`, "success");
+      const roleLabels: Record<string, string> = {
+        USER: "Người nghe",
+        CONTENT_LEAD: "Quản lý nội dung",
+        ARTIST: "Nghệ sĩ",
+        MODERATOR: "Kiểm duyệt viên",
+        ADMIN: "Quản trị viên",
+      };
+      const roleLabel = roleLabels[newRole] || newRole;
+      recordAudit("CHANGE_ROLE", `@${target?.username}`, `Chuyển vai trò sang ${roleLabel}`, "IAM", "info");
+      addToast(`Đã đổi vai trò của "${target?.username}" sang ${roleLabel} và làm mới phiên đăng nhập.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi đổi vai trò: ${msg}`, "error");
@@ -532,8 +532,8 @@ export default function AdminDashboardPage({
       );
       const freshUsers = await fetchAdminUsers().catch(() => null);
       if (Array.isArray(freshUsers)) setUsers(freshUsers);
-      recordAudit("REVOKE_DEVICE", `DEV-ID-${deviceId}`, "Thu hồi quyền truy cập của thiết bị", "SECURITY", "warning");
-      addToast("Đã thu hồi phiên thiết bị thành công.", "info");
+      recordAudit("REVOKE_DEVICE", `DEV-ID-${deviceId}`, "Thu hồi phiên đăng nhập thiết bị", "SECURITY", "warning");
+      addToast("Đã thu hồi phiên thiết bị.", "info");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi thu hồi thiết bị: ${msg}`, "error");
@@ -547,7 +547,7 @@ export default function AdminDashboardPage({
       if (Array.isArray(freshUsers)) setUsers(freshUsers);
       setDevices((prev) => prev.map((d) => (d.userId === userId ? { ...d, status: "REVOKED" } : d)));
       recordAudit("REVOKE_ALL_DEVICES", `User #${userId}`, res.message || "Thu hồi tất cả phiên đăng nhập", "SECURITY", "warning");
-      addToast(res.message || "Đã thu hồi toàn bộ phiên đăng nhập đang hoạt động.", "success");
+      addToast(res.message || "Đã thu hồi tất cả phiên đăng nhập đang hoạt động.", "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi thu hồi phiên đăng nhập: ${msg}`, "error");
@@ -571,8 +571,8 @@ export default function AdminDashboardPage({
           )
         );
       }
-      recordAudit("TOGGLE_PACKAGE", `PKG-00${packageId}`, "Bật/Tắt trạng thái hoạt động của gói cước", "BILLING", "info");
-      addToast("Đã thay đổi trạng thái kích hoạt gói dịch vụ thành công.", "success");
+      recordAudit("TOGGLE_PACKAGE", `PKG-00${packageId}`, "Bật/Tắt trạng thái gói cước", "BILLING", "info");
+      addToast("Đã thay đổi trạng thái gói dịch vụ.", "success");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -587,7 +587,7 @@ export default function AdminDashboardPage({
         prev.map((p) => (p.id === packageId ? { ...p, price: newPrice } : p))
       );
       recordAudit("UPDATE_PACKAGE_PRICE", `PKG-00${packageId}`, `Cập nhật giá gói thành ${newPrice.toLocaleString()} VNĐ`, "BILLING", "info");
-      addToast("Đã cập nhật biểu giá gói cước thành công.", "success");
+      addToast("Đã cập nhật giá gói cước.", "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Lỗi khi cập nhật giá: ${msg}`, "error");
@@ -603,7 +603,7 @@ export default function AdminDashboardPage({
         )
       );
       recordAudit("CANCEL_SUBSCRIPTION", `SUB-00${subscriptionId}`, "Hủy gói thuê bao người dùng", "BILLING", "warning");
-      addToast(`Đã hủy gói thuê bao #${subscriptionId} thành công.`, "success");
+      addToast(`Đã hủy gói thuê bao #${subscriptionId}.`, "success");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -611,35 +611,56 @@ export default function AdminDashboardPage({
     }
   };
 
-  const handleCreatePackage = async (data: Partial<ServicePackage>) => {
+  const handleCreatePackage = async (data: Partial<ServicePackage>): Promise<boolean> => {
     try {
       await createAdminPackage(data);
       const realPackages = await fetchAdminPackages();
       if (Array.isArray(realPackages) && realPackages.length > 0) {
         setPackages(realPackages);
       }
-      recordAudit("CREATE_PACKAGE", data.name || "Gói Cước Mới", `Tạo gói cước mới với giá ${Number(data.price || 0).toLocaleString()} đ`, "BILLING", "info");
-      addToast(`Đã tạo gói cước "${data.name || "mới"}" thành công vào cơ sở dữ liệu.`, "success");
+      recordAudit("CREATE_PACKAGE", data.name || "Gói mới", `Tạo gói dịch vụ mới với giá ${Number(data.price || 0).toLocaleString()} đ`, "BILLING", "info");
+      addToast(`Đã tạo gói dịch vụ "${data.name || "mới"}".`, "success");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi tạo gói cước: ${msg}`, "error");
+      addToast(`Lỗi khi tạo gói dịch vụ: ${msg}`, "error");
+      return false;
     }
   };
 
-  const handleUpdatePackageDetails = async (packageId: number, data: Partial<ServicePackage>) => {
+  const handleUpdatePackageDetails = async (packageId: number, data: Partial<ServicePackage>): Promise<boolean> => {
     try {
       await updateAdminPackageDetails(packageId, data);
       const realPackages = await fetchAdminPackages();
       if (Array.isArray(realPackages) && realPackages.length > 0) {
         setPackages(realPackages);
       }
-      recordAudit("UPDATE_PACKAGE", `PKG-00${packageId}`, `Cập nhật toàn diện thông tin và quyền lợi gói cước`, "BILLING", "info");
-      addToast("Đã cập nhật chi tiết gói cước thành công vào cơ sở dữ liệu.", "success");
+      recordAudit("UPDATE_PACKAGE", `PKG-00${packageId}`, `Cập nhật thông tin và quyền lợi gói dịch vụ`, "BILLING", "info");
+      addToast("Đã cập nhật chi tiết gói dịch vụ.", "success");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi cập nhật gói cước: ${msg}`, "error");
+      addToast(`Lỗi khi cập nhật gói dịch vụ: ${msg}`, "error");
+      return false;
+    }
+  };
+
+  const handleRefreshPackagesAndRevenue = async () => {
+    try {
+      const [realPackages, stats] = await Promise.all([
+        fetchAdminPackages(),
+        fetchAdminRevenueStats(revenueDays),
+      ]);
+      if (Array.isArray(realPackages)) {
+        setPackages(realPackages);
+      }
+      if (stats) {
+        setRevenueStats(stats);
+      }
+    } catch {
+      // Best-effort refresh after tier update
     }
   };
 
@@ -653,12 +674,12 @@ export default function AdminDashboardPage({
       } else {
         setPackages((prev) => prev.filter((p) => p.id !== packageId));
       }
-      recordAudit("DELETE_PACKAGE", target?.name || `PKG-00${packageId}`, "Xóa / vô hiệu hóa gói cước khỏi hệ thống", "BILLING", "warning");
-      addToast(`Đã xóa gói cước "${target?.name || packageId}" thành công khỏi cơ sở dữ liệu.`, "info");
+      recordAudit("DELETE_PACKAGE", target?.name || `PKG-00${packageId}`, "Xóa gói dịch vụ khỏi hệ thống", "BILLING", "warning");
+      addToast(`Đã xóa gói dịch vụ "${target?.name || packageId}".`, "info");
       void fetchAdminRevenueStats(revenueDays).then(setRevenueStats).catch(() => {});
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addToast(`Lỗi khi xóa gói cước: ${msg}`, "error");
+      addToast(`Lỗi khi xóa gói dịch vụ: ${msg}`, "error");
     }
   };
 
@@ -677,8 +698,8 @@ export default function AdminDashboardPage({
       if (Array.isArray(realUsers) && realUsers.length > 0) {
         setUsers(realUsers);
       }
-      recordAudit("CREATE_USER", `@${data.username}`, `Tạo người dùng mới với vai trò ${data.role}`, "IAM", "info");
-      addToast(`Đã tạo người dùng "${data.fullName}" thành công vào cơ sở dữ liệu.`, "success");
+      recordAudit("CREATE_USER", `@${data.username}`, `Tạo người dùng mới`, "IAM", "info");
+      addToast(`Đã tạo tài khoản "${data.fullName}".`, "success");
       return { ok: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -702,7 +723,7 @@ export default function AdminDashboardPage({
         );
       }
       recordAudit("UPDATE_USER_PROFILE", `User #${userId}`, "Cập nhật thông tin hồ sơ người dùng", "IAM", "info");
-      addToast("Đã cập nhật thông tin người dùng thành công vào cơ sở dữ liệu.", "success");
+      addToast("Đã cập nhật thông tin người dùng.", "success");
       return { ok: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -743,10 +764,10 @@ export default function AdminDashboardPage({
   // ================= RENDER GUARD STATES =================
   if (authState === "checking") {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#0e0f14] text-white">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#090a0f] text-white">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#ff5500] border-t-transparent" />
-        <p className="mt-4 font-graphik text-[13px] tracking-[0.16em] uppercase text-zinc-400">
-          Đang xác thực quyền Quản trị viên Moodify...
+        <p className="mt-4 text-sm text-zinc-400">
+          Đang kiểm tra quyền truy cập...
         </p>
       </div>
     );
@@ -754,20 +775,20 @@ export default function AdminDashboardPage({
 
   if (authState === "denied") {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#0e0f14] p-6 text-center text-white">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#090a0f] p-6 text-center text-white">
         <div className="grid h-16 w-16 place-items-center rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-400">
           <ShieldAlert className="h-8 w-8" />
         </div>
-        <h1 className="mt-5 font-graphik text-[26px] font-semibold text-white">Truy Cập Bị Từ Chối (403 Forbidden)</h1>
-        <p className="mt-2 max-w-md text-[14px] leading-6 text-zinc-400">
-          Tài khoản của bạn không có vai trò Quản trị viên (ADMIN) để truy cập vào Bảng điều khiển quản trị.
+        <h1 className="mt-5 font-graphik text-2xl font-semibold text-white">Không có quyền truy cập</h1>
+        <p className="mt-2 max-w-md text-sm leading-6 text-zinc-400">
+          Tài khoản của bạn không có quyền quản trị để mở trang này.
         </p>
         <div className="mt-6 flex gap-3">
           <Link
             href={USER_DASHBOARD_ROUTE}
-            className="rounded-xl border border-[#222432] bg-[#171822] px-5 py-2.5 text-[13px] font-medium text-white hover:bg-white/10 transition active:scale-[0.98]"
+            className="rounded-xl border border-white/[0.08] bg-[#12141c] px-5 py-2.5 text-xs font-medium text-white hover:bg-white/10 transition active:scale-[0.98]"
           >
-            Về Trang Nghe Nhạc
+            Về trang nghe nhạc
           </Link>
         </div>
       </div>
@@ -776,26 +797,26 @@ export default function AdminDashboardPage({
 
   // ================= 7 CORE ADMIN TABS =================
   const CORE_ADMIN_TABS: { key: AdminTab; label: string; count?: number; icon: React.ComponentType<{ className?: string }> }[] = [
-    { key: "overview", label: "Tổng Quan", icon: LayoutDashboard },
-    { key: "users", label: "Người Dùng", count: users.length, icon: Users },
-    { key: "monetization", label: "Gói Dịch Vụ", count: packages.length, icon: DollarSign },
-    { key: "recommendations", label: "Tuyển Chọn Âm Nhạc", icon: Sparkles },
-    { key: "karaoke-resources", label: "Tài Nguyên Karaoke", icon: Layers },
-    { key: "favorites", label: "Yêu Thích", count: overviewData?.totalFavorites, icon: Heart },
-    { key: "notifications", label: "Thông Báo", icon: Megaphone },
+    { key: "overview", label: "Tổng quan", icon: LayoutDashboard },
+    { key: "users", label: "Người dùng", count: users.length, icon: Users },
+    { key: "monetization", label: "Gói dịch vụ", count: packages.length, icon: DollarSign },
+    { key: "recommendations", label: "Gợi ý nhạc", icon: Sparkles },
+    { key: "karaoke-resources", label: "Tài nguyên karaoke", icon: Layers },
+    { key: "favorites", label: "Yêu thích", count: overviewData?.totalFavorites, icon: Heart },
+    { key: "notifications", label: "Thông báo", icon: Megaphone },
   ];
 
   return (
-    <div className="admin-workspace min-h-screen w-full bg-[#0e0f14] text-white font-sans flex flex-col md:flex-row antialiased">
+    <div className="admin-workspace min-h-screen w-full bg-[#090a0f] text-white font-sans flex flex-col md:flex-row antialiased">
       {/* ================= LEFT SIDEBAR NAVIGATION ================= */}
-      <aside className="admin-sidebar w-full md:w-56 xl:w-64 shrink-0 border-r border-[#222432] bg-[#12131a] flex flex-col justify-between md:sticky top-0 md:h-screen z-30 select-none">
+      <aside className="admin-sidebar w-full md:w-56 xl:w-64 shrink-0 border-r border-white/[0.08] bg-[#12141c] flex flex-col justify-between md:sticky top-0 md:h-screen z-30 select-none">
         {/* Top: Brand Logo (confined inside Admin Console) */}
-        <div className="p-5 border-b border-[#222432]">
+        <div className="p-5 border-b border-white/[0.08]">
           <button
             type="button"
             onClick={() => setActiveTab("overview")}
             className="flex items-center gap-2 group cursor-pointer"
-            title="Về Tổng quan quản trị"
+            title="Về Tổng quan"
           >
             <BrandLogo variant="horizontal-dark" className="h-7 w-auto transition-transform group-hover:scale-[1.02]" />
           </button>
@@ -803,8 +824,8 @@ export default function AdminDashboardPage({
 
         {/* Middle: Navigation Tabs List */}
         <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
-            Danh Mục Quản Trị
+          <div className="px-3 pb-2 text-[11px] font-medium text-zinc-500">
+            Quản trị
           </div>
 
           {CORE_ADMIN_TABS.map((tab) => {
@@ -816,7 +837,7 @@ export default function AdminDashboardPage({
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-[0.99] cursor-pointer ${
                   isActive
                     ? "bg-[#ff5500] text-white font-bold shadow-md shadow-[#ff5500]/25"
                     : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
@@ -828,7 +849,7 @@ export default function AdminDashboardPage({
                 </div>
                 {tab.count !== undefined && (
                   <span
-                    className={`text-[11px] px-2 py-0.5 rounded font-mono font-bold ${
+                    className={`text-[11px] px-2 py-0.5 rounded font-mono font-bold tabular-nums ${
                       isActive ? "bg-black/25 text-white" : "bg-white/[0.06] text-zinc-400"
                     }`}
                   >
@@ -841,17 +862,17 @@ export default function AdminDashboardPage({
         </div>
 
         {/* Bottom: Admin Profile & Logout */}
-        <div className="p-3.5 border-t border-[#222432] bg-[#0e0f14]">
+        <div className="p-3.5 border-t border-white/[0.08] bg-[#0e1017]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 shrink-0 rounded-lg bg-[#ff5500] flex items-center justify-center text-xs font-bold text-white font-mono shadow-sm">
+              <div className="h-8 w-8 shrink-0 rounded-lg bg-[#ff5500] flex items-center justify-center text-xs font-bold text-white shadow-sm">
                 {currentAdmin?.fullName.charAt(0) || "A"}
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-white truncate">
                   {currentAdmin?.fullName || "Quản trị viên"}
                 </div>
-                <div className="text-[10px] text-zinc-500 font-mono truncate">
+                <div className="text-[11px] text-zinc-500 font-mono truncate">
                   @{currentAdmin?.username || "admin"}
                 </div>
               </div>
@@ -871,12 +892,12 @@ export default function AdminDashboardPage({
       </aside>
 
       {/* ================= RIGHT MAIN WORKSPACE ================= */}
-      <div className="flex-1 min-w-0 min-h-screen flex flex-col z-10 bg-[#0e0f14]">
+      <div className="flex-1 min-w-0 min-h-screen flex flex-col z-10 bg-[#090a0f]">
         {/* Top Navbar */}
-        <header className="min-h-14 gap-3 flex-wrap py-3 px-4 sm:px-6 border-b border-[#222432] bg-[#12131a]/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
+        <header className="min-h-14 gap-3 flex-wrap py-3 px-4 sm:px-6 border-b border-white/[0.08] bg-[#12141c]/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 font-mono text-xs">
-              <span className="text-zinc-500">Moodify Operations</span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-zinc-500">Quản trị</span>
               <span className="text-zinc-700">/</span>
               <span className="text-white font-semibold">
                 {CORE_ADMIN_TABS.find((t) => t.key === activeTab)?.label}
@@ -885,36 +906,28 @@ export default function AdminDashboardPage({
           </div>
 
           <div className="flex items-center gap-3">
-            <span
-              className={`hidden sm:inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-mono ${
-                dbStatus === "connected"
-                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                  : dbStatus === "connecting"
-                  ? "border-amber-500/25 bg-amber-500/10 text-amber-300"
-                  : "border-rose-500/25 bg-rose-500/10 text-rose-300"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  dbStatus === "connected"
-                    ? "bg-emerald-400"
-                    : dbStatus === "connecting"
-                    ? "bg-amber-400 animate-pulse"
-                    : "bg-rose-400"
-                }`}
-              />
-              {dbStatus === "connected" ? "Đã đồng bộ" : dbStatus === "connecting" ? "Đang đồng bộ..." : "Mất đồng bộ"}
-            </span>
+            {dbStatus === "connecting" && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                Đang tải...
+              </span>
+            )}
+            {dbStatus === "error" && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                Mất kết nối máy chủ
+              </span>
+            )}
 
             <button
               type="button"
               disabled={isLoadingData}
               onClick={() => void loadRealData(false)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#222432] bg-[#171822] text-xs font-semibold text-zinc-300 hover:text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-              title="Đồng bộ lại dữ liệu quản trị"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/[0.08] bg-[#171923] text-xs font-semibold text-zinc-300 hover:text-white hover:border-[#ff5500]/50 hover:bg-[#ff5500]/10 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              title="Làm mới dữ liệu"
             >
               <RefreshCw className={`h-3.5 w-3.5 text-[#ff5500] ${isLoadingData ? "animate-spin" : ""}`} />
-              <span>Làm Mới</span>
+              <span>Làm mới</span>
             </button>
 
             <button
@@ -938,7 +951,6 @@ export default function AdminDashboardPage({
             <ul className="mt-2 list-inside list-disc space-y-1">{dataErrors.map((message) => <li key={message}>{message}</li>)}</ul>
             <button type="button" disabled={isLoadingData} onClick={() => void loadRealData()} className="mt-3 rounded-md border border-rose-300/30 px-3 py-2 disabled:opacity-50">Tải lại dữ liệu</button>
           </div>}
-          {!isLoadingData && dataErrors.length === 0 && lastSyncTime && <p className="mb-5 text-xs text-zinc-500">Cập nhật lúc {lastSyncTime}</p>}
           {activeTab === "overview" && (
             <OverviewTab
               users={users}
@@ -994,6 +1006,7 @@ export default function AdminDashboardPage({
               onUpdatePackageDetails={handleUpdatePackageDetails}
               onDeletePackage={handleDeletePackage}
               onCancelSubscription={handleCancelSubscription}
+              onTiersChanged={handleRefreshPackagesAndRevenue}
             />
           )}
 

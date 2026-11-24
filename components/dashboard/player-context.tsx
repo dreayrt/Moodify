@@ -1219,10 +1219,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [playAdAudio, clearRetry]);
 
   const skipAd = useCallback((force = false) => {
-    // Chỉ người dùng gói VIP Tiết Kiệm (INDIVIDUAL_BASIC) mới có quyền bấm bỏ qua quảng cáo sớm sau đếm ngược.
+    // Chỉ người dùng gói có giới hạn quảng cáo theo ngày (DAILY_QUOTA) mới có quyền bấm bỏ qua quảng cáo sớm sau đếm ngược.
     // Người dùng FREE bắt buộc phải nghe trọn vẹn quảng cáo trừ khi chuyển hướng mua gói (force = true) hoặc đã hết thời gian.
-    const isSaverVip = subTier === "INDIVIDUAL_BASIC";
-    if (!force && !isSaverVip && !isPremiumUser && adSecondsRemaining > 0) {
+    const canSkipAdEarly = entitlementsRef.current.adPolicy === "DAILY_QUOTA";
+    if (!force && !canSkipAdEarly && !isPremiumUser && adSecondsRemaining > 0) {
       return;
     }
 
@@ -1501,10 +1501,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setSkipLimitNotice({
             show: true,
             tier: subTier,
-            message:
-              subTier === "FREE"
-                ? `Tài khoản Miễn phí chỉ có ${skipLimit} lượt chuyển bài mỗi ngày. Nâng cấp Gói Tiết Kiệm (29K) hoặc Cá Nhân FULL để chuyển bài thoải mái!`
-                : `Bạn đã dùng hết ${skipLimit} lượt chuyển bài hôm nay. Nâng cấp lên Gói Cá Nhân FULL (49K) để chuyển bài không giới hạn!`,
+            message: `Bạn đã dùng hết ${skipLimit} lượt chuyển bài hôm nay. Nâng cấp gói để chuyển bài không giới hạn.`,
           });
           return;
         }

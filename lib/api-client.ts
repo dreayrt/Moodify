@@ -585,7 +585,7 @@ export async function fetchKaraokeTracks(options?: {
   } catch (error) {
     if (timedOut) {
       throw new Error(
-        "Kho bài Karaoke không phản hồi sau 10 giây. Hãy kiểm tra backend và dịch vụ MongoDB.",
+        "Kho bài Karaoke không phản hồi sau 10 giây. Vui lòng kiểm tra kết nối máy chủ.",
       );
     }
     throw error;
@@ -1255,9 +1255,29 @@ export interface ServicePackage {
   description: string;
   price: number;
   duration_days: number;
+  durationDays?: number;
   display_order: number;
   tier_id?: "INDIVIDUAL_BASIC" | "INDIVIDUAL_FULL" | "FAMILY" | string;
   tierId?: "INDIVIDUAL_BASIC" | "INDIVIDUAL_FULL" | "FAMILY" | string;
+  tier_name?: string;
+  tierName?: string;
+  entitlements?: PackageEntitlements;
+  featuresJson?: string;
+}
+
+export interface PublicSubscriptionTier {
+  id: string;
+  name: string;
+  description: string;
+  adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
+  adFreeDailyLimit: number;
+  skipPolicy: "UNLIMITED" | "LIMITED";
+  skipDailyLimit: number;
+  offlineAllowed: boolean;
+  offlineMaxTracks: number;
+  maxDevices: number;
+  vipBadge: boolean;
+  entitlements?: PackageEntitlements;
 }
 
 export interface PackageQuote extends ServicePackage {
@@ -1323,7 +1343,7 @@ export interface ManagedSubscription {
 // Quyền hạn theo gói (đồng bộ với PackageEntitlements ở admin types
 // và features_json phía backend). Quyết định hạn mức quảng cáo/skip/offline thật.
 export interface PackageEntitlements {
-  tier?: "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE";
+  tier?: "FAMILY" | "INDIVIDUAL_FULL" | "INDIVIDUAL_BASIC" | "FREE" | string;
   adPolicy: "NO_ADS" | "DAILY_QUOTA" | "FULL_ADS";
   adFreeDailyLimit: number;
   adIntervalAfterLimit: number;
@@ -1442,8 +1462,14 @@ export async function recordAdImpression(adId: string): Promise<void> {
 }
 
 export async function fetchServicePackages(): Promise<ServicePackage[]> {
-  const res = await fetch(`${API_BASE}/packages`);
+  const res = await fetch(`${API_BASE}/packages`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch packages");
+  return res.json();
+}
+
+export async function fetchPublicSubscriptionTiers(): Promise<PublicSubscriptionTier[]> {
+  const res = await fetch(`${API_BASE}/packages/tiers`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Không thể tải cấu hình hạng gói");
   return res.json();
 }
 

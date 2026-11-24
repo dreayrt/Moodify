@@ -58,15 +58,15 @@ const LICENSE_TYPES: Array<{
 }> = [
   {
     value: "DIGITAL_STREAMING",
-    label: "Digital Streaming",
-    desc: "Bản quyền phát trực tuyến kỹ thuật số cho các nền tảng streaming âm nhạc",
+    label: "Phát trực tuyến",
+    desc: "Bản quyền phát trực tuyến trên nền tảng âm nhạc",
     badge: "Phổ biến nhất",
   },
   {
     value: "DEMO_SIMULATED",
-    label: "Dữ liệu mô phỏng",
-    desc: "Hồ sơ thử nghiệm, không xác nhận quyền khai thác thương mại. Chỉ phát trong chế độ demo.",
-    badge: "Mô phỏng",
+    label: "Dữ liệu thử nghiệm",
+    desc: "Hồ sơ thử nghiệm, không dùng cho khai thác thương mại. Chỉ phát trong chế độ thử nghiệm.",
+    badge: "Thử nghiệm",
   },
 ];
 
@@ -479,7 +479,7 @@ export function TrackUploadModal({
       const newTrack: ArtistTrack = {
         id: savedResponse.id,
         title: savedResponse.title || finalTitle,
-        artist: savedResponse.artist || "You (Content Lead)",
+        artist: savedResponse.artist || "Quản lý nội dung",
         genre: savedResponse.genre || genre.trim() || "Pop",
         duration: savedResponse.duration || "0:00",
         status: (savedResponse.status as TrackStatus) || "draft",
@@ -598,7 +598,7 @@ export function TrackUploadModal({
                 <p className="text-[12px] text-white/50">
                   {currentStep === 1
                     ? t("dashboard.artist.trackCatalog.modal.uploadSubtitle")
-                    : "Đăng ký thông tin quyền tác giả (song_licenses) để bảo vệ bản quyền phát hành"}
+                    : "Đăng ký thông tin bản quyền và giấy phép phát hành"}
                 </p>
               </div>
             </div>
@@ -653,7 +653,7 @@ export function TrackUploadModal({
               >
                 2
               </span>
-              <span>2. Bản quyền & Giấy phép (song_licenses)</span>
+              <span>2. Bản quyền & Giấy phép</span>
             </button>
           </div>
         </div>
@@ -1032,10 +1032,10 @@ export function TrackUploadModal({
                           </div>
                           <div className="text-center px-2">
                             <p className="text-[13px] font-semibold text-white">
-                              Đang phân tích dữ liệu hợp đồng...
+                              Đang đọc thông tin từ tài liệu...
                             </p>
                             <p className="text-[11px] text-[#ffb488]/80 mt-0.5">
-                              Mô hình AI OCR đang bóc tách các trường bản quyền
+                              Hệ thống đang tự động trích xuất các trường bản quyền
                             </p>
                           </div>
                         </div>
@@ -1065,19 +1065,18 @@ export function TrackUploadModal({
                             Tải lên giấy phép / hợp đồng bản quyền
                           </p>
                           <p className="mt-1 text-[10px] text-white/40">
-                          Bắt buộc có hợp đồng. OCR hỗ trợ PDF, PNG, JPG
+                            Bắt buộc có hợp đồng. Hỗ trợ PDF, PNG, JPG
                           </p>
                         </>
                       )}
                     </div>
                   </div>
 
-                  {/* Thông báo kết quả AI OCR */}
                   {ocrNotification && (
                     <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-[12px] text-emerald-200 animate-in fade-in space-y-1.5">
                       <div className="flex items-center gap-2 font-medium text-emerald-300">
                         <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
-                        <span>Tự động điền dữ liệu thành công!</span>
+                        <span>Đã tự động điền thông tin từ tài liệu</span>
                       </div>
                       <p className="text-[11px] text-white/70 leading-relaxed">
                         {ocrNotification} Bạn có thể kiểm tra và chỉnh sửa lại các thông tin ở khung bên phải nếu cần.
@@ -1090,7 +1089,7 @@ export function TrackUploadModal({
                           className="mt-1 text-[11px] text-[#ffb488] hover:text-[#ff9e64] underline flex items-center gap-1 font-medium transition"
                         >
                           <Sparkles className="h-3 w-3" />
-                          <span>Quét lại tài liệu bằng OCR</span>
+                          <span>Đọc lại tài liệu</span>
                         </button>
                       )}
                     </div>
@@ -1105,7 +1104,7 @@ export function TrackUploadModal({
                         className="text-[11px] text-[#ffb488] hover:text-white flex items-center gap-1 transition"
                       >
                         <Sparkles className="h-3 w-3 text-[#ff7a2c]" />
-                        <span>Bóc tách lại bằng AI</span>
+                        <span>Đọc lại thông tin từ tài liệu</span>
                       </button>
                     </div>
                   )}
@@ -1117,8 +1116,8 @@ export function TrackUploadModal({
                   {/* License Type Input with Datalist Suggestions */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
-                        Loại bản quyền / Giấy phép (<span className="text-[#ffb488] font-mono">license_type</span>) <span className="text-[#ff7a2c]">*</span>
+                      <label className="block text-[11px] font-semibold tracking-[0.04em] text-white/60">
+                        Loại bản quyền / Giấy phép <span className="text-[#ff7a2c]">*</span>
                       </label>
                     </div>
                     <div className="relative">
@@ -1146,15 +1145,15 @@ export function TrackUploadModal({
                       Chi phí khai báo trong tài liệu (VND)
                     </label>
                     <input type="number" min="0" step="1" value={acquisitionCostVnd} onChange={(e) => setAcquisitionCostVnd(e.target.value)}
-                      placeholder="OCR sẽ tự điền nếu tài liệu ghi rõ chi phí"
+                      placeholder="Tự điền nếu tài liệu ghi rõ chi phí"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50" />
                     <p className="mt-1 text-[11px] text-white/45">
                       {costEvidence || "Để trống nếu tài liệu không ghi rõ chi phí. Số tiền khai báo chỉ được ghi nhận là chi phí thực tế sau khi xác minh hồ sơ quyền thật."}
                     </p>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                      Chủ sở hữu quyền tác giả (<span className="text-[#ffb488] font-mono">copyright_owner</span>) <span className="text-[#ff7a2c]">*</span>
+                    <label className="block text-[11px] font-semibold tracking-[0.04em] text-white/60 mb-1.5">
+                      Chủ sở hữu quyền tác giả <span className="text-[#ff7a2c]">*</span>
                     </label>
                     <input
                       type="text"
@@ -1170,8 +1169,8 @@ export function TrackUploadModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Distributor */}
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                        Đơn vị phân phối (<span className="text-[#ffb488] font-mono">distributor_id</span>)
+                      <label className="block text-[11px] font-semibold tracking-[0.04em] text-white/60 mb-1.5">
+                        Đơn vị phân phối
                       </label>
                       <div className="relative">
                         <select
@@ -1207,8 +1206,8 @@ export function TrackUploadModal({
 
                     {/* Distribution Contract ID */}
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                        Mã hợp đồng trong tài liệu (<span className="text-[#ffb488] font-mono">contract_code</span>)
+                      <label className="block text-[11px] font-semibold tracking-[0.04em] text-white/60 mb-1.5">
+                        Mã hợp đồng
                       </label>
                       <input
                         type="text"
@@ -1224,8 +1223,8 @@ export function TrackUploadModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Issue Date */}
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                        Ngày cấp / Bắt đầu (<span className="text-[#ffb488] font-mono">issue_date</span>)
+                      <label className="block text-[11px] font-semibold tracking-[0.04em] text-white/60 mb-1.5">
+                        Ngày cấp / Bắt đầu
                       </label>
                       <input
                         type="date"
@@ -1239,8 +1238,8 @@ export function TrackUploadModal({
                     {/* Expiry Date */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
-                          Ngày hết hạn (<span className="text-[#ffb488] font-mono">expiry_date</span>)
+                        <label className="block text-[11px] font-semibold tracking-[0.04em] text-white/60">
+                          Ngày hết hạn
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-white/70 select-none">
                           <input

@@ -215,21 +215,14 @@ export default function TrackShareClient({
               {/* Center Spindle Hole */}
               <div className="w-4 h-4 rounded-full bg-slate-950 border-2 border-white/80 absolute z-20 shadow-md" />
             </div>
-
-            {/* Floating Live Badge */}
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 border border-white/15 backdrop-blur-md flex items-center gap-2 shadow-lg text-[11px] font-medium text-slate-300">
-              <span className={`w-2 h-2 rounded-full ${isPlaying ? "bg-cyan-400 animate-ping" : "bg-slate-500"}`} />
-              <span>{isPlaying ? "Đang phát thử" : "Bản thu âm chất lượng cao"}</span>
-            </div>
           </div>
 
           {/* Right Column: Track Details, Audio Player, Actions */}
           <div className="flex-1 w-full flex flex-col justify-between text-center md:text-left">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold mb-3">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>BÀI HÁT ĐƯỢC CHIA SẺ TRÊN MOODIFY</span>
-              </div>
+              <p className="text-xs font-medium text-cyan-300/90 mb-2">
+                Bài hát được chia sẻ
+              </p>
 
               <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
                 {track.name}

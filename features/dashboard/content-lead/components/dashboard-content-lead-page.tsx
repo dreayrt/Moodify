@@ -282,7 +282,7 @@ function StudioFooter() {
     <footer className="mt-8 flex flex-col items-center justify-between gap-4 rounded-[22px] border border-white/6 bg-white/[0.02] px-5 py-4 text-[12px] text-white/40 sm:flex-row">
       <div className="flex flex-wrap items-center gap-2.5">
         <LogoMark className="h-5 w-5" />
-        <span className="font-medium text-white/70">Moodify Content Lead Studio</span>
+        <span className="font-medium text-white/70">Moodify · Quản lý nội dung</span>
       </div>
       <p className="text-[11px] text-white/35">
         © 2026 Moodify Platform. Mọi quyền được bảo lưu.
@@ -532,7 +532,7 @@ export default function ContentLeadDashboardPage() {
       );
     } catch (err) {
       addToast(
-        err instanceof Error ? err.message : "Không thể lưu thay đổi bài hát xuống database",
+        err instanceof Error ? err.message : "Không thể lưu thay đổi bài hát",
         "error"
       );
     }
@@ -560,7 +560,7 @@ export default function ContentLeadDashboardPage() {
       );
     } catch (err) {
       addToast(
-        err instanceof Error ? err.message : "Không thể xóa bài hát khỏi database",
+        err instanceof Error ? err.message : "Không thể xóa bài hát",
         "error"
       );
     } finally {
