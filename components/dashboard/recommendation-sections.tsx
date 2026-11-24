@@ -425,6 +425,7 @@ export default function RecommendationSections() {
   const [home, setHome] = useState<RecommendationHome | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [guest, setGuest] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [lastHidden, setLastHidden] = useState<{
@@ -448,9 +449,13 @@ export default function RecommendationSections() {
     async (genre?: string, signal?: AbortSignal) => {
       try {
         const result = await fetchRecommendationHome(genre || activeGenre, signal);
-        if (!signal?.aborted) setHome(result);
+        if (!signal?.aborted) {
+          setHome(result);
+          setGuest(false);
+        }
       } catch (failure) {
         if (!signal?.aborted) {
+          setGuest(failure instanceof RecommendationError && failure.status === 401);
           setError(failure instanceof Error ? failure.message : "Chưa thể tải gợi ý.");
         }
       } finally {
@@ -498,11 +503,13 @@ export default function RecommendationSections() {
       .then((result) => {
         if (!controller.signal.aborted) {
           setHome(result);
+          setGuest(false);
           setLoading(false);
         }
       })
       .catch((failure) => {
         if (!controller.signal.aborted) {
+          setGuest(failure instanceof RecommendationError && failure.status === 401);
           setError(failure instanceof Error ? failure.message : "Chưa thể tải gợi ý.");
           setLoading(false);
         }
@@ -589,8 +596,42 @@ export default function RecommendationSections() {
 
   return (
     <div className="flex flex-col gap-10" aria-label="Gợi ý cá nhân">
+      {/* Guest: invite to sign in instead of showing an error */}
+      {guest && (
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-purple-950/70 via-slate-900/80 to-[#080a10] p-6 md:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-purple-500/20 blur-3xl" />
+          <div className="relative flex flex-wrap items-center justify-between gap-5">
+            <div className="flex items-start gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-purple-500/15 text-purple-300">
+                <Sparkles size={22} />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-bold text-white md:text-xl">Gu nghe của riêng bạn</h2>
+                <p className="mt-1 max-w-xl text-sm text-white/55">
+                  Đăng nhập để Moodify gợi ý bản phối hằng ngày, nhạc khám phá và playlist theo đúng gu của bạn.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "login" } }))}
+                className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition hover:bg-white/90 cursor-pointer"
+              >
+                Đăng nhập
+              </button>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("moodify-open-auth", { detail: { mode: "register" } }))}
+                className="rounded-full border border-white/15 bg-white/[0.05] px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 cursor-pointer"
+              >
+                Đăng ký
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Vibe / Mood Quick Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
+      {!guest && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
         <div className="flex items-center gap-2">
           <SlidersHorizontal size={15} className="text-purple-400" />
           <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Gu nghe hôm nay</span>
@@ -613,10 +654,10 @@ export default function RecommendationSections() {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Error state */}
-      {error && (
+      {error && !guest && (
         <div
           role="status"
           className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-500/20 bg-red-950/20 p-4 text-sm text-red-200 backdrop-blur-md"
