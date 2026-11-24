@@ -602,9 +602,6 @@ export default function RecommendationSections() {
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-purple-500/20 blur-3xl" />
           <div className="relative flex flex-wrap items-center justify-between gap-5">
             <div className="flex items-start gap-4">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-purple-500/15 text-purple-300">
-                <Sparkles size={22} />
-              </div>
               <div>
                 <h2 className="font-display text-lg font-bold text-white md:text-xl">Gu nghe của riêng bạn</h2>
                 <p className="mt-1 max-w-xl text-sm text-white/55">
