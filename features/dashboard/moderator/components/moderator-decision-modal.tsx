@@ -195,7 +195,7 @@ export function ModeratorDecisionModal({
                 Bài hát sẽ được phát hành trên Moodify và gửi thông báo tới nghệ sĩ.
               </div>
 
-              {simulated ? <p className="text-sm text-amber-200">Hồ sơ mô phỏng. Phê duyệt nội dung này chỉ dùng trong chế độ mô phỏng, không xác nhận quyền khai thác thật.</p> : <label className="flex items-start gap-3 text-sm text-white/80">
+              {simulated ? null : <label className="flex items-start gap-3 text-sm text-white/80">
                 <input type="checkbox" checked={rightsVerified} onChange={e=>setRightsVerified(e.target.checked)} required={isApprove} />
                 <span>Tôi đã đối chiếu chủ thể cấp quyền, chữ ký, bản ghi và thời hạn trong tài liệu; đây là hồ sơ quyền thật.</span>
               </label>}
