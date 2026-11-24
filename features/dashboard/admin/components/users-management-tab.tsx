@@ -666,15 +666,6 @@ export function UsersManagementTab({
                                 Mở
                               </button>
                             )}
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenRoleModal(user)}
-                              className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition cursor-pointer"
-                              title="Đổi vai trò"
-                            >
-                              Vai trò
-                            </button>
                           </div>
                         ) : (
                           <span className="text-xs text-purple-400 font-semibold">Tài khoản đang dùng</span>
@@ -862,7 +853,7 @@ export function UsersManagementTab({
 
                   {isInspectingSelf ? (
                     <div className="rounded-xl border border-purple-500/25 bg-purple-500/10 px-3 py-2.5 text-xs text-purple-300 text-center">
-                      Tài khoản quản trị đang đăng nhập (không thể tự khóa, đổi vai trò hoặc đặt lại mật khẩu tạm).
+                      Tài khoản quản trị đang đăng nhập (không thể tự khóa hoặc đặt lại mật khẩu tạm).
                     </div>
                   ) : (
                     <>
@@ -872,14 +863,6 @@ export function UsersManagementTab({
                         className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition cursor-pointer"
                       >
                         <Key className="h-4 w-4" /> Đặt lại mật khẩu tạm
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRoleModal(inspectingUser)}
-                        className="w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 transition cursor-pointer"
-                      >
-                        Đổi vai trò
                       </button>
 
                       {inspectingUser.status !== "BANNED" ? (
