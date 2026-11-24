@@ -39,7 +39,16 @@ type TrackUploadModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onUploadSuccess: (newTrack: ArtistTrack) => void;
+  albumOptions?: string[];
 };
+
+const GENRE_OPTIONS = [
+  "Pop", "Rock", "Hip-Hop / Rap", "R&B", "Ballad", "EDM", "Indie", "Lo-fi",
+  "Jazz", "Classical", "Country", "Acoustic", "V-Pop", "K-Pop", "Khác",
+];
+
+// Stored in the album select for a track that belongs to no album; sent to the API as an empty album name.
+const SINGLE_ALBUM = "__single__";
 
 const GRADIENT_PALETTES = [
   "linear-gradient(135deg, #ff7a2c, #7a5cff)",
@@ -98,6 +107,7 @@ export function TrackUploadModal({
   isOpen,
   onClose,
   onUploadSuccess,
+  albumOptions = [],
 }: TrackUploadModalProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,9 +136,11 @@ export function TrackUploadModal({
 
   // Step 1: Track Metadata matching MongoDB track schema
   const [title, setTitle] = useState("");
-  const [genre, setGenre] = useState("Pop");
+  const [genre, setGenre] = useState("");
   const [featuredArtists, setFeaturedArtists] = useState("");
   const [albumName, setAlbumName] = useState("");
+  const [missing, setMissing] = useState({ genre: false, album: false });
+  const finalAlbumName = albumName === SINGLE_ALBUM ? "" : albumName;
   const [explicit, setExplicit] = useState(false);
   const status: TrackStatus = "draft";
   const [visibility, setVisibility] = useState<TrackVisibility>("public");
@@ -161,7 +173,7 @@ export function TrackUploadModal({
   const [isExtractingOcr, setIsExtractingOcr] = useState<boolean>(false);
   const ocrRequestRef = useRef(0);
   const [ocrExtractedFields, setOcrExtractedFields] = useState<string[]>([]);
-  const [ocrNotification, setOcrNotification] = useState<string | null>(null);
+  const [, setOcrNotification] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   if (!isOpen) return null;
@@ -355,6 +367,18 @@ export function TrackUploadModal({
       setShowAdvanced(true);
       return;
     }
+    const missingNow = { genre: !genre, album: !albumName };
+    setMissing(missingNow);
+    if (missingNow.genre || missingNow.album) {
+      setStepError(
+        missingNow.genre && missingNow.album
+          ? "Vui lòng chọn thể loại và album / đĩa đơn."
+          : missingNow.genre
+          ? "Vui lòng chọn thể loại."
+          : "Vui lòng chọn album hoặc đĩa đơn."
+      );
+      return;
+    }
     if (!title || title.trim() === "") {
       setTitle(selectedFileName ? selectedFileName.replace(/\.[^/.]+$/, "") : "Bản phối mới (New Track)");
     }
@@ -430,9 +454,9 @@ export function TrackUploadModal({
       }
 
       formData.append("title", finalTitle);
-      formData.append("genre", genre.trim() || "Pop");
+      formData.append("genre", genre);
       formData.append("featuredArtists", featuredArtists.trim());
-      formData.append("albumName", albumName.trim());
+      formData.append("albumName", finalAlbumName);
       formData.append("status", status);
       formData.append("visibility", visibility);
       formData.append("explicit", String(explicit));
@@ -480,7 +504,7 @@ export function TrackUploadModal({
         id: savedResponse.id,
         title: savedResponse.title || finalTitle,
         artist: savedResponse.artist || "Quản lý nội dung",
-        genre: savedResponse.genre || genre.trim() || "Pop",
+        genre: savedResponse.genre || genre,
         duration: savedResponse.duration || "0:00",
         status: (savedResponse.status as TrackStatus) || "draft",
         visibility: (savedResponse.visibility as TrackVisibility) || "private",
@@ -489,7 +513,7 @@ export function TrackUploadModal({
         commentsCount: 0,
         coverUrl: savedResponse.coverUrl || coverUrl || undefined,
         audioUrl: savedResponse.audioUrl || undefined,
-        albumName: albumName.trim() || undefined,
+        albumName: finalAlbumName || undefined,
         featuredArtists: featuredArtists.trim() || undefined,
         explicit,
         lyricsPlain: parsedLyrics.lyricsPlain || undefined,
@@ -528,7 +552,8 @@ export function TrackUploadModal({
     setFileSize("");
     setCoverUrl("");
     setTitle("");
-    setGenre("Pop");
+    setGenre("");
+    setMissing({ genre: false, album: false });
     setFeaturedArtists("");
     setAlbumName("");
     setExplicit(false);
@@ -823,17 +848,30 @@ export function TrackUploadModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                        {t("dashboard.artist.trackCatalog.modal.genre")}
+                        {t("dashboard.artist.trackCatalog.modal.genre")}{" "}
+                        <span className="text-[#ff7a2c]">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={genre}
-                        onChange={(e) => setGenre(e.target.value)}
-                        placeholder={t(
-                          "dashboard.artist.trackCatalog.modal.genrePlaceholder"
-                        )}
-                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50 transition"
-                      />
+                      <div className="relative">
+                        <select
+                          value={genre}
+                          onChange={(e) => {
+                            setGenre(e.target.value);
+                            setMissing((m) => ({ ...m, genre: false }));
+                            setStepError(null);
+                          }}
+                          className={`w-full appearance-none rounded-xl border bg-white/[0.04] px-3.5 py-2.5 pr-9 text-[13px] outline-none focus:border-[#ff8b4d]/50 transition ${
+                            missing.genre ? "border-rose-500/60" : "border-white/10"
+                          } ${genre ? "text-white" : "text-white/30"}`}
+                        >
+                          <option value="" className="bg-[#121318]">Chọn thể loại...</option>
+                          {GENRE_OPTIONS.map((option) => (
+                            <option key={option} value={option} className="bg-[#121318] text-white">
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-white/40" />
+                      </div>
                     </div>
 
                     <div>
@@ -855,17 +893,31 @@ export function TrackUploadModal({
                   {/* Album */}
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mb-1.5">
-                      {t("dashboard.artist.trackCatalog.modal.album")}
+                      {t("dashboard.artist.trackCatalog.modal.album")}{" "}
+                      <span className="text-[#ff7a2c]">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={albumName}
-                      onChange={(e) => setAlbumName(e.target.value)}
-                      placeholder={t(
-                        "dashboard.artist.trackCatalog.modal.albumPlaceholder"
-                      )}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#ff8b4d]/50 transition"
-                    />
+                    <div className="relative">
+                      <select
+                        value={albumName}
+                        onChange={(e) => {
+                          setAlbumName(e.target.value);
+                          setMissing((m) => ({ ...m, album: false }));
+                          setStepError(null);
+                        }}
+                        className={`w-full appearance-none rounded-xl border bg-white/[0.04] px-3.5 py-2.5 pr-9 text-[13px] outline-none focus:border-[#ff8b4d]/50 transition ${
+                          missing.album ? "border-rose-500/60" : "border-white/10"
+                        } ${albumName ? "text-white" : "text-white/30"}`}
+                      >
+                        <option value="" className="bg-[#121318]">Chọn album / đĩa đơn...</option>
+                        <option value={SINGLE_ALBUM} className="bg-[#121318] text-white">Đĩa đơn (không thuộc album)</option>
+                        {albumOptions.map((name) => (
+                          <option key={name} value={name} className="bg-[#121318] text-white">
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-white/40" />
+                    </div>
                   </div>
 
                   {/* Visibility (Full Width for all 3 buttons) */}
@@ -1072,30 +1124,7 @@ export function TrackUploadModal({
                     </div>
                   </div>
 
-                  {ocrNotification && (
-                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-[12px] text-emerald-200 animate-in fade-in space-y-1.5">
-                      <div className="flex items-center gap-2 font-medium text-emerald-300">
-                        <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
-                        <span>Đã tự động điền thông tin từ tài liệu</span>
-                      </div>
-                      <p className="text-[11px] text-white/70 leading-relaxed">
-                        {ocrNotification} Bạn có thể kiểm tra và chỉnh sửa lại các thông tin ở khung bên phải nếu cần.
-                      </p>
-                      {licenseDocFile && (
-                        <button
-                          type="button"
-                          disabled={isExtractingOcr}
-                          onClick={() => licenseDocFile && runOcrExtraction(licenseDocFile)}
-                          className="mt-1 text-[11px] text-[#ffb488] hover:text-[#ff9e64] underline flex items-center gap-1 font-medium transition"
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          <span>Đọc lại tài liệu</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {!ocrNotification && !isExtractingOcr && licenseDocFile && (
+                  {!isExtractingOcr && licenseDocFile && (
                     <div className="flex items-center justify-between px-1">
                       <span className="text-[11px] text-white/40">Tài liệu đã đính kèm</span>
                       <button

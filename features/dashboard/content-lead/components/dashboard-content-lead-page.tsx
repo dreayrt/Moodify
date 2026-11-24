@@ -305,6 +305,7 @@ export default function ContentLeadDashboardPage() {
 
   // Tracks State & Modals
   const [tracks, setTracks] = useState<ArtistTrack[]>([]);
+  const [albumNames, setAlbumNames] = useState<string[]>([]);
   const [editingTrack, setEditingTrack] = useState<ArtistTrack | null>(null);
   const [deletingTrack, setDeletingTrack] = useState<ArtistTrack | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -713,6 +714,7 @@ export default function ContentLeadDashboardPage() {
             return;
           }
           setArtistProfile(catalog.artist);
+          setAlbumNames(catalog.albums?.map((album) => album.name).filter(Boolean) ?? []);
           setTracks(catalog.tracks.map(mapCatalogTrack));
           setCatalogState("ready");
         } catch (catalogErr) {
@@ -891,6 +893,7 @@ export default function ContentLeadDashboardPage() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={handleUploadSuccess}
+        albumOptions={albumNames}
       />
 
       <ToastNotification toasts={toasts} onDismiss={dismissToast} />
