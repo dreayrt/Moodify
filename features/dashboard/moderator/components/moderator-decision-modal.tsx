@@ -197,27 +197,6 @@ export function ModeratorDecisionModal({
                 thống.
               </div>
 
-              {/* Explicit Content Toggle */}
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] p-3.5">
-                <div>
-                  <p className="text-[13px] font-medium text-white">
-                    Gán nhãn Explicit Content (18+)
-                  </p>
-                  <p className="text-[11px] text-white/50">
-                    Bật nhãn này nếu bài hát có ca từ nhạy cảm hoặc chủ đề người lớn.
-                  </p>
-                </div>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={assignExplicit}
-                    onChange={(e) => setAssignExplicit(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="peer h-6 w-11 rounded-full bg-white/20 after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[#ff7a2c] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                </label>
-              </div>
-
               {simulated ? <p className="text-sm text-amber-200">Hồ sơ mô phỏng. Phê duyệt nội dung này chỉ dùng trong chế độ mô phỏng, không xác nhận quyền khai thác thật.</p> : <label className="flex items-start gap-3 text-sm text-white/80">
                 <input type="checkbox" checked={rightsVerified} onChange={e=>setRightsVerified(e.target.checked)} required={isApprove} />
                 <span>Tôi đã đối chiếu chủ thể cấp quyền, chữ ký, bản ghi và thời hạn trong tài liệu; đây là hồ sơ quyền thật.</span>

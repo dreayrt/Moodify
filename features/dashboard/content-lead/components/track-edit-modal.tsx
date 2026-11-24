@@ -30,7 +30,7 @@ function TrackEditForm({
   const [genre, setGenre] = useState(track.genre || "Pop");
   const [featuredArtists, setFeaturedArtists] = useState(track.featuredArtists || "");
   const [albumName, setAlbumName] = useState(track.albumName || "");
-  const [explicit, setExplicit] = useState(track.explicit || false);
+  const [explicit] = useState(track.explicit || false);
   const [status, setStatus] = useState<TrackStatus>(track.status);
   const [visibility, setVisibility] = useState<TrackVisibility>(track.visibility);
   const [description, setDescription] = useState(track.description || "");
@@ -198,26 +198,6 @@ function TrackEditForm({
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Explicit 18+ Checkbox */}
-            <div>
-              <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-white/8 bg-white/[0.02] p-2 hover:border-white/15 transition">
-                <input
-                  type="checkbox"
-                  checked={explicit}
-                  onChange={(e) => setExplicit(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-white/20 bg-white/10 text-[#ff7a2c] focus:ring-0 accent-[#ff7a2c]"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="inline-grid h-3.5 w-3.5 place-items-center rounded bg-white/15 text-[8px] font-bold text-white">
-                    E
-                  </span>
-                  <span className="text-[11px] font-medium text-white/90">
-                    {t("dashboard.artist.trackCatalog.modal.explicit")}
-                  </span>
-                </div>
-              </label>
             </div>
           </div>
 

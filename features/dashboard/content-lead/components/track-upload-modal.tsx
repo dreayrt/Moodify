@@ -896,31 +896,6 @@ export function TrackUploadModal({
                     </div>
                   </div>
 
-                  {/* Explicit 18+ Row */}
-                  <div>
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-white/8 bg-white/[0.02] p-2 hover:border-white/15 transition">
-                      <input
-                        type="checkbox"
-                        checked={explicit}
-                        onChange={(e) => setExplicit(e.target.checked)}
-                        className="h-4 w-4 rounded border-white/20 bg-white/10 text-[#ff7a2c] focus:ring-0 accent-[#ff7a2c]"
-                      />
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="inline-grid h-3.5 w-3.5 place-items-center rounded bg-white/15 text-[8px] font-bold text-white">
-                            E
-                          </span>
-                          <span className="text-[11px] font-medium text-white/90">
-                            {t("dashboard.artist.trackCatalog.modal.explicit")}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-white/40">
-                          ({t("dashboard.artist.trackCatalog.modal.explicitDesc")})
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-
                   {/* Collapsible Lyrics & Description (Advanced) */}
                   <div className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
                     <button
